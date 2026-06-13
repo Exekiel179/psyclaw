@@ -267,13 +267,16 @@ def test_score_datafile_phq9_ethics_warning(tmp_path):
 
 
 def test_score_datafile_phq9_no_warning_item9_zero(tmp_path):
-    """PHQ-9 条目 9 全零时不触发伦理警告。"""
+    """PHQ-9 条目 9 全零 → 无数据感知计数告警，但 notes 伦理警告仍存在（D-3 行为）。"""
     rows = [{"Q" + str(i): ("0" if i == 9 else "1") for i in range(1, 10)} for _ in range(5)]
     f = tmp_path / "phq9z.csv"
     _make_csv(rows, f)
 
     result = score_datafile(str(f), "phq-9", prefix="Q", suffix="")
-    assert not any("自伤" in w for w in result["warnings"])
+    # D-3: PHQ-9 notes 包含"自伤意念"，notes-based 伦理警告始终触发（不依赖数据）
+    assert any("自伤" in w for w in result["warnings"])
+    # 数据感知告警（"在 N 名被试中有作答"）应不存在——条目 9 全零
+    assert not any("名被试中有作答" in w for w in result["warnings"])
 
 
 def test_score_datafile_dass42_warning(tmp_path):

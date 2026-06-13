@@ -289,14 +289,13 @@ def score_datafile(path: str, scale_id: str,
         warnings.append(
             f"CSV 中缺失条目列: {missing_items_global}（期望列名格式: {prefix}N{suffix}）")
 
-    # PHQ-9 条目 9 伦理警告
-    if scale_id.lower() == "phq-9" and 9 in found_cols:
-        n_endorse = sum(1 for p in participants
-                        if p["items"].get(9, 0) >= 1)
-        if n_endorse > 0:
-            warnings.append(
-                f"⚠ PHQ-9 条目 9（自伤意念）在 {n_endorse} 名被试中有应答（≥ 1）。"
-                "请确认 IRB 批准并建立危机转介流程；不得直接向被试报告个人评分。")
+    # D-3: 通用伦理检查（notes 关键词 + 条目级数据感知）
+    from psyclaw.psych.ethics import check_scale_ethics, check_item_level_ethics
+    ethics_notes_warns = check_scale_ethics(scale)
+    ethics_item_warns = check_item_level_ethics(participants, scale)
+    warnings.extend(ethics_notes_warns)
+    warnings.extend(ethics_item_warns)
+    ethics_prompted = bool(ethics_notes_warns or ethics_item_warns)
 
     # DASS-42 1-4 vs 0-3 歧义提示
     if scale_id.lower() == "dass-42":
@@ -320,6 +319,7 @@ def score_datafile(path: str, scale_id: str,
         "reverse_applied": reverse_applied,
         "warnings": warnings,
         "method": method,
+        "ethics_prompted": ethics_prompted,
     }
 
 

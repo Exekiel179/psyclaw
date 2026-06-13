@@ -44,7 +44,7 @@
 |---|------|------|----------|
 | ✅ D-1 | 功效分析预设 | 对标 G*Power：t / ANOVA / 相关回归 / 中介（Monte Carlo）/ SEM（MacCallum RMSEA）；先验默认 r≈.20 / d≈.40，提示发表偏倚高估 | **已落地** `psyclaw/psych/power.py`：纯 stdlib 非中心 t（积分）/F/χ²（Poisson 级数）核 + 六类检验功效与样本量反解（双向）；`psyclaw power <ttest\|anova\|r\|regression\|sem\|mediation> [-n N \| --power .80] [--json]`，保守先验默认 + 发表偏倚告警。无 scipy 环境下用闭式自检 + G*Power/Cohen 锚点 + 双路径互证验证。测试 `tests/test_power.py`（31 例） | `DESIGN.power` |
 | ✅ D-2 | 预注册模板 | `/preregister` 生成 OSF / AsPredicted 双格式，自动抽取假设（确证/探索）、IV/DV/协变量、剔除规则、样本量依据、分析计划 | **已落地** `psyclaw/psych/preregister.py`：读 `notes/clarification.md`（17 槽位）→ OSF 6 节标准模板 + AsPredicted 标准 8 问双文稿（`notes/preregistration_{osf,aspredicted}.md`）。假设按确证/探索自动归类，未标注 **fail-closed 按探索性**并告警（防 HARKing）；关键槽位缺失渲染 `[待补充]` 占位+告警，不替用户编造；`--test` 复用 D-1 `power.compute` 嵌入确定性样本量依据（保留发表偏倚告警）。`psyclaw preregister [--osf\|--aspredicted] [--test … 功效参数]`（REPL `/preregister`）。测试 `tests/test_preregister.py`（21 例） |
-| D-3 | 伦理提示 | 敏感测量（如 PHQ-9 条目 9 自伤意念）触发 IRB / 危机转介提示，量表库 `notes` 为触发源 | 新增软门禁 |
+| ✅ D-3 | 伦理提示 | 敏感测量（如 PHQ-9 条目 9 自伤意念）触发 IRB / 危机转介提示，量表库 `notes` 为触发源 | **已落地** `psyclaw/psych/ethics.py`：`check_scale_ethics`(notes 关键词检测)、`check_item_level_ethics`(数据感知，PHQ-9 条目 9 计数)、`ethics_summary`/`format_ethics_report`；`score_datafile` 集成（替换硬编码 PHQ-9 检查，通用化到 notes 驱动）；`MEASURE.ethics` 软门禁（warn, `scale_score_used`, `ethics_reviewed` 自动校验）入 `rules.yaml`+`checker.py`；新命令 `psyclaw ethics <id>`。测试 `tests/test_ethics.py`（32 例），门禁升至 16 条。 |
 
 ### 3. 分析层
 
