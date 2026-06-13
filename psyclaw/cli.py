@@ -281,6 +281,18 @@ def cmd_loop(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_research(args: argparse.Namespace) -> int:
+    from psyclaw.pipeline import run_pipeline
+    try:
+        return run_pipeline(topic=getattr(args, "topic", None),
+                            auto=getattr(args, "auto", False),
+                            revise=getattr(args, "revise", False),
+                            rounds=getattr(args, "rounds", 3))
+    except KeyboardInterrupt:
+        print("\n流水线已中断。已落盘的产物保留在 notes/ outputs/。")
+        return 0
+
+
 def cmd_review(args: argparse.Namespace) -> int:
     from psyclaw.review import run_review
     try:
@@ -403,12 +415,22 @@ def build_parser() -> argparse.ArgumentParser:
     ptk.add_argument("args", nargs="*", help="子命令与参数,留空 list")
     ptk.set_defaults(func=cmd_tasks)
 
-    # research / research-loop → 真实 HITL 回路
-    for nm in ("research", "research-loop"):
-        pl = sub.add_parser(nm, help="HITL 研究回路:planner→执行→critic→修复→交付")
-        pl.add_argument("topic", nargs="?", default=None, help="研究主题(可空,读 notes/goal.md)")
-        pl.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
-        pl.set_defaults(func=cmd_loop)
+    # research → 一句话端到端流水线(文献→设计→统计→写作→评审→门禁)
+    prs = sub.add_parser("research",
+                         help="一句话端到端流水线:文献→设计→统计→写作→评审→门禁")
+    prs.add_argument("topic", nargs="?", default=None, help="研究主题(可空,读 notes/goal.md)")
+    prs.add_argument("--revise", "-r", action="store_true",
+                     help="评审阶段闭合写作→评审→修复(把 BLOCKING/MAJOR 回灌修订)")
+    prs.add_argument("--rounds", type=int, default=3, help="评审修订最大轮次(默认 3)")
+    prs.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
+    prs.set_defaults(func=cmd_research)
+
+    # research-loop → 通用 HITL 回路(planner→执行→critic→修复→交付)
+    prl = sub.add_parser("research-loop",
+                         help="通用 HITL 回路:planner→执行→critic→修复→交付")
+    prl.add_argument("topic", nargs="?", default=None, help="研究主题(可空,读 notes/goal.md)")
+    prl.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
+    prl.set_defaults(func=cmd_loop)
 
     prv = sub.add_parser("review", help="审稿模拟(EIC+3审稿人+Devil's Advocate,产可解析意见)")
     prv.add_argument("draft", nargs="?", default=None,

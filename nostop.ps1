@@ -16,8 +16,9 @@
 #   "skip"        = --dangerously-skip-permissions。永不挂起，但【绕过】settings.json
 #                   所有防护。仅在容器/VM 里用，不要在真实机器上长期裸跑。
 $Mode      = "acceptEdits"
-$Model     = "sonnet"     # 过夜推荐 sonnet(便宜~1.7x)；复杂推理可 "opus"
-$MaxTurns  = 50           # 单轮上限，防止一轮失控；循环本身不受此限
+$Model     = "claude-opus-4-8"  # 主模型 Opus 4.8(质量最高)。省钱可换 "sonnet"(~1.7x 便宜)
+$Fallback  = "sonnet"           # Opus 过载/限流时自动降级，避免整轮失败；置 "" 关闭
+$MaxTurns  = 80           # 单轮上限(Opus 可做得更深)；防止一轮失控，循环本身不受此限
 $MaxFails  = 5            # 连续失败这么多次 ≈ 额度耗尽，自动退出
 $Cooldown  = 30           # 失败后退避秒数(指数退避，封顶 300s)
 # ─────────────────────────────────────────────────────────────
@@ -41,7 +42,8 @@ $iter = 0; $fails = 0
 while ($true) {
     $iter++
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $log   = ".\logs\$stamp.jsonl"
+    $ext   = if ($haveFmt) { "jsonl" } else { "log" }
+    $log   = ".\logs\$stamp.$ext"
     Write-Host "═══════════════════════════════════════════════════════"
     Write-Host ("  nostop · 第 {0} 轮 · {1} · 模式={2} 模型={3} · 失败 {4}/{5}" -f `
         $iter, (Get-Date -Format "HH:mm:ss"), $Mode, $Model, $fails, $MaxFails)
@@ -50,13 +52,15 @@ while ($true) {
     $args = $permArgs + @(
         "-p", $prompt,
         "--model", $Model,
-        "--max-turns", "$MaxTurns",
-        "--output-format", "stream-json", "--verbose"
+        "--max-turns", "$MaxTurns"
     )
+    if ($Fallback -ne "") { $args += @("--fallback-model", $Fallback) }
 
     if ($haveFmt) {
-        claude @args 2>&1 | Tee-Object -FilePath $log | format-claude-stream
+        # 装了 formatter：stream-json 美化输出，原始 JSON 落 .jsonl
+        claude @args --output-format stream-json --verbose 2>&1 | Tee-Object -FilePath $log | format-claude-stream
     } else {
+        # 没装 formatter：默认文本输出，屏幕直接可读，同时落 .log
         claude @args 2>&1 | Tee-Object -FilePath $log
     }
     $rc = $LASTEXITCODE
