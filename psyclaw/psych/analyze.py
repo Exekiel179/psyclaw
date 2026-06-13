@@ -272,7 +272,7 @@ def _repro_body(kind: str, dv: str, second: str) -> str:
 
 def analyze(path: str, dv: str, group: str | None = None,
             with_var: str | None = None, paired_with: str | None = None,
-            project_dir: str = ".") -> int:
+            project_dir: str = ".", cluster: str | None = None) -> int:
     from psyclaw import ui
     fp = Path(path)
     if not fp.exists():
@@ -321,6 +321,31 @@ def analyze(path: str, dv: str, group: str | None = None,
     meta["engine"] = "pingouin" if use_pg else "stdlib"
     print(ui.dim("引擎:pingouin(功效+BF 一次出全)" if use_pg
                  else "引擎:内置 stdlib(对照 scipy;装 pingouin 得功效+BF)"))
+
+    # —— A-1 特判:Likert 单题检测 ——
+    from psyclaw.psych.decision_tree import (
+        detect_likert, large_sample_effect_language, compute_icc)
+    dv_vals = _numcol(rows, dv)
+    if dv_vals:
+        lik = detect_likert(dv_vals)
+        if lik.get("is_likert"):
+            print(ui.warn(f"\n⚠ Likert 单题: {dv} — {lik['recommendation']}"))
+            meta["likert_detected"] = lik
+
+    # —— A-1 特判:嵌套数据 ICC ——
+    if cluster:
+        icc_res = compute_icc(rows, dv, cluster)
+        meta["icc"] = icc_res
+        print(ui.accent(f"\n嵌套数据 ICC(1) — cluster: {cluster}"))
+        if "error" not in icc_res:
+            print(f"  ICC(1) = {icc_res['icc']:.4f}  ({icc_res['interpretation']})")
+            print(f"  k = {icc_res['k_clusters']} clusters, N = {icc_res['N']}")
+            if icc_res["icc"] >= 0.05:
+                print(ui.warn(
+                    "  ⚠ ICC ≥ .05:建议改用多层线性模型(MLM/lme4)处理非独立性;"
+                    "忽视聚类会使 SE 偏小、I 类错误膨胀。"))
+        else:
+            print(ui.warn(f"  ICC 计算失败:{icc_res.get('error')}"))
 
     # —— 决策树 ——
     if with_var:  # 相关
@@ -493,6 +518,27 @@ def analyze(path: str, dv: str, group: str | None = None,
         return 1
 
     meta["test"] = kind
+
+    # —— A-1 特判:大样本效应量语言 ——
+    es = meta.get("effect_size", {})
+    stat = meta.get("statistics", {})
+    if es and "value" in es and "p" in stat:
+        n_for_ls = (
+            stat.get("n") or                          # 相关
+            (res.get("n") if "n" in dir(res) else None) or   # 配对
+            len(rows)                                 # fallback
+        )
+        ls = large_sample_effect_language(
+            int(n_for_ls or len(rows)),
+            es.get("name", ""),
+            float(es.get("value", float("nan"))),
+            float(stat.get("p", 1.0)),
+        )
+        if ls["message"]:
+            print(ui.warn(f"\n{ls['message']}"))
+            meta["large_sample_warning"] = ls
+            if ls["trivial"]:
+                apa = apa + f"\n{ls['message']}"
 
     # —— 输出 APA7 段 ——
     print(ui.accent("\n④ APA7 结果段"))

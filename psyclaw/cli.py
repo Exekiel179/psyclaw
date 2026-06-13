@@ -272,7 +272,34 @@ def cmd_stat(args: argparse.Namespace) -> int:
         return analyze_advanced(args.file, args.method, **{k: v for k, v in kw.items() if v})
     from psyclaw.psych.analyze import analyze
     return analyze(args.file, args.dv, getattr(args, "group", None),
-                   getattr(args, "with_var", None), getattr(args, "paired", None))
+                   getattr(args, "with_var", None), getattr(args, "paired", None),
+                   cluster=getattr(args, "cluster", None))
+
+
+def cmd_mediation(args: argparse.Namespace) -> int:
+    from psyclaw.psych.decision_tree import analyze_mediation_cli
+    argv = [args.file]
+    if args.x:
+        argv += ["--x", args.x]
+    if args.m:
+        argv += ["--m", args.m]
+    if args.y:
+        argv += ["--y", args.y]
+    if args.nboot != 5000:
+        argv += ["--nboot", str(args.nboot)]
+    return analyze_mediation_cli(argv)
+
+
+def cmd_moderation(args: argparse.Namespace) -> int:
+    from psyclaw.psych.decision_tree import analyze_moderation_cli
+    argv = [args.file]
+    if args.x:
+        argv += ["--x", args.x]
+    if args.w:
+        argv += ["--w", args.w]
+    if args.y:
+        argv += ["--y", args.y]
+    return analyze_moderation_cli(argv)
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
@@ -532,12 +559,30 @@ def build_parser() -> argparse.ArgumentParser:
     pstat.add_argument("--group", default=None, help="分组列(两组 t / 多组 ANOVA)")
     pstat.add_argument("--with", dest="with_var", default=None, help="另一连续变量(相关)")
     pstat.add_argument("--paired", default=None, help="配对的另一列(配对 t)")
+    pstat.add_argument("--cluster", default=None, help="聚类/嵌套列(计算 ICC,提示 MLM)")
     pstat.add_argument("--method", default=None,
                        help="高级方法走 R 后端:cfa/sem/mlm/omega/invariance")
     pstat.add_argument("--model", default=None, help="lavaan 模型语法(cfa/sem/invariance)")
     pstat.add_argument("--formula", default=None, help="lme4 公式(mlm)")
     pstat.add_argument("--items", default=None, help="omega 条目列,逗号分隔")
     pstat.set_defaults(func=cmd_stat)
+
+    pmed = sub.add_parser("mediation",
+                          help="中介分析(Preacher & Hayes bootstrap CI 5000,拒 Sobel)")
+    pmed.add_argument("file", help="CSV/TSV 数据文件")
+    pmed.add_argument("--x", required=True, help="自变量(预测变量)列名")
+    pmed.add_argument("--m", required=True, help="中介变量列名")
+    pmed.add_argument("--y", required=True, help="因变量(结果变量)列名")
+    pmed.add_argument("--nboot", type=int, default=5000, help="bootstrap 次数(默认 5000)")
+    pmed.set_defaults(func=cmd_mediation)
+
+    pmod = sub.add_parser("moderation",
+                          help="调节分析(简单斜率 W±1SD + Johnson-Neyman 显著性区间)")
+    pmod.add_argument("file", help="CSV/TSV 数据文件")
+    pmod.add_argument("--x", required=True, help="自变量列名")
+    pmod.add_argument("--w", required=True, help="调节变量列名")
+    pmod.add_argument("--y", required=True, help="因变量列名")
+    pmod.set_defaults(func=cmd_moderation)
 
     pau = sub.add_parser("auth", help="机构权限(EZProxy/LibKey)配置与认证状态自检")
     pau.add_argument("--set", action="store_true", help="配置机构权限(无密码)")
