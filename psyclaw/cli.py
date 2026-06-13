@@ -151,6 +151,17 @@ def cmd_check(args: argparse.Namespace) -> int:
     return check_cli(args.file, args.dv, args.group)
 
 
+def cmd_power(args: argparse.Namespace) -> int:
+    from psyclaw.psych.power import run_power
+    return run_power(
+        args.test, d=args.d, r=args.r, f=args.f, f2=args.f2,
+        a=args.a, b=args.b, cp=args.cp, k=args.k, u=args.u,
+        n=args.n, power=args.power, alpha=args.alpha, tails=args.tails,
+        kind=args.kind, df=args.df, rmsea0=args.rmsea0, rmsea1=args.rmsea1,
+        sims=args.sims, as_json=args.json,
+    )
+
+
 def cmd_clarify(args: argparse.Namespace) -> int:
     from psyclaw.psych.clarify import run_clarify_interactive, print_clarify_status
     if args.status:
@@ -373,6 +384,35 @@ def build_parser() -> argparse.ArgumentParser:
     pck.add_argument("--dv", required=True, help="因变量列名")
     pck.add_argument("--group", default=None, help="分组列名(可选)")
     pck.set_defaults(func=cmd_check)
+
+    pw = sub.add_parser("power",
+                        help="先验功效分析(G*Power 对标:t/ANOVA/相关/回归/SEM/中介)")
+    pw.add_argument("test", choices=["ttest", "anova", "r", "correlation",
+                                     "regression", "sem", "mediation"],
+                    help="检验类型")
+    pw.add_argument("--d", type=float, default=None, help="Cohen's d(t 检验,默认先验 .40)")
+    pw.add_argument("--r", type=float, default=None, help="相关 r(默认先验 .20)")
+    pw.add_argument("--f", type=float, default=None, help="Cohen's f(ANOVA,默认 .25)")
+    pw.add_argument("--f2", type=float, default=None, help="Cohen's f²(回归,默认 .15)")
+    pw.add_argument("--a", type=float, default=None, help="中介 a 路径(默认 .30)")
+    pw.add_argument("--b", type=float, default=None, help="中介 b 路径(默认 .30)")
+    pw.add_argument("--cp", type=float, default=0.0, help="中介直接路径 c′(默认 0)")
+    pw.add_argument("--k", type=int, default=None, help="ANOVA 组数(默认 3)")
+    pw.add_argument("--u", type=int, default=None, help="回归受检预测元数(默认 3)")
+    pw.add_argument("-n", "--n", type=int, default=None, dest="n",
+                    help="样本量(t/ANOVA 为每组,其余为总)→ 求功效")
+    pw.add_argument("--power", type=float, default=None, dest="power",
+                    help="目标功效 → 反解所需 N(与 -n 二选一,默认 .80)")
+    pw.add_argument("--alpha", type=float, default=0.05, help="显著性水平(默认 .05)")
+    pw.add_argument("--tails", type=int, choices=[1, 2], default=2, help="单/双尾(默认 2)")
+    pw.add_argument("--kind", choices=["two-sample", "paired", "one-sample"],
+                    default="two-sample", help="t 检验类型(默认 two-sample)")
+    pw.add_argument("--df", type=int, default=None, help="SEM 模型自由度(默认 30)")
+    pw.add_argument("--rmsea0", type=float, default=0.05, help="SEM H0 RMSEA(默认 .05)")
+    pw.add_argument("--rmsea1", type=float, default=0.08, help="SEM H1 RMSEA(默认 .08)")
+    pw.add_argument("--sims", type=int, default=1000, help="中介 Monte Carlo 模拟次数")
+    pw.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pw.set_defaults(func=cmd_power)
 
     pcl = sub.add_parser("clarify", help="研究澄清(grill-me 式,17 槽位,不澄清完不开工)")
     pcl.add_argument("--status", action="store_true", help="只看澄清进度")
