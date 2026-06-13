@@ -93,8 +93,12 @@ def cmd_mcp(args: argparse.Namespace) -> int:
             from psyclaw.mcp.servers.mne_server import srv
         elif args.name == "spss":
             from psyclaw.mcp.servers.spss_server import srv
+        elif args.name == "mplus":
+            from psyclaw.mcp.servers.mplus_server import srv
+        elif args.name == "stata":
+            from psyclaw.mcp.servers.stata_server import srv
         else:
-            print("可 serve:mne | spss")
+            print("可 serve:mne | spss | mplus | stata")
             return 1
         return srv.run()
     print("MCP 服务器目录（registry.yaml）：")
@@ -104,6 +108,8 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     print("\n内置 MCP 可独立 serve 给任意 MCP 客户端(Claude Desktop 等):")
     print("  psyclaw mcp --serve mne    # EEG/MEG/ERP")
     print("  psyclaw mcp --serve spss   # SPSS 语法生成 + 批处理")
+    print("  psyclaw mcp --serve mplus  # Mplus CFA/SEM/LGM/Mixture 语法生成")
+    print("  psyclaw mcp --serve stata  # Stata do-file 生成(面板/IV/生存等)")
     return 0
 
 
@@ -576,8 +582,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("skills", help="列出已注册 skills").set_defaults(func=cmd_skills)
     pmcp = sub.add_parser("mcp", help="MCP 目录 / 以 stdio 服务器身份运行内置 MCP")
-    pmcp.add_argument("--serve", dest="name", choices=["mne", "spss"], default=None,
-                      help="作为 stdio MCP 服务器运行(mne/spss)")
+    pmcp.add_argument("--serve", dest="name",
+                      choices=["mne", "spss", "mplus", "stata"], default=None,
+                      help="作为 stdio MCP 服务器运行(mne/spss/mplus/stata)")
     pmcp.set_defaults(func=cmd_mcp)
     sub.add_parser("gates", help="跑学术规范门禁自检").set_defaults(func=cmd_gates)
 
