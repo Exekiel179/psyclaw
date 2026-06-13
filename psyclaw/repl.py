@@ -33,6 +33,7 @@ COMMANDS = {
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
     "/audit": "逐轮审计开关(on/off;每轮多一次 LLM 调用)",
     "/clarify": "研究澄清(grill-me 式,不澄清完不开工)",
+    "/preregister": "预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取,可嵌功效分析)",
     "/check": "可运行假设诊断(正态/Levene/经典F+Welch)",
     "/screen": "草率作答筛查(longstring/IRV/直线)",
     "/scale": "量表库(DASS/PHQ-9/GAD-7/TIPI…)",
@@ -237,6 +238,9 @@ class ReplSession:
             else:
                 run_clarify_interactive()
                 self.system = _build_system_prompt()  # 重载(惯性可能已更新)
+        elif cmd in ("/preregister", "/prereg"):
+            from psyclaw.psych.preregister import preregister_cli
+            preregister_cli(arg.split() if arg else [])
         elif cmd == "/cite":
             from psyclaw.psych.knowledge import print_evidence
             print_evidence(arg or None)
@@ -396,6 +400,7 @@ HELP_TEXT = """\
   /check f    可运行假设诊断(/check data.csv --dv 分数 --group 组别)
   /screen f   数据草率作答筛查
   /clarify    研究澄清(grill-me 式;不澄清完 /research 不放行)
+  /preregister 预注册模板(OSF/AsPredicted;据澄清卡抽取,--test 嵌功效分析)
   /cite [t]   方法学背书库(每个设计决策的文献支撑)
   /export f   APA7 输出(Word + Markdown,确定性模板)
   /review f   审稿模拟(EIC+3审稿人+DA;--revise 闭合写作→评审→修复)

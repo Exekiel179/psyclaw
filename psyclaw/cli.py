@@ -162,6 +162,21 @@ def cmd_power(args: argparse.Namespace) -> int:
     )
 
 
+def cmd_preregister(args: argparse.Namespace) -> int:
+    from psyclaw.psych.preregister import run_preregister
+    opts = {}
+    for name in ("d", "r", "f", "f2", "a", "b", "cp", "k", "u", "n",
+                 "alpha", "tails", "kind", "df", "rmsea0", "rmsea1", "sims"):
+        v = getattr(args, name, None)
+        if v is not None:
+            opts[name] = v
+    if getattr(args, "power_target", None) is not None:
+        opts["power"] = args.power_target
+    fmt = "osf" if args.osf else "aspredicted" if args.aspredicted else "both"
+    return run_preregister(fmt=fmt, test=getattr(args, "test", None),
+                           power_opts=opts or None)
+
+
 def cmd_clarify(args: argparse.Namespace) -> int:
     from psyclaw.psych.clarify import run_clarify_interactive, print_clarify_status
     if args.status:
@@ -413,6 +428,36 @@ def build_parser() -> argparse.ArgumentParser:
     pw.add_argument("--sims", type=int, default=1000, help="中介 Monte Carlo 模拟次数")
     pw.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pw.set_defaults(func=cmd_power)
+
+    ppr = sub.add_parser("preregister",
+                         help="预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取,复用功效分析)")
+    ppr.add_argument("--osf", action="store_true", help="只出 OSF 格式")
+    ppr.add_argument("--aspredicted", action="store_true", help="只出 AsPredicted 格式")
+    ppr.add_argument("--both", action="store_true", help="两种格式(默认)")
+    ppr.add_argument("--test", choices=["ttest", "anova", "r", "correlation",
+                                        "regression", "sem", "mediation"],
+                     default=None, help="嵌入 D-1 功效分析的检验类型")
+    ppr.add_argument("--d", type=float, default=None, help="Cohen's d")
+    ppr.add_argument("--r", type=float, default=None, help="相关 r")
+    ppr.add_argument("--f", type=float, default=None, help="Cohen's f(ANOVA)")
+    ppr.add_argument("--f2", type=float, default=None, help="Cohen's f²(回归)")
+    ppr.add_argument("--a", type=float, default=None, help="中介 a 路径")
+    ppr.add_argument("--b", type=float, default=None, help="中介 b 路径")
+    ppr.add_argument("--cp", type=float, default=None, help="中介直接路径 c′")
+    ppr.add_argument("--k", type=int, default=None, help="ANOVA 组数")
+    ppr.add_argument("--u", type=int, default=None, help="回归受检预测元数")
+    ppr.add_argument("-n", "--n", type=int, default=None, dest="n", help="样本量 → 求功效")
+    ppr.add_argument("--power-target", type=float, default=None, dest="power_target",
+                     help="目标功效 → 反解所需 N")
+    ppr.add_argument("--alpha", type=float, default=None, help="显著性水平")
+    ppr.add_argument("--tails", type=int, choices=[1, 2], default=None, help="单/双尾")
+    ppr.add_argument("--kind", choices=["two-sample", "paired", "one-sample"],
+                     default=None, help="t 检验类型")
+    ppr.add_argument("--df", type=int, default=None, help="SEM 模型自由度")
+    ppr.add_argument("--rmsea0", type=float, default=None, help="SEM H0 RMSEA")
+    ppr.add_argument("--rmsea1", type=float, default=None, help="SEM H1 RMSEA")
+    ppr.add_argument("--sims", type=int, default=None, help="中介 Monte Carlo 次数")
+    ppr.set_defaults(func=cmd_preregister)
 
     pcl = sub.add_parser("clarify", help="研究澄清(grill-me 式,17 槽位,不澄清完不开工)")
     pcl.add_argument("--status", action="store_true", help="只看澄清进度")
