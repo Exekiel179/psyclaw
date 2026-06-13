@@ -1,0 +1,131 @@
+{
+  "_comment": "PsyClaw 复杂方法目录。何时用、样本量、软件路径、报告标准、常见坑。",
+  "methods": [
+    {
+      "id": "cfa",
+      "name": "验证性因子分析",
+      "use_when": "已有明确因子结构假设(如 DASS 三因子),检验结构效度",
+      "min_n": "≥200;或 5-10 人/自由参数;序贯:先单组 CFA 再不变性",
+      "software": "R lavaan(cfa)/Mplus;有序条目用 WLSMV",
+      "report": "χ²(df), CFI, TLI, RMSEA[90%CI], SRMR, 标准化载荷, ω 信度",
+      "pitfalls": "拟合不好就加残差相关=过拟合;比较嵌套模型用 Satorra-Bentler 校正 Δχ²"
+    },
+    {
+      "id": "sem",
+      "name": "结构方程模型",
+      "use_when": "多潜变量间结构关系;测量误差校正;中介的潜变量版",
+      "min_n": "比 CFA 更高;MacCallum RMSEA 功效法算精确 N",
+      "software": "R lavaan(sem)/Mplus",
+      "report": "测量模型先行(两步法),结构系数+CI,拟合指数全报,等值模型讨论",
+      "pitfalls": "拟合好≠模型真:存在大量等值模型;横断 SEM 画了箭头也不是因果"
+    },
+    {
+      "id": "bifactor",
+      "name": "双因子模型",
+      "use_when": "检验量表是'一个总分'还是'多个分量表分'更合理(如 DASS 总分 vs 三分)",
+      "min_n": "≥500 较稳(参数多)",
+      "software": "R lavaan/psych(omega);Mplus",
+      "report": "ωH(总因子)、ωHS(特殊因子)、ECV、PUC;ECV>.70 且 ωH>.80 支持总分",
+      "pitfalls": "双因子几乎总拟合更好(参数多),必须看 ωH/ECV 而非只比拟合"
+    },
+    {
+      "id": "invariance",
+      "name": "测量不变性(多组 CFA)",
+      "use_when": "任何跨组均值比较前(性别/文化/年龄/时间点)",
+      "min_n": "每组 ≥150-200",
+      "software": "R lavaan(group.equal 逐步)/Mplus",
+      "report": "configural→metric→scalar 逐级;ΔCFI≤.010 且 ΔRMSEA≤.015 视为不变",
+      "pitfalls": "scalar 不成立硬比均值=比较的可能是测量偏差;退而求其次:部分不变性(放开少数截距并报告)"
+    },
+    {
+      "id": "mlm",
+      "name": "多层模型(HLM/混合效应)",
+      "use_when": "嵌套(学生-班级)、重复测量、日记法/ESM、刺激抽样(被试×刺激交叉随机效应)",
+      "min_n": "L2 单位≥30 估方差较稳;ESM:人≥50,人内观测≥20",
+      "software": "R lme4/nlme(p 值用 lmerTest);贝叶斯 brms",
+      "report": "ICC、中心化策略、随机效应结构与选择依据、固定系数+CI、伪 R²",
+      "pitfalls": "随机斜率该放没放→Type I 膨胀(maximal 结构起步,收敛失败再简化并报告)"
+    },
+    {
+      "id": "irt-grm",
+      "name": "项目反应理论(等级反应模型)",
+      "use_when": "Likert 量表条目质量分析、量表简化(选信息量大的条目)、CAT",
+      "min_n": "GRM ≥500;Rasch 类 ≥250",
+      "software": "R mirt/ltm;Mplus",
+      "report": "区分度 a、阈值 b、条目/测验信息函数、DIF 检测结果",
+      "pitfalls": "先验单维性不查直接跑;DIF 不查就跨组比较(测量公平问题)"
+    },
+    {
+      "id": "lpa",
+      "name": "潜在剖面分析",
+      "use_when": "找'人的类型'而非'变量的维度'(如症状剖面亚组)",
+      "min_n": "≥500 较稳;预期最小类 ≥50 人",
+      "software": "R tidyLPA/mclust;Mplus",
+      "report": "1..k 类全模型拟合表(BIC/aBIC/BLRT/熵)、各类比例与剖面图、三步法外部关联",
+      "pitfalls": "类是统计构造不是自然类别;不同指标组合可产生不同剖面,理论先行"
+    },
+    {
+      "id": "network",
+      "name": "网络分析(高斯图模型)",
+      "use_when": "症状互相影响的系统观;桥症状识别(如共病机制)",
+      "min_n": "数百起步,随节点数增长",
+      "software": "R bootnet+qgraph(EBICglasso)、NetworkComparisonTest 跨组比较",
+      "report": "网络图、边权 bootstrap CI、中心性(强度/桥强度)及 CS 稳定性系数",
+      "pitfalls": "横断网络解释成个体内因果动态;中心性不稳定还排序"
+    },
+    {
+      "id": "clpm",
+      "name": "交叉滞后面板模型(含 RI-CLPM)",
+      "use_when": "纵向互为因果方向探索(X₁→Y₂ vs Y₁→X₂)",
+      "min_n": "≥200,波次≥3 才能上 RI-CLPM",
+      "software": "R lavaan;Mplus",
+      "report": "自回归+交叉滞后系数;传统 CLPM 与 RI-CLPM 结果常不同,优先 RI-CLPM(分离个体间稳定差异)",
+      "pitfalls": "传统 CLPM 把个体间差异混入个体内过程,交叉滞后系数可能完全是假象(Hamaker 2015)"
+    },
+    {
+      "id": "lgcm",
+      "name": "潜变量增长曲线模型",
+      "use_when": "发展轨迹:初始水平与变化速率的个体差异及其预测源",
+      "min_n": "≥200;波次≥3(线性)/≥4(二次)",
+      "software": "R lavaan(growth)/Mplus;与 MLM 增长模型多数情形等价",
+      "report": "截距/斜率均值与方差、协方差、条件模型预测系数、拟合指数",
+      "pitfalls": "测量不变性(纵向)不查直接建增长模型→'变化'可能是量尺漂移"
+    },
+    {
+      "id": "moderation",
+      "name": "调节分析(含潜变量交互)",
+      "use_when": "效应大小依赖第三变量(对谁/何时更有效)",
+      "min_n": "交互效应通常很小(f²≈.01-.02),需 N 数百;功效分析按交互项算",
+      "software": "回归+中心化乘积项;潜变量交互用 lavaan/Mplus LMS",
+      "report": "简单斜率(±1SD)+Johnson-Neyman 显著域,交互图",
+      "pitfalls": "中位数切分连续调节变量(功效损失+伪效应);交互项不中心化导致共线"
+    },
+    {
+      "id": "meta",
+      "name": "元分析",
+      "use_when": "RQ 是'文献整体效应多大、为何异质'",
+      "min_n": "k≥10 个研究做调节分析才稳",
+      "software": "R metafor;PRISMA 流程(对接 LIT.prisma 门禁)",
+      "report": "随机效应模型、I²/τ²、森林图、漏斗图+Egger、敏感性(留一法)、发表偏倚校正(trim-fill/PET-PEESE)",
+      "pitfalls": "把高度异质的研究硬合成一个均值;漏检灰色文献"
+    },
+    {
+      "id": "bayes",
+      "name": "贝叶斯估计与贝叶斯因子",
+      "use_when": "想量化支持 H0 的证据(BF01);小样本+先验信息;复杂模型(brms)",
+      "min_n": "无最低线但先验影响随 N 减小;必做先验敏感性",
+      "software": "R brms/rstanarm;JASP(教学友好);BayesFactor",
+      "report": "先验设定与依据、BF 或后验分布+95% 可信区间、敏感性分析",
+      "pitfalls": "默认先验当万能;BF>3 才算'中等证据',1-3 别过度解读"
+    },
+    {
+      "id": "equivalence",
+      "name": "等价检验(TOST)",
+      "use_when": "想证明'没有有意义的差异'(p>.05 不是无效应的证据!)",
+      "min_n": "由等价边界(SESOI)决定,通常比常规检验更大",
+      "software": "R TOSTER",
+      "report": "SESOI 设定依据、两个单侧检验 p、90% CI 落在边界内",
+      "pitfalls": "SESOI 事后随手定(应来自最小关注效应/既有文献)"
+    }
+  ]
+}

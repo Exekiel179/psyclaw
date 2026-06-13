@@ -1,0 +1,51 @@
+# PsyClaw MCP 服务器目录
+# 心理学研究工具的可插拔 MCP。由 `psyclaw config` 向导逐个询问启用并采集环境变量。
+# enable_when: always | env:<VAR> | detect:<binary>
+servers:
+  # stats-core = 主路径内置；stats-optional = 商业软件检测到才启用
+  - name: pystat
+    category: stats-core
+    enable_when: always
+    provides: [pingouin, statsmodels, descriptive, t_test, anova, regression, mediation]
+
+  - name: r-mcp
+    category: stats-core
+    enable_when: detect:Rscript
+    provides: [lavaan, lme4, psych, semTools]
+
+  - name: mplus-mcp
+    category: stats-optional
+    enable_when: detect:mplus
+    provides: [SEM, CFA, latent_growth, mixture_model]
+
+  - name: spss-mcp
+    category: stats-builtin
+    enable_when: always
+    command: python -m psyclaw.mcp.servers.spss_server
+    provides: [syntax_gen, sav_run, reliability, factor, ancova]
+
+  - name: mne-mcp
+    category: stats-builtin
+    enable_when: always
+    command: python -m psyclaw.mcp.servers.mne_server
+    provides: [eeg_info, preprocess_plan, erp_components, cluster_stats]
+
+  - name: stata-mcp
+    category: stats-optional
+    enable_when: detect:stata
+    provides: [panel, econometrics, do_file]
+
+  - name: zotero-mcp
+    category: literature
+    enable_when: env:ZOTERO_API_KEY
+    provides: [search, citation, fulltext, retraction_check, semantic_search]
+
+  - name: lit-search-mcp
+    category: literature
+    enable_when: always
+    provides: [pubmed, psycinfo, semantic_scholar, openalex, arxiv]
+
+  - name: osf-mcp
+    category: open-science
+    enable_when: env:OSF_TOKEN
+    provides: [preregistration, data_hosting]

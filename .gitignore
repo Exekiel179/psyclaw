@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+
+# PsyClaw 运行期产物（不入库）
+.psyclaw/
+~/.psyclaw/
+ralph.log
+logs/
+notes/mission.md
+notes/blocked.md
+notes/pending_for_human.md
+notes/decision_request.md
+
+# 密钥 / 个人覆盖（绝不入库）
+key.md
+*.env
+.env
+.claude/CLAUDE.local.md
+.claude/settings.local.json
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store

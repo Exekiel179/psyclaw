@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psyclaw"
+version = "0.1.0"
+description = "心理学研究全流程 Agent CLI — 文献调研 · 实验设计 · 统计分析 · 论文写作，规范门禁内置"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "PsyClaw" }]
+
+# 核心依赖：pingouin(心理学统计"一次出全")及其统计栈默认装。
+# CLI 骨架本身仍可在缺依赖时降级到纯 stdlib 实现(stats_core),保证处处可跑。
+dependencies = [
+    "pingouin>=0.5",
+    "pandas>=2.0",
+    "numpy>=1.22",
+    "scipy>=1.8",
+    "statsmodels>=0.14",
+]
+
+[project.optional-dependencies]
+viz = ["seaborn", "matplotlib"]
+full = ["pyyaml", "rich", "prompt_toolkit", "mcp"]
+embed = ["model2vec"]  # 本地语义嵌入(纯 numpy 静态模型);未装时召回用内置哈希向量兜底
+
+[project.scripts]
+psyclaw = "psyclaw.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["psyclaw*"]

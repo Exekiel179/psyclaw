@@ -1,0 +1,81 @@
+# PsyClaw 量表注册表
+# 每个量表:条目数、计分、子量表归属、反向计分、信度参考、注意事项。
+# ARS-Stat 据此自动计分、跑信度、提示常见坑(如 DASS 是 1-4 计分需减 1)。
+scales:
+  - id: dass-42
+    name: Depression Anxiety Stress Scales (42-item)
+    items: 42
+    response: "1-4 Likert(在线版常见;纸质版 0-3,分析前确认是否需减 1)"
+    subscales:
+      Depression: [3, 5, 10, 13, 16, 17, 21, 24, 26, 31, 34, 37, 38, 42]
+      Anxiety: [2, 4, 7, 9, 15, 19, 20, 23, 25, 28, 30, 36, 40, 41]
+      Stress: [1, 6, 8, 11, 12, 14, 18, 22, 27, 29, 32, 33, 35, 39]
+    reverse: []
+    reliability_ref: "α 通常 .89-.96(各子量表)"
+    notes: "OpenPsychometrics 版列名 Q{N}A=作答、Q{N}I=呈现位置、Q{N}E=耗时;只用 A 列计分"
+
+  - id: dass-21
+    name: DASS-21(简版)
+    items: 21
+    response: "0-3 Likert,子量表总分×2 与 42 版可比"
+    subscales:
+      Depression: [3, 5, 10, 13, 16, 17, 21]
+      Anxiety: [2, 4, 7, 9, 15, 19, 20]
+      Stress: [1, 6, 8, 11, 12, 14, 18]
+    reverse: []
+    reliability_ref: "α .87-.94"
+    notes: "条目号为 21 版内部编号"
+
+  - id: phq-9
+    name: Patient Health Questionnaire-9(抑郁)
+    items: 9
+    response: "0-3(完全没有→几乎每天)"
+    subscales:
+      Total: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    reverse: []
+    reliability_ref: "α ≈ .86-.89"
+    notes: "条目 9 涉及自伤意念,数据含此条目时提示伦理审查与危机转介流程"
+
+  - id: gad-7
+    name: Generalized Anxiety Disorder-7(焦虑)
+    items: 7
+    response: "0-3"
+    subscales:
+      Total: [1, 2, 3, 4, 5, 6, 7]
+    reverse: []
+    reliability_ref: "α ≈ .89-.92"
+    notes: "≥10 常用作筛查阈值(非诊断)"
+
+  - id: tipi
+    name: Ten-Item Personality Inventory(大五,10 题)
+    items: 10
+    response: "1-7"
+    subscales:
+      Extraversion: [1, 6]
+      Agreeableness: [2, 7]
+      Conscientiousness: [3, 8]
+      EmotionalStability: [4, 9]
+      Openness: [5, 10]
+    reverse: [2, 4, 6, 8, 10]
+    reliability_ref: "α 偏低(.40-.73)属设计预期,两题/维度;建议报告重测信度而非 α"
+    notes: "每维度 1 正 1 反;OpenPsychometrics DASS 数据集附带 TIPI1-TIPI10"
+
+  - id: rses
+    name: Rosenberg Self-Esteem Scale(自尊,10 题)
+    items: 10
+    response: "1-4(或 0-3)"
+    subscales:
+      Total: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    reverse: [3, 5, 8, 9, 10]
+    reliability_ref: "α ≈ .88"
+    notes: "反向条目编号随版本不同,使用前对照原文"
+
+  - id: pss-10
+    name: Perceived Stress Scale(知觉压力,10 题)
+    items: 10
+    response: "0-4"
+    subscales:
+      Total: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    reverse: [4, 5, 7, 8]
+    reliability_ref: "α ≈ .78-.91"
+    notes: ""

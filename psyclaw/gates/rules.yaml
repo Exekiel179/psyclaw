@@ -1,0 +1,80 @@
+# PsyClaw 门禁规则（机器可校验）。checker.py 在每个产出点执行。
+# action: block（阻断并要求修复） | warn（警告并记审计日志）
+gates:
+  - id: STAT.effect_size
+    trigger: stat_output
+    requires: [effect_size, confidence_interval]
+    action: block
+    fix: 自动补算 Cohen's d / eta^2 / r 及 95% CI
+
+  - id: STAT.assumptions
+    trigger: before_test
+    requires: [normality_check, homogeneity_check, independence_check]
+    action: block
+    fix: 提示稳健替代 Welch / 非参 / bootstrap
+
+  - id: STAT.no_phack
+    trigger: analysis
+    forbids: [undeclared_multiple_comparison, selective_reporting, harking]
+    action: warn
+
+  - id: DESIGN.power
+    trigger: experiment_design
+    requires: [a_priori_power_analysis]
+    action: block
+
+  - id: DESIGN.prereg
+    trigger: confirmatory_study
+    requires_one_of: [preregistration, exploratory_label]
+    action: block
+
+  - id: WRITE.apa7
+    trigger: paper_output
+    requires: [apa7_citations, apa7_numbers, apa7_tables]
+    action: block
+
+  - id: LIT.prisma
+    trigger: literature_review
+    requires: [prisma_flow]
+    action: warn
+
+  - id: REPRO.script
+    trigger: stat_conclusion
+    requires: [repro_script, data_fingerprint]
+    action: block
+
+  - id: FIG.honest
+    trigger: figure_output
+    requires: [axis_from_zero_or_flagged, error_bar_meaning, colorblind_safe]
+    action: block
+
+  - id: DATA.careless
+    trigger: data_screening
+    requires: [careless_screen_run, exclusion_approved_by_human]
+    action: block
+    fix: 跑 psyclaw screen;剔除决定写 notes/decision_request.md 走人工审批
+
+  - id: MEASURE.reliability
+    trigger: scale_score_used
+    requires: [reliability_reported]
+    action: block
+    fix: 合成量表分前必报信度(α,M2 后默认加报 ω);TIPI 类两题量表报重测信度
+
+  - id: CLARIFY.complete
+    trigger: research_start
+    requires: [clarification_card_all_resolved]
+    action: block
+    fix: 运行 psyclaw clarify 完成全部 17 个槽位;notes/clarification.md 无 UNRESOLVED
+
+  - id: DESIGN.evidence
+    trigger: design_decision
+    requires: [decision_has_citation]
+    action: block
+    fix: 决策台账每条决策须引用方法学文献(psyclaw cite 查背书库)或自补文献
+
+  - id: STAT.rigor
+    trigger: analysis_pipeline
+    requires: [step1_data_quality, step2_descriptives, step4_diagnostics,
+               step5_robustness_2plus, hedged_language]
+    action: block
+    fix: 按 gates/rigor.md 流程补齐;因果措辞须带识别假设限定
