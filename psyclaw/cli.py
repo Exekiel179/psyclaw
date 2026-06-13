@@ -198,6 +198,25 @@ def cmd_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_declare_test(args: argparse.Namespace) -> int:
+    from psyclaw import ui
+    from psyclaw.psych.analysis_plan import declare, load_plan
+    entry = declare(
+        project_dir=args.project_dir,
+        dv=args.dv,
+        test=args.test,
+        iv=args.iv,
+        hypothesis=args.hypothesis,
+        name=args.name,
+    )
+    print(ui.ok(f"✓ 已声明分析: {entry['name']}"))
+    plan = load_plan(args.project_dir)
+    print(f"  计划内条目数: {len(plan['analyses'])}")
+    print(f"  计划文件: {args.project_dir}/notes/analysis_plan.json")
+    print(ui.dim("\n  下次跑 psyclaw stat 时将自动对照此声明校验分析类型。"))
+    return 0
+
+
 def cmd_screen(args: argparse.Namespace) -> int:
     from psyclaw.psych.careless import screen_csv_cli
     argv = [args.file]
@@ -495,6 +514,22 @@ def build_parser() -> argparse.ArgumentParser:
     psc.add_argument("--out", default=None, help="输出计分结果 CSV 路径（追加子量表/总分列）")
     psc.add_argument("--json", action="store_true", help="输出机器可读 JSON（含描述统计）")
     psc.set_defaults(func=cmd_score)
+
+    pdt = sub.add_parser(
+        "declare-test",
+        help="预注册一个计划分析（A-2 研究者自由度门禁；确证性假设须先声明）")
+    pdt.add_argument("--dv", required=True, help="因变量列名")
+    pdt.add_argument("--test", required=True,
+                     choices=["ttest", "anova", "correlation", "paired",
+                              "mann_whitney", "chi2", "regression"],
+                     help="计划检验类型")
+    pdt.add_argument("--iv", default=None, help="自变量/分组列名（可选）")
+    pdt.add_argument("--hypothesis", choices=["confirmatory", "exploratory"],
+                     default="confirmatory", help="分析性质（默认 confirmatory）")
+    pdt.add_argument("--name", default=None, help="假设名称（如 H1，默认自动生成）")
+    pdt.add_argument("--project-dir", default=".", dest="project_dir",
+                     help="项目根目录（默认 .）")
+    pdt.set_defaults(func=cmd_declare_test)
 
     pscr = sub.add_parser("screen", help="数据草率作答筛查(longstring/IRV/直线作答)")
     pscr.add_argument("file", help="CSV/TSV 数据文件")

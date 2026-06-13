@@ -519,6 +519,39 @@ def analyze(path: str, dv: str, group: str | None = None,
 
     meta["test"] = kind
 
+    # —— A-2: 分析计划检查（确证 / 探索 / 未声明）——
+    plan_status = "undeclared"
+    plan_label = ""
+    try:
+        from psyclaw.psych.analysis_plan import check as plan_check, log_deviation
+        pc = plan_check(project_dir, dv=dv, test=kind, iv=group or with_var or paired_with)
+        plan_status = pc["status"]
+        meta["analysis_plan_status"] = plan_status
+        meta["analysis_plan_entry"] = pc.get("entry")
+        if pc["deviation"]:
+            entry = pc.get("entry") or {}
+            log_deviation(project_dir, dv=dv,
+                          actual_test=kind,
+                          planned_test=entry.get("test", ""),
+                          note=pc["deviation"])
+            print(ui.warn(
+                f"\n⚠ A-2 偏离计划: {pc['deviation']}（已记入 notes/audit_deviations.md）"))
+            plan_label = "[UNPLANNED]"
+        elif plan_status == "confirmatory":
+            plan_label = "[确证性分析]"
+            print(ui.ok(f"\n✓ A-2 确证性分析（已在计划内）: {pc['entry']['name']}"))
+        elif plan_status == "exploratory":
+            plan_label = "[探索性分析]"
+            print(ui.warn("\n⚠ A-2 探索性分析（已在计划内，标为探索性）"))
+        else:
+            plan_label = "[EXPLORATORY · UNDECLARED]"
+            print(ui.warn(
+                "\n⚠ A-2 未声明分析: 本次检验未在 notes/analysis_plan.json 中预先声明。"
+                " 标注为探索性；若属确证性假设，请先 `psyclaw declare-test --dv …` 注册后重跑。"
+                " 建议对探索性发现做 split-half 验证再报告。"))
+    except Exception:  # noqa: BLE001
+        pass
+
     # —— A-1 特判:大样本效应量语言 ——
     es = meta.get("effect_size", {})
     stat = meta.get("statistics", {})
@@ -539,6 +572,14 @@ def analyze(path: str, dv: str, group: str | None = None,
             meta["large_sample_warning"] = ls
             if ls["trivial"]:
                 apa = apa + f"\n{ls['message']}"
+
+    # A-2: 标注 + 探索性建议
+    if plan_label:
+        apa = f"{plan_label} {apa}"
+    if plan_status in ("exploratory", "undeclared"):
+        apa += ("\n\n[探索性结果须知] 本分析未预先注册或标注为探索性，"
+                "结论应视作假设生成。建议：①报告时明确标注"探索性"；"
+                "②在独立样本或 split-half 折分上重复验证后再作推断。")
 
     # —— 输出 APA7 段 ——
     print(ui.accent("\n④ APA7 结果段"))
