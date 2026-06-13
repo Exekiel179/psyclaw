@@ -23,9 +23,79 @@ APA7(学生论文版)规格,全部落实在 styles.xml:
 
 from __future__ import annotations
 
+import re
 import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
+
+
+# ---------------------------------------------------------------------------
+# W-2: APA7 统计结果格式化
+# ---------------------------------------------------------------------------
+
+def format_apa_stat_md(text: str) -> str:
+    """对 APA7 统计结果字符串应用 Markdown 斜体格式（符合 APA7 §6.42 斜体规则）。
+
+    处理：t/F/r 前置 (；p/d/dz/V 前置 =/< ；M/SD 前置 =；η²/ω²/Cohen's d 等。
+    """
+    # stat(df) 模式
+    text = re.sub(r'\bt\(', '*t*(', text)
+    text = re.sub(r'\bF\(', '*F*(', text)
+    text = re.sub(r'\br\(', '*r*(', text)
+    text = re.sub(r'\bz\(', '*z*(', text)
+    text = re.sub(r'χ²\(', '*χ*²(', text)
+    # p/stat 前置 = < >
+    text = re.sub(r'\bp\s*(=|<|>)\s*', lambda m: f'*p* {m.group(1)} ', text)
+    # 效应量符号
+    text = re.sub(r"Cohen's\s+(d[z]?)\b", lambda m: f"Cohen's *{m.group(1)}*", text)
+    text = re.sub(r'\brank-biserial\s+r\b', 'rank-biserial *r*', text)
+    text = re.sub(r"Cramér's\s+V\b", "Cramér's *V*", text)
+    text = re.sub(r'\bη²\b', '*η*²', text)
+    text = re.sub(r'\bω²\b', '*ω*²', text)
+    text = re.sub(r'\bR²\b', '*R*²', text)
+    # M= / SD=
+    text = re.sub(r'\bM\s*=', '*M* =', text)
+    text = re.sub(r'\bSD\s*=', '*SD* =', text)
+    # 移除多余空格
+    text = re.sub(r'  +', ' ', text)
+    return text
+
+
+def format_apa_p(p: float) -> str:
+    """APA7 p 值格式：p < .001；不保留前导零；三位小数。"""
+    if p != p:
+        return "*p* = NA"
+    return "*p* < .001" if p < 0.001 else f"*p* = {p:.3f}".replace("0.", ".")
+
+
+def format_apa_stat(value: float, n_dec: int = 2) -> str:
+    """APA7 数值格式：两位小数；|v|<1 时去除前导零（.34 非 0.34）。"""
+    if value != value:
+        return "NA"
+    formatted = f"{value:.{n_dec}f}"
+    if abs(value) < 1:
+        formatted = formatted.lstrip("0") if value >= 0 else "-" + formatted[2:]
+        if not formatted or formatted in (".", "-."):
+            formatted = ".00"
+    return formatted
+
+
+def _split_for_italic(text: str) -> list[tuple[str, bool]]:
+    """将 APA 统计字符串分拆为 (片段, 是否斜体) 列表，供 docx run 生成使用。
+
+    把 *...* 标记内的文本设为斜体。
+    """
+    parts: list[tuple[str, bool]] = []
+    pattern = re.compile(r'\*([^*]+)\*')
+    last = 0
+    for m in pattern.finditer(text):
+        if m.start() > last:
+            parts.append((text[last:m.start()], False))
+        parts.append((m.group(1), True))
+        last = m.end()
+    if last < len(text):
+        parts.append((text[last:], False))
+    return parts or [(text, False)]
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +131,11 @@ class APA7Document:
         if text.strip():
             self.references.append(text.strip())
 
+    def add_stat_table(self, caption: str, headers: list[str],
+                       rows: list[list[str]]) -> None:
+        """添加 APA7 三线统计表格（用于相关矩阵、ANOVA 表等）。"""
+        self.blocks.append(("table", (caption, headers, rows)))
+
     # -- Markdown 输出 -------------------------------------------------------
     def to_markdown(self) -> str:
         out = ["---",
@@ -75,11 +150,21 @@ class APA7Document:
             out += ["## Abstract", "", self.abstract, ""]
             if self.keywords:
                 out += [f"*Keywords:* {', '.join(self.keywords)}", ""]
-        for kind, text in self.blocks:
+        for kind, content in self.blocks:
             if kind == "p":
-                out += [text, ""]
+                out += [content, ""]
+            elif kind == "table":
+                caption, headers, rows = content
+                if caption:
+                    out += [caption, ""]
+                sep = "|".join(["---"] * len(headers))
+                out += ["| " + " | ".join(headers) + " |",
+                        "| " + sep + " |"]
+                for row in rows:
+                    out += ["| " + " | ".join(str(v) for v in row) + " |"]
+                out += [""]
             else:
-                out += ["#" * (int(kind[1]) + 1) + " " + text, ""]
+                out += ["#" * (int(kind[1]) + 1) + " " + content, ""]
         if self.references:
             out += ["## References", ""]
             for r in sorted(self.references, key=str.lower):
@@ -113,9 +198,15 @@ class APA7Document:
             body.append(_page_break())
         # 正文(APA7:正文第一页顶部重复标题,加粗居中)
         body.append(_p(self.title, style="PCH1"))
-        for kind, text in self.blocks:
-            style = {"h1": "PCH1", "h2": "PCH2", "h3": "PCH3", "p": "PCBody"}[kind]
-            body.append(_p(text, style=style))
+        for kind, content in self.blocks:
+            if kind == "table":
+                caption, headers, rows = content
+                body.append(_table_three_line(headers, rows, caption=caption))
+            elif kind == "p":
+                body.append(_p_stat(content, style="PCBody"))
+            else:
+                style = {"h1": "PCH1", "h2": "PCH2", "h3": "PCH3"}[kind]
+                body.append(_p(content, style=style))
         # 参考文献
         if self.references:
             body.append(_page_break())
@@ -229,9 +320,78 @@ def export_cli(argv: list) -> int:
 # OOXML 构件
 # ---------------------------------------------------------------------------
 
+def _run(text: str, italic: bool = False) -> str:
+    rpr = "<w:rPr><w:i/><w:iCs/></w:rPr>" if italic else ""
+    return f'<w:r>{rpr}<w:t xml:space="preserve">{escape(text)}</w:t></w:r>'
+
+
 def _p(text: str, style: str = "PCBody") -> str:
     runs = f'<w:r><w:t xml:space="preserve">{escape(text)}</w:t></w:r>' if text else ""
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{runs}</w:p>'
+
+
+def _p_stat(text: str, style: str = "PCBody") -> str:
+    """段落，自动对 *...* 标记的片段应用斜体 run。"""
+    parts = _split_for_italic(text)
+    runs = "".join(_run(t, italic=it) for t, it in parts)
+    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{runs}</w:p>'
+
+
+def _table_three_line(headers: list[str], rows: list[list[str]],
+                      caption: str = "") -> str:
+    """生成 APA7 三线表 OOXML（顶线加粗、表头下细线、底线加粗、无竖线）。
+
+    headers: 列标题列表
+    rows: 数据行列表，每行是字符串列表（与 headers 等长）
+    caption: 表注（如 "Table 1\\n注变量间相关矩阵"）
+    """
+    THICK = "24"
+    THIN = "12"
+
+    def _border(name: str, size: str) -> str:
+        return (f'<w:top w:val="single" w:sz="{size}" w:space="0" w:color="000000"/>'
+                if name == "top"
+                else f'<w:bottom w:val="single" w:sz="{size}" w:space="0" w:color="000000"/>')
+
+    def _cell(txt: str, bold: bool = False, top_border: str = "",
+              bot_border: str = "") -> str:
+        borders = ""
+        if top_border or bot_border:
+            parts_b = []
+            if top_border:
+                parts_b.append(f'<w:top w:val="single" w:sz="{top_border}" '
+                                'w:space="0" w:color="000000"/>')
+            if bot_border:
+                parts_b.append(f'<w:bottom w:val="single" w:sz="{bot_border}" '
+                                'w:space="0" w:color="000000"/>')
+            # suppress left/right/insideH borders
+            parts_b.append('<w:left w:val="none" w:sz="0" w:space="0" w:color="auto"/>')
+            parts_b.append('<w:right w:val="none" w:sz="0" w:space="0" w:color="auto"/>')
+            borders = f'<w:tcBorders>{"".join(parts_b)}</w:tcBorders>'
+        rpr = "<w:rPr><w:b/></w:rPr>" if bold else ""
+        run = f'<w:r>{rpr}<w:t xml:space="preserve">{escape(str(txt))}</w:t></w:r>'
+        return (f'<w:tc><w:tcPr>{borders}</w:tcPr>'
+                f'<w:p><w:pPr><w:pStyle w:val="PCNoIndent"/></w:pPr>{run}</w:p></w:tc>')
+
+    parts: list[str] = []
+    if caption:
+        parts.append(_p(caption, style="PCNoIndent"))
+
+    # 表头行 (top=thick, bottom=thin)
+    header_cells = "".join(
+        _cell(h, bold=True, top_border=THICK, bot_border=THIN) for h in headers)
+    parts.append(f'<w:tr>{header_cells}</w:tr>')
+
+    # 数据行 (最后一行 bottom=thick)
+    for i, row in enumerate(rows):
+        is_last = (i == len(rows) - 1)
+        bot = THICK if is_last else ""
+        data_cells = "".join(_cell(str(v), bot_border=bot) for v in row)
+        parts.append(f'<w:tr>{data_cells}</w:tr>')
+
+    table_content = "".join(parts[1:]) if caption else "".join(parts)
+    table_xml = f'<w:tbl><w:tblPr><w:tblStyle w:val="TableNormal"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>{table_content}</w:tbl>'
+    return (parts[0] if caption else "") + table_xml
 
 
 def _p_keywords(kw: str) -> str:
