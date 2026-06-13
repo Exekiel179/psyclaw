@@ -1,0 +1,42 @@
+# PsyClaw 图片风格规范。所有图经 psyclaw.figures 统一主题层生成。
+default_style: apa7
+
+styles:
+  apa7:
+    font_family: [Arial, Helvetica, sans-serif]
+    min_font_pt: 8
+    spines: [left, bottom]        # 去掉顶/右边框
+    grid: false
+    background: white
+  nature:
+    font_family: [Arial, sans-serif]
+    min_font_pt: 7
+    spines: [left, bottom]
+    grid: false
+  frontiers:
+    font_family: [Arial, sans-serif]
+    spines: [left, bottom]
+  minimal:
+    spines: [bottom]
+    grid: false
+
+honesty_rules:                    # 对应 gate FIG.honest，违反即阻断
+  y_axis_start_zero: true         # 默认从 0 起；截断须显式标注
+  truncation_must_flag: true
+  error_bar_must_label: true      # 标注 SD / SE / 95%CI
+  no_dual_axis_without_flag: true
+
+color:
+  palette: okabe_ito              # 色盲友好；备选 viridis
+  grayscale_distinguishable: true
+  no_redgreen_only: true          # 不用红绿对比承载唯一信息
+
+export:
+  vector_preferred: [pdf, svg]
+  raster_min_dpi: 300
+  paper_export: [tiff, pdf]
+
+caption:
+  require_n: true                 # 图注含 N
+  require_test_stat: true         # 含统计量
+  require_significance_legend: true

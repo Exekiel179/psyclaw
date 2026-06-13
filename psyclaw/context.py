@@ -1,0 +1,240 @@
+"""长上下文优化(stdlib only)。
+
+三个机制:
+
+1. **按需知识注入** — 不再每轮塞全部知识库。固定注入瘦核心
+   (诚信原则 + 严谨性协议要点),其余(16 检验族/13 方法/12 设计/26 背书)
+   按当前消息关键词匹配,只注入命中的条目。系统提示从 ~30k 字符降到 ~6k。
+
+2. **滚动压缩** — 历史超预算时,最老的轮次蒸馏成"决策备忘"
+   (抽取含决策/数据/结论特征的行),保留最近 K 轮原文。
+   备忘随会话累积,关键决策不会因压缩丢失。
+
+3. **@file 智能摘录** — CSV 取列结构+样本行+行数(而非整个文件),
+   长文本取头尾;原始路径保留供工具直接读全量。
+"""
+
+from __future__ import annotations
+
+import csv as _csv
+import io
+import json
+from pathlib import Path
+
+CHAR_BUDGET_HISTORY = 60_000     # 历史预算(约 15k tokens)
+KEEP_RECENT_TURNS = 8            # 压缩时保留的最近消息数
+FILE_EXCERPT_CHARS = 6_000
+CSV_SAMPLE_ROWS = 8
+
+_PSYCH_DIR = Path(__file__).parent / "psych"
+_GATES_DIR = Path(__file__).parent / "gates"
+
+
+# ---------------------------------------------------------------------------
+# 1. 按需知识注入
+# ---------------------------------------------------------------------------
+
+def _load_entries() -> list:
+    """汇总知识库条目 → [(关键词集, 渲染文本)]。惰性缓存。"""
+    global _ENTRIES_CACHE
+    if _ENTRIES_CACHE is not None:
+        return _ENTRIES_CACHE
+    out = []
+
+    def add(keys: str, text: str) -> None:
+        kw = {w for w in keys.lower().replace("-", " ").replace("/", " ").split() if len(w) > 1}
+        out.append((kw, text))
+
+    try:
+        data = json.loads((_PSYCH_DIR / "assumptions.json").read_text(encoding="utf-8"))
+        for t in data.get("tests", []):
+            body = "; ".join(f"{a['name']}(违反:{a['violated']})" for a in t["assumptions"])
+            add(t["id"] + " " + t["name"],
+                f"[前提假设·{t['name']}] {body}。现代默认:{t.get('modern_default', '')}")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        data = json.loads((_PSYCH_DIR / "methods.json").read_text(encoding="utf-8"))
+        for m in data.get("methods", []):
+            add(m["id"] + " " + m["name"],
+                f"[方法·{m['name']}] 何时用:{m['use_when']};样本量:{m['min_n']};"
+                f"报告:{m['report']};坑:{m['pitfalls']}")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        data = json.loads((_PSYCH_DIR / "designs.json").read_text(encoding="utf-8"))
+        for d in data.get("designs", []):
+            add(d["id"] + " " + d["name"],
+                f"[设计·{d['name']}] 威胁:{d.get('threats', '')};实践:{d.get('key_practices', '')}")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        data = json.loads((_PSYCH_DIR / "evidence.json").read_text(encoding="utf-8"))
+        for t in data.get("topics", []):
+            add(t["id"] + " " + t["decision"],
+                f"[背书·{t['decision']}] {t['citation'].split('.')[0]} 等;要点:{t['gist']}")
+    except Exception:  # noqa: BLE001
+        pass
+
+    _ENTRIES_CACHE = out
+    return out
+
+
+_ENTRIES_CACHE: list | None = None
+
+# 中文触发词 → 知识库英文 id 的桥接
+_ALIASES = {
+    "中介": "mediation", "调节": "moderation", "信度": "omega alpha",
+    "方差分析": "anova", "重复测量": "anova-rm rm", "回归": "regression",
+    "相关": "correlation", "卡方": "chisq", "多层": "mlm", "嵌套": "mlm",
+    "结构方程": "cfa-sem sem", "因子": "efa cfa", "网络": "network",
+    "潜在剖面": "lpa", "纵向": "clpm lgcm longitudinal", "交叉滞后": "clpm",
+    "功效": "power", "样本量": "power", "效应量": "power_priors",
+    "测量不变": "invariance", "预注册": "prereg", "日记": "esm",
+    "经验取样": "esm", "被试间": "between", "被试内": "within",
+    "准实验": "quasi", "析因": "factorial", "贝叶斯": "bayes",
+    "等价": "equivalence", "元分析": "meta", "irt": "irt", "项目反应": "irt",
+}
+
+
+def relevant_knowledge(message: str, max_items: int = 6) -> str:
+    """根据消息内容挑选相关知识条目(命中越多越靠前)。"""
+    text = message.lower()
+    expanded = text
+    for zh, en in _ALIASES.items():
+        if zh in text:
+            expanded += " " + en
+    words = {w for w in expanded.replace("-", " ").replace("/", " ").split() if len(w) > 1}
+    scored = []
+    for kw, rendered in _load_entries():
+        hits = len(kw & words)
+        # 子串兜底(如消息含 "anova-rm")
+        if not hits and any(k in expanded for k in kw if len(k) > 3):
+            hits = 1
+        if hits:
+            scored.append((hits, rendered))
+    scored.sort(key=lambda x: -x[0])
+    if not scored:
+        return ""
+    return "# 相关方法学知识(按需注入)\n" + "\n".join(r for _, r in scored[:max_items])
+
+
+def lean_core() -> str:
+    """固定注入的瘦核心:诚信原则 + 严谨性要点(不再整本塞)。"""
+    parts = [
+        "你是 PsyClaw,心理学研究全流程助手。学术铁律:",
+        "效应量+CI 优先于 p 值;相关≠因果(因果措辞必须带识别假设限定);",
+        "区分探索性/确证性;大样本下显著≠重要;两组比较默认 Welch;",
+        "中介用 bootstrap CI;每个统计结论附可复现思路;",
+        "**信息不足就停**:结局/暴露定义、目标类型(描述/相关/因果/预测)、",
+        "数据生成过程不明时,先提问再分析,禁止擅自假设(见严谨性协议)。",
+        "统计输出按强制流程:数据质量→描述→主分析→诊断→稳健性(≥2 类)→限定性解释。",
+    ]
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# 2. 滚动压缩
+# ---------------------------------------------------------------------------
+
+_DECISION_MARKERS = ("决定", "采用", "选择", "剔除", "排除", "假设", "样本量",
+                     "显著", "效应量", "p ", "p=", "d =", "n=", "N=", "结论",
+                     "α", "CI", "批准", "驳回")
+
+
+def _distill(msg: dict) -> str:
+    """从一条消息抽取决策性内容(每条最多 3 行)。"""
+    role = "用户" if msg["role"] == "user" else "助手"
+    lines = [ln.strip() for ln in msg["content"].splitlines() if ln.strip()]
+    keep = [ln for ln in lines if any(m in ln for m in _DECISION_MARKERS)][:3]
+    if not keep and lines:
+        keep = [lines[0][:120]]
+    return "\n".join(f"  [{role}] {ln[:160]}" for ln in keep)
+
+
+def compact_history(messages: list, memo: str) -> tuple:
+    """超预算时压缩。返回 (new_messages, new_memo)。
+
+    memo 是累积的"决策备忘",作为首条 user 消息的前缀注入。
+    """
+    total = sum(len(m["content"]) for m in messages)
+    if total <= CHAR_BUDGET_HISTORY or len(messages) <= KEEP_RECENT_TURNS:
+        return messages, memo
+    cut = len(messages) - KEEP_RECENT_TURNS
+    dropped, kept = messages[:cut], messages[cut:]
+    new_notes = "\n".join(_distill(m) for m in dropped if m["content"].strip())
+    memo = (memo + "\n" + new_notes).strip()
+    # memo 本身限长:保最近 4000 字符
+    if len(memo) > 4000:
+        memo = "…(更早备忘已截断)\n" + memo[-4000:]
+    return kept, memo
+
+
+def render_memo(memo: str) -> str:
+    if not memo:
+        return ""
+    return ("# 会话决策备忘(早期轮次压缩而来,作为既定事实参考)\n" + memo)
+
+
+# ---------------------------------------------------------------------------
+# 3. @file 智能摘录
+# ---------------------------------------------------------------------------
+
+def smart_excerpt(path: Path) -> str:
+    """文件 → 上下文友好的摘录。CSV 给结构,文本给头尾。"""
+    suffix = path.suffix.lower()
+    try:
+        if suffix in (".csv", ".tsv"):
+            return _csv_excerpt(path)
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except Exception as exc:  # noqa: BLE001
+        return f"<file path={path} error={exc}/>"
+    if len(text) <= FILE_EXCERPT_CHARS:
+        return f"<file path={path}>\n{text}\n</file>"
+    head = text[: FILE_EXCERPT_CHARS // 2]
+    tail = text[-FILE_EXCERPT_CHARS // 2:]
+    return (f"<file path={path} chars={len(text)} excerpt=head+tail>\n"
+            f"{head}\n…(中部省略 {len(text) - FILE_EXCERPT_CHARS} 字符,"
+            f"需全文请用工具直接读)…\n{tail}\n</file>")
+
+
+def _csv_excerpt(path: Path) -> str:
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    sniff = raw[:4096]
+    try:
+        dialect = _csv.Sniffer().sniff(sniff, delimiters=",\t;")
+    except _csv.Error:
+        dialect = _csv.excel
+    reader = _csv.reader(io.StringIO(raw), dialect)
+    rows = []
+    for i, row in enumerate(reader):
+        if i <= CSV_SAMPLE_ROWS:
+            rows.append(row)
+        else:
+            pass
+    n_rows = raw.count("\n")
+    header = rows[0] if rows else []
+    sample = rows[1:CSV_SAMPLE_ROWS + 1]
+    # 粗略列类型
+    types = []
+    for ci in range(len(header)):
+        vals = [r[ci] for r in sample if ci < len(r) and r[ci].strip()]
+        if vals and all(_is_num(v) for v in vals):
+            types.append("num")
+        else:
+            types.append("str")
+    lines = [f"<csv path={path} rows≈{n_rows} cols={len(header)}>",
+             "列: " + ", ".join(f"{h}({t})" for h, t in zip(header, types))]
+    for r in sample[:5]:
+        lines.append("  " + " | ".join(x[:18] for x in r))
+    lines.append(f"(数据样例 {min(5, len(sample))} 行;统计请用 psyclaw check/screen 直接跑全量)")
+    lines.append("</csv>")
+    return "\n".join(lines)
+
+
+def _is_num(s: str) -> bool:
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False

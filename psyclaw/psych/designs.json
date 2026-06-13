@@ -1,0 +1,113 @@
+{
+  "_comment": "PsyClaw 实验设计目录。结构、效度威胁、抵消平衡、功效要点、分析映射。",
+  "designs": [
+    {
+      "id": "between",
+      "name": "被试间设计",
+      "structure": "每人只接受一个条件;随机分配是因果推断的命脉",
+      "strengths": "无练习/疲劳/需求特征污染;条件间绝对隔离",
+      "threats": "个体差异全进误差项→功效低;随机化失败(小样本尤甚,检查基线)",
+      "key_practices": "真随机(代码生成,记录种子);分配隐藏;操纵检查;每组 n 由功效分析定(d=.40 双尾 80% 需 ~100/组)",
+      "analysis": "独立 t/单因素 ANOVA(psyclaw assume t-ind / anova-oneway)"
+    },
+    {
+      "id": "within",
+      "name": "被试内设计(重复测量)",
+      "structure": "每人接受全部条件;自己当自己的对照",
+      "strengths": "个体差异被分离→同等功效所需 N 大幅减少(常 1/3-1/2)",
+      "threats": "顺序效应(练习/疲劳);延滞效应(条件 A 残留影响 B);需求特征(被试猜出设计)",
+      "key_practices": "抵消平衡必做:条件少用完全抵消(全排列),条件多用拉丁方/平衡拉丁方;延滞强的操纵(情绪诱导/药物)别用被试内;洗脱间隔",
+      "analysis": "配对 t/重复测量 ANOVA 或 MLM(psyclaw assume anova-rm)"
+    },
+    {
+      "id": "mixed-design",
+      "name": "混合设计",
+      "structure": "≥1 被试间因素 × ≥1 被试内因素(经典:组别×时间)",
+      "strengths": "干预研究标准型:处理组 vs 对照组的前后测交互即干预效应",
+      "threats": "兼具两者威胁;重点看交互而非简单主效应",
+      "key_practices": "干预效应=组×时间交互;别做'实验组前后测显著、对照组不显著'的错误推断(差异的显著性≠显著性的差异!critic 会拦)",
+      "analysis": "混合 ANOVA 或 MLM(psyclaw assume anova-mixed)"
+    },
+    {
+      "id": "factorial",
+      "name": "析因设计(2×2 及以上)",
+      "structure": "全交叉多因素;2×2 是心理学主力(主效应×2 + 交互)",
+      "strengths": "一次实验回答交互问题;交互往往才是理论贡献",
+      "threats": "胞数随因素爆炸;交互功效远低于主效应(同样效应需 4 倍 N 是常见低估)",
+      "key_practices": "以交互项做功效分析,不是主效应;高阶交互(3 阶+)难复现难解释,预注册时克制;单元 n 均衡",
+      "analysis": "析因 ANOVA;简单效应分解(psyclaw method moderation 同逻辑)"
+    },
+    {
+      "id": "pre-post-control",
+      "name": "随机前后测对照设计(RCT 原型)",
+      "structure": "R: O₁ X O₂ / R: O₁ — O₂",
+      "strengths": "因果推断金标准;基线可查随机化质量",
+      "threats": "测验效应(前测敏化);流失(差异流失破坏随机化)",
+      "key_practices": "分析首选 ANCOVA(后测~组别+前测,随机化下功效最高)而非'增益分数 t 检验'或'组×时间 ANOVA'(三者中 ANCOVA 最优,Senn);流失要报 CONSORT 流程图+ITT 分析",
+      "analysis": "ANCOVA(psyclaw assume ancova)"
+    },
+    {
+      "id": "solomon",
+      "name": "所罗门四组设计",
+      "structure": "前后测两组 + 仅后测两组(2×2:处理×是否前测)",
+      "strengths": "可分离前测敏化效应",
+      "threats": "N 需求翻倍;实务少用,前测敏化可疑时才上",
+      "key_practices": "分析按 2×2 析因处理后测",
+      "analysis": "析因 ANOVA"
+    },
+    {
+      "id": "quasi-negd",
+      "name": "准实验(非等组对照)",
+      "structure": "现成组(如两所学校)无随机分配:O₁ X O₂ / O₁ — O₂",
+      "strengths": "随机化不可行时(教育/组织场景)的现实选择",
+      "threats": "选择偏差是头号敌人;选择×成熟交互;回归向均值(按极端分入组时)",
+      "key_practices": "ANCOVA '控制'基线≠等于随机化(Lord's paradox);更优:倾向得分匹配/加权、双重差分;多测几个前测点查平行趋势",
+      "analysis": "PSM+敏感性分析;DiD;明确写'准实验,因果解释受限'(critic 检查)"
+    },
+    {
+      "id": "longitudinal-panel",
+      "name": "纵向追踪(面板)设计",
+      "structure": "同批人多波次测量(≥3 波才能玩出花)",
+      "strengths": "时间顺序确立;个体内变化可建模;中介的合法载体",
+      "threats": "流失(必报流失分析:流失者与留下者基线比较);练习效应;纵向测量不变性",
+      "key_practices": "波次间隔由理论过程速度决定(不是'方便就每学期一次');≥3 波可上 RI-CLPM/LGCM;预注册波次与变量",
+      "analysis": "RI-CLPM / LGCM / MLM(psyclaw method clpm / lgcm / mlm)"
+    },
+    {
+      "id": "esm-diary",
+      "name": "经验取样/日记法(密集追踪)",
+      "structure": "每天多次/每天一次,连续 1-4 周;捕捉日常生活中的个体内过程",
+      "strengths": "生态效度高;个体内关系≠个体间关系(生态谬误的解药)",
+      "threats": "依从性(响应率<70% 要处理);反应性(测量本身改变行为);测量负担→量表必须短",
+      "key_practices": "信号方案(随机提示/固定/事件触发)预注册;功效:人数×人内观测数双维度(psyclaw method mlm);短量表信度用多层信度(ω_within)",
+      "analysis": "MLM(人内中心化)/DSEM(Mplus v8+)"
+    },
+    {
+      "id": "single-case",
+      "name": "单被试实验设计(ABAB/多基线)",
+      "structure": "个体为分析单位,反复引入/撤回干预(ABAB)或跨行为/跨被试错峰引入(多基线)",
+      "strengths": "临床/特教场景小样本因果推断;What Works Clearinghouse 认可",
+      "threats": "撤回阶段伦理问题(干预有效却要撤);外推受限",
+      "key_practices": "每阶段≥5 个观测点;视觉分析+效应量(Tau-U/LRR);多基线避免撤回伦理问题",
+      "analysis": "视觉分析+Tau-U;多层扩展(被试间汇总)"
+    },
+    {
+      "id": "stimulus-sampling",
+      "name": "刺激抽样设计(被试×刺激交叉)",
+      "structure": "多被试对多刺激反应(面孔/词汇/情境)——刺激也是随机因素!",
+      "strengths": "结论可推广到刺激总体而非'这 20 张脸'",
+      "threats": "把刺激当固定因素→'语言学家谬误',F1 显著 F2 不显著的旧问题",
+      "key_practices": "交叉随机效应 MLM(被试与刺激都进随机效应)是现代标准;刺激数功效常比被试数更卡脖子(各 ≥30 起步)",
+      "analysis": "lme4 交叉随机效应(psyclaw method mlm)"
+    },
+    {
+      "id": "manipulation-validity",
+      "name": "操纵与效度通用清单(任何实验设计都查)",
+      "structure": "—",
+      "strengths": "—",
+      "threats": "操纵无效/混淆变量/需求特征/实验者效应/天花板地板效应",
+      "key_practices": "操纵检查(但放结尾防敏化);混淆排查(操纵了情绪还是唤醒?);双盲或至少施测者盲;预实验测天花板;注意力检查题(对接 psyclaw screen);demand 敏感场景用掩饰任务+怀疑探查",
+      "analysis": "—"
+    }
+  ]
+}

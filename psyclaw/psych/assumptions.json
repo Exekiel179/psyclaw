@@ -1,0 +1,170 @@
+{
+  "_comment": "PsyClaw 前提假设注册表。每个检验族:假设→怎么检查→违反了怎么办。ARS-Stat 决策树与 STAT.assumptions 门禁的依据。",
+  "tests": [
+    {
+      "id": "t-ind",
+      "name": "独立样本 t 检验",
+      "assumptions": [
+        {"name": "独立性", "check": "设计层面判断(无重复测量/嵌套);嵌套数据看 ICC", "violated": "嵌套→多层模型;配对→配对 t"},
+        {"name": "各组正态", "check": "偏度/峰度 z(n<50)或 |skew|<2,|kurt|<7 经验法;QQ 图;n≥30/组可靠 CLT", "violated": "Mann-Whitney U 或 bootstrap CI;但注意 U 检验的是分布而非均值"},
+        {"name": "方差齐性", "check": "Levene/Brown-Forsythe(psyclaw check 内置)", "violated": "默认就用 Welch t(现代建议:无论齐不齐都用 Welch)"}
+      ],
+      "modern_default": "直接报 Welch t + Cohen's d(汇合 SD 或 Glass's Δ)+ 95% CI",
+      "psyclaw_runnable": "psyclaw check data.csv --dv 分数列 --group 组别列"
+    },
+    {
+      "id": "t-paired",
+      "name": "配对样本 t 检验",
+      "assumptions": [
+        {"name": "差值正态", "check": "对差值列做偏度/峰度检查(不是对原始两列!)", "violated": "Wilcoxon 符号秩或 bootstrap"},
+        {"name": "配对独立", "check": "被试间互不影响", "violated": "考虑组内相关结构(MLM)"}
+      ],
+      "modern_default": "t + Cohen's dz(或 dav,报哪种要说明)+ CI"
+    },
+    {
+      "id": "anova-oneway",
+      "name": "单因素方差分析",
+      "assumptions": [
+        {"name": "独立性", "check": "设计层面;班级/团队抽样必查 ICC", "violated": "ICC>.05 → 多层模型"},
+        {"name": "各组正态", "check": "同 t 检验;组均 n≥30 较稳", "violated": "Kruskal-Wallis 或 bootstrap"},
+        {"name": "方差齐性", "check": "Brown-Forsythe Levene(psyclaw check 内置)", "violated": "Welch ANOVA(psyclaw check 同时输出经典 F 和 Welch F)"}
+      ],
+      "modern_default": "Welch F + η²(或 ω²,小样本偏差更小)+ 事后 Games-Howell",
+      "psyclaw_runnable": "psyclaw check data.csv --dv 分数列 --group 组别列"
+    },
+    {
+      "id": "anova-rm",
+      "name": "重复测量方差分析",
+      "assumptions": [
+        {"name": "球形性", "check": "Mauchly 检验(M3 接 R/pingouin)", "violated": "Greenhouse-Geisser(ε<.75)或 Huynh-Feldt(ε≥.75)校正;或干脆用 MLM"},
+        {"name": "各水平正态", "check": "各时点偏度/峰度", "violated": "Friedman 或 MLM+稳健 SE"},
+        {"name": "无极端离群", "check": "各条件箱线图/MAD 法", "violated": "敏感性分析:带/不带离群值各跑一遍,都报告"}
+      ],
+      "modern_default": "现代首选 MLM(容忍缺失、不需球形性);若用 RM-ANOVA 必报 ε 与校正后 df"
+    },
+    {
+      "id": "anova-mixed",
+      "name": "混合设计方差分析(被试间×被试内)",
+      "assumptions": [
+        {"name": "球形性(被试内)", "check": "Mauchly", "violated": "GG/HF 校正"},
+        {"name": "协方差矩阵同质(跨组)", "check": "Box's M(对违反敏感,α 取 .001)", "violated": "MLM 或 MANOVA 路径"},
+        {"name": "各胞正态+方差齐", "check": "逐胞诊断", "violated": "MLM+稳健估计"}
+      ],
+      "modern_default": "MLM(被试随机截距)逐渐替代混合 ANOVA"
+    },
+    {
+      "id": "correlation",
+      "name": "Pearson 相关",
+      "assumptions": [
+        {"name": "线性", "check": "散点图;非线性时 r 会严重低估关系", "violated": "Spearman ρ 或建模非线性项"},
+        {"name": "双变量正态", "check": "两变量各自正态 + 散点呈椭圆", "violated": "Spearman 或 bootstrap CI"},
+        {"name": "无极端离群", "check": "散点图;单点可翻转结论", "violated": "稳健相关(skipped/winsorized)+ 敏感性分析"}
+      ],
+      "modern_default": "r + 95% CI;n<100 时 CI 很宽,解释要克制;相关≠因果(门禁拦截因果表述)"
+    },
+    {
+      "id": "regression",
+      "name": "多元线性回归",
+      "assumptions": [
+        {"name": "线性", "check": "残差-拟合值图无弯曲", "violated": "多项式/样条/变换"},
+        {"name": "残差独立", "check": "Durbin-Watson(时序/重复测量数据)", "violated": "时序→GLS;嵌套→MLM"},
+        {"name": "同方差", "check": "残差图无喇叭形;Breusch-Pagan", "violated": "HC3 稳健标准误(现代默认建议)"},
+        {"name": "残差正态", "check": "残差 QQ 图(大样本可放宽)", "violated": "bootstrap 或稳健回归"},
+        {"name": "无多重共线", "check": "VIF<5(严格 <2.5);相关阵 r>.8 警惕", "violated": "中心化/合并变量/岭回归;调节分析先中心化再乘积"},
+        {"name": "无强影响点", "check": "Cook's d > 4/n 标记;杠杆值", "violated": "敏感性分析,报告带/不带影响点结果"}
+      ],
+      "modern_default": "系数 + HC3 稳健 SE + 标准化 β + R²/调整 R² + f²"
+    },
+    {
+      "id": "ancova",
+      "name": "协方差分析",
+      "assumptions": [
+        {"name": "回归斜率同质", "check": "组×协变量交互项不显著(p>.10 较稳)", "violated": "改报调节分析(交互本身就是发现)或 Johnson-Neyman"},
+        {"name": "协变量与处理独立", "check": "随机化实验天然满足;非随机分组慎用!", "violated": "观察数据用 ANCOVA '控制'基线差异是经典误用(Lord's paradox),改倾向得分或变化分数模型并说明"},
+        {"name": "协变量无测量误差", "check": "量表协变量看信度(α<.8 误差不可忽略)", "violated": "SEM 潜变量法校正"}
+      ],
+      "modern_default": "随机实验中 ANCOVA 提升功效;非随机数据它不是万能药"
+    },
+    {
+      "id": "chisq",
+      "name": "卡方检验(独立性/拟合优度)",
+      "assumptions": [
+        {"name": "期望频次", "check": "≥80% 单元格期望频次≥5,且全部≥1", "violated": "Fisher 精确检验或合并类别"},
+        {"name": "观测独立", "check": "每人只贡献一个单元格;重复测量不可用普通卡方", "violated": "McNemar(配对)或混合 logistic"}
+      ],
+      "modern_default": "χ² + Cramér's V(或 φ)+ 标准化残差定位哪格驱动效应"
+    },
+    {
+      "id": "mediation",
+      "name": "中介分析",
+      "assumptions": [
+        {"name": "因果顺序", "check": "X→M→Y 的时间/理论顺序;横断数据的中介只是统计分解!", "violated": "纵向设计(至少半纵向)或明确写'与中介模型一致'而非'证明中介'"},
+        {"name": "无未测混淆", "check": "M-Y 路径最脆弱(X 随机化也保护不了它)", "violated": "敏感性分析(如留一法、E-value 思路)必做并报告"},
+        {"name": "无 X×M 交互", "check": "加交互项检验", "violated": "用因果中介框架(自然直接/间接效应)"}
+      ],
+      "modern_default": "间接效应 bootstrap CI(≥5000 次,偏差校正),禁用 Sobel;横断中介在讨论里必须有局限声明(critic 会查)"
+    },
+    {
+      "id": "mlm",
+      "name": "多层线性模型(HLM/混合效应)",
+      "assumptions": [
+        {"name": "需要分层的证据", "check": "空模型 ICC;设计效应 deff=1+(组均n-1)×ICC>2 必须 MLM", "violated": "ICC≈0 可退回 OLS 但要报告 ICC"},
+        {"name": "两层残差正态", "check": "L1 残差 + 随机效应 QQ 图", "violated": "稳健 SE 或 bootstrap"},
+        {"name": "L1 预测变量中心化决策", "check": "组均中心化(CWC)还是总均(CGM)?决定系数含义!", "violated": "—— 这是规范问题:跨层交互必须 CWC 并把组均放回 L2"},
+        {"name": "L2 样本量", "check": "组数≥30 估 L2 方差较稳;<10 组慎用", "violated": "组少→固定效应(组哑变量)或贝叶斯 MLM"}
+      ],
+      "modern_default": "报 ICC、两层 n、估计法(REML/ML)、中心化策略、伪 R²"
+    },
+    {
+      "id": "efa",
+      "name": "探索性因子分析",
+      "assumptions": [
+        {"name": "取样充分性", "check": "KMO≥.60(<.50 不可做);Bartlett p<.05", "violated": "增样本/删低相关条目"},
+        {"name": "样本量", "check": "N≥200 且 N/条目≥10 较稳;公因子方差高可放宽", "violated": "报告并谨慎解释"},
+        {"name": "条目分布", "check": "Likert 偏态严重时 Pearson 阵会低估", "violated": "多分相关阵(polychoric)+ 加权最小二乘"}
+      ],
+      "modern_default": "平行分析定因子数(碎石图只是参考),斜交旋转(geomin/oblimin),报告全部载荷;别用主成分当因子分析"
+    },
+    {
+      "id": "cfa-sem",
+      "name": "验证性因子分析 / 结构方程模型",
+      "assumptions": [
+        {"name": "多元正态", "check": "Mardia 系数;Likert 5 点以下视为有序", "violated": "MLR(Satorra-Bentler)或 WLSMV(有序条目)"},
+        {"name": "样本量", "check": "N≥200 基线;复杂模型 5-10 人/自由参数;MacCallum 功效法", "violated": "简化模型/打包条目(parceling 有争议,须声明)"},
+        {"name": "模型识别", "check": "df≥0;每因子≥3 指标(2 指标需额外约束)", "violated": "增加指标或固定参数"},
+        {"name": "无海伍德案例", "check": "负方差/标准化载荷>1", "violated": "模型误设信号,别只是约束掉,要诊断"}
+      ],
+      "modern_default": "报 χ²(df,p)、CFI/TLI≥.95、RMSEA≤.06(90%CI)、SRMR≤.08;全报不挑;修正指数改模型=探索性,须声明并理想上换样本验证"
+    },
+    {
+      "id": "irt",
+      "name": "项目反应理论(GRM 等)",
+      "assumptions": [
+        {"name": "单维性", "check": "先跑 EFA/双因子模型,ECV/ωH 判断", "violated": "多维 IRT 或分量表分别建模"},
+        {"name": "局部独立", "check": "残差相关(Q3>.20 警惕)", "violated": "合并题对/testlet 模型"},
+        {"name": "单调性", "check": "非参数 IRT(Mokken)或经验题目特征曲线", "violated": "删除/修改违反条目"}
+      ],
+      "modern_default": "GRM 报区分度 a、阈值 b、信息函数;DIF 检测(性别/文化)是测量公平的标配"
+    },
+    {
+      "id": "lpa-lca",
+      "name": "潜在剖面/类别分析",
+      "assumptions": [
+        {"name": "局部独立", "check": "类内指标独立;违反会虚增类数", "violated": "放开类内相关或减指标"},
+        {"name": "类数枚举", "check": "BIC+aBIC+BLRT 收敛证据,不只看一个指标;熵≥.80 分类质量", "violated": "类数存疑时报多个解并理论裁决"},
+        {"name": "样本量", "check": "N≥500 较稳;小类(<5%)慎解释", "violated": "合并或承认探索性"}
+      ],
+      "modern_default": "报全部备选模型拟合表;三步法(BCH/ML)做类与外部变量关系,别用最可能类别硬分"
+    },
+    {
+      "id": "network",
+      "name": "网络心理测量(EBICglasso 等)",
+      "assumptions": [
+        {"name": "节点非冗余", "check": "goldbricker 检查重叠条目", "violated": "合并冗余节点(否则中心性失真)"},
+        {"name": "稳定性", "check": "bootstrap 边权 CI + 中心性稳定性系数 CS>.25(理想>.5)", "violated": "不稳定就别解释中心性排序"},
+        {"name": "样本量", "check": "节点 p 的网络需 N 数百起步", "violated": "正则化强度更保守,解释更克制"}
+      ],
+      "modern_default": "报 CS 系数与 bootstrap 图;横断网络≠个体内动态网络(推断层级不能混)"
+    }
+  ]
+}
