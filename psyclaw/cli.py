@@ -14,7 +14,7 @@ import sys
 from psyclaw import __version__
 from psyclaw import config as cfg
 from psyclaw.gates.checker import run_gates_selfcheck
-from psyclaw.mcp.manager import list_mcp_catalog
+from psyclaw.mcp.manager import list_mcp_catalog, list_mcp_catalog_with_health, probe_capabilities
 from psyclaw.skills.loader import list_skills
 
 
@@ -48,10 +48,28 @@ def cmd_doctor(args: argparse.Namespace) -> int:
           + ui.dim(f"  model={conf.get('model', 'default')}"))
     py = sys.version.split()[0]
     print(f"Python        : {py}")
-    print("\n" + ui.accent("MCP 目录:"))
-    for m in list_mcp_catalog():
-        mark = ui.ok("✓") if m["enabled"] else ui.dim("·")
-        print(f"  {mark} {m['name']:<14} " + ui.dim(f"[{m['category']}] {m['enable_when']}"))
+    print("\n" + ui.accent("MCP 健康检查:"))
+    mcp_catalog = list_mcp_catalog_with_health()
+    mcp_failures: list[str] = []
+    for m in mcp_catalog:
+        h = m["health"]
+        if m["enabled"]:
+            if h["ok"]:
+                mark = ui.ok("✓")
+            else:
+                mark = ui.err("✗")
+                mcp_failures.append(m["name"])
+        else:
+            mark = ui.dim("·")
+        note = m.get("note", "") or m["enable_when"]
+        detail = h["detail"] if m["enabled"] else ui.dim(h["detail"])
+        print(f"  {mark} {m['name']:<14} {detail:<24} " + ui.dim(note))
+
+    caps = probe_capabilities(mcp_catalog)
+    if caps:
+        print("\n" + ui.accent("能力探测（已启用且健康）:"))
+        for cap, servers in sorted(caps.items()):
+            print(f"  • {cap:<28} " + ui.dim(" + ".join(servers)))
     print("\n" + ui.accent("Gates 自检:"))
     ok = run_gates_selfcheck()
     print("\n" + ui.accent("能力矩阵:"))
@@ -66,8 +84,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 print(f"  {ui.ok('✓')} {name:<6} " + ui.dim(str(info['path'])))
     except Exception:  # noqa: BLE001
         pass
-    print("\n总体状态:" + (ui.ok("OK ✓") if ok else ui.err("有问题,请见上方")))
-    return 0 if ok else 1
+    all_ok = ok and not mcp_failures
+    if mcp_failures:
+        print(ui.err(f"MCP 健康失败: {', '.join(mcp_failures)}"))
+    print("\n总体状态:" + (ui.ok("OK ✓") if all_ok else ui.err("有问题,请见上方")))
+    return 0 if all_ok else 1
 
 
 def cmd_config(args: argparse.Namespace) -> int:
