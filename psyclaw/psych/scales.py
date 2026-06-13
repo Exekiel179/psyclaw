@@ -2,17 +2,20 @@
 
 M-4: 自定义量表支持 — 用户量表 YAML 放 .psyclaw/scales/，与内置库合并；
      相同 id 时用户定义优先覆盖内置。
+W-3: 中文常模支持 — get_cn_norms() 读取 cn_norms.json；print_scale() 可显示中文常模。
 """
 
 from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import re
 from pathlib import Path
 
 SCALES_FILE = Path(__file__).with_name("scales.yaml")
+CN_NORMS_FILE = Path(__file__).with_name("cn_norms.json")
 
 
 def _parse_scales(path: Path) -> list:
@@ -112,15 +115,96 @@ def get_scale(scale_id: str, project_dir: Path | str | None = None) -> dict | No
     return None
 
 
+# ---------------------------------------------------------------------------
+# W-3: 中文常模支持
+# ---------------------------------------------------------------------------
+
+def _load_cn_norms() -> dict:
+    """加载内置中文常模数据(cn_norms.json)，失败时返回空字典。"""
+    if not CN_NORMS_FILE.exists():
+        return {}
+    try:
+        return json.loads(CN_NORMS_FILE.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def get_cn_norms(scale_id: str) -> dict | None:
+    """返回指定量表的中文常模数据，无数据时返回 None。"""
+    norms = _load_cn_norms()
+    return norms.get(scale_id.lower().strip())
+
+
+def format_cn_norms_text(scale_id: str) -> str:
+    """将中文常模格式化为可读文本。"""
+    data = get_cn_norms(scale_id)
+    if not data:
+        return f"  {scale_id} 暂无内置中文常模（可查阅原始文献或自行补充）。"
+
+    lines: list[str] = []
+    lines.append(f"  来源    : {data.get('source_zh', '')}")
+    lines.append(f"  样本    : {data.get('sample', '')}")
+
+    for sub, sub_data in data.get("subscales", {}).items():
+        m = sub_data.get("M")
+        sd = sub_data.get("SD")
+        stat_str = ""
+        if m is not None and sd is not None:
+            stat_str = f"  M={m:.2f}, SD={sd:.2f}"
+        cutoffs = sub_data.get("cutoffs", {})
+        cut_str = "  截断值: " + " | ".join(
+            f"{k}:{v}" for k, v in cutoffs.items()
+        ) if cutoffs else ""
+        lines.append(f"  {sub:<20}: {stat_str}  {cut_str}".rstrip())
+
+    warning = data.get("warning", "")
+    if warning:
+        lines.append(f"  ⚠ 注意  : {warning}")
+
+    return "\n".join(lines)
+
+
+def print_cn_norms(scale_id: str | None = None) -> None:
+    """打印指定量表（或全部量表）的中文常模摘要。"""
+    all_norms = _load_cn_norms()
+
+    if not scale_id:
+        ids_with_norms = [k for k in all_norms if not k.startswith("_")]
+        if not ids_with_norms:
+            print("  未找到中文常模数据 (cn_norms.json 缺失或为空)。")
+            return
+        print("  内置中文常模量表:")
+        for sid in ids_with_norms:
+            entry = all_norms[sid]
+            sample = entry.get("sample", "")
+            print(f"    {sid:<12} {sample}")
+        print()
+        print("  使用 `psyclaw norms <id>` 查看具体量表常模。")
+        return
+
+    sid = scale_id.lower().strip()
+    if sid not in all_norms:
+        ids_with_norms = [k for k in all_norms if not k.startswith("_")]
+        print(f"  {sid} 无内置中文常模。已有常模量表: {', '.join(ids_with_norms)}")
+        return
+
+    data = all_norms[sid]
+    print(f"\n  ── {sid} 中文常模 ──")
+    print(format_cn_norms_text(sid))
+
+
 def print_scale(scale_id: str | None = None,
-                project_dir: Path | str | None = None) -> None:
+                project_dir: Path | str | None = None,
+                show_cn_norms: bool = False) -> None:
     if not scale_id:
         print("  量表库(/scale <id> 查看详情):")
         for s in list_scales(project_dir):
             src_tag = "" if s.get("_source") == "built-in" else f"  [用户:{s.get('_source', '?')}]"
-            print(f"    {s['id']:<10} {s.get('name', '')}({s.get('items', '?')} 题){src_tag}")
+            has_norms = "★" if get_cn_norms(s["id"]) else " "
+            print(f"    {has_norms} {s['id']:<10} {s.get('name', '')}({s.get('items', '?')} 题){src_tag}")
         user_dir = _user_scales_dir(project_dir)
-        print(f"\n  用户量表目录: {user_dir}")
+        print(f"\n  ★ = 有内置中文常模（psyclaw norms <id> 查看）")
+        print(f"  用户量表目录: {user_dir}")
         print("  (在此放置 *.yaml 文件即可扩展量表库，格式同内置 scales.yaml)")
         return
     s = get_scale(scale_id, project_dir)
@@ -140,6 +224,11 @@ def print_scale(scale_id: str | None = None,
     src = s.get("_source", "built-in")
     if src != "built-in":
         print(f"  来源    : .psyclaw/scales/{src}")
+    if show_cn_norms:
+        print()
+        print(format_cn_norms_text(s["id"]))
+    elif get_cn_norms(s["id"]):
+        print("  ★ 中文常模: 使用 `psyclaw norms " + s["id"] + "` 查看截断值与中国样本参数")
 
 
 # ---------------------------------------------------------------------------
