@@ -1,4 +1,8 @@
-"""量表注册表读取与查询 + 自动计分(stdlib only)。"""
+"""量表注册表读取与查询 + 自动计分(stdlib only)。
+
+M-4: 自定义量表支持 — 用户量表 YAML 放 .psyclaw/scales/，与内置库合并；
+     相同 id 时用户定义优先覆盖内置。
+"""
 
 from __future__ import annotations
 
@@ -57,27 +61,71 @@ def _parse_intlist(v: str) -> list:
     return out
 
 
-def list_scales() -> list:
-    return _parse_scales(SCALES_FILE)
+# ---------------------------------------------------------------------------
+# M-4: 自定义量表加载与合并
+# ---------------------------------------------------------------------------
+
+def _user_scales_dir(project_dir: Path | str | None = None) -> Path:
+    """返回 .psyclaw/scales/ 目录(相对于 project_dir，默认 CWD)。"""
+    base = Path(project_dir) if project_dir is not None else Path.cwd()
+    return base / ".psyclaw" / "scales"
 
 
-def get_scale(scale_id: str) -> dict | None:
+def _load_user_scales(project_dir: Path | str | None = None) -> list:
+    """从 .psyclaw/scales/*.yaml 加载用户自定义量表。
+
+    文件格式与内置 scales.yaml 相同（每个条目以 `- id:` 开头）。
+    加载失败的单个文件仅发警告，不影响其他文件。
+    """
+    user_dir = _user_scales_dir(project_dir)
+    scales: list = []
+    if not user_dir.exists():
+        return scales
+    for yf in sorted(user_dir.glob("*.yaml")):
+        try:
+            loaded = _parse_scales(yf)
+        except Exception as exc:  # noqa: BLE001
+            import warnings
+            warnings.warn(f"[psyclaw] 跳过损坏的用户量表文件 {yf.name}: {exc}")
+            continue
+        for s in loaded:
+            s["_source"] = yf.name
+        scales.extend(loaded)
+    return scales
+
+
+def list_scales(project_dir: Path | str | None = None) -> list:
+    """返回合并后的量表列表：内置 + 用户自定义（用户同 id 覆盖内置）。"""
+    builtin = _parse_scales(SCALES_FILE)
+    for s in builtin:
+        s.setdefault("_source", "built-in")
+    user = _load_user_scales(project_dir)
+    user_ids = {s["id"] for s in user}
+    return [s for s in builtin if s["id"] not in user_ids] + user
+
+
+def get_scale(scale_id: str, project_dir: Path | str | None = None) -> dict | None:
     sid = scale_id.lower().strip()
-    for s in list_scales():
+    for s in list_scales(project_dir):
         if s["id"] == sid:
             return s
     return None
 
 
-def print_scale(scale_id: str | None = None) -> None:
+def print_scale(scale_id: str | None = None,
+                project_dir: Path | str | None = None) -> None:
     if not scale_id:
         print("  量表库(/scale <id> 查看详情):")
-        for s in list_scales():
-            print(f"    {s['id']:<10} {s.get('name', '')}({s.get('items', '?')} 题)")
+        for s in list_scales(project_dir):
+            src_tag = "" if s.get("_source") == "built-in" else f"  [用户:{s.get('_source', '?')}]"
+            print(f"    {s['id']:<10} {s.get('name', '')}({s.get('items', '?')} 题){src_tag}")
+        user_dir = _user_scales_dir(project_dir)
+        print(f"\n  用户量表目录: {user_dir}")
+        print("  (在此放置 *.yaml 文件即可扩展量表库，格式同内置 scales.yaml)")
         return
-    s = get_scale(scale_id)
+    s = get_scale(scale_id, project_dir)
     if not s:
-        print(f"  未收录 {scale_id}。可用:{', '.join(x['id'] for x in list_scales())}")
+        print(f"  未收录 {scale_id}。可用:{', '.join(x['id'] for x in list_scales(project_dir))}")
         return
     print(f"  {s.get('name', s['id'])}")
     print(f"  条目数 : {s.get('items', '?')}    计分: {s.get('response', '?')}")
@@ -89,6 +137,9 @@ def print_scale(scale_id: str | None = None) -> None:
         print(f"  信度参考: {s['reliability_ref']}")
     if s.get("notes"):
         print(f"  注意    : {s['notes']}")
+    src = s.get("_source", "built-in")
+    if src != "built-in":
+        print(f"  来源    : .psyclaw/scales/{src}")
 
 
 # ---------------------------------------------------------------------------
@@ -168,7 +219,8 @@ def _desc(vals: list[float]) -> dict:
 
 def score_datafile(path: str, scale_id: str,
                    prefix: str = "Q", suffix: str = "",
-                   method: str = "sum") -> dict:
+                   method: str = "sum",
+                   project_dir: Path | str | None = None) -> dict:
     """对 CSV 全体被试自动计分。
 
     返回 {
@@ -184,9 +236,9 @@ def score_datafile(path: str, scale_id: str,
       "method": method,
     }
     """
-    scale = get_scale(scale_id)
+    scale = get_scale(scale_id, project_dir)
     if not scale:
-        avail = ", ".join(s["id"] for s in list_scales())
+        avail = ", ".join(s["id"] for s in list_scales(project_dir))
         return {"error": f"未知量表 {scale_id}。可用: {avail}"}
 
     fp = Path(path)
