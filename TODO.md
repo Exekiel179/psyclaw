@@ -58,7 +58,7 @@
 | # | 任务 | 说明 |
 |---|------|------|
 | W-1 | JARS 检查单 | 按研究类型挂 JARS-Quant / Qual / Mixed；缺项（缺失数据处理、剔除人数与理由）阻断 |
-| W-2 | 统计结果 APA7 格式器深化 | 斜体统计量、两位小数、`p < .001` 规则、效应量符号、三线表；扩展现有 `apa7.py` |
+| ✅ W-2 | 统计结果 APA7 格式器深化 | 斜体统计量、两位小数、`p < .001` 规则、效应量符号、三线表；扩展现有 `apa7.py` | **已落地** `psyclaw/output/apa7.py`：`format_apa_stat_md`(斜体 *t*/*F*/*r*/*p*/*d*/*η*²/*ω*²)、`format_apa_p`(APA7 p 格式)、`format_apa_stat`(两位小数 + 前导零移除)、`_split_for_italic`、`_table_three_line`(OOXML 三线表)、`APA7Document.add_stat_table`、`_p_stat`(段落斜体 run)。测试 `tests/test_apa7_stat.py`（30 例） |
 | W-3 | 中文心理学语境 | 中文版量表常模进量表库扩展字段；《心理学报》/《心理科学》格式 vs APA 切换；中英双语模板（评估复用 academic-research-skills 双语摘要能力） |
 
 ---
