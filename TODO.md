@@ -32,7 +32,7 @@
 
 | # | 任务 | 说明 | 关联门禁/文件 |
 |---|------|------|--------------|
-| M-1 | 量表自动计分 | ARS-Stat 据 `scales.yaml` 自动计分，含反向题翻转、子量表分 | `scales.py` 扩展 |
+| ✅ M-1 | 量表自动计分 | ARS-Stat 据 `scales.yaml` 自动计分，含反向题翻转、子量表分 | **已落地** `psyclaw/psych/scales.py`：`score_participant`/`score_datafile`/`write_scored_csv`；`psyclaw score <data.csv> --scale <id> [--prefix Q] [--suffix A] [--method sum\|mean] [--out out.csv] [--json]`；PHQ-9 条目 9 伦理警告、DASS-42 版本歧义提示、`write_scored_csv` 追加子量表/总分列至 CSV。测试 `tests/test_scale_score.py`（28 例） |
 | M-2 | 子量表自动信度 | 计分后自动跑各子量表信度（α / ω） | `reliability.py` |
 | M-3 | 测量不变性序列 | 跨组比较前强制 configural → metric → scalar 不变性检验；不成立则阻止潜均值比较，建议部分不变性 | `r_backend.py`，新门禁 `MEASURE.invariance` |
 | M-4 | 自定义量表 | 用户量表 YAML 放 `.psyclaw/scales/`，与内置库合并 | loader 合并逻辑 |

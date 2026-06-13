@@ -1,7 +1,11 @@
-"""量表注册表读取与查询(stdlib only)。"""
+"""量表注册表读取与查询 + 自动计分(stdlib only)。"""
 
 from __future__ import annotations
 
+import csv
+import io
+import math
+import re
 from pathlib import Path
 
 SCALES_FILE = Path(__file__).with_name("scales.yaml")
@@ -85,3 +89,217 @@ def print_scale(scale_id: str | None = None) -> None:
         print(f"  信度参考: {s['reliability_ref']}")
     if s.get("notes"):
         print(f"  注意    : {s['notes']}")
+
+
+# ---------------------------------------------------------------------------
+# M-1: 量表自动计分
+# ---------------------------------------------------------------------------
+
+def _response_range(scale: dict) -> tuple[int, int]:
+    """从 response 字段字符串提取 (最小值, 最大值)，如 '0-3 Likert' → (0, 3)。"""
+    m = re.search(r'(\d+)-(\d+)', scale.get("response", ""))
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    return (1, 5)
+
+
+def reverse_item(value: float, lo: int, hi: int) -> float:
+    """反向计分：lo+hi - 原值。"""
+    return float(lo + hi - value)
+
+
+def _col_name(prefix: str, item_num: int, suffix: str) -> str:
+    return f"{prefix}{item_num}{suffix}"
+
+
+def score_participant(item_values: dict, scale: dict, method: str = "sum") -> dict:
+    """对单个被试的条目应答向量计分。
+
+    item_values: {条目号(1-indexed int): 原始作答(float)}
+    method: "sum" 或 "mean"（子量表聚合方式）
+    返回 {
+      "items": {条目号: 计分后值},      # 含反向翻转
+      "subscales": {维度名: 合计/均值},
+      "total": float,
+      "missing_items": [缺失的条目号],
+    }
+    """
+    lo, hi = _response_range(scale)
+    reverse_set = set(scale.get("reverse", []))
+    n_items = int(scale.get("items", 0))
+
+    scored: dict[int, float] = {}
+    missing: list[int] = []
+    for i in range(1, n_items + 1):
+        if i in item_values:
+            val = item_values[i]
+            scored[i] = reverse_item(val, lo, hi) if i in reverse_set else float(val)
+        else:
+            missing.append(i)
+
+    subscales: dict[str, float] = {}
+    for sub_name, sub_items in scale.get("subscales", {}).items():
+        vals = [scored[i] for i in sub_items if i in scored]
+        if vals:
+            subscales[sub_name] = (sum(vals) / len(vals) if method == "mean"
+                                   else float(sum(vals)))
+
+    if subscales:
+        total = sum(subscales.values())
+    elif scored:
+        total = float(sum(scored.values()))
+    else:
+        total = float("nan")
+
+    return {"items": scored, "subscales": subscales, "total": total,
+            "missing_items": missing}
+
+
+def _desc(vals: list[float]) -> dict:
+    """单列描述统计（n/mean/sd/min/max）。"""
+    n = len(vals)
+    if n == 0:
+        return {"n": 0, "mean": float("nan"), "sd": float("nan"),
+                "min": float("nan"), "max": float("nan")}
+    m = sum(vals) / n
+    sd = math.sqrt(sum((v - m) ** 2 for v in vals) / (n - 1)) if n > 1 else 0.0
+    return {"n": n, "mean": m, "sd": sd, "min": min(vals), "max": max(vals)}
+
+
+def score_datafile(path: str, scale_id: str,
+                   prefix: str = "Q", suffix: str = "",
+                   method: str = "sum") -> dict:
+    """对 CSV 全体被试自动计分。
+
+    返回 {
+      "scale": scale_def,
+      "n": 行数,
+      "n_complete": 完整应答行数,
+      "participants": [{items, subscales, total, missing_items}],
+      "subscale_stats": {维度名: {n,mean,sd,min,max}},
+      "total_stats": {n,mean,sd,min,max},
+      "missing_items_global": [csv 中完全缺失的条目号],
+      "reverse_applied": [已翻转的条目号],
+      "warnings": [str],
+      "method": method,
+    }
+    """
+    scale = get_scale(scale_id)
+    if not scale:
+        avail = ", ".join(s["id"] for s in list_scales())
+        return {"error": f"未知量表 {scale_id}。可用: {avail}"}
+
+    fp = Path(path)
+    if not fp.exists():
+        return {"error": f"文件不存在: {path}"}
+
+    raw = fp.read_bytes().decode("utf-8", errors="replace")
+    try:
+        dialect = csv.Sniffer().sniff(raw[:4096], delimiters=",\t;")
+    except csv.Error:
+        dialect = csv.excel
+    reader = csv.DictReader(io.StringIO(raw), dialect=dialect)
+    rows = list(reader)
+    headers: set[str] = set(reader.fieldnames or [])
+
+    n_items = int(scale.get("items", 0))
+    found_cols: dict[int, str] = {
+        i: _col_name(prefix, i, suffix)
+        for i in range(1, n_items + 1)
+        if _col_name(prefix, i, suffix) in headers
+    }
+    missing_items_global = [i for i in range(1, n_items + 1) if i not in found_cols]
+
+    participants: list[dict] = []
+    for row in rows:
+        item_values: dict[int, float] = {}
+        for item_num, col in found_cols.items():
+            v = row.get(col, "").strip()
+            try:
+                item_values[item_num] = float(v)
+            except ValueError:
+                pass
+        participants.append(score_participant(item_values, scale, method=method))
+
+    # 子量表描述统计
+    subscale_stats: dict[str, dict] = {}
+    for sub in scale.get("subscales", {}).keys():
+        vals = [p["subscales"][sub] for p in participants
+                if sub in p["subscales"] and not math.isnan(p["subscales"][sub])]
+        subscale_stats[sub] = _desc(vals)
+
+    # 总分描述统计
+    totals = [p["total"] for p in participants if not math.isnan(p["total"])]
+    total_stats = _desc(totals)
+
+    warnings: list[str] = []
+    if missing_items_global:
+        warnings.append(
+            f"CSV 中缺失条目列: {missing_items_global}（期望列名格式: {prefix}N{suffix}）")
+
+    # PHQ-9 条目 9 伦理警告
+    if scale_id.lower() == "phq-9" and 9 in found_cols:
+        n_endorse = sum(1 for p in participants
+                        if p["items"].get(9, 0) >= 1)
+        if n_endorse > 0:
+            warnings.append(
+                f"⚠ PHQ-9 条目 9（自伤意念）在 {n_endorse} 名被试中有应答（≥ 1）。"
+                "请确认 IRB 批准并建立危机转介流程；不得直接向被试报告个人评分。")
+
+    # DASS-42 1-4 vs 0-3 歧义提示
+    if scale_id.lower() == "dass-42":
+        warnings.append(
+            "DASS-42：在线版常用 1–4，纸质版为 0–3（总分差 42 分）。"
+            "请确认数据计分规则与量表版本一致。")
+
+    reverse_applied = sorted(set(scale.get("reverse", [])) & set(found_cols.keys()))
+
+    return {
+        "scale": scale,
+        "n": len(rows),
+        "n_complete": sum(1 for p in participants if not p["missing_items"]),
+        "participants": participants,
+        "subscale_stats": subscale_stats,
+        "total_stats": total_stats,
+        "missing_items_global": missing_items_global,
+        "reverse_applied": reverse_applied,
+        "warnings": warnings,
+        "method": method,
+    }
+
+
+def write_scored_csv(result: dict, out_path: str, original_path: str) -> None:
+    """将计分结果追加到原始 CSV 列尾，输出到 out_path。"""
+    scale = result["scale"]
+    sid = scale["id"].upper().replace("-", "_")
+    fp = Path(original_path)
+    raw = fp.read_bytes().decode("utf-8", errors="replace")
+    try:
+        dialect = csv.Sniffer().sniff(raw[:4096], delimiters=",\t;")
+    except csv.Error:
+        dialect = csv.excel
+    reader = csv.DictReader(io.StringIO(raw), dialect=dialect)
+    orig_rows = list(reader)
+    fieldnames = list(reader.fieldnames or [])
+
+    sub_keys = list(scale.get("subscales", {}).keys())
+    extra_fields = [f"{sid}_{s}" for s in sub_keys] + [f"{sid}_Total"]
+    fieldnames = fieldnames + [f for f in extra_fields if f not in fieldnames]
+
+    out_rows = []
+    for i, row in enumerate(orig_rows):
+        new_row = dict(row)
+        if i < len(result["participants"]):
+            p = result["participants"][i]
+            for sub in sub_keys:
+                val = p["subscales"].get(sub, "")
+                new_row[f"{sid}_{sub}"] = "" if val == "" or (
+                    isinstance(val, float) and math.isnan(val)) else f"{val:.2f}"
+            total = p.get("total", float("nan"))
+            new_row[f"{sid}_Total"] = "" if math.isnan(total) else f"{total:.2f}"
+        out_rows.append(new_row)
+
+    with open(out_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(out_rows)

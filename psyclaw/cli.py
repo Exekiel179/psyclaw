@@ -118,6 +118,67 @@ def cmd_scale(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_score(args: argparse.Namespace) -> int:
+    import json as _json
+    from psyclaw import ui
+    from psyclaw.psych.scales import score_datafile, write_scored_csv
+
+    result = score_datafile(
+        args.data, args.scale,
+        prefix=args.prefix,
+        suffix=args.suffix,
+        method=args.method,
+    )
+    if "error" in result:
+        print(ui.err(result["error"]))
+        return 1
+
+    scale = result["scale"]
+    print(ui.title(f"量表自动计分 — {scale.get('name', scale['id'])}"))
+    print(ui.rule())
+    print(f"  数据: {args.data}  |  量表: {scale['id']}  |  聚合: {args.method}")
+    print(f"  有效行: {result['n']}  |  完整应答（无缺失条目）: {result['n_complete']}")
+
+    lo_hi = ""
+    import re
+    m = re.search(r"(\d+)-(\d+)", scale.get("response", ""))
+    if m:
+        lo_hi = f"  计分范围: {m.group(1)}–{m.group(2)}"
+    if lo_hi:
+        print(lo_hi)
+    if result["reverse_applied"]:
+        print(ui.dim(f"  反向计分条目（已翻转）: {result['reverse_applied']}"))
+
+    if result["subscale_stats"]:
+        print(ui.accent("\n子量表描述统计"))
+        for sub, st in result["subscale_stats"].items():
+            if st["n"] == 0:
+                print(f"  {sub:<22} 无有效数据")
+            else:
+                print(f"  {sub:<22} M={st['mean']:.2f}  SD={st['sd']:.2f}"
+                      f"  range=[{st['min']:.0f},{st['max']:.0f}]  n={st['n']}")
+
+    ts = result["total_stats"]
+    if ts and ts["n"] > 0:
+        print(ui.accent("\n总分描述统计"))
+        print(f"  Total  M={ts['mean']:.2f}  SD={ts['sd']:.2f}"
+              f"  range=[{ts['min']:.0f},{ts['max']:.0f}]  n={ts['n']}")
+
+    for w in result["warnings"]:
+        print(ui.warn(f"\n{w}"))
+
+    if args.out:
+        write_scored_csv(result, args.out, args.data)
+        print(ui.ok(f"\n  已写出计分结果: {args.out}"))
+
+    if args.json:
+        safe = {k: v for k, v in result.items() if k not in ("participants", "scale")}
+        safe["scale_id"] = scale["id"]
+        print(_json.dumps(safe, ensure_ascii=False, indent=2, default=float))
+
+    return 0
+
+
 def cmd_screen(args: argparse.Namespace) -> int:
     from psyclaw.psych.careless import screen_csv_cli
     argv = [args.file]
@@ -402,6 +463,19 @@ def build_parser() -> argparse.ArgumentParser:
     ps = sub.add_parser("scale", help="量表库查询(DASS/PHQ-9/GAD-7/TIPI…)")
     ps.add_argument("scale_id", nargs="?", default=None, help="量表 id,留空列出全部")
     ps.set_defaults(func=cmd_scale)
+
+    psc = sub.add_parser(
+        "score",
+        help="量表自动计分(反向题翻转 + 子量表总分/均值，据 scales.yaml 定义)")
+    psc.add_argument("data", help="CSV/TSV 数据文件")
+    psc.add_argument("--scale", required=True, help="量表 id（如 tipi / phq-9 / dass-21）")
+    psc.add_argument("--prefix", default="Q", help="条目列前缀（默认 Q）")
+    psc.add_argument("--suffix", default="", help="条目列后缀（默认空；OpenPsychometrics DASS 用 A）")
+    psc.add_argument("--method", choices=["sum", "mean"], default="sum",
+                     help="子量表聚合方式：sum（默认）或 mean")
+    psc.add_argument("--out", default=None, help="输出计分结果 CSV 路径（追加子量表/总分列）")
+    psc.add_argument("--json", action="store_true", help="输出机器可读 JSON（含描述统计）")
+    psc.set_defaults(func=cmd_score)
 
     pscr = sub.add_parser("screen", help="数据草率作答筛查(longstring/IRV/直线作答)")
     pscr.add_argument("file", help="CSV/TSV 数据文件")
