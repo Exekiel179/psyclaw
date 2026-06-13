@@ -175,6 +175,13 @@ REQUIREMENT_CHECKS = {
     # M-3 测量不变性门控 — sidecar 由 psyclaw invariance 生成
     "invariance_tested": lambda d, base: d.get("invariance_tested") is True,
     "scalar_invariance_met": lambda d, base: d.get("scalar_invariance") is True,
+    # FIG.honest 门控 — figure sidecar (by psyclaw figures --check)
+    "axis_from_zero_or_flagged": lambda d, base: (
+        d.get("axis_from_zero", True) is not False
+        or bool(d.get("truncation_flagged"))
+    ),
+    "error_bar_meaning": lambda d, base: bool(str(d.get("error_bar_label", "")).strip()),
+    "colorblind_safe": lambda d, base: d.get("colorblind_safe") is True,
     # 其余 requirement(apa7_*、prisma_flow、harking 等)暂无自动校验
     # → check_artifact 会显式输出"需人工核"warning,绝不静默放行。
 }

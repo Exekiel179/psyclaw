@@ -407,6 +407,20 @@ def cmd_auth(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_figures(args: argparse.Namespace) -> int:
+    from psyclaw.figures import figures_cli
+    argv: list[str] = []
+    if getattr(args, "list_styles", False):
+        argv += ["--list-styles"]
+    if getattr(args, "style", None):
+        argv += ["--style", args.style]
+    if getattr(args, "check", None):
+        argv += ["--check", args.check]
+    if getattr(args, "palette", 0):
+        argv += ["--palette", str(args.palette)]
+    return figures_cli(argv or None)
+
+
 def cmd_lit(args: argparse.Namespace) -> int:
     from psyclaw.psych.lit_cli import lit_cli
     return lit_cli(query=args.query or "", sources=args.sources, limit=args.limit,
@@ -838,6 +852,19 @@ def build_parser() -> argparse.ArgumentParser:
     pau.add_argument("--set", action="store_true", help="配置机构权限(无密码)")
     pau.add_argument("--verify", action="store_true", help="连通自检并记录认证状态")
     pau.set_defaults(func=cmd_auth)
+
+    pfig = sub.add_parser(
+        "figures",
+        help="图表主题层(E-1): 风格预设 / FIG.honest 诚实性核查 / Okabe-Ito 调色板")
+    pfig.add_argument("--list-styles", action="store_true", dest="list_styles",
+                      help="列出内置风格(apa7/nature/frontiers/minimal)")
+    pfig.add_argument("--style", default=None,
+                      help="查看指定风格配置")
+    pfig.add_argument("--check", default=None, metavar="SPEC.JSON",
+                      help="对图表 sidecar JSON 跑 FIG.honest 诚实性核查")
+    pfig.add_argument("--palette", type=int, default=0, metavar="N",
+                      help="打印 Okabe-Ito 调色板前 N 色(默认 8)")
+    pfig.set_defaults(func=cmd_figures)
 
     plit = sub.add_parser("lit", help="文献检索 + 全文获取(合法 OA;PRISMA 计数)")
     plit.add_argument("query", nargs="?", default=None, help="检索式")
