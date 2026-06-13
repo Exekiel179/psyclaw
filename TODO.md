@@ -67,7 +67,7 @@
 
 | # | 任务 | 说明 |
 |---|------|------|
-| E-1 | 图表主题层 | `psyclaw.figures` 统一主题（matplotlib rcParams + seaborn + ggplot 对照），所有子技能出图走同一入口；落实 `figure_style.yaml` 的 APA7/nature/frontiers 预设与诚实性门禁（y 轴归零、误差棒标注） |
+| ✅ E-1 | 图表主题层 | **已落地** `psyclaw/figures.py`：`apply_style(name)` contextmanager(matplotlib rcParams；无 matplotlib 时静默降级)、`honesty_check(spec)` FIG.honest 三项自动核查(axis_from_zero_or_flagged/error_bar_meaning/colorblind_safe)、`write_figure_sidecar` 写 sidecar JSON、`okabe_ito_palette(n)` 色盲友好调色板、`list_styles/theme_spec` 读取 figure_style.yaml；`REQUIREMENT_CHECKS` 注册 FIG.honest 三项(checker.py)；`psyclaw figures [--list-styles\|--style\|--check spec.json\|--palette N]`；测试 `tests/test_figures.py`（51 例）；门禁自动化升至 20 项。 |
 | E-2 | 商业统计软件 MCP | SPSS（已有 `spss_server.py` 雏形）/ Mplus / Stata 完整 MCP；先定接口契约，实现可后置 |
 | E-3 | MCP registry 完善 | `config` 向导逐项启用 + 健康检查 + 能力探测；`doctor` 全绿 |
 
