@@ -234,7 +234,7 @@ def cmd_lit(args: argparse.Namespace) -> int:
     from psyclaw.psych.lit_cli import lit_cli
     return lit_cli(query=args.query or "", sources=args.sources, limit=args.limit,
                    year_from=args.year_from, fulltext_doi=args.fulltext,
-                   zotero_doi=args.zotero)
+                   zotero_doi=args.zotero, synthesize=getattr(args, "synthesize", False))
 
 
 def cmd_stat(args: argparse.Namespace) -> int:
@@ -466,6 +466,8 @@ def build_parser() -> argparse.ArgumentParser:
     plit.add_argument("--year-from", dest="year_from", type=int, default=None)
     plit.add_argument("--fulltext", default=None, help="按 DOI 取合法 OA 全文")
     plit.add_argument("--zotero", default=None, help="按 DOI 从你的 Zotero 文库取全文")
+    plit.add_argument("--synthesize", "-s", action="store_true",
+                      help="据检索命中一键合成结构化综述(notes/lit_review.md)")
     plit.set_defaults(func=cmd_lit)
 
     for name, helptext in [
