@@ -428,6 +428,23 @@ def cmd_mediation(args: argparse.Namespace) -> int:
     return analyze_mediation_cli(argv)
 
 
+def cmd_invariance(args: argparse.Namespace) -> int:
+    from psyclaw.psych.invariance import run_invariance
+    return run_invariance(
+        data_path=args.data,
+        model=args.model or "",
+        group=args.group,
+        output_dir=args.output_dir,
+        cfi_configural=args.cfi_configural,
+        rmsea_configural=args.rmsea_configural,
+        cfi_metric=args.cfi_metric,
+        rmsea_metric=args.rmsea_metric,
+        cfi_scalar=args.cfi_scalar,
+        rmsea_scalar=args.rmsea_scalar,
+        as_json=args.json,
+    )
+
+
 def cmd_moderation(args: argparse.Namespace) -> int:
     from psyclaw.psych.decision_tree import analyze_moderation_cli
     argv = [args.file]
@@ -760,6 +777,31 @@ def build_parser() -> argparse.ArgumentParser:
     pmed.add_argument("--y", required=True, help="因变量(结果变量)列名")
     pmed.add_argument("--nboot", type=int, default=5000, help="bootstrap 次数(默认 5000)")
     pmed.set_defaults(func=cmd_mediation)
+
+    pinv = sub.add_parser(
+        "invariance",
+        help="测量不变性序列检验(configural→metric→scalar；scalar 不成立则阻断潜均值比较)")
+    pinv.add_argument("data", help="CSV 数据文件路径")
+    pinv.add_argument("--model", default=None,
+                      help="lavaan CFA 模型语法(如 'F =~ q1 + q2 + q3');"
+                           "缺省时仅凭手动拟合指数判决")
+    pinv.add_argument("--group", required=True, help="分组列名(跨组不变性检验)")
+    pinv.add_argument("--output-dir", default="notes", dest="output_dir",
+                      help="sidecar JSON 输出目录(默认 notes)")
+    pinv.add_argument("--cfi-configural", type=float, default=None, dest="cfi_configural",
+                      help="手动录入: configural 层 CFI")
+    pinv.add_argument("--rmsea-configural", type=float, default=None, dest="rmsea_configural",
+                      help="手动录入: configural 层 RMSEA")
+    pinv.add_argument("--cfi-metric", type=float, default=None, dest="cfi_metric",
+                      help="手动录入: metric 层 CFI")
+    pinv.add_argument("--rmsea-metric", type=float, default=None, dest="rmsea_metric",
+                      help="手动录入: metric 层 RMSEA")
+    pinv.add_argument("--cfi-scalar", type=float, default=None, dest="cfi_scalar",
+                      help="手动录入: scalar 层 CFI")
+    pinv.add_argument("--rmsea-scalar", type=float, default=None, dest="rmsea_scalar",
+                      help="手动录入: scalar 层 RMSEA")
+    pinv.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pinv.set_defaults(func=cmd_invariance)
 
     pmod = sub.add_parser("moderation",
                           help="调节分析(简单斜率 W±1SD + Johnson-Neyman 显著性区间)")

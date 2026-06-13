@@ -49,6 +49,7 @@ KIND_TRIGGERS = {
     "figure": {"figure_output"},
     "literature": {"literature_review"},
     "scale": {"scale_score_used"},
+    "invariance": {"latent_mean_comparison"},   # M-3 测量不变性
 }
 
 
@@ -171,6 +172,9 @@ REQUIREMENT_CHECKS = {
     # D-3 伦理门控 — ethics_prompted 键由 psyclaw score 写入 sidecar
     # 键存在(True 或 False)表明伦理检查已运行；键缺失则视为未经伦理核查。
     "ethics_reviewed": lambda d, base: "ethics_prompted" in d,
+    # M-3 测量不变性门控 — sidecar 由 psyclaw invariance 生成
+    "invariance_tested": lambda d, base: d.get("invariance_tested") is True,
+    "scalar_invariance_met": lambda d, base: d.get("scalar_invariance") is True,
     # 其余 requirement(apa7_*、prisma_flow、harking 等)暂无自动校验
     # → check_artifact 会显式输出"需人工核"warning,绝不静默放行。
 }
