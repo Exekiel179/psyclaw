@@ -20,7 +20,7 @@
 
 | # | 任务 | 说明 | 验收 | 关联 |
 |---|------|------|------|------|
-| P0-1 | 审稿模拟接入 | 接入 `academic-research-skills:academic-paper-reviewer`，对产出稿做多视角同行评审（EIC + 3 审稿人 + Devil's Advocate） | `/review <draft>` 产出可解析的审稿意见，并回灌 critic 修复环 | README §下一步 |
+| ✅ P0-1 | 审稿模拟接入 | 多视角同行评审（EIC + R1/R2/R3 + Devil's Advocate），保守 fail-closed 编辑决定 | **已落地** `psyclaw/review.py` + `agents/reviewer.md`；`psyclaw review <draft> [--revise]`（REPL `/review`）产出 `notes/review_panel.{md,json}` 可解析意见 + `response_letter.md`，`--revise` 回灌 executor 修订并复审闭合「写作→评审→修复」。测试 `tests/test_review.py`（20 例） | README §下一步 |
 | P0-2 | ARS 一句话编排 | ARS skill 把文献→设计→统计→写作全链编排成一句「研究 X」 | `/research <topic>` 端到端跑出一篇过门禁的稿 | DESIGN §10 M5 |
 | P0-3 | knowledge 抽取入综述 | 文献 knowledge 抽取自动汇入综述段落 | `/lit` 检索结果可一键生成结构化综述 | README §下一步 |
 
@@ -93,8 +93,8 @@
 
 ## 建议的下一步执行顺序
 
-1. **P0-1 审稿模拟** —— 闭合「写作 → 评审 → 修复」回路，价值最高且依赖已就绪。
-2. **P0-2 一句话编排** —— 把已打通的四象限串成产品级体验。
+1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
+2. **P0-2 一句话编排** —— 把已打通的四象限串成产品级体验。**← 下一步**
 3. **D-2 预注册 + D-1 功效分析** —— 设计层最大缺口，直接影响门禁完整性。
 4. **A-1 检验决策树特判** —— 心理学统计的核心差异化。
 5. 其余 P1/P2 按需排期。
