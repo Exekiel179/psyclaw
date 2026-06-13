@@ -43,7 +43,7 @@
 | # | 任务 | 说明 | 关联门禁 |
 |---|------|------|----------|
 | ✅ D-1 | 功效分析预设 | 对标 G*Power：t / ANOVA / 相关回归 / 中介（Monte Carlo）/ SEM（MacCallum RMSEA）；先验默认 r≈.20 / d≈.40，提示发表偏倚高估 | **已落地** `psyclaw/psych/power.py`：纯 stdlib 非中心 t（积分）/F/χ²（Poisson 级数）核 + 六类检验功效与样本量反解（双向）；`psyclaw power <ttest\|anova\|r\|regression\|sem\|mediation> [-n N \| --power .80] [--json]`，保守先验默认 + 发表偏倚告警。无 scipy 环境下用闭式自检 + G*Power/Cohen 锚点 + 双路径互证验证。测试 `tests/test_power.py`（31 例） | `DESIGN.power` |
-| D-2 | 预注册模板 | `/preregister` 生成 OSF / AsPredicted 双格式，自动抽取假设（确证/探索）、IV/DV/协变量、剔除规则、样本量依据、分析计划 | `DESIGN.prereg`（命令未实现） |
+| ✅ D-2 | 预注册模板 | `/preregister` 生成 OSF / AsPredicted 双格式，自动抽取假设（确证/探索）、IV/DV/协变量、剔除规则、样本量依据、分析计划 | **已落地** `psyclaw/psych/preregister.py`：读 `notes/clarification.md`（17 槽位）→ OSF 6 节标准模板 + AsPredicted 标准 8 问双文稿（`notes/preregistration_{osf,aspredicted}.md`）。假设按确证/探索自动归类，未标注 **fail-closed 按探索性**并告警（防 HARKing）；关键槽位缺失渲染 `[待补充]` 占位+告警，不替用户编造；`--test` 复用 D-1 `power.compute` 嵌入确定性样本量依据（保留发表偏倚告警）。`psyclaw preregister [--osf\|--aspredicted] [--test … 功效参数]`（REPL `/preregister`）。测试 `tests/test_preregister.py`（21 例） |
 | D-3 | 伦理提示 | 敏感测量（如 PHQ-9 条目 9 自伤意念）触发 IRB / 危机转介提示，量表库 `notes` 为触发源 | 新增软门禁 |
 
 ### 3. 分析层
@@ -97,6 +97,6 @@
 2. ~~**P0-2 一句话编排**~~ ✅ 四象限端到端流水线（`psyclaw/pipeline.py`,`psyclaw research`）。
 3. ~~**P0-3 knowledge 抽取入综述**~~ ✅ `/lit --synthesize` 一键综述 + 流水线 ① 据 `/lit` 缓存合成有据综述（`psyclaw/psych/synthesize.py`）。
 4. ~~**D-1 功效分析**~~ ✅ G*Power 对标的先验功效分析（`psyclaw power`，`psyclaw/psych/power.py`）。
-5. **D-2 预注册模板** —— `/preregister` 生成 OSF/AsPredicted；可直接复用 D-1 的样本量依据。**← 下一步**
-6. **A-1 检验决策树特判** —— 心理学统计的核心差异化。
+5. ~~**D-2 预注册模板**~~ ✅ `/preregister` 据澄清卡产 OSF/AsPredicted 双格式，复用 D-1 功效（`psyclaw/psych/preregister.py`）。
+6. **A-1 检验决策树特判** —— 心理学统计的核心差异化。**← 下一步**
 7. 其余 P1/P2 按需排期。
