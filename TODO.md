@@ -36,7 +36,7 @@
 | ✅ M-2 | 子量表自动信度 | 计分后自动跑各子量表信度（α / ω） | **已落地** `psyclaw/psych/scales.py`：`compute_subscale_reliability`(完整观测 Cronbach's α + 逐题删除后 α)；集成入 `score_datafile` 返回值 `reliability` 键；`cmd_score` 显示各维度 α + 解释文字 + 拖后腿条目提示。ω 需 R/lavaan，留 `analyze_advanced` 接口（`psyclaw stat --method omega`）。测试复用 `tests/test_scale_score.py`（37 例） |
 | M-3 | 测量不变性序列 | 跨组比较前强制 configural → metric → scalar 不变性检验；不成立则阻止潜均值比较，建议部分不变性 | `r_backend.py`，新门禁 `MEASURE.invariance` |
 | ✅ M-4 | 自定义量表 | 用户量表 YAML 放 `.psyclaw/scales/`，与内置库合并 | **已落地** `psyclaw/psych/scales.py`：`_user_scales_dir`/`_load_user_scales`；`list_scales`/`get_scale`/`print_scale`/`score_datafile` 均接受 `project_dir` 参数；用户同 id 优先覆盖内置；来源标签 `_source` 字段；列表视图显示 `[用户:文件名]`；损坏文件 warning 跳过不中断；内置量表标记 `built-in`。测试 `tests/test_custom_scales.py`（22 例） |
-| M-5 | 草率作答扩展指标 | psychsyn/psychant 语义一致性、Mahalanobis D、作答时间（Q{N}E）、假词法（infrequency items） | `careless.py` |
+| ✅ M-5 | 草率作答扩展指标 | psychsyn/psychant 语义一致性、Mahalanobis D、作答时间（Q{N}E）、假词法（infrequency items） | **已落地** `psyclaw/psych/careless.py`：`psychsyn_score`(同/反义题对一致性)、`mahalanobis_d`+`chi2_critical`(纯 stdlib Gauss-Jordan 矩阵求逆,Tabachnick & Fidell 阈值)、`response_time_flag`(Q{N}E 列速度标记)、`infrequency_score`(陷阱词项偏离计数)；`flag_respondent` 整合四类新指标；`screen_csv` 自动检测时间列并跑全局 Mahalanobis D²；CLI `--no-mahal` 可关闭。测试 `tests/test_careless.py`（44 例） |
 
 ### 2. 设计层
 
