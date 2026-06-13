@@ -176,6 +176,37 @@ def test_pipeline_end_to_end_produces_all_artifacts():
         assert summ["final_draft"] == "outputs/report.md"
 
 
+def test_pipeline_literature_grounded_from_lit_cache():
+    # P0-3:若存在 /lit 检索缓存,① 文献阶段据真实题录合成有据综述 + 证据图谱。
+    with tempfile.TemporaryDirectory() as d:
+        proj = Path(d)
+        _resolved_card(proj)
+        (proj / "notes" / "lit_search.json").write_text(json.dumps({
+            "query": "X 对 Y", "results": [
+                {"title": "X improves Y in adults",
+                 "authors": ["John Smith"], "year": 2019, "doi": "10.1/a",
+                 "abstract": "X improves Y outcomes; mechanism unclear.",
+                 "oa_status": "gold"},
+                {"title": "X and Y across contexts",
+                 "authors": ["Brown JA", "Lee K"], "year": 2021, "doi": "10.2/b",
+                 "abstract": "X predicts Y across contexts and tasks.",
+                 "oa_status": "closed"},
+            ]}, ensure_ascii=False), encoding="utf-8")
+        # ① 综述叙事 ② 设计 ③(无数据跳过) ④ 写作 ⑤ 评审面板 —— ① 仍只 1 次 provider。
+        seq = _SeqProvider(["Smith (2019) 发现 X 改善 Y。", "# 设计",
+                            "# 稿 d=0.5 [0.1, 0.9]", PANEL_ACCEPT])
+        rc = _patched(seq, lambda: run_pipeline(
+            topic="探究 X 对 Y 的影响", project_dir=str(proj), auto=True))
+        assert rc == 0
+        # 证据图谱落盘(真实题录可回溯),综述含证据表与 provider 叙事。
+        assert (proj / "notes" / "evidence_map.json").exists()
+        emap = json.loads((proj / "notes" / "evidence_map.json")
+                          .read_text(encoding="utf-8"))
+        assert emap["n_papers"] == 2
+        review = (proj / "notes" / "lit_review.md").read_text(encoding="utf-8")
+        assert "证据图谱" in review and "Smith (2019) 发现 X 改善 Y" in review
+
+
 def test_pipeline_failclosed_when_review_not_accept():
     # mock 风格面板不含 RECOMMENDATION → 无同行推荐 → 决定 MAJOR → 不过门禁,
     # 但流水线仍跑通(返回 0,交人工),summary 记录 BLOCK。

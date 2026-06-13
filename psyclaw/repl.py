@@ -345,7 +345,10 @@ class ReplSession:
         elif cmd == "/research-loop":
             from psyclaw.loop import run_loop
             run_loop(topic=arg or None)
-        elif cmd in ("/lit", "/stat", "/write", "/init"):
+        elif cmd == "/lit":
+            from psyclaw.psych.lit_cli import lit_cli_argv
+            lit_cli_argv(arg.split() if arg else [])
+        elif cmd in ("/stat", "/write", "/init"):
             print(f"  [{cmd}] M2+ 实现(见 DESIGN.md 路线图)。当前可直接用自然语言询问,ARS 规范已注入。")
         else:
             print(f"  未知命令 {cmd},输入 /help 查看可用命令")
@@ -401,7 +404,8 @@ HELP_TEXT = """\
   /config     配置向导           /exit          退出
   /research [t]    一句话端到端流水线:文献→设计→统计→写作→评审→门禁(--revise 闭环)
   /research-loop   通用 HITL 回路(planner→executor→critic→修复→交付)
-  /lit /stat /write  → M2+ 实现"""
+  /lit [q] [-s]    文献检索(合法 OA;-s 据真实命中一键合成结构化综述)
+  /stat /write     → M2+ 实现"""
 
 
 def run_repl() -> int:

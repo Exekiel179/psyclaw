@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
 def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
             year_from: int | None = None, fulltext_doi: str | None = None,
-            zotero_doi: str | None = None, project_dir: str = ".") -> int:
+            zotero_doi: str | None = None, synthesize: bool = False,
+            project_dir: str = ".") -> int:
     from psyclaw import ui
     from psyclaw.psych import litsearch, zotero_client
 
@@ -65,7 +67,84 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
         f"- 下一步(screening): 按纳入排除标准人工筛选,记录排除数与原因\n",
         encoding="utf-8")
     print(ui.dim(f"PRISMA 检索记录 → {notes / 'prisma_search.md'}"))
+
+    # 检索结果缓存(供 `psyclaw research` ① 文献阶段据真实题录合成综述)
+    (notes / "lit_search.json").write_text(
+        json.dumps(r, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(ui.dim(f"检索结果缓存 → {notes / 'lit_search.json'}"
+                 "(下次 psyclaw research 将据此合成有据综述)"))
+
+    if synthesize:
+        _synthesize_review(query, r, project_dir, ui)
+    else:
+        print(ui.dim("一键生成结构化综述:加 --synthesize(据上述真实命中合成)。"))
     return 0
+
+
+def _synthesize_review(query: str, search_result: dict, project_dir: str, ui) -> None:
+    """据检索命中一键合成结构化综述 → notes/lit_review.md + evidence_map.json。"""
+    from psyclaw import config as cfg
+    from psyclaw.providers import get_provider
+    from psyclaw.psych import synthesize
+
+    notes = Path(project_dir) / "notes"
+    if not search_result.get("results"):
+        print(ui.warn("  无检索命中,跳过综述合成。"))
+        return
+    provider = get_provider(cfg.load_config())
+    print(ui.dim(f"  合成综述(provider={provider.name})…"))
+    syn = synthesize.synthesize_review(query, search_result, provider=provider)
+    (notes / "lit_review.md").write_text(syn["markdown"], encoding="utf-8")
+    (notes / "evidence_map.json").write_text(
+        json.dumps(syn["evidence_map"], ensure_ascii=False, indent=2),
+        encoding="utf-8")
+    tag = ui.ok("有据叙事") if syn["grounded"] else ui.warn("确定性骨架(LLM 未接入)")
+    print(ui.ok(f"✓ 结构化综述 → {notes / 'lit_review.md'}") + f" · {tag}")
+    print(ui.dim(f"  证据图谱 → {notes / 'evidence_map.json'}"
+                 f"(构念 {len(syn['evidence_map']['themes'])} · "
+                 f"参考文献 {syn['n_papers']})"))
+
+
+def lit_cli_argv(argv: list[str], project_dir: str = ".") -> int:
+    """薄入口(REPL `/lit` 复用):lit <检索式> [--synthesize] [--limit N]
+    [--sources s1,s2] [--year-from Y] [--fulltext DOI] [--zotero DOI]。"""
+    query_parts: list[str] = []
+    sources, limit, year_from = "openalex,europepmc", 10, None
+    fulltext_doi = zotero_doi = None
+    synthesize = False
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--synthesize", "-s"):
+            synthesize = True
+        elif a == "--limit" and i + 1 < len(argv):
+            i += 1
+            try:
+                limit = int(argv[i])
+            except ValueError:
+                limit = 10
+        elif a == "--sources" and i + 1 < len(argv):
+            i += 1
+            sources = argv[i]
+        elif a == "--year-from" and i + 1 < len(argv):
+            i += 1
+            try:
+                year_from = int(argv[i])
+            except ValueError:
+                year_from = None
+        elif a == "--fulltext" and i + 1 < len(argv):
+            i += 1
+            fulltext_doi = argv[i]
+        elif a == "--zotero" and i + 1 < len(argv):
+            i += 1
+            zotero_doi = argv[i]
+        elif not a.startswith("-"):
+            query_parts.append(a)
+        i += 1
+    return lit_cli(query=" ".join(query_parts), sources=sources, limit=limit,
+                   year_from=year_from, fulltext_doi=fulltext_doi,
+                   zotero_doi=zotero_doi, synthesize=synthesize,
+                   project_dir=project_dir)
 
 
 def _print_fulltext(res: dict, ui) -> None:

@@ -98,8 +98,8 @@ def _lit_task(goal: str) -> str:
         f"研究目标:{goal}\n"
         "产出**文献/背景综述草稿**(related work):围绕目标梳理核心构念、已有"
         "发现、争议与研究空白(gap),为假设提供理论铺垫。论断尽量标注可核验的"
-        "出处占位 `[作者, 年]`。**不得编造具体数值或 DOI**;自动 OA 文献检索"
-        "接入见 P0-3,此处为结构化背景综述。")
+        "出处占位 `[作者, 年]`。**不得编造具体数值或 DOI**。(回落占位:先跑 "
+        "`psyclaw lit <检索式>` 可据真实检索命中合成有据综述,见 synthesize.py。)")
 
 
 def _design_task(goal: str) -> str:
@@ -130,6 +130,42 @@ def _write_task() -> str:
 def _latest_stat_sidecar(project: Path) -> Path | None:
     js = sorted((project / "outputs").glob("result_*.json"))
     return js[-1] if js else None
+
+
+def _literature_stage(provider, goal: str, clar: str, project: Path) -> str:
+    """① 文献:优先据 `/lit` 缓存的真实检索命中合成**有据综述**;无缓存则回落占位。
+
+    无论走哪条分支,都只消耗**一次** provider 调用(综述叙事),保证编排时序稳定。
+    `psyclaw lit <检索式>` 会把检索结果缓存到 notes/lit_search.json —— 跑过 lit 再跑
+    research,本阶段即据真实题录(知识抽取 → 证据图谱 → 有据叙事)产出综述。
+    """
+    from psyclaw.loop import _gen
+
+    cache = project / "notes" / "lit_search.json"
+    papers = None
+    if cache.exists():
+        try:
+            data = json.loads(cache.read_text(encoding="utf-8"))
+            papers = data.get("results") if isinstance(data, dict) else None
+        except (json.JSONDecodeError, OSError):
+            papers = None
+
+    if papers:
+        from psyclaw.psych import synthesize
+        syn = synthesize.synthesize_review(goal, {"results": papers}, provider=provider)
+        (project / "notes" / "evidence_map.json").write_text(
+            json.dumps(syn["evidence_map"], ensure_ascii=False, indent=2),
+            encoding="utf-8")
+        from psyclaw import ui
+        print(ui.dim(f"  据 /lit 缓存 {syn['n_papers']} 篇真实命中合成综述"
+                     f"({'有据叙事' if syn['grounded'] else '确定性骨架'});"
+                     f"证据图谱 → notes/evidence_map.json"))
+        return syn["markdown"]
+
+    from psyclaw import ui
+    print(ui.dim("  无 /lit 检索缓存,产出占位综述;先跑 `psyclaw lit <检索式>` "
+                 "可据真实文献合成有据综述。"))
+    return _gen(provider, "executor", _lit_task(goal), clar)
 
 
 def run_pipeline(topic: str | None = None, project_dir: str = ".",
@@ -185,7 +221,7 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
 
     # —— ① 文献 ——
     print("\n" + ui.accent("① 文献(背景综述)"))
-    lit = _gen(provider, "executor", _lit_task(goal), clar)
+    lit = _literature_stage(provider, goal, clar, project)
     (project / "notes" / "lit_review.md").write_text(lit, encoding="utf-8")
     artifacts["literature"] = "notes/lit_review.md"
     _log(project, "pipeline ① 文献 → notes/lit_review.md")
