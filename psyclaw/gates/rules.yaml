@@ -90,3 +90,9 @@ gates:
     requires: [ethics_reviewed]
     action: warn
     fix: 使用敏感量表前确认 IRB 批准并制定危机转介流程（psyclaw ethics <id> 查看伦理要求）
+
+  - id: MEASURE.invariance
+    trigger: latent_mean_comparison
+    requires: [invariance_tested, scalar_invariance_met]
+    action: block
+    fix: 运行 psyclaw invariance <data.csv> --group <col> --model '...' 检验 configural→metric→scalar 不变性序列；scalar 不成立时改用 partial invariance 或删除潜均值比较
