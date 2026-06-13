@@ -51,7 +51,7 @@
 | # | 任务 | 说明 | 关联门禁 |
 |---|------|------|----------|
 | ✅ A-1 | 心理学检验决策树特判 | 嵌套数据强制 MLM + 报 ICC；Likert 单题默认有序处理；大样本「显著但效应可忽略」自动改用效应量语言；中介默认 bootstrap CI(5000)，拒 Sobel；调节报简单斜率 + Johnson-Neyman；SEM 全拟合指数 | **已落地** `psyclaw/psych/decision_tree.py`：`detect_likert` / `large_sample_effect_language` / `compute_icc` / `bootstrap_mediation` / `moderation_analysis`；集成到 `analyze.py` (Likert/ICC/大样本自动检测)；新命令 `psyclaw mediation` / `psyclaw moderation`，`psyclaw stat --cluster`。测试 `tests/test_decision_tree.py`（35 例） |
-| A-2 | 多重比较 / 研究者自由度 | 分析前声明计划写入 `notes/plan.md`；偏离即触发审计记录；探索性分析强制标注 + 建议 split-half 验证 | `STAT.no_phack` |
+| ✅ A-2 | 多重比较 / 研究者自由度 | 分析前声明计划写入 `notes/plan.md`；偏离即触发审计记录；探索性分析强制标注 + 建议 split-half 验证 | **已落地** `psyclaw/psych/analysis_plan.py`：`declare/check/log_deviation`；`psyclaw declare-test --dv … --test … --hypothesis confirmatory\|exploratory`；`analyze.py` 集成 plan_check——确证性/探索性/未声明三态 + 偏离时写 `notes/audit_deviations.md` + APA 段前缀标注 + 探索性 split-half 建议。测试 `tests/test_analysis_plan.py`（20 例） |
 
 ### 4. 写作层（`psyclaw/output/`）
 
