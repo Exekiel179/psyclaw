@@ -110,18 +110,8 @@ def run_config_wizard(non_interactive: bool = False) -> int:
     else:
         print(ui.dim("  本地模型,无需 API key ✓"))
 
-    # -- MCP ----------------------------------------------------------------
-    if _ask_yn("启用 Zotero MCP?", True):
-        zk = _ask("  ZOTERO_API_KEY", "", secret=True)
-        if zk:
-            secrets["ZOTERO_API_KEY"] = zk
-        zl = _ask("  ZOTERO_LIBRARY_ID", "")
-        if zl:
-            secrets["ZOTERO_LIBRARY_ID"] = zl
-
-    if _ask_yn("启用 文献检索 MCP?", True):
-        conf["lit_sources"] = _ask("  数据源 [pubmed,semantic-scholar,openalex,arxiv]",
-                                    "openalex,semantic-scholar")
+    # -- MCP — 逐项启用（registry 驱动）--------------------------------------
+    _configure_mcp_servers(conf, secrets)
 
     conf["figure_style"] = _ask("图片风格 [apa7/nature/frontiers/minimal]",
                                 DEFAULTS["figure_style"])
@@ -143,6 +133,48 @@ def run_config_wizard(non_interactive: bool = False) -> int:
         print(ui.ok(f"✓ 密钥已写入 {ENV_FILE}") + ui.dim("(请勿提交该文件)"))
     print(ui.dim("运行 `psyclaw doctor` 自检。"))
     return 0
+
+
+def _configure_mcp_servers(conf: dict, secrets: dict) -> None:
+    """逐项遍历 registry.yaml，向用户询问可选 MCP 服务器的启用与凭据。"""
+    from psyclaw.mcp.manager import _parse_registry, _is_enabled, SERVER_SECRETS, REGISTRY
+
+    print()
+    print("MCP 服务器配置（逐项）：")
+    for s in _parse_registry(REGISTRY):
+        name = s.get("name", "?")
+        ew = s.get("enable_when", "always")
+
+        if ew == "always":
+            print(f"  ✓ {name:<14} 始终启用（无需配置）")
+            continue
+
+        if ew.startswith("detect:"):
+            import shutil as _shutil
+            binary = ew[7:]
+            found = _shutil.which(binary)
+            status = f"已检测到 {found}" if found else f"未检测到 {binary}（跳过）"
+            print(f"  {'✓' if found else '·'} {name:<14} 自动检测: {status}")
+            continue
+
+        if ew.startswith("env:"):
+            key_name = ew[4:]
+            already = bool(secrets.get(key_name) or _is_enabled(ew))
+            prompt_label = f"启用 {name}?"
+            if _ask_yn(f"  {prompt_label}", not already):
+                required_keys = SERVER_SECRETS.get(name, [key_name])
+                for k in required_keys:
+                    val = _ask(f"    {k}", "", secret=True)
+                    if val:
+                        secrets[k] = val
+                # lit_sources 特化配置
+                if name == "lit-search-mcp":
+                    conf["lit_sources"] = _ask(
+                        "    数据源 [pubmed,semantic-scholar,openalex,arxiv]",
+                        "openalex,semantic-scholar",
+                    )
+            else:
+                print(f"    跳过 {name}")
 
 
 def _write_config(conf: dict, secrets: dict) -> None:
