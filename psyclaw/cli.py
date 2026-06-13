@@ -198,6 +198,32 @@ def cmd_score(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ethics(args: argparse.Namespace) -> int:
+    from psyclaw import ui
+    from psyclaw.psych.scales import get_scale
+    from psyclaw.psych.ethics import format_ethics_report
+
+    scale = get_scale(args.scale_id)
+    if not scale:
+        from psyclaw.psych.scales import list_scales
+        avail = ", ".join(s["id"] for s in list_scales())
+        print(ui.err(f"未知量表: {args.scale_id}。可用: {avail}"))
+        return 1
+
+    print(ui.title(f"伦理审查提示 — {scale.get('name', args.scale_id)}"))
+    print(ui.rule())
+    report = format_ethics_report(scale)
+    # 跳过第一行标题（已由 title 显示）
+    for line in report.splitlines()[1:]:
+        if line.startswith("⚠"):
+            print(ui.warn(line))
+        elif line.startswith("ℹ"):
+            print(ui.accent(line))
+        else:
+            print(line)
+    return 0
+
+
 def cmd_declare_test(args: argparse.Namespace) -> int:
     from psyclaw import ui
     from psyclaw.psych.analysis_plan import declare, load_plan
@@ -527,6 +553,11 @@ def build_parser() -> argparse.ArgumentParser:
     psc.add_argument("--out", default=None, help="输出计分结果 CSV 路径（追加子量表/总分列）")
     psc.add_argument("--json", action="store_true", help="输出机器可读 JSON（含描述统计）")
     psc.set_defaults(func=cmd_score)
+
+    pe = sub.add_parser("ethics",
+                        help="量表伦理审查提示（IRB 要求 / 危机转介 / 敏感条目，D-3）")
+    pe.add_argument("scale_id", help="量表 ID（如 phq-9、dass-42）")
+    pe.set_defaults(func=cmd_ethics)
 
     pdt = sub.add_parser(
         "declare-test",

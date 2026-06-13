@@ -168,6 +168,9 @@ REQUIREMENT_CHECKS = {
     # W-1 JARS gate — artifact 即 notes/jars_check.json(由 psyclaw jars 生成)
     "jars_missing_data": lambda d, base: bool(d.get("jars_missing_data_ok")),
     "jars_exclusions": lambda d, base: bool(d.get("jars_exclusions_ok")),
+    # D-3 伦理门控 — ethics_prompted 键由 psyclaw score 写入 sidecar
+    # 键存在(True 或 False)表明伦理检查已运行；键缺失则视为未经伦理核查。
+    "ethics_reviewed": lambda d, base: "ethics_prompted" in d,
     # 其余 requirement(apa7_*、prisma_flow、harking 等)暂无自动校验
     # → check_artifact 会显式输出"需人工核"warning,绝不静默放行。
 }

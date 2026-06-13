@@ -84,3 +84,9 @@ gates:
     requires: [jars_missing_data, jars_exclusions]
     action: block
     fix: 运行 psyclaw jars <draft.md> 检查 JARS 缺项;两项阻断须补后方可投稿
+
+  - id: MEASURE.ethics
+    trigger: scale_score_used
+    requires: [ethics_reviewed]
+    action: warn
+    fix: 使用敏感量表前确认 IRB 批准并制定危机转介流程（psyclaw ethics <id> 查看伦理要求）
