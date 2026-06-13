@@ -51,8 +51,8 @@ COMMANDS = {
     "/clear": "清空上下文",
     "/compact": "压缩上下文",
     "/config": "配置向导",
-    "/research": "完整研究流水线(受澄清门禁约束)",
-    "/research-loop": "HITL 回路(planner→executor→critic)",
+    "/research": "一句话端到端流水线:文献→设计→统计→写作→评审→门禁(受澄清门禁约束)",
+    "/research-loop": "通用 HITL 回路(planner→executor→critic)",
     "/review": "审稿模拟(EIC+3审稿人+DA;--revise 回灌修复环)",
     "/lit": "文献检索(M2+)",
     "/stat": "ARS-Stat 统计分析(M2+)",
@@ -339,7 +339,13 @@ class ReplSession:
         elif cmd == "/review":
             from psyclaw.review import review_cli
             review_cli(arg.split() if arg else [])
-        elif cmd in ("/research", "/research-loop", "/lit", "/stat", "/write", "/init"):
+        elif cmd == "/research":
+            from psyclaw.pipeline import pipeline_cli
+            pipeline_cli(arg.split() if arg else [])
+        elif cmd == "/research-loop":
+            from psyclaw.loop import run_loop
+            run_loop(topic=arg or None)
+        elif cmd in ("/lit", "/stat", "/write", "/init"):
             print(f"  [{cmd}] M2+ 实现(见 DESIGN.md 路线图)。当前可直接用自然语言询问,ARS 规范已注入。")
         else:
             print(f"  未知命令 {cmd},输入 /help 查看可用命令")
@@ -393,7 +399,9 @@ HELP_TEXT = """\
   /memory     三层记忆(画像/决策惯性/教训卡)
   /clear      清空上下文         /compact       压缩上下文
   /config     配置向导           /exit          退出
-  /research /lit /stat /write  → M2+ 实现(research 受澄清门禁约束)"""
+  /research [t]    一句话端到端流水线:文献→设计→统计→写作→评审→门禁(--revise 闭环)
+  /research-loop   通用 HITL 回路(planner→executor→critic→修复→交付)
+  /lit /stat /write  → M2+ 实现"""
 
 
 def run_repl() -> int:
