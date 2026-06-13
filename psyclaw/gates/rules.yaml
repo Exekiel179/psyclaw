@@ -78,3 +78,9 @@ gates:
                step5_robustness_2plus, hedged_language]
     action: block
     fix: 按 gates/rigor.md 流程补齐;因果措辞须带识别假设限定
+
+  - id: WRITE.jars
+    trigger: paper_output
+    requires: [jars_missing_data, jars_exclusions]
+    action: block
+    fix: 运行 psyclaw jars <draft.md> 检查 JARS 缺项;两项阻断须补后方可投稿

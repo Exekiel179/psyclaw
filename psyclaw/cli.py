@@ -299,6 +299,19 @@ def cmd_export(args: argparse.Namespace) -> int:
     return export_cli(argv)
 
 
+def cmd_jars(args: argparse.Namespace) -> int:
+    from psyclaw.output.jars import jars_cli
+    argv = []
+    if args.draft:
+        argv += [args.draft]
+    argv += ["--type", args.research_type]
+    if args.json:
+        argv += ["--json"]
+    if args.no_sidecar:
+        argv += ["--no-sidecar"]
+    return jars_cli(argv)
+
+
 def cmd_memory(args: argparse.Namespace) -> int:
     from psyclaw.memory import memory_cli
     return memory_cli(args.args or ["list"])
@@ -627,6 +640,19 @@ def build_parser() -> argparse.ArgumentParser:
     pex.add_argument("--docx", default=None, help="docx 输出路径")
     pex.add_argument("--md", default=None, help="md 输出路径")
     pex.set_defaults(func=cmd_export)
+
+    pjars = sub.add_parser(
+        "jars",
+        help="JARS 检查清单(APA 2018 Quant/Qual/Mixed；缺失数据处理+剔除信息阻断)")
+    pjars.add_argument("draft", nargs="?", default=None,
+                       help="论文草稿 Markdown 文件（留空从 stdin 读）")
+    pjars.add_argument("--type", "-t", dest="research_type",
+                       choices=["quant", "qual", "mixed"], default="quant",
+                       help="研究类型(默认 quant)")
+    pjars.add_argument("--json", action="store_true", help="以 JSON 格式输出结果")
+    pjars.add_argument("--no-sidecar", action="store_true",
+                       help="不写 notes/jars_check.json sidecar")
+    pjars.set_defaults(func=cmd_jars)
 
     pme = sub.add_parser("memory", help="三层记忆(画像/决策惯性/教训卡)")
     pme.add_argument("args", nargs="*", help="list | set <键> <值> | lesson <触发> <教训> | confirm <序号>")
