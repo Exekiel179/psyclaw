@@ -68,7 +68,7 @@
 | # | 任务 | 说明 |
 |---|------|------|
 | ✅ E-1 | 图表主题层 | **已落地** `psyclaw/figures.py`：`apply_style(name)` contextmanager(matplotlib rcParams；无 matplotlib 时静默降级)、`honesty_check(spec)` FIG.honest 三项自动核查(axis_from_zero_or_flagged/error_bar_meaning/colorblind_safe)、`write_figure_sidecar` 写 sidecar JSON、`okabe_ito_palette(n)` 色盲友好调色板、`list_styles/theme_spec` 读取 figure_style.yaml；`REQUIREMENT_CHECKS` 注册 FIG.honest 三项(checker.py)；`psyclaw figures [--list-styles\|--style\|--check spec.json\|--palette N]`；测试 `tests/test_figures.py`（51 例）；门禁自动化升至 20 项。 |
-| E-2 | 商业统计软件 MCP | SPSS（已有 `spss_server.py` 雏形）/ Mplus / Stata 完整 MCP；先定接口契约，实现可后置 |
+| ✅ E-2 | 商业统计软件 MCP | **已落地** `psyclaw/mcp/servers/mplus_server.py`：Mplus CFA/SEM/LGM/Mixture 语法生成 + 批处理执行（mplus_syntax/mplus_run）；`psyclaw/mcp/servers/stata_server.py`：Stata do-file 生成 + 批处理执行（stata_dofile/stata_run，涵盖 regression/panel/iv/logistic/survival/poisson）；两服务器均已注册为 registry.yaml 内置 MCP（enable_when: always）并入 CLI `psyclaw mcp --serve mplus|stata`。测试 `tests/test_mcp_servers.py`（44 例）。 |
 | E-3 | MCP registry 完善 | `config` 向导逐项启用 + 健康检查 + 能力探测；`doctor` 全绿 |
 
 ---

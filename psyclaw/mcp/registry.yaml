@@ -14,9 +14,10 @@ servers:
     provides: [lavaan, lme4, psych, semTools]
 
   - name: mplus-mcp
-    category: stats-optional
-    enable_when: detect:mplus
-    provides: [SEM, CFA, latent_growth, mixture_model]
+    category: stats-builtin
+    enable_when: always
+    command: python -m psyclaw.mcp.servers.mplus_server
+    provides: [cfa_syntax, sem_syntax, lgm_syntax, mixture_syntax, mplus_run]
 
   - name: spss-mcp
     category: stats-builtin
@@ -31,9 +32,10 @@ servers:
     provides: [eeg_info, preprocess_plan, erp_components, cluster_stats]
 
   - name: stata-mcp
-    category: stats-optional
-    enable_when: detect:stata
-    provides: [panel, econometrics, do_file]
+    category: stats-builtin
+    enable_when: always
+    command: python -m psyclaw.mcp.servers.stata_server
+    provides: [dofile_gen, panel, iv, logistic, survival, poisson, stata_run]
 
   - name: zotero-mcp
     category: literature
