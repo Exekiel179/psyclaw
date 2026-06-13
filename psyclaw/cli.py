@@ -281,6 +281,18 @@ def cmd_loop(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    from psyclaw.review import run_review
+    try:
+        return run_review(draft=getattr(args, "draft", None),
+                          revise=getattr(args, "revise", False),
+                          auto=getattr(args, "auto", False),
+                          rounds=getattr(args, "rounds", 3))
+    except KeyboardInterrupt:
+        print("\n评审已中断。已落盘的评审产物保留在 notes/。")
+        return 0
+
+
 def _stub(name: str):
     def handler(args: argparse.Namespace) -> int:
         print(f"[{name}] 骨架占位 — 该命令的实现见路线图 M2/M5（DESIGN.md §10）。")
@@ -397,6 +409,15 @@ def build_parser() -> argparse.ArgumentParser:
         pl.add_argument("topic", nargs="?", default=None, help="研究主题(可空,读 notes/goal.md)")
         pl.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
         pl.set_defaults(func=cmd_loop)
+
+    prv = sub.add_parser("review", help="审稿模拟(EIC+3审稿人+Devil's Advocate,产可解析意见)")
+    prv.add_argument("draft", nargs="?", default=None,
+                     help="待审稿件 md(留空取 outputs/report.md)")
+    prv.add_argument("--revise", "-r", action="store_true",
+                     help="把 BLOCKING/MAJOR 回灌 executor 修订并复审(闭合写作→评审→修复)")
+    prv.add_argument("--rounds", type=int, default=3, help="修订复审最大轮次(默认 3)")
+    prv.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用)")
+    prv.set_defaults(func=cmd_review)
 
     pstat = sub.add_parser("stat", help="ARS-Stat 自动分析(选检验+诊断+APA7+复现脚本)")
     pstat.add_argument("file", help="CSV/TSV 数据")

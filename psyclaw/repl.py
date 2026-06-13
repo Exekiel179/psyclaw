@@ -53,6 +53,7 @@ COMMANDS = {
     "/config": "配置向导",
     "/research": "完整研究流水线(受澄清门禁约束)",
     "/research-loop": "HITL 回路(planner→executor→critic)",
+    "/review": "审稿模拟(EIC+3审稿人+DA;--revise 回灌修复环)",
     "/lit": "文献检索(M2+)",
     "/stat": "ARS-Stat 统计分析(M2+)",
     "/write": "APA JARS 写作(M2+)",
@@ -335,6 +336,9 @@ class ReplSession:
             cfg.run_config_wizard()
             self.conf = cfg.load_config()
             self.provider = get_provider(self.conf)
+        elif cmd == "/review":
+            from psyclaw.review import review_cli
+            review_cli(arg.split() if arg else [])
         elif cmd in ("/research", "/research-loop", "/lit", "/stat", "/write", "/init"):
             print(f"  [{cmd}] M2+ 实现(见 DESIGN.md 路线图)。当前可直接用自然语言询问,ARS 规范已注入。")
         else:
@@ -385,6 +389,7 @@ HELP_TEXT = """\
   /clarify    研究澄清(grill-me 式;不澄清完 /research 不放行)
   /cite [t]   方法学背书库(每个设计决策的文献支撑)
   /export f   APA7 输出(Word + Markdown,确定性模板)
+  /review f   审稿模拟(EIC+3审稿人+DA;--revise 闭合写作→评审→修复)
   /memory     三层记忆(画像/决策惯性/教训卡)
   /clear      清空上下文         /compact       压缩上下文
   /config     配置向导           /exit          退出
