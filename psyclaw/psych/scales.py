@@ -254,6 +254,8 @@ def score_datafile(path: str, scale_id: str,
 
     reverse_applied = sorted(set(scale.get("reverse", [])) & set(found_cols.keys()))
 
+    reliability = compute_subscale_reliability(participants, scale)
+
     return {
         "scale": scale,
         "n": len(rows),
@@ -261,11 +263,59 @@ def score_datafile(path: str, scale_id: str,
         "participants": participants,
         "subscale_stats": subscale_stats,
         "total_stats": total_stats,
+        "reliability": reliability,
         "missing_items_global": missing_items_global,
         "reverse_applied": reverse_applied,
         "warnings": warnings,
         "method": method,
     }
+
+
+# ---------------------------------------------------------------------------
+# M-2: 子量表自动信度
+# ---------------------------------------------------------------------------
+
+def compute_subscale_reliability(participants: list, scale: dict) -> dict:
+    """对每个子量表计算 Cronbach's α（纯 stdlib）。
+
+    participants: score_datafile 返回的 participants 列表（已含反向翻转后条目分）
+    返回 {维度名: {alpha, interpretation, n_items, n_obs, alpha_if_deleted}}
+    """
+    from psyclaw.psych.reliability import cronbach_alpha, alpha_if_deleted, interpret_alpha
+
+    reliability: dict[str, dict] = {}
+    for sub_name, sub_items in scale.get("subscales", {}).items():
+        # 只用完整应答（对该子量表所有条目都有计分）的被试
+        complete = [p for p in participants
+                    if all(i in p["items"] for i in sub_items)]
+        n_obs = len(complete)
+        n_items = len(sub_items)
+
+        if n_obs < 3 or n_items < 2:
+            reason = (f"完整观测 < 3（n={n_obs}）" if n_obs < 3
+                      else "条目数 < 2，无法计算")
+            reliability[sub_name] = {
+                "alpha": float("nan"),
+                "interpretation": reason,
+                "n_items": n_items,
+                "n_obs": n_obs,
+                "alpha_if_deleted": [],
+            }
+            continue
+
+        # k × n 矩阵（k 个条目，每条目 n_obs 人）
+        item_cols = [[p["items"][i] for p in complete] for i in sub_items]
+        a = cronbach_alpha(item_cols)
+        aid = alpha_if_deleted(item_cols)
+
+        reliability[sub_name] = {
+            "alpha": a,
+            "interpretation": interpret_alpha(a),
+            "n_items": n_items,
+            "n_obs": n_obs,
+            "alpha_if_deleted": [(sub_items[idx], av) for idx, (_, av) in enumerate(aid)],
+        }
+    return reliability
 
 
 def write_scored_csv(result: dict, out_path: str, original_path: str) -> None:

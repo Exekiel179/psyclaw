@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 
 from psyclaw import __version__
@@ -163,6 +164,24 @@ def cmd_score(args: argparse.Namespace) -> int:
         print(ui.accent("\n总分描述统计"))
         print(f"  Total  M={ts['mean']:.2f}  SD={ts['sd']:.2f}"
               f"  range=[{ts['min']:.0f},{ts['max']:.0f}]  n={ts['n']}")
+
+    if result.get("reliability"):
+        print(ui.accent("\n子量表信度（Cronbach's α）"))
+        for sub, rel in result["reliability"].items():
+            a = rel["alpha"]
+            if math.isnan(a):
+                print(f"  {sub:<22} α = —（{rel['interpretation']}）")
+            else:
+                print(f"  {sub:<22} α = {a:.3f}  {rel['interpretation']}"
+                      f"  (k={rel['n_items']}, n={rel['n_obs']})")
+                # 逐题删除后 α：只报降幅最大的条目（便于定位拖后腿条目）
+                aid = rel.get("alpha_if_deleted", [])
+                if aid and not math.isnan(a):
+                    worst_item, worst_a = min(aid, key=lambda x: a - x[1])
+                    drop = a - worst_a
+                    if drop > 0.02:
+                        print(ui.dim(f"      删除条目 {worst_item} 后 α 升 {drop:.3f}"
+                                     " → 考虑检查该题措辞"))
 
     for w in result["warnings"]:
         print(ui.warn(f"\n{w}"))
