@@ -45,6 +45,7 @@ KIND_TRIGGERS = {
                  "stat_output", "before_test", "stat_conclusion"},
     "design": {"experiment_design", "confirmatory_study", "design_decision"},
     "paper": {"paper_output"},
+    "jars": {"paper_output"},   # jars_check.json 直接作为 artifact
     "figure": {"figure_output"},
     "literature": {"literature_review"},
     "scale": {"scale_score_used"},
@@ -164,6 +165,9 @@ REQUIREMENT_CHECKS = {
     "step4_diagnostics": lambda d, base: bool(d.get("assumptions_checked")),
     "clarification_card_all_resolved":
         lambda d, base: d.get("clarification_resolved") is True,
+    # W-1 JARS gate — artifact 即 notes/jars_check.json(由 psyclaw jars 生成)
+    "jars_missing_data": lambda d, base: bool(d.get("jars_missing_data_ok")),
+    "jars_exclusions": lambda d, base: bool(d.get("jars_exclusions_ok")),
     # 其余 requirement(apa7_*、prisma_flow、harking 等)暂无自动校验
     # → check_artifact 会显式输出"需人工核"warning,绝不静默放行。
 }
