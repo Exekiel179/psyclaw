@@ -119,6 +119,12 @@ def cmd_scale(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_norms(args: argparse.Namespace) -> int:
+    from psyclaw.psych.scales import print_cn_norms
+    print_cn_norms(getattr(args, "scale_id", None))
+    return 0
+
+
 def cmd_score(args: argparse.Namespace) -> int:
     import json as _json
     from psyclaw import ui
@@ -316,6 +322,13 @@ def cmd_cite(args: argparse.Namespace) -> int:
 
 
 def cmd_export(args: argparse.Namespace) -> int:
+    journal = getattr(args, "journal", "apa7") or "apa7"
+    if journal != "apa7":
+        from psyclaw.output.cn_journal import cn_journal_cli
+        argv = [args.file, "--journal", journal]
+        if args.md:
+            argv += ["--out", args.md]
+        return cn_journal_cli(argv)
     from psyclaw.output.apa7 import export_cli
     argv = [args.file]
     if args.docx:
@@ -683,11 +696,21 @@ def build_parser() -> argparse.ArgumentParser:
     pci.add_argument("topic_id", nargs="?", default=None, help="决策主题,留空列出全部")
     pci.set_defaults(func=cmd_cite)
 
-    pex = sub.add_parser("export", help="APA7 输出(Word docx + Markdown,确定性模板)")
+    pex = sub.add_parser("export", help="格式化输出(APA7 / 心理学报 / 心理科学,确定性模板)")
     pex.add_argument("file", help="结构化 Markdown 草稿")
-    pex.add_argument("--docx", default=None, help="docx 输出路径")
+    pex.add_argument("--docx", default=None, help="docx 输出路径(仅 APA7 格式可用)")
     pex.add_argument("--md", default=None, help="md 输出路径")
+    pex.add_argument(
+        "--journal", "-j",
+        choices=["apa7", "xinlixuebao", "xinlikexue"],
+        default="apa7",
+        help="目标格式: apa7(默认) / xinlixuebao(心理学报) / xinlikexue(心理科学)",
+    )
     pex.set_defaults(func=cmd_export)
+
+    pnm = sub.add_parser("norms", help="中文量表常模(截断值 + 中国样本均值/SD)")
+    pnm.add_argument("scale_id", nargs="?", default=None, help="量表 id(留空列出全部有常模量表)")
+    pnm.set_defaults(func=cmd_norms)
 
     pjars = sub.add_parser(
         "jars",

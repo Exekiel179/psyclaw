@@ -1,0 +1,123 @@
+{
+  "_note": "中文版量表常模与截断值。数值来自已发表中文验证研究；仅供参考，使用时请核对原始文献。",
+  "dass-21": {
+    "source_zh": "王凯等 (2016). DASS-21 在中国大学生中的信效度. 中国临床心理学杂志, 24(4), 633-636.",
+    "source_en": "Wang et al. (2016). Reliability and validity of DASS-21 among Chinese college students. Chinese Journal of Clinical Psychology.",
+    "sample": "中国大学生 (N≈1553)",
+    "subscales": {
+      "Depression": {
+        "M": 6.88, "SD": 7.43,
+        "cutoffs": {
+          "正常": "0–4", "轻度": "5–6", "中度": "7–10", "重度": "11–13", "极重度": "≥14"
+        }
+      },
+      "Anxiety": {
+        "M": 5.34, "SD": 6.02,
+        "cutoffs": {
+          "正常": "0–3", "轻度": "4–5", "中度": "6–7", "重度": "8–9", "极重度": "≥10"
+        }
+      },
+      "Stress": {
+        "M": 9.38, "SD": 7.41,
+        "cutoffs": {
+          "正常": "0–7", "轻度": "8–9", "中度": "10–12", "重度": "13–16", "极重度": "≥17"
+        }
+      }
+    },
+    "warning": "截断值基于 Lovibond & Lovibond (1995) 原始量表；中国样本临床截断值应参照本土验证研究。"
+  },
+  "dass-42": {
+    "source_zh": "参照 DASS-21 中文常模，DASS-42 得分×0.5 可与 DASS-21 相当。",
+    "source_en": "Scores may be halved to compare with DASS-21 norms.",
+    "sample": "中国成人",
+    "subscales": {
+      "Depression": {
+        "M": null, "SD": null,
+        "cutoffs": {
+          "正常": "0–9", "轻度": "10–13", "中度": "14–20", "重度": "21–27", "极重度": "≥28"
+        }
+      },
+      "Anxiety": {
+        "M": null, "SD": null,
+        "cutoffs": {
+          "正常": "0–7", "轻度": "8–9", "中度": "10–14", "重度": "15–19", "极重度": "≥20"
+        }
+      },
+      "Stress": {
+        "M": null, "SD": null,
+        "cutoffs": {
+          "正常": "0–14", "轻度": "15–18", "中度": "19–25", "重度": "26–33", "极重度": "≥34"
+        }
+      }
+    }
+  },
+  "phq-9": {
+    "source_zh": "陈心茹等 (2009). PHQ-9 中文版信效度验证. 中华内科杂志, 48(12), 1010-1014.",
+    "source_en": "Chen et al. (2009). Validation of Chinese PHQ-9. Chinese Journal of Internal Medicine.",
+    "sample": "中国门诊及社区样本",
+    "subscales": {
+      "Total": {
+        "M": null, "SD": null,
+        "cutoffs": {
+          "无/极轻度": "0–4", "轻度": "5–9", "中度": "10–14", "偏重度": "15–19", "重度": "20–27"
+        }
+      }
+    },
+    "warning": "条目 9（自伤意念）≥1 时，无论总分高低均建议进行安全评估。中国筛查阈值建议 ≥10（与原版一致）。"
+  },
+  "gad-7": {
+    "source_zh": "He X.Y. 等 (2010). GAD-7 中文版信效度研究. 中华内科杂志.",
+    "source_en": "He et al. (2010). Reliability and validity of GAD-7 in Chinese patients.",
+    "sample": "中国社区/门诊样本",
+    "subscales": {
+      "Total": {
+        "M": null, "SD": null,
+        "cutoffs": {
+          "轻度": "5–9", "中度": "10–14", "重度": "15–21"
+        }
+      }
+    },
+    "warning": "筛查阈值 ≥10（灵敏度 89%，特异度 82%）；总分 ≥15 建议专业评估。"
+  },
+  "rses": {
+    "source_zh": "Zhong J. 等 (2008). Rosenberg 自尊量表在中国大学生中的信效度. 中国临床心理学杂志.",
+    "source_en": "Zhong et al. (2008). RSES reliability and validity in Chinese college students.",
+    "sample": "中国大学生 (N≈800)",
+    "subscales": {
+      "Total": {
+        "M": 29.35, "SD": 4.98,
+        "cutoffs": {
+          "低自尊": "10–20", "中等自尊": "21–30", "高自尊": "31–40"
+        }
+      }
+    },
+    "warning": "基于 1-4 计分（总分范围 10–40）；若使用 0-3 计分请换算后比对。"
+  },
+  "pss-10": {
+    "source_zh": "Leung D.Y.P. 等 (2010). 知觉压力量表(PSS-10)中文版信效度. 心理学报, 42(3), 391-400.",
+    "source_en": "Leung et al. (2010). Psychometric properties of Chinese PSS-10. Acta Psychologica Sinica.",
+    "sample": "中国大学生 (N≈855)",
+    "subscales": {
+      "Total": {
+        "M": 18.49, "SD": 6.73,
+        "cutoffs": {
+          "低压力": "0–13", "中等压力": "14–26", "高压力": "27–40"
+        }
+      }
+    },
+    "warning": "截断值为经验性参考，非临床诊断标准；高分提示需进一步评估应激水平。"
+  },
+  "tipi": {
+    "source_zh": "刘仁刚等 (2014). TIPI 中文版(C-TIPI)信效度. 中国临床心理学杂志.",
+    "source_en": "Liu et al. (2014). Chinese TIPI (C-TIPI) reliability and validity.",
+    "sample": "中国大学生",
+    "subscales": {
+      "Extraversion": {"M": 3.86, "SD": 1.40, "cutoffs": {}},
+      "Agreeableness": {"M": 4.84, "SD": 1.12, "cutoffs": {}},
+      "Conscientiousness": {"M": 4.61, "SD": 1.20, "cutoffs": {}},
+      "EmotionalStability": {"M": 3.84, "SD": 1.33, "cutoffs": {}},
+      "Openness": {"M": 4.71, "SD": 1.14, "cutoffs": {}}
+    },
+    "warning": "TIPI 单维度仅两题，内部一致性偏低(.40–.73)，建议谨慎解读维度分数；优先报告重测信度。"
+  }
+}
