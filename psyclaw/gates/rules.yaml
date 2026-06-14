@@ -96,3 +96,9 @@ gates:
     requires: [invariance_tested, scalar_invariance_met]
     action: block
     fix: 运行 psyclaw invariance <data.csv> --group <col> --model '...' 检验 configural→metric→scalar 不变性序列；scalar 不成立时改用 partial invariance 或删除潜均值比较
+
+  - id: STAT.meta
+    trigger: meta_analysis
+    requires: [meta_heterogeneity_reported, meta_effect_ci_reported]
+    action: block
+    fix: 元分析结果必须报告 I²、τ²、Q 检验（异质性）和随机效应汇总效应量及 95% CI；运行 psyclaw meta <data.csv> 自动生成合规报告
