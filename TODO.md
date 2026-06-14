@@ -208,4 +208,5 @@
 
 | # | 任务 | 说明 | 验收 |
 |---|------|------|------|
+| ✅ P5-E2 | audit.py + memory.py 单元测试 | **已落地** `tests/test_audit_memory.py`：`parse_audit`（fail-closed 空/None/无 verdict/capped 100/最后一个 score/verdict wins/大小写容忍）、`render_verdict`（无分数标签/有分数/返回值类型）；三层记忆（`_decayed` 半衰期/极旧归零）、`suggest`（无数据/记录后命中/信度随次数升/极旧衰减）、`draft_lesson`（写入/去重）、`confirm_lesson`（激活/越界）、`active_lessons`（过滤/空）、`memory_prompt`（空/画像/教训卡）；fixture 将 MEM_DIR 重定向到 tmp_path 避免污染真实 ~/.psyclaw；48 例。 | `tests/test_audit_memory.py` ≥30例 |
 | ✅ P5-E1 | context.py 单元测试 | **已落地** `tests/test_context.py`：`lean_core`（内容/可复现性）、`relevant_knowledge`（关键词命中/max_items 上限/中文别名/降级）、`compact_history`（阈值触发/recent-turns 保留/memo 累积/memo 长度上限）、`render_memo`（空/非空格式）、`_distill`（决策行抽取/角色标签/回退首行/截断）、`smart_excerpt`（大文件 head+tail/CSV 结构摘要/TSV/路径注入/错误降级）、`_is_num`（数值/非数值 parametrize）；57 例。 | `tests/test_context.py` ≥30例 |
