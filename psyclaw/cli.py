@@ -598,6 +598,18 @@ def cmd_anova(args: argparse.Namespace) -> int:
     return anova_cli(argv)
 
 
+def cmd_anova2(args: argparse.Namespace) -> int:
+    from psyclaw.psych.anova2 import anova2_cli
+    argv = [args.csv, "--dv", args.dv, "--factorA", args.factorA, "--factorB", args.factorB]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return anova2_cli(argv)
+
+
 def cmd_nonpar(args: argparse.Namespace) -> int:
     from psyclaw.psych.nonparametric import nonpar_cli
     argv = [args.csv, "--test", args.test, "--dv", args.dv]
@@ -1226,6 +1238,20 @@ def build_parser() -> argparse.ArgumentParser:
     panova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     panova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     panova.set_defaults(func=cmd_anova)
+
+    panova2 = sub.add_parser(
+        "anova2",
+        help="双因素析因 ANOVA：主效应 A/B + 交互效应 A×B + eta²/omega²",
+    )
+    panova2.add_argument("csv", help="输入数据 CSV 路径")
+    panova2.add_argument("--dv", required=True, help="因变量列名")
+    panova2.add_argument("--factorA", required=True, help="因子 A 列名")
+    panova2.add_argument("--factorB", required=True, help="因子 B 列名")
+    panova2.add_argument("--alpha", type=float, default=0.05,
+                         help="显著性水平（默认 .05）")
+    panova2.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    panova2.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    panova2.set_defaults(func=cmd_anova2)
 
     pnonpar = sub.add_parser(
         "nonpar",
