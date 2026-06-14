@@ -208,6 +208,7 @@
 
 | # | 任务 | 说明 | 验收 |
 |---|------|------|------|
+| ✅ P5-E5 | bootstrap.py 单元测试 | **已落地** `tests/test_bootstrap.py`：`_has_module`（stdlib命中/不存在返回False/空串/psyclaw自身）、DEP_GROUPS/EXTERNAL_BINS 常量结构校验、`detect`（返回结构/所有键/have+missing互补=总数/ready一致性/reproducible）；20 例。 | `tests/test_bootstrap.py` ≥15例 |
 | ✅ P5-E4 | ui.py 单元测试 | **已落地** `tests/test_ui.py`：`paint`（非TTY纯文本/TTY-ANSI/多样式/未知样式忽略）、语义函数（`ok`/`warn`/`err`/`accent`/`title`/`dim`/`rule`）双路径（disabled+enabled）、`panel`（含标题/内容/多行/结构/类型）、`term_width`（int/正数/上限100）、`banner`（含版本号/PsyClaw）；38 例。 | `tests/test_ui.py` ≥20例 |
 | ✅ P5-E3 | embed.py 单元测试 | **已落地** `tests/test_embed.py`：`cosine`（同向1.0/正交0.0/反向-1.0/对称/不同长度/零向量）、`HashEmbedder._features`（英文token/CJK unigram+bigram/空/None/混排）、`HashEmbedder.encode`（dim=256/L2归一/确定性/不同文本不同向量/相似>不同/空文本不崩）、`_sha256`（known hash/空文件/不同内容/hex格式）、`local_model_dir`/`get_embedder(prefer='hash')`；40 例。 | `tests/test_embed.py` ≥25例 |
 | ✅ P5-E2 | audit.py + memory.py 单元测试 | **已落地** `tests/test_audit_memory.py`：`parse_audit`（fail-closed 空/None/无 verdict/capped 100/最后一个 score/verdict wins/大小写容忍）、`render_verdict`（无分数标签/有分数/返回值类型）；三层记忆（`_decayed` 半衰期/极旧归零）、`suggest`（无数据/记录后命中/信度随次数升/极旧衰减）、`draft_lesson`（写入/去重）、`confirm_lesson`（激活/越界）、`active_lessons`（过滤/空）、`memory_prompt`（空/画像/教训卡）；fixture 将 MEM_DIR 重定向到 tmp_path 避免污染真实 ~/.psyclaw；48 例。 | `tests/test_audit_memory.py` ≥30例 |
