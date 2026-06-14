@@ -22,14 +22,17 @@ SERVER_SECRETS: dict[str, list[str]] = {
 SERVER_NOTES: dict[str, str] = {
     "pystat": "Python 统计库（pingouin/statsmodels 等）",
     "r-mcp": "R 统计环境（lavaan/lme4/semTools）",
-    "mplus-mcp": "Mplus CFA/SEM/LGM/Mixture 语法生成",
-    "spss-mcp": "SPSS 语法生成 + 批处理执行",
+    "mplus-mcp": "Mplus CFA/SEM/LGM/Mixture 语法生成【可选便捷集成，需安装 Mplus】",
+    "spss-mcp": "SPSS 语法生成 + 批处理执行【用户自研，需安装 IBM SPSS Statistics】",
     "mne-mcp": "EEG/MEG/ERP 分析（MNE-Python）",
-    "stata-mcp": "Stata do-file 生成（面板/IV/生存等）",
+    "stata-mcp": "Stata do-file 生成（面板/IV/生存等）【可选便捷集成，需安装 Stata】",
     "zotero-mcp": "Zotero 文献管理（搜索/引用/全文/撤稿）",
     "lit-search-mcp": "文献多源检索（PubMed/OpenAlex/Semantic Scholar）",
     "osf-mcp": "OSF 开放科学（预注册/数据托管）",
 }
+
+# origin=optional/user 的商业软件 MCP 不纳入 doctor 强制健康门禁（可选，非核心路径）
+OPTIONAL_ORIGINS = frozenset({"optional", "user"})
 
 
 def _parse_registry(path: Path) -> list:
@@ -54,6 +57,11 @@ def _parse_registry(path: Path) -> list:
     return servers
 
 
+def is_optional(entry: dict) -> bool:
+    """返回 True 表示该 MCP 为可选集成（commercial/user-built，不纳入强制健康门禁）。"""
+    return entry.get("origin", "builtin") in OPTIONAL_ORIGINS
+
+
 def _is_enabled(enable_when: str) -> bool:
     if enable_when == "always":
         return True
@@ -65,19 +73,22 @@ def _is_enabled(enable_when: str) -> bool:
 
 
 def health_check(entry: dict) -> dict:
-    """对单个 MCP 条目做健康探测，返回 {"ok": bool, "detail": str}。
+    """对单个 MCP 条目做健康探测，返回 {"ok": bool, "detail": str, "optional": bool}。
 
     启用条件不满足 → ok=False（未启用，不是错误）。
     对 Python 内置服务器：检查模块是否可找到（find_spec，无副作用）。
     对 env:/detect: 服务器：条件满足即视为健康（无法进一步 ping）。
+    商业可选服务器（origin: optional/user）未安装时带「可选」标注。
     """
     ew = entry.get("enable_when", "always")
+    optional = is_optional(entry)
+    optional_tag = "（可选，未安装）" if optional else "（可选）"
     if not _is_enabled(ew):
         if ew.startswith("env:"):
-            return {"ok": False, "detail": f"未设置 ${ew[4:]}（可选）"}
+            return {"ok": False, "detail": f"未设置 ${ew[4:]}{optional_tag}", "optional": optional}
         if ew.startswith("detect:"):
-            return {"ok": False, "detail": f"未检测到 {ew[7:]}（可选）"}
-        return {"ok": False, "detail": f"条件未满足: {ew}"}
+            return {"ok": False, "detail": f"未检测到 {ew[7:]}{optional_tag}", "optional": optional}
+        return {"ok": False, "detail": f"条件未满足: {ew}", "optional": optional}
 
     # Python 内置命令服务器 — 检查模块是否可找到
     command = entry.get("command", "")
@@ -88,26 +99,27 @@ def health_check(entry: dict) -> dict:
         except (ModuleNotFoundError, ValueError):
             spec = None
         if spec is None:
-            return {"ok": False, "detail": f"模块未找到: {mod_path}"}
-        return {"ok": True, "detail": "模块就绪"}
+            return {"ok": False, "detail": f"模块未找到: {mod_path}", "optional": optional}
+        return {"ok": True, "detail": "模块就绪", "optional": optional}
 
     # env:/detect: — 条件已满足
     if ew.startswith("env:"):
-        return {"ok": True, "detail": f"${ew[4:]} 已设置"}
+        return {"ok": True, "detail": f"${ew[4:]} 已设置", "optional": optional}
     if ew.startswith("detect:"):
-        path = shutil.which(ew[7:])
-        return {"ok": True, "detail": f"检测到 {path}"}
-    return {"ok": True, "detail": "就绪"}
+        bin_path = shutil.which(ew[7:])
+        return {"ok": True, "detail": f"检测到 {bin_path}", "optional": optional}
+    return {"ok": True, "detail": "就绪", "optional": optional}
 
 
 def list_mcp_catalog() -> list:
-    """读取目录并标注每个 MCP 当前是否满足启用条件。"""
+    """读取目录并标注每个 MCP 当前是否满足启用条件（含 origin 归属字段）。"""
     out = []
     for s in _parse_registry(REGISTRY):
         ew = s.get("enable_when", "always")
         out.append({
             "name": s.get("name", "?"),
             "category": s.get("category", "?"),
+            "origin": s.get("origin", "builtin"),
             "enable_when": ew,
             "enabled": _is_enabled(ew),
             "provides": s.get("provides", ""),
@@ -118,7 +130,7 @@ def list_mcp_catalog() -> list:
 
 
 def list_mcp_catalog_with_health() -> list:
-    """读取目录并包含实时健康检查结果。"""
+    """读取目录并包含实时健康检查结果（含 origin 归属字段）。"""
     out = []
     for s in _parse_registry(REGISTRY):
         ew = s.get("enable_when", "always")
@@ -127,6 +139,7 @@ def list_mcp_catalog_with_health() -> list:
         out.append({
             "name": s.get("name", "?"),
             "category": s.get("category", "?"),
+            "origin": s.get("origin", "builtin"),
             "enable_when": ew,
             "enabled": enabled,
             "provides": s.get("provides", ""),

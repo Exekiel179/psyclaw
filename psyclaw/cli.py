@@ -14,7 +14,8 @@ import sys
 from psyclaw import __version__
 from psyclaw import config as cfg
 from psyclaw.gates.checker import run_gates_selfcheck
-from psyclaw.mcp.manager import list_mcp_catalog, list_mcp_catalog_with_health, probe_capabilities
+from psyclaw.mcp.manager import (is_optional, list_mcp_catalog,
+                                  list_mcp_catalog_with_health, probe_capabilities)
 from psyclaw.skills.loader import list_skills
 
 
@@ -53,17 +54,20 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     mcp_failures: list[str] = []
     for m in mcp_catalog:
         h = m["health"]
+        opt = is_optional(m)
         if m["enabled"]:
             if h["ok"]:
                 mark = ui.ok("✓")
             else:
                 mark = ui.err("✗")
-                mcp_failures.append(m["name"])
+                if not opt:  # 可选商业软件未安装不计入强制门禁
+                    mcp_failures.append(m["name"])
         else:
             mark = ui.dim("·")
+        opt_label = ui.dim(" [可选]") if opt else ""
         note = m.get("note", "") or m["enable_when"]
         detail = h["detail"] if m["enabled"] else ui.dim(h["detail"])
-        print(f"  {mark} {m['name']:<14} {detail:<24} " + ui.dim(note))
+        print(f"  {mark} {m['name']:<14} {detail:<28} " + ui.dim(note) + opt_label)
 
     caps = probe_capabilities(mcp_catalog)
     if caps:
@@ -124,8 +128,8 @@ def cmd_mcp(args: argparse.Namespace) -> int:
         return srv.run()
     print("MCP 服务器目录（registry.yaml）：")
     for m in list_mcp_catalog():
-        gate = "本地软件检测" if m["category"] == "stats-optional" else "—"
-        print(f"  - {m['name']:<14} [{m['category']:<14}] 启用条件: {m.get('enable_when', gate)}")
+        opt_tag = " [可选]" if is_optional(m) else ""
+        print(f"  - {m['name']:<14} [{m['category']:<16}] 启用条件: {m.get('enable_when', '—')}{opt_tag}")
     print("\n内置 MCP 可独立 serve 给任意 MCP 客户端(Claude Desktop 等):")
     print("  psyclaw mcp --serve mne    # EEG/MEG/ERP")
     print("  psyclaw mcp --serve spss   # SPSS 语法生成 + 批处理")
