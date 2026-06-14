@@ -738,6 +738,20 @@ def cmd_ancova(args: argparse.Namespace) -> int:
     return ancova_cli(argv)
 
 
+def cmd_cfa(args: argparse.Namespace) -> int:
+    from psyclaw.psych.cfa import cfa_cli
+    argv = [args.csv, "--model", args.model]
+    if getattr(args, "oblique", False):
+        argv += ["--oblique"]
+    if getattr(args, "max_iter", 4000) != 4000:
+        argv += ["--max-iter", str(args.max_iter)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return cfa_cli(argv)
+
+
 def cmd_anova2(args: argparse.Namespace) -> int:
     from psyclaw.psych.anova2 import anova2_cli
     argv = [args.csv, "--dv", args.dv, "--factorA", args.factorA, "--factorB", args.factorB]
@@ -1357,7 +1371,7 @@ def build_parser() -> argparse.ArgumentParser:
     pdesc.add_argument("--cols", default=None,
                        help="逗号分隔的列名（默认自动选数值列）")
     pdesc.add_argument("--corr", action="store_true",
-                       help="附加 Pearson 相关矩阵（含 Fisher-z 95% CI 和 * 标注）")
+                       help="附加 Pearson 相关矩阵（含 Fisher-z 95%% CI 和 * 标注）")
     pdesc.add_argument("--alpha", type=float, default=0.05,
                        help="显著性水平（默认 .05）")
     pdesc.add_argument("--out", default="notes",
@@ -1597,6 +1611,27 @@ def build_parser() -> argparse.ArgumentParser:
     pancova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     pancova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pancova.set_defaults(func=cmd_ancova)
+
+    pcfa = sub.add_parser(
+        "cfa",
+        help=(
+            "验证性因子分析（CFA，ULS 估计，stdlib only）："
+            "载荷矩阵 / CFI / TLI / RMSEA / SRMR / APA-7 报告"
+        ),
+    )
+    pcfa.add_argument("csv", help="输入数据 CSV 路径")
+    pcfa.add_argument(
+        "--model", "-m", required=True,
+        help='模型规格，格式："F1:x1,x2,x3;F2:x4,x5,x6"',
+    )
+    pcfa.add_argument("--oblique", action="store_true",
+                      help="允许因子间相关（斜交，默认正交）")
+    pcfa.add_argument("--max-iter", type=int, default=4000, dest="max_iter",
+                      help="最大迭代次数（默认 4000）")
+    pcfa.add_argument("--out", default="notes",
+                      help="sidecar 输出目录（默认 notes/）")
+    pcfa.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pcfa.set_defaults(func=cmd_cfa)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),

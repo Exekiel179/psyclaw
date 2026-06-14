@@ -16,7 +16,7 @@
 #   "skip"        = --dangerously-skip-permissions。永不挂起，但【绕过】settings.json
 #                   所有防护。仅在容器/VM 里用，不要在真实机器上长期裸跑。
 $Mode      = "acceptEdits"
-$Model     = "claude-opus-4-8"  # 主模型 Opus 4.8(质量最高)。省钱可换 "sonnet"(~1.7x 便宜)
+$Model     = "sonnet"           # 主模型 Sonnet(省钱~1.7x)。复杂推理可换 "claude-opus-4-8"
 $Fallback  = "sonnet"           # Opus 过载/限流时自动降级，避免整轮失败；置 "" 关闭
 $MaxTurns  = 80           # 单轮上限(Opus 可做得更深)；防止一轮失控，循环本身不受此限
 $MaxFails  = 5            # 连续失败这么多次 ≈ 额度耗尽，自动退出
@@ -26,6 +26,11 @@ $Cooldown  = 30           # 失败后退避秒数(指数退避，封顶 300s)
 $ErrorActionPreference = "Continue"
 Set-Location -Path $PSScriptRoot
 New-Item -ItemType Directory -Force -Path ".\logs" | Out-Null
+
+# 关键:阻止 PowerShell 在管道里给 format-claude-stream 的 stdin 注入 UTF-8 BOM，
+# 否则它 JSON.parse 第一行就崩(Unexpected token '﻿')。
+$OutputEncoding = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 
 switch ($Mode) {
     "skip" { $permArgs = @("--dangerously-skip-permissions") }
@@ -63,14 +68,21 @@ while ($true) {
         # 没装 formatter：默认文本输出，屏幕直接可读，同时落 .log
         claude @args 2>&1 | Tee-Object -FilePath $log
     }
-    $rc = $LASTEXITCODE
 
-    if ($rc -eq 0) {
+    # 判定本轮成败：stream-json 模式以日志里的 result 事件为准(解耦 formatter 的退出码，
+    # 它崩了也不影响判定)；文本模式直接看 claude 的退出码。
+    if ($haveFmt) {
+        $ok = Select-String -Path $log -Pattern '"is_error":false' -SimpleMatch -Quiet
+    } else {
+        $ok = ($LASTEXITCODE -eq 0)
+    }
+
+    if ($ok) {
         $fails = 0
         Start-Sleep -Seconds 2
     } else {
         $fails++
-        Write-Host ("⚠️  本轮退出码 {0}（连续失败 {1}）。可能额度耗尽/限流/网络。" -f $rc, $fails)
+        Write-Host ("⚠️  本轮未正常完成（连续失败 {0}）。可能额度耗尽/限流/网络。" -f $fails)
         if ($fails -ge $MaxFails) {
             Write-Host ("🛑 连续 {0} 次失败，判定额度耗尽，循环退出。共 {1} 轮。" -f $MaxFails, $iter)
             break
