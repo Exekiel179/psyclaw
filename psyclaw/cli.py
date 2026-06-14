@@ -546,6 +546,22 @@ def cmd_bayes(args: argparse.Namespace) -> int:
     return bayes_cli(argv)
 
 
+def cmd_describe(args: argparse.Namespace) -> int:
+    from psyclaw.psych.descriptives import descriptives_cli
+    argv = [args.csv]
+    if getattr(args, "cols", None):
+        argv += ["--cols", args.cols]
+    if getattr(args, "corr", False):
+        argv += ["--corr"]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return descriptives_cli(argv)
+
+
 def cmd_sensitivity(args: argparse.Namespace) -> int:
     from psyclaw.psych.sensitivity import sensitivity_cli
     argv = [args.plan]
@@ -1065,6 +1081,22 @@ def build_parser() -> argparse.ArgumentParser:
     pbf.add_argument("--out", default="notes", help="sidecar 输出目录（默认 notes/）")
     pbf.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pbf.set_defaults(func=cmd_bayes)
+
+    pdesc = sub.add_parser(
+        "describe",
+        help="APA-7 描述统计表（M/SD/N/Sk/Kurt/CI）+ 可选 Pearson 相关矩阵",
+    )
+    pdesc.add_argument("csv", help="输入数据 CSV 路径")
+    pdesc.add_argument("--cols", default=None,
+                       help="逗号分隔的列名（默认自动选数值列）")
+    pdesc.add_argument("--corr", action="store_true",
+                       help="附加 Pearson 相关矩阵（含 Fisher-z 95% CI 和 * 标注）")
+    pdesc.add_argument("--alpha", type=float, default=0.05,
+                       help="显著性水平（默认 .05）")
+    pdesc.add_argument("--out", default="notes",
+                       help="报告输出目录（默认 notes/）")
+    pdesc.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pdesc.set_defaults(func=cmd_describe)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
