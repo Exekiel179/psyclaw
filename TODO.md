@@ -190,6 +190,16 @@
 
 ---
 
+---
+
+## P13 · 统计纵深扩展 VIII（P12 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P13-1 | 混合 ANOVA（between × within） | **已落地** `psyclaw/psych/mixed_anova.py`：一个被试间因素 × 一个被试内因素 Split-plot ANOVA；标准 SS 分解（SS_A/SS_S(A)/SS_B/SS_AB/SS_BS(A)）+ 可加性验证；F_A=MS_A/MS_S(A)，F_B=F_AB=MS/MS_BS(A)；Mauchly 球形检验（W/χ²/p）+ GG/HF ε 校正（被试内及交互效应 df）；partial η²（Lakens 2013）+ partial ω²（Olejnik & Algina 2003）；`simple_effects_within`（各 between 水平上被试内简单主效应，配对 t + Holm 校正）；`format_apa_mixed`（单元格均值表 / Mauchly 段 / ANOVA 汇总表 / APA-7 文字段落 / 参考文献）；`write_mixed_report` MD+JSON sidecar（NaN/inf→null）；`analyze_mixed` CSV 主入口（完整案例筛选 + 非均衡警告）；`psyclaw mixed-anova <data.csv> --dv <col> --between <col> --within <col> --subject <col> [--post-hoc] [--alpha] [--json] [--out]`；CLI 注册 `cli.py`；stdlib only。理论依据：Kirk (2013)；Maxwell et al. (2017)；Olejnik & Algina (2003)；Greenhouse & Geisser (1959)；Huynh & Feldt (1976)。测试 `tests/test_mixed_anova.py`（70 例）。 | `tests/test_mixed_anova.py` ≥50例，SS 加和等于 SS_total，df 公式正确，手算已知值误差<1e-8 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。

@@ -618,6 +618,23 @@ def cmd_rm_anova(args: argparse.Namespace) -> int:
     return rm_anova_cli(argv)
 
 
+def cmd_mixed_anova(args: argparse.Namespace) -> int:
+    from psyclaw.psych.mixed_anova import mixed_anova_cli
+    argv = [args.csv, "--dv", args.dv,
+            "--between", args.between,
+            "--within", args.within,
+            "--subject", args.subject]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "post_hoc", False):
+        argv += ["--post-hoc"]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return mixed_anova_cli(argv)
+
+
 def cmd_hreg(args: argparse.Namespace) -> int:
     from psyclaw.psych.hierarchical_regression import hierarchical_cli
     argv = [args.csv, "--dv", args.dv]
@@ -1591,6 +1608,26 @@ def build_parser() -> argparse.ArgumentParser:
                      help="sidecar 输出目录（写 rm_anova_report.{md,json}）")
     prm.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     prm.set_defaults(func=cmd_rm_anova)
+
+    pmixed = sub.add_parser(
+        "mixed-anova",
+        help=(
+            "混合 ANOVA（between × within）：Mauchly 球形检验 / GG/HF ε 校正 / "
+            "partial η² / ω² / 简单主效应事后检验 / APA-7 报告"
+        ),
+    )
+    pmixed.add_argument("csv", help="输入数据 CSV 路径（长格式：每行一个 subject×condition 观测）")
+    pmixed.add_argument("--dv",      required=True, help="因变量列名（数值）")
+    pmixed.add_argument("--between", required=True, help="被试间因素列名")
+    pmixed.add_argument("--within",  required=True, help="被试内因素列名")
+    pmixed.add_argument("--subject", required=True, help="被试 ID 列名")
+    pmixed.add_argument("--alpha",   type=float, default=0.05, help="显著性水平（默认 .05）")
+    pmixed.add_argument("--post-hoc", action="store_true", dest="post_hoc",
+                        help="各 between 水平上被试内因素简单主效应（Holm 校正配对 t）")
+    pmixed.add_argument("--out", default=None,
+                        help="sidecar 输出目录（写 mixed_anova_report.{md,json}）")
+    pmixed.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pmixed.set_defaults(func=cmd_mixed_anova)
 
     pancova = sub.add_parser(
         "ancova",
