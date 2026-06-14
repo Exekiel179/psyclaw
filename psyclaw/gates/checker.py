@@ -51,6 +51,7 @@ KIND_TRIGGERS = {
     "scale": {"scale_score_used"},
     "invariance": {"latent_mean_comparison"},   # M-3 测量不变性
     "meta": {"meta_analysis"},                  # P3-1 元分析
+    "equivalence": {"equivalence_test"},        # P4-1 等价检验
 }
 
 
@@ -179,6 +180,8 @@ REQUIREMENT_CHECKS = {
     # P3-1 元分析门控 — sidecar 由 psyclaw meta 生成
     "meta_heterogeneity_reported": lambda d, base: d.get("meta_heterogeneity_reported") is True,
     "meta_effect_ci_reported": lambda d, base: d.get("meta_effect_ci_reported") is True,
+    # P4-1 等价检验门控 — sidecar 由 psyclaw tost 生成
+    "equivalence_tested": lambda d, base: d.get("equivalence_tested") is True,
     # FIG.honest 门控 — figure sidecar (by psyclaw figures --check)
     "axis_from_zero_or_flagged": lambda d, base: (
         d.get("axis_from_zero", True) is not False

@@ -508,6 +508,24 @@ def cmd_missing(args: argparse.Namespace) -> int:
     return missing_cli(argv)
 
 
+def cmd_tost(args: argparse.Namespace) -> int:
+    from psyclaw.psych.equivalence import equivalence_cli
+    argv = [args.csv, "--dv", args.dv, "--lower", str(args.lower), "--upper", str(args.upper)]
+    if getattr(args, "group", None):
+        argv += ["--group", args.group]
+    if getattr(args, "mu0", None) is not None:
+        argv += ["--one-sample", str(args.mu0)]
+    if getattr(args, "paired", False):
+        argv += ["--paired"]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return equivalence_cli(argv)
+
+
 def cmd_sensitivity(args: argparse.Namespace) -> int:
     from psyclaw.psych.sensitivity import sensitivity_cli
     argv = [args.plan]
@@ -981,6 +999,30 @@ def build_parser() -> argparse.ArgumentParser:
     plit.add_argument("--synthesize", "-s", action="store_true",
                       help="据检索命中一键合成结构化综述(notes/lit_review.md)")
     plit.set_defaults(func=cmd_lit)
+
+    ptost = sub.add_parser(
+        "tost",
+        help=(
+            "TOST 等价检验（Two One-Sided Tests；Lakens, 2017）"
+            "——建立两组等价/无差异的统计证据"
+        ),
+    )
+    ptost.add_argument("csv", help="CSV 数据文件")
+    ptost.add_argument("--dv", required=True, help="因变量列名")
+    ptost.add_argument("--group", default=None,
+                       help="分组列名（双样本/配对；需恰好 2 个水平）")
+    ptost.add_argument("--lower", type=float, required=True,
+                       help="等价区间下界（原始均值差单位，如 -0.5；负值）")
+    ptost.add_argument("--upper", type=float, required=True,
+                       help="等价区间上界（原始均值差单位，如 0.5；正值）")
+    ptost.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
+    ptost.add_argument("--one-sample", type=float, default=None, dest="mu0",
+                       metavar="MU0", help="参考均值（单样本模式，与 --group 互斥）")
+    ptost.add_argument("--paired", action="store_true", help="配对样本模式")
+    ptost.add_argument("--out", default=None,
+                       help="sidecar 输出目录（写 notes/equivalence_report.*）")
+    ptost.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    ptost.set_defaults(func=cmd_tost)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
