@@ -13,12 +13,14 @@ from psyclaw.mcp.manager import (
     _is_enabled,
     _parse_registry,
     health_check,
+    is_optional,
     list_mcp_catalog,
     list_mcp_catalog_with_health,
     probe_capabilities,
     REGISTRY,
     SERVER_SECRETS,
     SERVER_NOTES,
+    OPTIONAL_ORIGINS,
 )
 
 
@@ -130,14 +132,18 @@ class TestHealthCheck:
         assert "Rscript" in h["detail"]
 
     def test_builtin_servers_pass(self):
-        """mplus/stata/spss/mne 内置 Python 服务器应全部健康。"""
+        """enable_when:always の Python 内置服务器应健康；
+        商业可选（detect:）服务器若未安装则 ok=False（可选，不算失败）。"""
         catalog = list_mcp_catalog_with_health()
-        builtin = {e["name"]: e for e in catalog
-                   if e.get("command", "").startswith("python -m")}
-        for name, entry in builtin.items():
-            assert entry["health"]["ok"] is True, (
-                f"{name} 健康检查失败: {entry['health']['detail']}"
-            )
+        for entry in catalog:
+            ew = entry.get("enable_when", "always")
+            if ew == "always" and entry.get("command", "").startswith("python -m"):
+                assert entry["health"]["ok"] is True, (
+                    f"{entry['name']} 内置健康检查失败: {entry['health']['detail']}"
+                )
+            elif is_optional(entry) and not entry["enabled"]:
+                # 商业可选服务器未安装时 ok=False 是预期行为
+                assert entry["health"]["ok"] is False
 
 
 # ===========================================================================
@@ -191,17 +197,26 @@ class TestListMcpCatalogWithHealth:
             if ew.startswith("env:") and not os.environ.get(ew[4:]):
                 assert e["health"]["ok"] is False
 
-    def test_mplus_healthy(self):
+    def test_mplus_is_commercial_optional(self):
+        """mplus-mcp 已标为商业可选（detect:mplus），未安装时 ok=False 属预期。"""
         catalog = list_mcp_catalog_with_health()
         mplus = next((e for e in catalog if e["name"] == "mplus-mcp"), None)
         assert mplus is not None
-        assert mplus["health"]["ok"] is True
+        assert mplus["enable_when"].startswith("detect:")
+        assert is_optional(mplus)
+        # 未安装 Mplus 时 ok=False；安装了则 ok=True；两种都接受
+        assert isinstance(mplus["health"]["ok"], bool)
+        # 不管有没有安装，detail 都应带「未检测到」或「检测到」
+        assert "mplus" in mplus["health"]["detail"].lower() or mplus["health"]["ok"]
 
-    def test_stata_healthy(self):
+    def test_stata_is_commercial_optional(self):
+        """stata-mcp 已标为商业可选（detect:stata），未安装时 ok=False 属预期。"""
         catalog = list_mcp_catalog_with_health()
         stata = next((e for e in catalog if e["name"] == "stata-mcp"), None)
         assert stata is not None
-        assert stata["health"]["ok"] is True
+        assert stata["enable_when"].startswith("detect:")
+        assert is_optional(stata)
+        assert isinstance(stata["health"]["ok"], bool)
 
 
 # ===========================================================================
@@ -261,12 +276,108 @@ class TestProbeCapabilities:
         assert isinstance(caps, dict)
 
     def test_builtin_capabilities_present(self):
-        """内置 Python 服务器（mplus/stata/spss/mne）应产出对应能力。"""
+        """enable_when:always 的 mne-mcp 应产出对应能力（商业可选 mplus/stata/spss 可能不在）。"""
         caps = probe_capabilities()
-        # mplus-mcp 提供 cfa_syntax 等
-        assert "cfa_syntax" in caps or "mplus_syntax" in caps or any(
-            "cfa" in k for k in caps
+        # mne-mcp is always enabled, should provide eeg_info
+        assert "eeg_info" in caps or any("eeg" in k for k in caps), (
+            f"mne-mcp 应产出 eeg_info 能力，当前能力集: {list(caps)[:10]}"
         )
+
+
+# ===========================================================================
+# R-3: 商业统计 MCP 归属标注
+# ===========================================================================
+
+class TestCommercialMcpAttribution:
+    def test_origin_field_in_catalog(self):
+        """每个 catalog 条目应有 origin 字段。"""
+        for e in list_mcp_catalog():
+            assert "origin" in e, f"{e['name']} 缺少 origin 字段"
+
+    def test_origin_field_in_catalog_with_health(self):
+        for e in list_mcp_catalog_with_health():
+            assert "origin" in e
+
+    def test_mplus_origin_is_optional(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["mplus-mcp"]["origin"] == "optional"
+
+    def test_stata_origin_is_optional(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["stata-mcp"]["origin"] == "optional"
+
+    def test_spss_origin_is_user(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["spss-mcp"]["origin"] == "user"
+
+    def test_mne_origin_is_builtin(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["mne-mcp"]["origin"] == "builtin"
+
+    def test_mplus_enable_when_detect(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["mplus-mcp"]["enable_when"].startswith("detect:")
+
+    def test_stata_enable_when_detect(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["stata-mcp"]["enable_when"].startswith("detect:")
+
+    def test_spss_enable_when_detect(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["spss-mcp"]["enable_when"].startswith("detect:")
+
+    def test_mplus_category_is_commercial(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["mplus-mcp"]["category"] == "stats-commercial"
+
+    def test_stata_category_is_commercial(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["stata-mcp"]["category"] == "stats-commercial"
+
+    def test_spss_category_is_commercial(self):
+        cat = {e["name"]: e for e in list_mcp_catalog()}
+        assert cat["spss-mcp"]["category"] == "stats-commercial"
+
+    def test_is_optional_true_for_commercial(self):
+        """is_optional() 对 origin=optional/user 返回 True。"""
+        assert is_optional({"origin": "optional"}) is True
+        assert is_optional({"origin": "user"}) is True
+
+    def test_is_optional_false_for_builtin(self):
+        assert is_optional({"origin": "builtin"}) is False
+        assert is_optional({}) is False  # 无 origin 字段 → 默认 builtin
+
+    def test_optional_in_optional_origins(self):
+        assert "optional" in OPTIONAL_ORIGINS
+        assert "user" in OPTIONAL_ORIGINS
+
+    def test_health_check_optional_tag_in_detail(self):
+        """商业可选服务器未启用时，detail 应带『可选』标注。"""
+        entry = {"name": "mplus-mcp", "enable_when": "detect:no_such_bin_xyz",
+                 "origin": "optional", "command": ""}
+        with mock.patch("shutil.which", return_value=None):
+            h = health_check(entry)
+        assert h["ok"] is False
+        assert "可选" in h["detail"]
+        assert h.get("optional") is True
+
+    def test_health_check_non_optional_no_optional_tag(self):
+        """非可选服务器未启用时，detail 不带『，未安装）』。"""
+        entry = {"name": "some-mcp", "enable_when": "detect:no_such_bin_xyz",
+                 "origin": "builtin", "command": ""}
+        with mock.patch("shutil.which", return_value=None):
+            h = health_check(entry)
+        assert h["ok"] is False
+        assert "，未安装）" not in h["detail"]
+
+    def test_mplus_note_mentions_optional(self):
+        assert "可选" in SERVER_NOTES["mplus-mcp"]
+
+    def test_stata_note_mentions_optional(self):
+        assert "可选" in SERVER_NOTES["stata-mcp"]
+
+    def test_spss_note_mentions_user_built(self):
+        assert "用户自研" in SERVER_NOTES["spss-mcp"]
 
 
 # ===========================================================================
@@ -366,6 +477,7 @@ if __name__ == "__main__":
         TestListMcpCatalog,
         TestListMcpCatalogWithHealth,
         TestProbeCapabilities,
+        TestCommercialMcpAttribution,
         TestMetadata,
         TestConfigWizard,
     ]

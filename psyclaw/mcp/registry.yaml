@@ -13,27 +13,32 @@ servers:
     enable_when: detect:Rscript
     provides: [lavaan, lme4, psych, semTools]
 
+  # 商业统计软件 MCP — 仅在本机检测到对应软件时启用（可选便捷集成，非核心路径）
   - name: mplus-mcp
-    category: stats-builtin
-    enable_when: always
+    category: stats-commercial      # 可选商业软件集成
+    origin: optional                # 可选便捷集成，非核心路径
+    enable_when: detect:mplus       # 仅本机有 Mplus 才启用
     command: python -m psyclaw.mcp.servers.mplus_server
     provides: [cfa_syntax, sem_syntax, lgm_syntax, mixture_syntax, mplus_run]
 
   - name: spss-mcp
-    category: stats-builtin
-    enable_when: always
+    category: stats-commercial      # 可选商业软件集成
+    origin: user                    # 用户自研（psyclaw 团队维护）
+    enable_when: detect:statisticsb # 仅本机有 IBM Statistics Batch Facility 才启用
     command: python -m psyclaw.mcp.servers.spss_server
     provides: [syntax_gen, sav_run, reliability, factor, ancova]
 
   - name: mne-mcp
     category: stats-builtin
+    origin: builtin
     enable_when: always
     command: python -m psyclaw.mcp.servers.mne_server
     provides: [eeg_info, preprocess_plan, erp_components, cluster_stats]
 
   - name: stata-mcp
-    category: stats-builtin
-    enable_when: always
+    category: stats-commercial      # 可选商业软件集成
+    origin: optional                # 可选便捷集成，非核心路径
+    enable_when: detect:stata       # 仅本机有 Stata 才启用
     command: python -m psyclaw.mcp.servers.stata_server
     provides: [dofile_gen, panel, iv, logistic, survival, poisson, stata_run]
 
