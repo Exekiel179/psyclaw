@@ -98,10 +98,14 @@ def panel(title: str, content: str, color: str = "brcyan") -> str:
 
 
 class StreamBlock:
-    """流式渲染块:LLM 回复边流边进边框。
+    """流式渲染块:LLM 回复边缓冲、关闭时整块 Markdown 渲染后输出。
 
     用法:
         blk = StreamBlock("PsyClaw"); blk.write(chunk)...; blk.close()
+
+    设计原则:按整块渲染(非逐 token)避免 Markdown 标记截断。
+    TTY 模式:打印生成指示符,close() 时上移覆盖 → ANSI 渲染版。
+    非 TTY / NO_COLOR:直接输出去标记纯文本,无 ANSI。
     """
 
     def __init__(self, title: str = "PsyClaw", color: str = "brcyan") -> None:
@@ -113,19 +117,28 @@ class StreamBlock:
         head = paint("╭─ ", color) + paint(title, color, "bold") + " " \
             + paint("─" * max(0, w - len(title) - 4), color)
         self._out.write(head + "\n")
-        self._out.write(paint("│ ", color))
+        if _ENABLED:
+            # 生成期间显示进度指示符;close() 时用 ANSI 光标上移覆盖
+            self._out.write(paint("│ ", color) + dim("▪ 正在生成…") + "\n")
+        self._indicator = _ENABLED
         self._out.flush()
 
     def write(self, chunk: str) -> None:
-        prefix = paint("│ ", self.color)
-        # 行缓冲:遇换行补左边框
-        text = chunk.replace("\n", "\n" + prefix)
-        self._out.write(text)
-        self._out.flush()
+        """缓冲流式 chunk;不直接输出,避免 Markdown 标记被截断。"""
+        self._buf += chunk
 
     def close(self) -> None:
+        """渲染缓冲内容并关闭面板。"""
+        from psyclaw.md_render import render_md
+        if self._indicator:
+            # 光标上移一行 + 清屏到末尾(覆盖「▪ 正在生成…」行)
+            self._out.write("\033[1A\033[J")
+        rendered = render_md(self._buf)
+        prefix = paint("│ ", self.color)
+        for ln in (rendered.splitlines() if rendered else [""]):
+            self._out.write(prefix + ln + "\n")
         w = term_width() - 2
-        self._out.write("\n" + paint("╰" + "─" * max(0, w - 1), self.color) + "\n")
+        self._out.write(paint("╰" + "─" * max(0, w - 1), self.color) + "\n")
         self._out.flush()
 
 
