@@ -584,6 +584,20 @@ def cmd_regress(args: argparse.Namespace) -> int:
     return regression_cli(argv)
 
 
+def cmd_anova(args: argparse.Namespace) -> int:
+    from psyclaw.psych.anova import anova_cli
+    argv = [args.csv, "--dv", args.dv, "--group", args.group]
+    if getattr(args, "post_hoc", False):
+        argv += ["--post-hoc"]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return anova_cli(argv)
+
+
 def cmd_describe(args: argparse.Namespace) -> int:
     from psyclaw.psych.descriptives import descriptives_cli
     argv = [args.csv]
@@ -1182,6 +1196,20 @@ def build_parser() -> argparse.ArgumentParser:
                        help="报告输出目录（默认 notes/）")
     pdesc.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pdesc.set_defaults(func=cmd_describe)
+
+    panova = sub.add_parser(
+        "anova",
+        help="单因素 ANOVA（F/eta²/omega²）+ 可选 Holm 校正成对事后检验",
+    )
+    panova.add_argument("csv", help="输入数据 CSV 路径")
+    panova.add_argument("--dv", required=True, help="因变量列名")
+    panova.add_argument("--group", required=True, help="分组列名")
+    panova.add_argument("--post-hoc", action="store_true", dest="post_hoc",
+                        help="附加 Holm 校正成对 t 事后检验")
+    panova.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
+    panova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    panova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    panova.set_defaults(func=cmd_anova)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
