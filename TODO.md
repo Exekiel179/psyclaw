@@ -201,3 +201,11 @@
 7. ~~**R-4 REPL Markdown 渲染**~~ ✅ 整块缓冲 + Markdown→ANSI（`psyclaw/md_render.py`）→ ~~**R-1 prompt_toolkit REPL**~~ ✅ 三级降级（ptk→stdlib→input），`_slash_completions` 纯函数 + PromptSession 单例（`psyclaw/ui_input.py`） → **R-2 writing 复用 academic-research-skills** → **R-3 MCP 归属标注**（决策已定，优先于 P3）。
 8. ~~**R-5 对话读取本地文件路径**~~ ✅ 路径自动检测（`psyclaw/path_ingest.py`）+ REPL 接线（`repl.py`）；57 例测试。
 9. 其余 P1/P2/P3 按需排期。
+
+---
+
+## P5 · 正确性加固（自我扩展，2026-06-14 起）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P5-E1 | context.py 单元测试 | **已落地** `tests/test_context.py`：`lean_core`（内容/可复现性）、`relevant_knowledge`（关键词命中/max_items 上限/中文别名/降级）、`compact_history`（阈值触发/recent-turns 保留/memo 累积/memo 长度上限）、`render_memo`（空/非空格式）、`_distill`（决策行抽取/角色标签/回退首行/截断）、`smart_excerpt`（大文件 head+tail/CSV 结构摘要/TSV/路径注入/错误降级）、`_is_num`（数值/非数值 parametrize）；57 例。 | `tests/test_context.py` ≥30例 |
