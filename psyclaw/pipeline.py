@@ -114,14 +114,6 @@ def _design_task(goal: str) -> str:
         "设计决策尽量给方法学依据(背书库见 `psyclaw cite`)。")
 
 
-def _write_task() -> str:
-    return (
-        "据背景综述、研究设计与统计结果,写一篇 **APA-JARS 结构**的研究稿:\n"
-        "标题 / 摘要 / 引言(含假设) / 方法(被试·测量·程序·分析计划) / "
-        "结果 / 讨论(限定性措辞,相关≠因果,区分探索/确证,讨论局限) / 参考。\n"
-        "**只引用 outputs/ 中已存在的表图与 result_* 统计量,不存在的结果不得"
-        "编造**;每个显著性检验必报效应量 + 95% CI。")
-
 
 # ---------------------------------------------------------------------------
 # 编排(依赖 provider / IO)
@@ -248,18 +240,30 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
         print(ui.dim("  跳过自动分析:无数据或澄清卡未明确对应数据列(不猜列名)。"))
 
     # —— ④ 写作(APA-JARS)——
-    print("\n" + ui.accent("④ 写作(APA-JARS 结构稿)"))
-    report = _gen(provider, "executor", _write_task(),
-                  f"# 背景综述\n{lit}\n\n# 研究设计\n{design}\n\n"
-                  f"# 统计结果(只引用 outputs/ 已存在的)\n{stat_out}")
+    from psyclaw.output.writing_backend import BACKEND_ARS, detect_backend, write_paper
+
+    writing_backend = detect_backend(project_dir)
+    backend_label = "ARS插件" if writing_backend == BACKEND_ARS else "内置"
+    print("\n" + ui.accent(f"④ 写作(APA-JARS 结构稿 · {backend_label}写作后端)"))
+    write_ctx = (f"# 背景综述\n{lit}\n\n# 研究设计\n{design}\n\n"
+                 f"# 统计结果(只引用 outputs/ 已存在的)\n{stat_out}")
+    report, write_meta = write_paper(goal, write_ctx, provider, project,
+                                     backend=writing_backend)
     report_path = project / "outputs" / "report.md"
     if not report.strip():
         print(ui.err("✗ 写作阶段未产出稿(provider 返回空),硬停止。"))
         _log(project, "pipeline ④ 写作产出为空 → 硬停止")
         return 1
-    report_path.write_text(report, encoding="utf-8")
     artifacts["writing"] = "outputs/report.md"
-    _log(project, "pipeline ④ 写作 → outputs/report.md")
+    if write_meta.get("abstract", {}) and write_meta["abstract"].get("zh"):
+        artifacts["abstract"] = "notes/abstract_bilingual.md"
+        print(ui.ok("  ✓ 双语摘要 → notes/abstract_bilingual.md"))
+    if write_meta.get("jars"):
+        jars = write_meta["jars"]
+        n_blk = len(jars.get("blocking", []))
+        jars_label = "通过" if jars.get("passed") else f"阻断({n_blk}项)"
+        print(ui.ok(f"  ✓ JARS 检查 {jars_label} → notes/jars_check.json"))
+    _log(project, f"pipeline ④ 写作({backend_label}) → outputs/report.md")
     print(ui.panel("outputs/report.md", report[:700] + ("…" if len(report) > 700 else "")))
 
     # —— ⑤ 评审(peer-review panel;revise=True 闭合写作→评审→修复)——
