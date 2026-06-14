@@ -604,6 +604,22 @@ def cmd_efa(args: argparse.Namespace) -> int:
     return efa_cli(argv)
 
 
+def cmd_mlm(args: argparse.Namespace) -> int:
+    from psyclaw.psych.mlm import mlm_cli
+    argv = [args.csv, "--dv", args.dv, "--cluster", args.cluster]
+    if getattr(args, "iv", None):
+        argv += ["--iv", args.iv]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "max_iter", 200) != 200:
+        argv += ["--max-iter", str(args.max_iter)]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return mlm_cli(argv)
+
+
 def cmd_logit(args: argparse.Namespace) -> int:
     from psyclaw.psych.logistic import logistic_cli
     argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
@@ -1458,6 +1474,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pefa.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pefa.set_defaults(func=cmd_efa)
+
+    pmlm = sub.add_parser(
+        "mlm",
+        help="两层随机截距混合线性模型（HLM/MLM）；ICC/AIC/BIC；APA-7 表格",
+    )
+    pmlm.add_argument("csv", help="输入数据 CSV 路径")
+    pmlm.add_argument("--dv", required=True, help="因变量列名")
+    pmlm.add_argument("--cluster", required=True,
+                      help="Level-2 聚类变量列名（如 school_id、therapist_id）")
+    pmlm.add_argument("--iv", default=None,
+                      help="固定效应预测变量，逗号分隔（可选；不填仅拟合零模型）")
+    pmlm.add_argument("--alpha", type=float, default=0.05,
+                      help="显著性水平（默认 .05）")
+    pmlm.add_argument("--max-iter", type=int, default=200, dest="max_iter",
+                      help="EM 最大迭代次数（默认 200）")
+    pmlm.add_argument("--out", default=None,
+                      help="sidecar 输出目录（写 mlm_report.{md,json}）")
+    pmlm.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pmlm.set_defaults(func=cmd_mlm)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
