@@ -546,6 +546,11 @@ def cmd_bayes(args: argparse.Namespace) -> int:
     return bayes_cli(argv)
 
 
+def cmd_effect_size(args: argparse.Namespace) -> int:
+    from psyclaw.psych.effect_size import effect_size_cli
+    return effect_size_cli(list(getattr(args, "effect_args", [])))
+
+
 def cmd_correct_p(args: argparse.Namespace) -> int:
     from psyclaw.psych.multiple_testing import corrections_cli
     argv = []
@@ -1114,6 +1119,15 @@ def build_parser() -> argparse.ArgumentParser:
     pbf.add_argument("--out", default="notes", help="sidecar 输出目录（默认 notes/）")
     pbf.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pbf.set_defaults(func=cmd_bayes)
+
+    pes = sub.add_parser(
+        "effect-size",
+        help="效应量转换（d↔r↔f↔η²↔OR）+ 从摘要统计计算 Cohen's d",
+    )
+    pes.add_argument("effect_args", nargs=argparse.REMAINDER,
+                     help="子命令：convert --from d --to r --value 0.5 | "
+                          "compute --m1 M --sd1 S --n1 N [--m2 ...] | interpret --type d --value 0.5")
+    pes.set_defaults(func=cmd_effect_size)
 
     pcp = sub.add_parser(
         "correct-p",
