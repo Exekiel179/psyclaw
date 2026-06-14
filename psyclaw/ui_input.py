@@ -1,11 +1,13 @@
-"""键级交互输入 — slash 命令实时联想(stdlib only,仿 claude-code)。
+"""键级交互输入 — slash 命令实时联想(stdlib + prompt_toolkit optional)。
 
-输入 "/" 即时弹出命令联想列表(随输入过滤),
-↑/↓ 或 Tab 选择,Enter 补全/提交,Esc 关闭联想,Ctrl+C 退出。
+**优先路径**：若已安装 prompt_toolkit（`psyclaw[full]`），启用：
+  - slash 命令实时补全（Tab/Enter 选择）
+  - 会话内历史（↑/↓ 浏览，可跨 read_line 调用持久）
+  - 多行编辑、标准键位（Ctrl+A/E/K/...）
+  - ANSI 彩色 prompt 原样透传
 
-实现:Windows 用 msvcrt.getwch,Unix 用 termios+tty 原始模式;
-非 TTY(管道/重定向)或任何异常 → 自动降级为内置 input(),
-保证脚本化调用永远可用。
+**降级路径**：prompt_toolkit 未安装，或非 TTY（管道/重定向），或任何异常 →
+  回落到原 stdlib msvcrt/termios 实现，保证脚本化调用永远可用。
 """
 
 from __future__ import annotations
@@ -16,6 +18,73 @@ import sys
 from psyclaw import ui
 
 MAX_SUGGEST = 6
+
+# ---------------------------------------------------------------------------
+# prompt_toolkit 可选导入（装了才用）
+# ---------------------------------------------------------------------------
+
+_PTK_AVAILABLE = False
+_ptk_session = None           # PromptSession 单例，惰性创建
+
+try:
+    from prompt_toolkit import PromptSession as _PtkSession          # type: ignore[import-not-found]
+    from prompt_toolkit.completion import (                           # type: ignore[import-not-found]
+        Completer as _PtkCompleter,
+        Completion as _PtkCompletion,
+    )
+    from prompt_toolkit.formatted_text import ANSI as _PtkANSI      # type: ignore[import-not-found]
+    from prompt_toolkit.history import InMemoryHistory as _PtkHist  # type: ignore[import-not-found]
+
+    class _SlashCompleter(_PtkCompleter):
+        """prompt_toolkit Completer：仅对 / 开头输入触发命令补全。"""
+
+        def __init__(self, commands: dict) -> None:
+            self._commands = commands
+
+        def get_completions(self, document, complete_event):
+            for suffix, display, meta in _slash_completions(
+                    document.text_before_cursor, self._commands):
+                yield _PtkCompletion(suffix, display=display, display_meta=meta)
+
+    _PTK_AVAILABLE = True
+except ImportError:
+    pass
+
+
+def _slash_completions(text: str, commands: dict) -> list[tuple[str, str, str]]:
+    """纯函数：给定缓冲文本与命令表，返回 (后缀, 显示命令, 描述) 三元组列表。
+
+    触发条件：文本以 / 开头且不含空格（避免参数阶段干扰）。
+    """
+    if not text.startswith("/") or " " in text:
+        return []
+    return [
+        (cmd[len(text):], cmd, desc[:50])
+        for cmd, desc in commands.items()
+        if cmd.startswith(text)
+    ][:MAX_SUGGEST]
+
+
+def _get_ptk_session(commands: dict):
+    """获取或创建 PromptSession 单例（仅当 _PTK_AVAILABLE 时调用）。"""
+    global _ptk_session
+    if _ptk_session is None:
+        _ptk_session = _PtkSession(
+            completer=_SlashCompleter(commands),
+            history=_PtkHist(),
+            complete_while_typing=True,
+            mouse_support=False,
+        )
+    else:
+        _ptk_session.completer = _SlashCompleter(commands)
+    return _ptk_session
+
+
+def _ptk_read_line(prompt_str: str, commands: dict) -> str:
+    """使用 prompt_toolkit 读取一行（含历史/补全/键位）。"""
+    session = _get_ptk_session(commands)
+    result = session.prompt(_PtkANSI(prompt_str))
+    return (result or "").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -119,15 +188,20 @@ def _clear_suggestions(prev_lines: int) -> None:
 def read_line(prompt: str, commands: dict) -> str:
     """带 slash 联想的行输入。commands: {"/cmd": "描述"}。
 
-    非 TTY 或读键失败 → 降级 input()。
+    优先 prompt_toolkit（若已安装且 TTY）→ 降级 stdlib 交互输入 → 降级 input()。
     """
+    if _PTK_AVAILABLE and sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            return _ptk_read_line(prompt, commands)
+        except (KeyboardInterrupt, EOFError):
+            raise
+        except Exception:  # noqa: BLE001 — ptk 失败时降级 stdlib
+            pass
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         return input(prompt).strip()
     try:
         return _read_line_interactive(prompt, commands)
-    except KeyboardInterrupt:
-        raise
-    except EOFError:
+    except (KeyboardInterrupt, EOFError):
         raise
     except Exception:  # noqa: BLE001 — 任何终端兼容问题都降级
         return input(prompt).strip()
