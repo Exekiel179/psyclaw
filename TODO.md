@@ -145,6 +145,14 @@
 
 ---
 
+## P8 · 统计纵深扩展 III（P7 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P8-1 | 探索性因子分析（EFA） | **已落地** `psyclaw/psych/efa.py`：循环 Jacobi 特征值分解（对称矩阵，60 sweep 收敛）；SMC 初始公因子方差（R⁻¹对角线）；主轴因子法（PAF，迭代共同度估计）+ PCA 可选；Kaiser Varimax 正交旋转（非规范化，最大化载荷⁴方差）；Kaiser 准则自动确定因子数（特征值 ≥ 1.0）；ASCII 碎石图；APA-7 Markdown 因子载荷三线表（低于阈值空白，≥.50 加粗）+ 段落；MD+JSON sidecar；`psyclaw efa <data.csv> --cols c1,c2,... [--n-factors N] [--rotation varimax\|none] [--method paf\|pca] [--min-loading .30] [--json] [--out]`；CLI 注册 `cli.py`。理论依据：Harman (1976)；Kaiser (1958)；Cattell (1966)。stdlib only。测试 `tests/test_efa.py`（54 例）。 | `tests/test_efa.py` ≥35例，2因子结构正确检出，Varimax 旋转矩阵正交，SMC 随相关升高 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
