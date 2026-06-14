@@ -161,6 +161,16 @@
 
 ---
 
+---
+
+## P10 · 统计纵深扩展 V（P9 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P10-1 | 层级多元回归（Hierarchical OLS） | **已落地** `psyclaw/psych/hierarchical_regression.py`：分块逐步纳入预测变量（每块继承前块全部 IV + 新增变量）；ΔR²、ΔF 变化量检验（`F = (ΔR²/df_ch)/((1-R²)/df_res)`）；各块 R²/调整 R²/F/p 整体显著；最终块完整系数表（B/β/SE/t/p/95%CI）；`format_apa_hierarchical_table`（APA-7 Markdown 三线分块汇总表）+ `format_apa_coefficients_table` + `format_apa_hierarchical_paragraph`（含步骤描述 + 显著预测变量文字）；`write_hierarchical_report` MD+JSON sidecar；`analyze_hierarchical` CSV 主入口；`psyclaw hreg <data.csv> --dv <col> --block1 c1,c2 [--block2 c3 --block3 c4,c5 ...] [--alpha] [--json] [--out]`；CLI 注册 `cli.py`；stdlib only。理论依据：Cohen, Cohen, West & Aiken (2003)。测试 `tests/test_hierarchical_regression.py`（50 例）。 | `tests/test_hierarchical_regression.py` ≥35例，ΔF 公式精确，ΔR² 累加等于最终 R² |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
