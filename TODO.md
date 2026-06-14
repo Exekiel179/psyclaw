@@ -79,7 +79,7 @@
 |---|------|------|------|
 | ✅ P3-1 | 元分析工具 | **已落地** `psyclaw/psych/meta.py`：DerSimonian-Laird 随机效应模型、Q/I²/τ²/τ 异质性、Egger's 偏倚检验(k≥10)、固定效应对比、ASCII 森林图、APA-7 中文段落；stdlib only（无scipy降级可用）；`STAT.meta` 门禁（meta_heterogeneity_reported + meta_effect_ci_reported，block）注册入 `rules.yaml`+`checker.py`；`psyclaw meta <data.csv> [--json] [--out dir] [--no-forest]`；四种 SE 推导（se/ci/n1n2/r+n Fisher z）；门禁升至 21 项。测试 `tests/test_meta.py`（48 例，全绿）。 | `tests/test_meta.py` ≥30例，无scipy降级可用 |
 | ✅ P3-2 | 缺失数据报告 | **已落地** `psyclaw/psych/missing_data.py`：缺失模式矩阵（`missing_pattern`）、Little's MCAR 检验（`little_mcar_test`，完整案例协方差估计，stdlib only）、MAR 预测分组 t 检验（`mar_test`，Welch df）、插补策略推荐（`recommend_imputation`，MCAR/MAR/比例三维判断）、APA-7 缺失报告段落（`format_apa_missing`）；主入口 `analyze_missing` 写 `missing_report.md` + `missing_report.json`；CLI `psyclaw missing <data.csv> [--json] [--out <dir>]`（已注册 `cli.py`）。测试 `tests/test_missing_data.py`（39 例）。 | `tests/test_missing_data.py` ≥25例 |
-| 📋 P3-3 | 敏感性分析框架 | `psyclaw sensitivity <plan.md>` — 据 `notes/plan.md` 中分析决策分叉点产出多种合理分析规格(Multiverse分析框架)、汇报规格曲线(effect size分布)。 | `tests/test_sensitivity.py` ≥20例 |
+| ✅ P3-3 | 敏感性分析框架 | **已落地** `psyclaw/psych/sensitivity.py`：极简 YAML 解析（`_parse_forks_yaml`，避免 pyyaml）、笛卡尔积多元宇宙生成（`generate_multiverse`）、组内 SD 阈值离群值过滤（`_apply_outlier_filter`）、三类统计检验（Welch/Student/Mann-Whitney，效应量统一转 Cohen's *d*）、稳健性指标（`compute_robustness`）、ASCII 规格曲线表（`format_ascii_spec_curve`）、APA-7 段落（`format_apa_sensitivity`）、MD+JSON sidecar 输出；`psyclaw sensitivity <plan.md\|forks.yaml> [--data CSV] [--dv col] [--group col] [--out dir]`（REPL `/sensitivity`）；引入 Steegen et al. 2016 + Simonsohn et al. 2020 引文。测试 `tests/test_sensitivity.py`（43 例）。 | `tests/test_sensitivity.py` ≥20例 |
 
 ---
 

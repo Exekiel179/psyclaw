@@ -58,6 +58,7 @@ COMMANDS = {
     "/lit": "文献检索(M2+)",
     "/stat": "ARS-Stat 统计分析(M2+)",
     "/write": "APA JARS 写作(M2+)",
+    "/sensitivity": "敏感性/多元宇宙分析(Multiverse + 规格曲线；P3-3)",
     "/exit": "退出",
 }
 
@@ -352,6 +353,13 @@ class ReplSession:
         elif cmd == "/lit":
             from psyclaw.psych.lit_cli import lit_cli_argv
             lit_cli_argv(arg.split() if arg else [])
+        elif cmd == "/sensitivity":
+            from psyclaw.psych.sensitivity import sensitivity_cli
+            if not arg:
+                print("  用法:/sensitivity <plan.md|forks.yaml> [--data data.csv] "
+                      "[--dv col] [--group col] [--out dir]")
+            else:
+                sensitivity_cli(arg.split())
         elif cmd in ("/stat", "/write", "/init"):
             print(f"  [{cmd}] M2+ 实现(见 DESIGN.md 路线图)。当前可直接用自然语言询问,ARS 规范已注入。")
         else:
