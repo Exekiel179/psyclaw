@@ -110,6 +110,16 @@
 
 ---
 
+---
+
+## P4 · 持续扩展（P3 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P4-1 | TOST 等价检验 | **已落地** `psyclaw/psych/equivalence.py`：`tost_two_sample`（Welch t）、`tost_one_sample`（单样本）、`tost_paired`（配对）三类 TOST；`compute_mdes`（大样本正态近似 MDES）；`format_apa_equivalence` APA-7 段落；`write_equivalence_report` MD+JSON sidecar；`analyze_equivalence` CSV 主入口；`equivalence_cli`；`STAT.equivalence` 门禁（block，trigger: equivalence_test，自动校验 `equivalence_tested`）注册入 `rules.yaml`+`checker.py`+`KIND_TRIGGERS`；`psyclaw tost <data.csv> --dv <col> --group <col> --lower <lb> --upper <ub> [--alpha] [--paired] [--one-sample <mu0>] [--json] [--out]`。理论依据：Schuirmann 1987；Lakens 2017；Lakens et al. 2018。门禁升至 19 条。测试 `tests/test_equivalence.py`（49 例）。 | `tests/test_equivalence.py` ≥25例，STAT.equivalence 门禁自动校验 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。

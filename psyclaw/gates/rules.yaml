@@ -102,3 +102,9 @@ gates:
     requires: [meta_heterogeneity_reported, meta_effect_ci_reported]
     action: block
     fix: 元分析结果必须报告 I²、τ²、Q 检验（异质性）和随机效应汇总效应量及 95% CI；运行 psyclaw meta <data.csv> 自动生成合规报告
+
+  - id: STAT.equivalence
+    trigger: equivalence_test
+    requires: [equivalence_tested]
+    action: block
+    fix: 声称"无差异/等价/非劣效"时必须提供 TOST 等价检验证据；运行 psyclaw tost <data.csv> --dv <列> --group <组列> --lower <下界> --upper <上界>
