@@ -73,12 +73,31 @@
 
 ---
 
-## ❓ 开放问题（需先决策，来自 DESIGN §8）
+## P3 · 自我扩展（E-3 完成后新增）
 
-1. **REPL 库选型**：`prompt_toolkit`（功能全）vs `rich.prompt`（轻）vs 维持当前 stdlib 双实现（零依赖）？
-2. **ARS 子技能组织**：独立 SKILL.md vs 单文件多 section？当前为独立子技能 + ARS 总编排。
-3. **复用 academic-research-skills 插件**作为 writing 子技能后端，避免重造？（M2 曾建议评估，至今未定）
-4. **商业统计软件 MCP 归属**：谁实现/维护？接口契约先行。
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P3-1 | 元分析工具 | **已落地** `psyclaw/psych/meta.py`：DerSimonian-Laird 随机效应模型、Q/I²/τ²/τ 异质性、Egger's 偏倚检验(k≥10)、固定效应对比、ASCII 森林图、APA-7 中文段落；stdlib only（无scipy降级可用）；`STAT.meta` 门禁（meta_heterogeneity_reported + meta_effect_ci_reported，block）注册入 `rules.yaml`+`checker.py`；`psyclaw meta <data.csv> [--json] [--out dir] [--no-forest]`；四种 SE 推导（se/ci/n1n2/r+n Fisher z）；门禁升至 21 项。测试 `tests/test_meta.py`（48 例，全绿）。 | `tests/test_meta.py` ≥30例，无scipy降级可用 |
+| 📋 P3-2 | 缺失数据报告 | `psyclaw missing <data.csv>` — 缺失模式矩阵、Little's MCAR 检验、MAR 预测(分组缺失比较)、推荐插补策略、APA-7 缺失报告段落。`psyclaw/psych/missing_data.py`。 | `tests/test_missing_data.py` ≥25例 |
+| 📋 P3-3 | 敏感性分析框架 | `psyclaw sensitivity <plan.md>` — 据 `notes/plan.md` 中分析决策分叉点产出多种合理分析规格(Multiverse分析框架)、汇报规格曲线(effect size分布)。 | `tests/test_sensitivity.py` ≥20例 |
+
+---
+
+## ✅ 已决策（2026-06-14，原 DESIGN §8 开放问题）
+
+1. **REPL 库选型 → `prompt_toolkit`（功能全）**。落地为 R-1，**保留 stdlib 降级**（零依赖铁律不破）。
+2. **ARS 子技能组织 → 维持现状**：独立子技能 SKILL.md + ARS 总编排，不改。
+3. **复用 academic-research-skills 插件作为 writing 子技能后端 → 采纳**。落地为 R-2。
+4. **商业统计软件 MCP 归属 → 定位为「可选便捷集成」**：`spss-mcp` 为用户（你）自研；Mplus/Stata/SPSS 等 MCP 仅在用户本机检测到对应软件时启用（`enable_when: detect`），用户自愿使用，非核心路径。E-2/E-3 已实现该可选模型，仅需补全归属标注（R-3）。
+
+## P4 · 决策落地任务（优先于 P3 自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| 📋 R-1 | prompt_toolkit REPL 后端 | `repl.py` 接入 prompt_toolkit（命令补全/历史/多行/键位），**装了才用、未装回落现有 stdlib msvcrt/termios 双实现**（零依赖铁律不破）；`full` 选装组已含 prompt_toolkit | `tests/test_repl_ptk.py`；无 prompt_toolkit 环境 REPL 仍可跑、现有命令不回归 |
+| 📋 R-2 | writing 后端复用 academic-research-skills | `skills/ars` writing 子技能后端对接 academic-research-skills 插件（academic-paper 写作 + reviewer、APA-JARS/双语摘要能力），**插件缺失时回落现有内置写作**；与 P0-1 评审保持单一契约不重复造轮子 | `tests/test_writing_backend.py`；插件缺失降级可用 |
+| 📋 R-3 | 商业统计 MCP 归属标注 | `registry.yaml`/`manager.py` 标注 `spss-mcp` 为用户自研、Mplus/Stata 为可选便捷集成（`enable_when: detect`，本机有软件才启用）；`doctor` 文案体现「可选」 | 现有 MCP 测试不回归 + 标注校验 |
+| 📋 R-4 | REPL 输出框 Markdown 渲染（**用户实测痛点，优先**） | LLM 回复在圆角块内渲染 Markdown：**粗体**/*斜体*/`行内代码`/标题/有序+无序列表/分隔线/引用 → ANSI 富文本，**纯 stdlib 实现不引依赖**；`NO_COLOR=1`、非 TTY、管道环境降级为**去标记纯文本**（绝不显示裸 `**`/`#`/`-`）；与现有 `ui.py` 圆角块和全局配色统一；流式输出下按整块（非逐 token）渲染避免标记截断 | `tests/test_ui_markdown.py`：粗体/斜体/行内代码/标题/有序无序列表各有用例；`NO_COLOR` 下输出无 ANSI 且无残留标记符；现有 REPL/ui 测试不回归 |
 
 ---
 
@@ -99,4 +118,5 @@
 4. ~~**D-1 功效分析**~~ ✅ G*Power 对标的先验功效分析（`psyclaw power`，`psyclaw/psych/power.py`）。
 5. ~~**D-2 预注册模板**~~ ✅ `/preregister` 据澄清卡产 OSF/AsPredicted 双格式，复用 D-1 功效（`psyclaw/psych/preregister.py`）。
 6. ~~**A-1 检验决策树特判**~~ ✅ 六类特判落地(`psyclaw/psych/decision_tree.py`)。
-7. 其余 P1/P2 按需排期。
+7. **R-4 REPL Markdown 渲染**（用户实测痛点，最优先）→ **R-1 prompt_toolkit REPL** → **R-2 writing 复用 academic-research-skills** → **R-3 MCP 归属标注**（决策已定，优先于 P3）。
+8. 其余 P1/P2/P3 按需排期。

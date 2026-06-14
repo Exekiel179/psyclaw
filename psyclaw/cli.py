@@ -482,6 +482,18 @@ def cmd_mediation(args: argparse.Namespace) -> int:
     return analyze_mediation_cli(argv)
 
 
+def cmd_meta(args: argparse.Namespace) -> int:
+    from psyclaw.psych.meta import meta_cli
+    argv = [args.csv]
+    if args.json:
+        argv += ["--json"]
+    if args.out:
+        argv += ["--out", args.out]
+    if not args.forest:
+        argv += ["--no-forest"]
+    return meta_cli(argv)
+
+
 def cmd_invariance(args: argparse.Namespace) -> int:
     from psyclaw.psych.invariance import run_invariance
     return run_invariance(
@@ -833,6 +845,15 @@ def build_parser() -> argparse.ArgumentParser:
     pstat.add_argument("--formula", default=None, help="lme4 公式(mlm)")
     pstat.add_argument("--items", default=None, help="omega 条目列,逗号分隔")
     pstat.set_defaults(func=cmd_stat)
+
+    pmt = sub.add_parser("meta",
+                         help="元分析(DerSimonian-Laird 随机效应；I²/τ²/Egger；ASCII 森林图)")
+    pmt.add_argument("csv", help="效应量 CSV（含 study, d/g/r, se/ci/n 列）")
+    pmt.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pmt.add_argument("--out", default="notes", help="sidecar 输出目录（默认 notes/）")
+    pmt.add_argument("--no-forest", action="store_false", dest="forest",
+                     help="不输出 ASCII 森林图")
+    pmt.set_defaults(func=cmd_meta, forest=True)
 
     pmed = sub.add_parser("mediation",
                           help="中介分析(Preacher & Hayes bootstrap CI 5000,拒 Sobel)")
