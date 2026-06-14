@@ -604,6 +604,22 @@ def cmd_efa(args: argparse.Namespace) -> int:
     return efa_cli(argv)
 
 
+def cmd_hreg(args: argparse.Namespace) -> int:
+    from psyclaw.psych.hierarchical_regression import hierarchical_cli
+    argv = [args.csv, "--dv", args.dv]
+    for i in range(1, 10):
+        v = getattr(args, f"block{i}", None)
+        if v:
+            argv += [f"--block{i}", v]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return hierarchical_cli(argv)
+
+
 def cmd_mlm(args: argparse.Namespace) -> int:
     from psyclaw.psych.mlm import mlm_cli
     argv = [args.csv, "--dv", args.dv, "--cluster", args.cluster]
@@ -1493,6 +1509,27 @@ def build_parser() -> argparse.ArgumentParser:
                       help="sidecar 输出目录（写 mlm_report.{md,json}）")
     pmlm.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pmlm.set_defaults(func=cmd_mlm)
+
+    phreg = sub.add_parser(
+        "hreg",
+        help=(
+            "层级多元回归（Hierarchical OLS）：分块逐步纳入预测变量，"
+            "输出 ΔR²、ΔF、最终块系数表（APA-7）"
+        ),
+    )
+    phreg.add_argument("csv", help="输入数据 CSV 路径")
+    phreg.add_argument("--dv", required=True, help="因变量列名")
+    for _bi in range(1, 10):
+        phreg.add_argument(
+            f"--block{_bi}", default=None,
+            help=f"第 {_bi} 块新增预测变量，逗号分隔（按数字顺序逐块纳入）",
+        )
+    phreg.add_argument("--alpha", type=float, default=0.05,
+                       help="显著性水平（默认 .05）")
+    phreg.add_argument("--out", default="notes",
+                       help="报告输出目录（默认 notes/）")
+    phreg.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    phreg.set_defaults(func=cmd_hreg)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
