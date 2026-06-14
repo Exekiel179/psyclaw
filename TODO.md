@@ -78,7 +78,7 @@
 | # | 任务 | 说明 | 验收 |
 |---|------|------|------|
 | ✅ P3-1 | 元分析工具 | **已落地** `psyclaw/psych/meta.py`：DerSimonian-Laird 随机效应模型、Q/I²/τ²/τ 异质性、Egger's 偏倚检验(k≥10)、固定效应对比、ASCII 森林图、APA-7 中文段落；stdlib only（无scipy降级可用）；`STAT.meta` 门禁（meta_heterogeneity_reported + meta_effect_ci_reported，block）注册入 `rules.yaml`+`checker.py`；`psyclaw meta <data.csv> [--json] [--out dir] [--no-forest]`；四种 SE 推导（se/ci/n1n2/r+n Fisher z）；门禁升至 21 项。测试 `tests/test_meta.py`（48 例，全绿）。 | `tests/test_meta.py` ≥30例，无scipy降级可用 |
-| 📋 P3-2 | 缺失数据报告 | `psyclaw missing <data.csv>` — 缺失模式矩阵、Little's MCAR 检验、MAR 预测(分组缺失比较)、推荐插补策略、APA-7 缺失报告段落。`psyclaw/psych/missing_data.py`。 | `tests/test_missing_data.py` ≥25例 |
+| ✅ P3-2 | 缺失数据报告 | **已落地** `psyclaw/psych/missing_data.py`：缺失模式矩阵（`missing_pattern`）、Little's MCAR 检验（`little_mcar_test`，完整案例协方差估计，stdlib only）、MAR 预测分组 t 检验（`mar_test`，Welch df）、插补策略推荐（`recommend_imputation`，MCAR/MAR/比例三维判断）、APA-7 缺失报告段落（`format_apa_missing`）；主入口 `analyze_missing` 写 `missing_report.md` + `missing_report.json`；CLI `psyclaw missing <data.csv> [--json] [--out <dir>]`（已注册 `cli.py`）。测试 `tests/test_missing_data.py`（39 例）。 | `tests/test_missing_data.py` ≥25例 |
 | 📋 P3-3 | 敏感性分析框架 | `psyclaw sensitivity <plan.md>` — 据 `notes/plan.md` 中分析决策分叉点产出多种合理分析规格(Multiverse分析框架)、汇报规格曲线(effect size分布)。 | `tests/test_sensitivity.py` ≥20例 |
 
 ---
