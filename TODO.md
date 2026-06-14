@@ -98,6 +98,7 @@
 | ✅ R-2 | writing 后端复用 academic-research-skills | **已落地** `psyclaw/output/writing_backend.py`：`detect_backend`（env var→插件路径→builtin 三级优先）、`get_write_task`（ARS 后端含双语摘要/JARS 章节列表，内置保持原契约）、`write_abstract`（双语/单语两路+LLM解析）、`write_paper`（主入口，ARS 后端附加双语摘要 `notes/abstract_bilingual.md` + JARS 自动检查）；插件缺失或 env=builtin 自动降级；`pipeline.py` ④ 写作阶段改用 `write_paper()`（评审仍在 review.py，单一契约不破）。测试 `tests/test_writing_backend.py`（42 例）。 | `tests/test_writing_backend.py`；插件缺失降级可用 |
 | ✅ R-3 | 商业统计 MCP 归属标注 | **已落地** `registry.yaml`：mplus-mcp/stata-mcp → `origin: optional` + `category: stats-commercial` + `enable_when: detect:mplus/stata`；spss-mcp → `origin: user` + `enable_when: detect:statisticsb`；mne-mcp 保留 `origin: builtin/always`。`manager.py`：`is_optional()`/`OPTIONAL_ORIGINS`/`health_check` 带「可选，未安装」标注/`list_mcp_catalog*` 含 origin 字段/SERVER_NOTES 更新；`cli.py` `doctor` 可选服务器不计入强制门禁/`[可选]` 标签；`cmd_mcp` 显示 `[可选]` 标签。测试 `tests/test_mcp_registry.py`（61 例，较原 41 例 +20）。 | 现有 MCP 测试不回归 + 标注校验 |
 | ✅ R-4 | REPL 输出框 Markdown 渲染（**用户实测痛点，优先**） | **已落地** `psyclaw/md_render.py`：`render_md`/`_render`/`_inline`/`_paint`；支持 **bold**/*italic*/`code`/# H1–H3/有序+无序列表/---水平线/> 引用/``` 代码块；`enabled` 参数独立于 `ui._ENABLED`（可在非 TTY 测试环境中验证 ANSI 输出）；`NO_COLOR`/非 TTY 降级为去标记纯文本；`ui.StreamBlock` 改为缓冲整块内容，`close()` 时 Markdown 渲染 + ANSI 光标覆盖生成指示符。`tests/test_ui_markdown.py`（62 例）。 | `tests/test_ui_markdown.py` ≥25例，NO_COLOR 无 ANSI 且无残留标记符 |
+| 📋 R-5 | 对话读取本地文件路径（**用户实测痛点，最优先**） | 现状：REPL 纯对话里 LLM 拒绝读本地路径，逼用户手输频数表（已有 `@file` 显式引用 + `context.py` 摘录，但对话未接线）。目标：① REPL 每轮**自动识别**用户消息里的本地路径（Windows `F:\...`/Unix/带引号/相对/绝对/`~` 展开/`@file` 等价），存在即纳入；② **数据文件（csv/tsv/xlsx/sav）不走"塞进 LLM 上下文"**——把路径透传给本地 ARS-Stat 引擎（`analyze.py`/`stat`/`screen`/`score`），真实分析跑在完整数据上，LLM 只解读结果（守住「原始数据不入对话/记忆」隐私铁律 + 大文件不灌上下文）；③ 文本/小文件（md/txt/pdf 节选）才走 `context.py` 摘录入上下文；④ 只读、绝不改写原始文件；路径不存在/无权限给清晰报错。涉及 `repl.py`（路径识别+turn 接线）、`context.py`、到 `analyze.py` 的桥接。 | `tests/test_path_ingest.py`：路径识别（含反斜杠/引号/相对）、csv 路由到 stat 引擎而非上下文、文本走摘录、缺失文件友好报错、原始文件未被修改；REPL 里「分析 &lt;路径&gt;.csv 的 X 与 Y」端到端可跑 |
 
 ---
 
@@ -198,4 +199,5 @@
 5. ~~**D-2 预注册模板**~~ ✅ `/preregister` 据澄清卡产 OSF/AsPredicted 双格式，复用 D-1 功效（`psyclaw/psych/preregister.py`）。
 6. ~~**A-1 检验决策树特判**~~ ✅ 六类特判落地(`psyclaw/psych/decision_tree.py`)。
 7. ~~**R-4 REPL Markdown 渲染**~~ ✅ 整块缓冲 + Markdown→ANSI（`psyclaw/md_render.py`）→ ~~**R-1 prompt_toolkit REPL**~~ ✅ 三级降级（ptk→stdlib→input），`_slash_completions` 纯函数 + PromptSession 单例（`psyclaw/ui_input.py`） → **R-2 writing 复用 academic-research-skills** → **R-3 MCP 归属标注**（决策已定，优先于 P3）。
-8. 其余 P1/P2/P3 按需排期。
+8. **R-5 对话读取本地文件路径**（用户实测痛点，**最优先**）—— 让分析能直接吃本地 CSV，不再逼用户手输频数表。
+9. 其余 P1/P2/P3 按需排期。
