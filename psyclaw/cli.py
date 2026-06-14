@@ -598,6 +598,28 @@ def cmd_anova(args: argparse.Namespace) -> int:
     return anova_cli(argv)
 
 
+def cmd_chi2(args: argparse.Namespace) -> int:
+    from psyclaw.psych.chisquare import chi2_cli
+    argv = [args.csv, "--test", args.test]
+    if getattr(args, "obs_col", None):
+        argv += ["--obs", args.obs_col]
+    if getattr(args, "exp_col", None):
+        argv += ["--exp", args.exp_col]
+    if getattr(args, "label_col", None):
+        argv += ["--label", args.label_col]
+    if getattr(args, "row_col", None):
+        argv += ["--row-col", args.row_col]
+    if getattr(args, "col_col", None):
+        argv += ["--col-col", args.col_col]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return chi2_cli(argv)
+
+
 def cmd_anova2(args: argparse.Namespace) -> int:
     from psyclaw.psych.anova2 import anova2_cli
     argv = [args.csv, "--dv", args.dv, "--factorA", args.factorA, "--factorB", args.factorB]
@@ -1238,6 +1260,33 @@ def build_parser() -> argparse.ArgumentParser:
     panova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     panova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     panova.set_defaults(func=cmd_anova)
+
+    pchi2 = sub.add_parser(
+        "chi2",
+        help="卡方检验：拟合优度 / 独立性 / Fisher 精确检验",
+    )
+    pchi2.add_argument("csv", help="输入数据 CSV 路径")
+    pchi2.add_argument(
+        "--test",
+        required=True,
+        choices=["gof", "independence", "fisher"],
+        help="检验类型：gof | independence | fisher",
+    )
+    pchi2.add_argument("--obs", dest="obs_col", default=None,
+                       help="观测频率列名（gof 必需）")
+    pchi2.add_argument("--exp", dest="exp_col", default=None,
+                       help="期望频率列名（gof 可选）")
+    pchi2.add_argument("--label", dest="label_col", default=None,
+                       help="类别标签列名（gof 可选）")
+    pchi2.add_argument("--row-col", dest="row_col", default=None,
+                       help="行因子列名（independence/fisher 必需）")
+    pchi2.add_argument("--col-col", dest="col_col", default=None,
+                       help="列因子列名（independence/fisher 必需）")
+    pchi2.add_argument("--alpha", type=float, default=0.05,
+                       help="显著性水平（默认 .05）")
+    pchi2.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    pchi2.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pchi2.set_defaults(func=cmd_chi2)
 
     panova2 = sub.add_parser(
         "anova2",
