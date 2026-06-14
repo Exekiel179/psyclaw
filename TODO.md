@@ -97,7 +97,7 @@
 | 📋 R-1 | prompt_toolkit REPL 后端 | `repl.py` 接入 prompt_toolkit（命令补全/历史/多行/键位），**装了才用、未装回落现有 stdlib msvcrt/termios 双实现**（零依赖铁律不破）；`full` 选装组已含 prompt_toolkit | `tests/test_repl_ptk.py`；无 prompt_toolkit 环境 REPL 仍可跑、现有命令不回归 |
 | 📋 R-2 | writing 后端复用 academic-research-skills | `skills/ars` writing 子技能后端对接 academic-research-skills 插件（academic-paper 写作 + reviewer、APA-JARS/双语摘要能力），**插件缺失时回落现有内置写作**；与 P0-1 评审保持单一契约不重复造轮子 | `tests/test_writing_backend.py`；插件缺失降级可用 |
 | 📋 R-3 | 商业统计 MCP 归属标注 | `registry.yaml`/`manager.py` 标注 `spss-mcp` 为用户自研、Mplus/Stata 为可选便捷集成（`enable_when: detect`，本机有软件才启用）；`doctor` 文案体现「可选」 | 现有 MCP 测试不回归 + 标注校验 |
-| 📋 R-4 | REPL 输出框 Markdown 渲染（**用户实测痛点，优先**） | LLM 回复在圆角块内渲染 Markdown：**粗体**/*斜体*/`行内代码`/标题/有序+无序列表/分隔线/引用 → ANSI 富文本，**纯 stdlib 实现不引依赖**；`NO_COLOR=1`、非 TTY、管道环境降级为**去标记纯文本**（绝不显示裸 `**`/`#`/`-`）；与现有 `ui.py` 圆角块和全局配色统一；流式输出下按整块（非逐 token）渲染避免标记截断 | `tests/test_ui_markdown.py`：粗体/斜体/行内代码/标题/有序无序列表各有用例；`NO_COLOR` 下输出无 ANSI 且无残留标记符；现有 REPL/ui 测试不回归 |
+| ✅ R-4 | REPL 输出框 Markdown 渲染（**用户实测痛点，优先**） | **已落地** `psyclaw/md_render.py`：`render_md`/`_render`/`_inline`/`_paint`；支持 **bold**/*italic*/`code`/# H1–H3/有序+无序列表/---水平线/> 引用/``` 代码块；`enabled` 参数独立于 `ui._ENABLED`（可在非 TTY 测试环境中验证 ANSI 输出）；`NO_COLOR`/非 TTY 降级为去标记纯文本；`ui.StreamBlock` 改为缓冲整块内容，`close()` 时 Markdown 渲染 + ANSI 光标覆盖生成指示符。`tests/test_ui_markdown.py`（62 例）。 | `tests/test_ui_markdown.py` ≥25例，NO_COLOR 无 ANSI 且无残留标记符 |
 
 ---
 
@@ -118,5 +118,5 @@
 4. ~~**D-1 功效分析**~~ ✅ G*Power 对标的先验功效分析（`psyclaw power`，`psyclaw/psych/power.py`）。
 5. ~~**D-2 预注册模板**~~ ✅ `/preregister` 据澄清卡产 OSF/AsPredicted 双格式，复用 D-1 功效（`psyclaw/psych/preregister.py`）。
 6. ~~**A-1 检验决策树特判**~~ ✅ 六类特判落地(`psyclaw/psych/decision_tree.py`)。
-7. **R-4 REPL Markdown 渲染**（用户实测痛点，最优先）→ **R-1 prompt_toolkit REPL** → **R-2 writing 复用 academic-research-skills** → **R-3 MCP 归属标注**（决策已定，优先于 P3）。
+7. ~~**R-4 REPL Markdown 渲染**~~ ✅ 整块缓冲 + Markdown→ANSI（`psyclaw/md_render.py`）→ **R-1 prompt_toolkit REPL** → **R-2 writing 复用 academic-research-skills** → **R-3 MCP 归属标注**（决策已定，优先于 P3）。
 8. 其余 P1/P2/P3 按需排期。
