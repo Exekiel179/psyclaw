@@ -724,6 +724,20 @@ def cmd_chi2(args: argparse.Namespace) -> int:
     return chi2_cli(argv)
 
 
+def cmd_ancova(args: argparse.Namespace) -> int:
+    from psyclaw.psych.ancova import ancova_cli
+    argv = [args.csv, "--dv", args.dv, "--group", args.group, "--cov", args.cov]
+    if getattr(args, "post_hoc", False):
+        argv += ["--post-hoc"]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return ancova_cli(argv)
+
+
 def cmd_anova2(args: argparse.Namespace) -> int:
     from psyclaw.psych.anova2 import anova2_cli
     argv = [args.csv, "--dv", args.dv, "--factorA", args.factorA, "--factorB", args.factorB]
@@ -1563,6 +1577,26 @@ def build_parser() -> argparse.ArgumentParser:
                      help="sidecar 输出目录（写 rm_anova_report.{md,json}）")
     prm.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     prm.set_defaults(func=cmd_rm_anova)
+
+    pancova = sub.add_parser(
+        "ancova",
+        help=(
+            "单因素 ANCOVA（协方差分析）：控制协变量后比较各组调整均值；"
+            "Type-III SS / 偏 η² / 偏 ω² / EMM / 同质性检验 / APA-7 报告"
+        ),
+    )
+    pancova.add_argument("csv", help="输入数据 CSV 路径")
+    pancova.add_argument("--dv", required=True, help="因变量列名")
+    pancova.add_argument("--group", required=True, help="分组列名（分类变量）")
+    pancova.add_argument("--cov", required=True,
+                         help="协变量列名，逗号分隔（如 --cov age,pretest）")
+    pancova.add_argument("--post-hoc", action="store_true", dest="post_hoc",
+                         help="附加 Holm 校正事后成对调整均值比较")
+    pancova.add_argument("--alpha", type=float, default=0.05,
+                         help="显著性水平（默认 .05）")
+    pancova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    pancova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pancova.set_defaults(func=cmd_ancova)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
