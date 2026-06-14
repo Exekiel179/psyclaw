@@ -546,6 +546,18 @@ def cmd_bayes(args: argparse.Namespace) -> int:
     return bayes_cli(argv)
 
 
+def cmd_regress(args: argparse.Namespace) -> int:
+    from psyclaw.psych.regression import regression_cli
+    argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return regression_cli(argv)
+
+
 def cmd_describe(args: argparse.Namespace) -> int:
     from psyclaw.psych.descriptives import descriptives_cli
     argv = [args.csv]
@@ -1081,6 +1093,21 @@ def build_parser() -> argparse.ArgumentParser:
     pbf.add_argument("--out", default="notes", help="sidecar 输出目录（默认 notes/）")
     pbf.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pbf.set_defaults(func=cmd_bayes)
+
+    pregress = sub.add_parser(
+        "regress",
+        help="OLS 多元回归：B/β/SE/t/p/R²/F，输出 APA-7 系数表",
+    )
+    pregress.add_argument("csv", help="输入数据 CSV 路径")
+    pregress.add_argument("--dv", required=True, help="因变量列名")
+    pregress.add_argument("--iv", required=True,
+                          help="预测变量（逗号分隔，如 --iv age,edu,score）")
+    pregress.add_argument("--alpha", type=float, default=0.05,
+                          help="显著性水平（默认 .05）")
+    pregress.add_argument("--out", default="notes",
+                          help="报告输出目录（默认 notes/）")
+    pregress.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pregress.set_defaults(func=cmd_regress)
 
     pdesc = sub.add_parser(
         "describe",
