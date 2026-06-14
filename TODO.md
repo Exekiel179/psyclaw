@@ -179,6 +179,16 @@
 
 ---
 
+---
+
+## P12 · 统计纵深扩展 VII（P11 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P12-1 | 协方差分析（ANCOVA） | **已落地** `psyclaw/psych/ancova.py`：Type-III SS（两次 OLS 对比）；GLM 哑变量编码（treatment coding，首组参照）；同质性回归斜率检验（group×cov 交互，k-1 df）；估计边际均值 EMM（协变量总体均值处的 GLM 预测）+ SE + 95% CI；偏 partial η² / partial ω²（Olejnik & Algina 2003）；事后成对 t 检验（GLM 对比向量，Holm 校正）；多协变量支持（Type-III SS 逐一剔除）；APA-7 ANOVA 汇总表 + 调整均值表 + 文字段落 + MD/JSON sidecar；`psyclaw ancova <data.csv> --dv <col> --group <col> --cov cov1[,cov2] [--post-hoc] [--alpha] [--json] [--out]`；CLI 注册 `cli.py`；stdlib only。理论依据：Maxwell et al. (2017)；Olejnik & Algina (2003)；Milliken & Johnson (2009)。测试 `tests/test_ancova.py`（69 例）。 | `tests/test_ancova.py` ≥35例，调整均值差精确，df_error=N-k-p，CI 包含均值 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
