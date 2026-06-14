@@ -114,7 +114,15 @@ class ReplSession:
     # -- 对话 --------------------------------------------------------------
     def ask(self, text: str) -> None:
         from psyclaw.context import compact_history, relevant_knowledge, render_memo
+        # 路径自动检测：先于 @file 展开，把数据元数据/文本摘录注入上下文
+        from psyclaw.path_ingest import process_message
+        path_ctx, path_errors = process_message(text)
+        for err in path_errors:
+            print(err)
         text = self._expand_files(text)
+        # 若有路径注入内容，拼在用户消息前（LLM 可据此解读数据结构）
+        if path_ctx:
+            text = path_ctx + "\n\n用户问题：" + text
         self.messages.append({"role": "user", "content": text})
         self.messages, self.memo = compact_history(self.messages, self.memo)
         # 动态系统提示:瘦核心 + 决策备忘 + 按需知识
