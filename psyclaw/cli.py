@@ -498,6 +498,16 @@ def cmd_meta(args: argparse.Namespace) -> int:
     return meta_cli(argv)
 
 
+def cmd_missing(args: argparse.Namespace) -> int:
+    from psyclaw.psych.missing_data import missing_cli
+    argv = [args.csv]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    return missing_cli(argv)
+
+
 def cmd_invariance(args: argparse.Namespace) -> int:
     from psyclaw.psych.invariance import run_invariance
     return run_invariance(
@@ -858,6 +868,14 @@ def build_parser() -> argparse.ArgumentParser:
     pmt.add_argument("--no-forest", action="store_false", dest="forest",
                      help="不输出 ASCII 森林图")
     pmt.set_defaults(func=cmd_meta, forest=True)
+
+    pmis = sub.add_parser(
+        "missing",
+        help="缺失数据报告(Little MCAR / MAR 分组比较 / 插补推荐 / APA-7 段落；P3-2)")
+    pmis.add_argument("csv", help="CSV 数据文件")
+    pmis.add_argument("--json", action="store_true", help="同时输出机器可读 JSON")
+    pmis.add_argument("--out", default=None, help="sidecar 输出目录（默认不写文件）")
+    pmis.set_defaults(func=cmd_missing)
 
     pmed = sub.add_parser("mediation",
                           help="中介分析(Preacher & Hayes bootstrap CI 5000,拒 Sobel)")
