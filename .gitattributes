@@ -1,0 +1,29 @@
+# 统一换行符，避免 Windows/Mac 跨平台 CRLF/LF 反复污染 diff。
+# 仓库内一律存 LF；检出时按文件类型决定。
+
+# 默认：文本文件在仓库里规范化为 LF
+* text=auto eol=lf
+
+# Shell 脚本【必须】LF——CRLF 会让 Mac/Linux 报 "bad interpreter: ...^M"
+*.sh   text eol=lf
+
+# Windows 专用脚本保持 CRLF（PowerShell/批处理在 Windows 上更稳）
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# 源码/配置/文档统一 LF（跨平台一致）
+*.py   text eol=lf
+*.md   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# 二进制：不做任何换行转换
+*.png  binary
+*.jpg  binary
+*.pdf  binary
+*.xlsx binary
+*.docx binary
+*.sav  binary
