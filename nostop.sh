@@ -5,7 +5,7 @@
 # 停止:  Ctrl-C；或额度跑完连续失败后自动退出。
 # 建议在 tmux 里跑，Mac 防休眠见文末注释。
 
-set -uo pipefail
+set -o pipefail   # 不用 set -u：macOS 自带 bash 3.2 在失败分支会误报 unbound variable 打死整个循环
 cd "$(dirname "$0")"
 mkdir -p logs
 
@@ -13,7 +13,7 @@ mkdir -p logs
 MODE="acceptEdits"          # acceptEdits(安全默认) | auto | skip(危险,仅容器内)
 MODEL="sonnet"              # 编码用 Sonnet；复杂推理可 "claude-opus-4-8"
 FALLBACK="sonnet"           # 过载自动降级；置空字符串关闭
-MAX_TURNS=80                # 单轮上限，防失控；循环本身不受限
+MAX_TURNS=150               # 单轮上限，防失控；循环本身不受限（80 对大任务偏紧）
 MAX_FAILS=5                 # 连续失败这么多次≈额度耗尽，自动退出
 COOLDOWN=30                 # 失败后退避秒数(指数退避，封顶 300s)
 # ───────────────────────────────────────────────────────────────
@@ -44,7 +44,8 @@ while true; do
     grep -q '"is_error":false' "$LOG" && OK=1 || OK=0
   else
     claude "${ARGS[@]}" 2>&1 | tee "$LOG"
-    OK=$([ "${PIPESTATUS[0]}" -eq 0 ] && echo 1 || echo 0)
+    rc=${PIPESTATUS[0]}                       # 紧跟管道取退出码，别放进 $() 子shell(老 bash 会丢)
+    if [ "${rc:-1}" -eq 0 ]; then OK=1; else OK=0; fi
   fi
 
   if [ "$OK" = 1 ]; then
