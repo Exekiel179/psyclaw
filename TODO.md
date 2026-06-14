@@ -131,6 +131,7 @@
 | # | 任务 | 说明 | 验收 |
 |---|------|------|------|
 | ✅ P6-1 | 非参数检验套件 | **已落地** `psyclaw/psych/nonparametric.py`：`mann_whitney_u`（Wilcoxon 秩和，U1/U2/Z/r_effect）、`wilcoxon_signed_rank`（配对差值秩和，W+/W-/Z/r）、`kruskal_wallis`（多组非参数替代单因素 ANOVA，H/eta²_H/各组中位数+平均秩）、`spearman_rho`（秩相关，ρ/t/p）；正态近似（erfc）+ chi²近似（不完全伽马函数），stdlib only；`format_apa_nonpar` APA-7 段落；`write_nonpar_report` MD+JSON sidecar；`analyze_nonpar` CSV 主入口；`psyclaw nonpar <data.csv> --test mwu\|wilcoxon\|kruskal\|spearman --dv <col> [--group col] [--y col] [--alpha] [--json] [--out]`。测试 `tests/test_nonparametric.py`（47 例）。 | 47例全绿，ρ=1精确，U1+U2=n1×n2，W++W-=n(n+1)/2 |
+| ✅ P6-2 | 双因素析因 ANOVA | **已落地** `psyclaw/psych/anova2.py`：`two_way_anova`（Type-I SS，主效应A/B+交互效应A×B/eta²/omega²/单元格均值表，F=0→p=1 特判）；`format_apa_anova2`（APA-7 ANOVA 汇总表+效应文字段落+单元格均值表）；`write_anova2_report` MD+JSON sidecar；`analyze_anova2` CSV 主入口；`psyclaw anova2 <data.csv> --dv <col> --factorA <col> --factorB <col> [--alpha] [--json] [--out]`；stdlib only；支持 2×2 至 m×n 均衡/非均衡设计；df_e=0 时报错。测试 `tests/test_anova2.py`（24 例）。 | SS 加和精确，交互效应显著检出，无效应 p>0.05 |
 
 ---
 
