@@ -584,6 +584,26 @@ def cmd_regress(args: argparse.Namespace) -> int:
     return regression_cli(argv)
 
 
+def cmd_efa(args: argparse.Namespace) -> int:
+    from psyclaw.psych.efa import efa_cli
+    argv = [args.csv]
+    if getattr(args, "cols", None):
+        argv += ["--cols", args.cols]
+    if getattr(args, "n_factors", 0):
+        argv += ["--n-factors", str(args.n_factors)]
+    if getattr(args, "rotation", "varimax") != "varimax":
+        argv += ["--rotation", args.rotation]
+    if getattr(args, "method", "paf") != "paf":
+        argv += ["--method", args.method]
+    if getattr(args, "min_loading", 0.30) != 0.30:
+        argv += ["--min-loading", str(args.min_loading)]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return efa_cli(argv)
+
+
 def cmd_logit(args: argparse.Namespace) -> int:
     from psyclaw.psych.logistic import logistic_cli
     argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
@@ -1406,6 +1426,38 @@ def build_parser() -> argparse.ArgumentParser:
                         help="sidecar 输出目录（写 logistic_report.{md,json}）")
     plogit.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
     plogit.set_defaults(func=cmd_logit)
+
+    pefa = sub.add_parser(
+        "efa",
+        help="探索性因子分析（主轴因子法 PAF + Varimax 旋转；APA-7 载荷表）",
+    )
+    pefa.add_argument("csv", help="输入数据 CSV 路径")
+    pefa.add_argument(
+        "--cols", default=None,
+        help="参与分析的列名，逗号分隔（默认自动选所有数值列）",
+    )
+    pefa.add_argument(
+        "--n-factors", type=int, default=0, dest="n_factors",
+        help="提取因子数（默认 0 = Kaiser 准则自动确定，特征值 ≥ 1.0）",
+    )
+    pefa.add_argument(
+        "--rotation", choices=["varimax", "none"], default="varimax",
+        help="旋转方法（默认 varimax）",
+    )
+    pefa.add_argument(
+        "--method", choices=["paf", "pca"], default="paf",
+        help="提取方法：paf（主轴因子法，默认）| pca（主成分法）",
+    )
+    pefa.add_argument(
+        "--min-loading", type=float, default=0.30, dest="min_loading",
+        help="载荷显示阈值（|载荷| < 阈值显示空白，默认 .30）",
+    )
+    pefa.add_argument(
+        "--out", default=None,
+        help="sidecar 输出目录（写 efa_report.md + efa_report.json）",
+    )
+    pefa.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pefa.set_defaults(func=cmd_efa)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
