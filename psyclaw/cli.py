@@ -598,6 +598,22 @@ def cmd_anova(args: argparse.Namespace) -> int:
     return anova_cli(argv)
 
 
+def cmd_nonpar(args: argparse.Namespace) -> int:
+    from psyclaw.psych.nonparametric import nonpar_cli
+    argv = [args.csv, "--test", args.test, "--dv", args.dv]
+    if getattr(args, "group_col", None):
+        argv += ["--group", args.group_col]
+    if getattr(args, "y_col", None):
+        argv += ["--y", args.y_col]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return nonpar_cli(argv)
+
+
 def cmd_describe(args: argparse.Namespace) -> int:
     from psyclaw.psych.descriptives import descriptives_cli
     argv = [args.csv]
@@ -1210,6 +1226,28 @@ def build_parser() -> argparse.ArgumentParser:
     panova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     panova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     panova.set_defaults(func=cmd_anova)
+
+    pnonpar = sub.add_parser(
+        "nonpar",
+        help="非参数检验：Mann-Whitney U / Wilcoxon / Kruskal-Wallis / Spearman ρ",
+    )
+    pnonpar.add_argument("csv", help="输入数据 CSV 路径")
+    pnonpar.add_argument(
+        "--test",
+        required=True,
+        choices=["mwu", "wilcoxon", "kruskal", "spearman"],
+        help="检验类型：mwu | wilcoxon | kruskal | spearman",
+    )
+    pnonpar.add_argument("--dv", required=True, help="因变量列名（或第一变量）")
+    pnonpar.add_argument("--group", dest="group_col", default=None,
+                         help="分组列名（mwu/kruskal 必需）")
+    pnonpar.add_argument("--y", dest="y_col", default=None,
+                         help="第二变量列名（wilcoxon/spearman 必需）")
+    pnonpar.add_argument("--alpha", type=float, default=0.05,
+                         help="显著性水平（默认 .05）")
+    pnonpar.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    pnonpar.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pnonpar.set_defaults(func=cmd_nonpar)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
