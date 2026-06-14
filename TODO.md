@@ -117,6 +117,7 @@
 | # | 任务 | 说明 | 验收 |
 |---|------|------|------|
 | ✅ P4-1 | TOST 等价检验 | **已落地** `psyclaw/psych/equivalence.py`：`tost_two_sample`（Welch t）、`tost_one_sample`（单样本）、`tost_paired`（配对）三类 TOST；`compute_mdes`（大样本正态近似 MDES）；`format_apa_equivalence` APA-7 段落；`write_equivalence_report` MD+JSON sidecar；`analyze_equivalence` CSV 主入口；`equivalence_cli`；`STAT.equivalence` 门禁（block，trigger: equivalence_test，自动校验 `equivalence_tested`）注册入 `rules.yaml`+`checker.py`+`KIND_TRIGGERS`；`psyclaw tost <data.csv> --dv <col> --group <col> --lower <lb> --upper <ub> [--alpha] [--paired] [--one-sample <mu0>] [--json] [--out]`。理论依据：Schuirmann 1987；Lakens 2017；Lakens et al. 2018。门禁升至 19 条。测试 `tests/test_equivalence.py`（49 例）。 | `tests/test_equivalence.py` ≥25例，STAT.equivalence 门禁自动校验 |
+| ✅ P4-2 | 贝叶斯因子分析 | **已落地** `psyclaw/psych/bayes.py`：`bf_t_one_sample`（单样本/配对，JZS Cauchy 先验）、`bf_t_two_sample`（独立样本）、`bf_correlation`（Pearson r）三类贝叶斯因子；`_quad_0_inf_stdlib`（变量替换中点法数值积分）+ scipy 精确积分可选升级；`interpret_bf`（Jeffreys 1961 + Lee & Wagenmakers 2013 量表）；`format_apa_bayes` APA-7 段落；`write_bayes_report` MD+JSON sidecar；`analyze_bayes` CSV 主入口；`bayes_cli`；`psyclaw bayes <data.csv> --dv <col> --test ttest\|paired\|correlation [--group <col>] [--mu0 0] [--r-scale 0.707] [--json] [--out]`。理论依据：Rouder et al. 2009；Ly et al. 2016；Lee & Wagenmakers 2013。stdlib only + scipy 可用时自动升级精度。测试 `tests/test_bayes.py`（56 例）。 | `tests/test_bayes.py` ≥40例，BF₁₀ × BF₀₁ ≈ 1，解读量表边界正确 |
 
 ---
 

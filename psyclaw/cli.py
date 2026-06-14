@@ -526,6 +526,26 @@ def cmd_tost(args: argparse.Namespace) -> int:
     return equivalence_cli(argv)
 
 
+def cmd_bayes(args: argparse.Namespace) -> int:
+    from psyclaw.psych.bayes import bayes_cli
+    argv = [args.csv, "--dv", args.dv]
+    if getattr(args, "test", "ttest") != "ttest":
+        argv += ["--test", args.test]
+    if getattr(args, "group", None):
+        argv += ["--group", args.group]
+    if getattr(args, "mu0", 0.0) != 0.0:
+        argv += ["--mu0", str(args.mu0)]
+    if getattr(args, "r_scale", None) is not None:
+        import math as _math
+        if abs(args.r_scale - _math.sqrt(2) / 2) > 1e-9:
+            argv += ["--r-scale", str(args.r_scale)]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return bayes_cli(argv)
+
+
 def cmd_sensitivity(args: argparse.Namespace) -> int:
     from psyclaw.psych.sensitivity import sensitivity_cli
     argv = [args.plan]
@@ -1023,6 +1043,28 @@ def build_parser() -> argparse.ArgumentParser:
                        help="sidecar 输出目录（写 notes/equivalence_report.*）")
     ptost.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     ptost.set_defaults(func=cmd_tost)
+
+    pbf = sub.add_parser(
+        "bayes",
+        help=(
+            "贝叶斯因子分析（JZS Cauchy 先验；Rouder et al., 2009）"
+            "——量化证据强度、补充 p 值 / 接受 H₀ 的证据"
+        ),
+    )
+    pbf.add_argument("csv", help="CSV 数据文件")
+    pbf.add_argument("--dv", required=True, help="因变量 / 第一变量列名")
+    pbf.add_argument("--test",
+                     choices=["ttest", "paired", "correlation"],
+                     default="ttest",
+                     help="检验类型：ttest（独立/单样本）| paired（配对）| correlation（默认 ttest）")
+    pbf.add_argument("--group", default=None,
+                     help="分组列名（ttest 双样本 / paired）或第二变量列名（correlation）")
+    pbf.add_argument("--mu0", type=float, default=0.0, help="单样本原假设均值（默认 0）")
+    pbf.add_argument("--r-scale", type=float, default=None, dest="r_scale",
+                     help="Cauchy 先验尺度参数（默认 √2/2 ≈ 0.707）")
+    pbf.add_argument("--out", default="notes", help="sidecar 输出目录（默认 notes/）")
+    pbf.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pbf.set_defaults(func=cmd_bayes)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
