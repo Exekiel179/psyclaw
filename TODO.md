@@ -153,6 +153,14 @@
 
 ---
 
+## P9 · 统计纵深扩展 IV（P8 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P9-1 | 两层随机截距混合线性模型（MLM/HLM） | **已落地** `psyclaw/psych/mlm.py`：EM 算法 ML 估计；GLS 固定效应（Gauss-Jordan）；BLUP 随机效应（后验均值/方差）；ICC = τ²/(τ²+σ²)；对数似然/AIC/BIC；`format_apa_mlm` APA-7 固定效应 Markdown 三线表 + 方差分量表 + 结果段落；`write_mlm_report` MD+JSON sidecar；`analyze_mlm` CSV 主入口；`psyclaw mlm <data.csv> --dv <col> --cluster <col> [--iv col1,...] [--alpha .05] [--max-iter 200] [--json] [--out]`；CLI 注册 `cli.py`；stdlib only。理论依据：Laird & Ware (1982)；Raudenbush & Bryk (2002)。测试 `tests/test_mlm.py`（65 例）。 | `tests/test_mlm.py` ≥50例，ICC∈[0,1]，AIC/BIC 公式精确，大效应 p<.05 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
