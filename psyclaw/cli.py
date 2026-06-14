@@ -598,6 +598,30 @@ def cmd_anova(args: argparse.Namespace) -> int:
     return anova_cli(argv)
 
 
+def cmd_ttest(args: argparse.Namespace) -> int:
+    from psyclaw.psych.ttest import ttest_cli
+    argv = [args.csv, "--dv", args.dv]
+    test_map = {"independent": "independent", "paired": "paired",
+                "one-sample": "one-sample", "one_sample": "one-sample"}
+    t = getattr(args, "test_type", "independent")
+    argv += ["--test", test_map.get(t, t)]
+    if getattr(args, "group_col", None):
+        argv += ["--group", args.group_col]
+    if getattr(args, "y_col", None):
+        argv += ["--y", args.y_col]
+    if getattr(args, "mu0", 0.0) != 0.0:
+        argv += ["--mu0", str(args.mu0)]
+    if getattr(args, "student", False):
+        argv += ["--student"]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return ttest_cli(argv)
+
+
 def cmd_chi2(args: argparse.Namespace) -> int:
     from psyclaw.psych.chisquare import chi2_cli
     argv = [args.csv, "--test", args.test]
@@ -1260,6 +1284,33 @@ def build_parser() -> argparse.ArgumentParser:
     panova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     panova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     panova.set_defaults(func=cmd_anova)
+
+    pttest = sub.add_parser(
+        "ttest",
+        help="t 检验：单样本 / 独立样本（Welch/Student）/ 配对样本 + APA-7 报告",
+    )
+    pttest.add_argument("csv", help="输入数据 CSV 路径")
+    pttest.add_argument("--dv", required=True, help="因变量列名（或第一变量）")
+    pttest.add_argument(
+        "--test",
+        dest="test_type",
+        choices=["independent", "paired", "one-sample"],
+        default="independent",
+        help="检验类型（默认 independent）",
+    )
+    pttest.add_argument("--group", dest="group_col", default=None,
+                        help="分组列名（independent 必需）")
+    pttest.add_argument("--y", dest="y_col", default=None,
+                        help="第二变量列名（paired 必需）")
+    pttest.add_argument("--mu0", type=float, default=0.0,
+                        help="单样本原假设均值（默认 0）")
+    pttest.add_argument("--student", action="store_true",
+                        help="使用 Student t（等方差），默认 Welch t")
+    pttest.add_argument("--alpha", type=float, default=0.05,
+                        help="显著性水平（默认 .05）")
+    pttest.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    pttest.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pttest.set_defaults(func=cmd_ttest)
 
     pchi2 = sub.add_parser(
         "chi2",
