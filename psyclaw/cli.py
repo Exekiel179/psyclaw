@@ -604,6 +604,20 @@ def cmd_efa(args: argparse.Namespace) -> int:
     return efa_cli(argv)
 
 
+def cmd_rm_anova(args: argparse.Namespace) -> int:
+    from psyclaw.psych.rm_anova import rm_anova_cli
+    argv = [args.csv, "--dv", args.dv, "--subject", args.subject, "--within", args.within]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "post_hoc", False):
+        argv += ["--post-hoc"]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return rm_anova_cli(argv)
+
+
 def cmd_hreg(args: argparse.Namespace) -> int:
     from psyclaw.psych.hierarchical_regression import hierarchical_cli
     argv = [args.csv, "--dv", args.dv]
@@ -1530,6 +1544,25 @@ def build_parser() -> argparse.ArgumentParser:
                        help="报告输出目录（默认 notes/）")
     phreg.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     phreg.set_defaults(func=cmd_hreg)
+
+    prm = sub.add_parser(
+        "rm-anova",
+        help=(
+            "单因素重复测量 ANOVA（长格式数据）：Mauchly 球形检验 / GG/HF ε 校正 / "
+            "partial η² / ω² / 配对事后检验（Holm）；APA-7 报告"
+        ),
+    )
+    prm.add_argument("csv", help="输入数据 CSV 路径（长格式：每行一个 subject×condition 观测）")
+    prm.add_argument("--dv", required=True, help="因变量列名（数值）")
+    prm.add_argument("--subject", required=True, help="被试 ID 列名")
+    prm.add_argument("--within", required=True, help="被试内因子列名（条件/时间点）")
+    prm.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
+    prm.add_argument("--post-hoc", action="store_true", dest="post_hoc",
+                     help="输出所有条件对配对 t 检验（Holm 校正）")
+    prm.add_argument("--out", default=None,
+                     help="sidecar 输出目录（写 rm_anova_report.{md,json}）")
+    prm.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    prm.set_defaults(func=cmd_rm_anova)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
