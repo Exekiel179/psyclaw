@@ -171,6 +171,14 @@
 
 ---
 
+## P11 · 统计纵深扩展 VI（P10 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P11-1 | 重复测量单因素 ANOVA | **已落地** `psyclaw/psych/rm_anova.py`：Mauchly 球形检验（W/χ²/df/p，Helmert 正交归一对比矩阵，k=2 自动成立）；Greenhouse-Geisser ε + Huynh-Feldt ε（违反球形性时 ε_GG≥.75 报 HF 否则报 GG，APA 建议）；SS 分解（SS_between/SS_subjects/SS_error）；F 检验（未校正 + GG/HF 校正 df）；partial η² / ω²（Olejnik & Algina, 2003）；成对配对 t 检验 Holm 校正事后检验；APA-7 Markdown 三线表 + 结果段落；MD+JSON sidecar；`psyclaw rm-anova <data.csv> --dv <col> --subject <col> --within <col> [--alpha] [--post-hoc] [--json] [--out]`；CLI 注册 `cli.py`；stdlib only。理论依据：Greenhouse & Geisser (1959)；Huynh & Feldt (1976)；Mauchly (1940)；Maxwell, Delaney & Kelley (2017)。测试 `tests/test_rm_anova.py`（78 例）。 | `tests/test_rm_anova.py` ≥50例，SS 分解正确，GG/HF ε 在有效范围，Mauchly df 公式正确 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
