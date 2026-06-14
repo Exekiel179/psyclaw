@@ -584,6 +584,20 @@ def cmd_regress(args: argparse.Namespace) -> int:
     return regression_cli(argv)
 
 
+def cmd_logit(args: argparse.Namespace) -> int:
+    from psyclaw.psych.logistic import logistic_cli
+    argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "no_hl", False):
+        argv += ["--no-hl"]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return logistic_cli(argv)
+
+
 def cmd_anova(args: argparse.Namespace) -> int:
     from psyclaw.psych.anova import anova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group]
@@ -1374,6 +1388,24 @@ def build_parser() -> argparse.ArgumentParser:
     pnonpar.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     pnonpar.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pnonpar.set_defaults(func=cmd_nonpar)
+
+    plogit = sub.add_parser(
+        "logit",
+        help="二元 Logistic 回归（IRLS；OR/Wald/LR/Hosmer-Lemeshow；APA-7）",
+    )
+    plogit.add_argument("csv", help="输入数据 CSV 路径")
+    plogit.add_argument("--dv",    required=True,
+                        help="因变量列名（必须为 0/1 二元编码）")
+    plogit.add_argument("--iv",    required=True,
+                        help="预测变量列名，逗号分隔（如 age,sex,score）")
+    plogit.add_argument("--alpha", type=float, default=0.05,
+                        help="显著性水平（默认 .05）")
+    plogit.add_argument("--no-hl", action="store_true", dest="no_hl",
+                        help="跳过 Hosmer-Lemeshow 拟合优度检验")
+    plogit.add_argument("--out",   default=None,
+                        help="sidecar 输出目录（写 logistic_report.{md,json}）")
+    plogit.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
+    plogit.set_defaults(func=cmd_logit)
 
     for name, helptext in [
         ("write", "按 APA JARS 写作"),

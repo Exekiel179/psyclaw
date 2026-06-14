@@ -137,6 +137,14 @@
 
 ---
 
+## P7 · 统计纵深扩展 II（P6 完成后自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P7-1 | 二元 Logistic 回归 | **已落地** `psyclaw/psych/logistic.py`：IRLS（Newton-Raphson 精确 Hessian）二元 Logistic 回归；Wald z/p/OR/95%CI；LR chi²/df/p；Cox-Snell R² + Nagelkerke R²；`_safe_exp` 防完全分离溢出；`hosmer_lemeshow`（g=10 分组，χ²(g-2)）拟合优度；`format_apa_logistic`（APA-7 Markdown 三线系数表 + 模型总结段落 + 显著预测变量文字 + HL 段落）；`write_logistic_report` MD+JSON sidecar；`analyze_logistic` CSV 主入口（0/1 校验 + 缺失排除）；`psyclaw logit <data.csv> --dv <col> --iv col1,col2,... [--alpha] [--no-hl] [--json] [--out]`。理论依据：Hosmer & Lemeshow (2000)；Nagelkerke (1991)。stdlib only。测试 `tests/test_logistic.py`（68 例）。 | `tests/test_logistic.py` ≥35例，OR=exp(B) 精确，Nagelkerke≥Cox-Snell，HL p∈[0,1] |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
