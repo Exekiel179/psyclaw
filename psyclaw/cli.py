@@ -508,6 +508,24 @@ def cmd_missing(args: argparse.Namespace) -> int:
     return missing_cli(argv)
 
 
+def cmd_sensitivity(args: argparse.Namespace) -> int:
+    from psyclaw.psych.sensitivity import sensitivity_cli
+    argv = [args.plan]
+    if getattr(args, "data", None):
+        argv += ["--data", args.data]
+    if getattr(args, "dv", None):
+        argv += ["--dv", args.dv]
+    if getattr(args, "group", None):
+        argv += ["--group", args.group]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return sensitivity_cli(argv)
+
+
 def cmd_invariance(args: argparse.Namespace) -> int:
     from psyclaw.psych.invariance import run_invariance
     return run_invariance(
@@ -876,6 +894,22 @@ def build_parser() -> argparse.ArgumentParser:
     pmis.add_argument("--json", action="store_true", help="同时输出机器可读 JSON")
     pmis.add_argument("--out", default=None, help="sidecar 输出目录（默认不写文件）")
     pmis.set_defaults(func=cmd_missing)
+
+    psen = sub.add_parser(
+        "sensitivity",
+        help="敏感性分析/多元宇宙分析(Multiverse + 规格曲线；P3-3)")
+    psen.add_argument(
+        "plan",
+        help="分叉点文件：plan.md（含 ```yaml sensitivity_forks 块）/ .yaml / .json")
+    psen.add_argument("--data", default=None,
+                      help="CSV 数据文件（提供后自动运行所有规格并生成规格曲线）")
+    psen.add_argument("--dv", default=None, help="因变量列名（--data 时必填）")
+    psen.add_argument("--group", default=None, help="分组列名（--data 时必填）")
+    psen.add_argument("--alpha", type=float, default=0.05, help="显著性阈值（默认 .05）")
+    psen.add_argument("--out", default=None,
+                      help="sidecar 输出目录（写 sensitivity_report.md + .json）")
+    psen.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    psen.set_defaults(func=cmd_sensitivity)
 
     pmed = sub.add_parser("mediation",
                           help="中介分析(Preacher & Hayes bootstrap CI 5000,拒 Sobel)")
