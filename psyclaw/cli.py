@@ -546,6 +546,27 @@ def cmd_bayes(args: argparse.Namespace) -> int:
     return bayes_cli(argv)
 
 
+def cmd_correct_p(args: argparse.Namespace) -> int:
+    from psyclaw.psych.multiple_testing import corrections_cli
+    argv = []
+    if getattr(args, "pvalues", None):
+        argv += [args.pvalues]
+    if getattr(args, "csv_file", None):
+        argv += ["--csv", args.csv_file]
+    if getattr(args, "p_col", "p") != "p":
+        argv += ["--p-col", args.p_col]
+    if getattr(args, "label_col", None):
+        argv += ["--label-col", args.label_col]
+    argv += ["--method", getattr(args, "method", "benjamini_hochberg")]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return corrections_cli(argv)
+
+
 def cmd_regress(args: argparse.Namespace) -> int:
     from psyclaw.psych.regression import regression_cli
     argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
@@ -1093,6 +1114,29 @@ def build_parser() -> argparse.ArgumentParser:
     pbf.add_argument("--out", default="notes", help="sidecar 输出目录（默认 notes/）")
     pbf.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pbf.set_defaults(func=cmd_bayes)
+
+    pcp = sub.add_parser(
+        "correct-p",
+        help="多重检验校正：Bonferroni / Holm / Benjamini-Hochberg FDR",
+    )
+    pcp.add_argument("pvalues", nargs="?", default=None,
+                     help="逗号分隔的 p 值（如 0.01,0.03,0.2）")
+    pcp.add_argument("--csv", default=None, dest="csv_file",
+                     help="从 CSV 文件读取 p 值")
+    pcp.add_argument("--p-col", default="p", dest="p_col",
+                     help="CSV 中 p 值列名（默认 'p'）")
+    pcp.add_argument("--label-col", default=None, dest="label_col",
+                     help="CSV 中标签列名（可选）")
+    pcp.add_argument("--method",
+                     choices=["bonferroni", "holm", "benjamini_hochberg", "bh", "fdr"],
+                     default="benjamini_hochberg",
+                     help="校正方法（默认 benjamini_hochberg；bh/fdr 均等于 BH）")
+    pcp.add_argument("--alpha", type=float, default=0.05,
+                     help="显著性水平（默认 .05）")
+    pcp.add_argument("--out", default="notes",
+                     help="报告输出目录（默认 notes/）")
+    pcp.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pcp.set_defaults(func=cmd_correct_p)
 
     pregress = sub.add_parser(
         "regress",
