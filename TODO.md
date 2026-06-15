@@ -219,6 +219,14 @@
 
 ---
 
+## P15 · 统计纵深扩展 X（自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P15-1 | 评分者间信度（Cohen's / Fleiss' κ + ICC） | **已落地** `psyclaw/psych/irr.py`（stdlib only，填补观察编码/内容分析一致性空白；此前仅有 Cronbach's α）：`cohens_kappa`（两评分者，名义 + 线性/二次有序加权；κ=(pₒ−pₑ)/(1−pₑ)；Fleiss-Cohen-Everitt 1969 渐近方差→Wald z/p + 95% CI；名义/加权统一方差路径，对 2×2 手算 SE 校验 0.127）；`fleiss_kappa`（多评分者名义，N×k 计数矩阵；Pᵢ 对象一致度 + 类别比例 + 渐近 z/p；`ratings_to_fleiss_counts` 标签表→计数转换）；`intraclass_correlation`（Shrout & Fleiss 1979 六模型 ICC(1/2/3,1/k)；双向 ANOVA 均方分解 MSR/MSC/MSE/MSW；F 检验 + McGraw & Wong 1996 95% CI；金标准数据手算校验 ICC(1,1)=.166/ICC(2,1)=.290/ICC(3,1)=.715）；`interpret_kappa`（Landis & Koch 1977）/ `interpret_icc`（Koo & Li 2016）；F 分布 CDF（不完全 Beta）+ 二分法求逆分位数；`format_apa_kappa` / `format_apa_icc`（APA-7 三线表 + 文字段落 + 参考文献）；`write_irr_report` MD+JSON sidecar（NaN/inf→null）；`analyze_irr` CSV 主入口（kappa/fleiss/icc 三路由 + 缺失排除）；`psyclaw irr <data.csv> --method kappa\|fleiss\|icc [--rater-a col --rater-b col] [--raters c1,c2,...] [--weights linear\|quadratic] [--alpha] [--json] [--out]`；CLI 注册 `cli.py`。理论依据：Cohen (1960, 1968)；Fleiss (1971)；Fleiss, Cohen & Everitt (1969)；Shrout & Fleiss (1979)；McGraw & Wong (1996)；Landis & Koch (1977)；Koo & Li (2016)。测试 `tests/test_irr.py`（约 110 例）。 | `tests/test_irr.py` ≥60例，Cohen κ=0.40 手算精确，ICC 对 Shrout & Fleiss 1979 金标准误差<.005，Fleiss κ=1/3 手算精确，加权 κ 对 2 类等于未加权 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
