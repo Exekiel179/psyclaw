@@ -320,6 +320,21 @@
 
 ---
 
+## P24 · 统计纵深扩展 XIX（自我扩展）
+
+> **动机**：分类数据套件（`chisquare.py`）的普通卡方要求**观测独立**（每人只贡献一个单元格），
+> `assumptions.json` 早已明示重复测量/配对二分结局须改用 **McNemar**，但此前无实现。
+> 心理学常见配对二分结局：同一批被试在干预前后的二分判定（通过/未通过、达标/未达标）、
+> 两评分者对同一对象的 0/1 编码、强迫选择的两时点偏好。误用普通卡方会把配对数据当独立，
+> 严重低估检验、夸大显著性。McNemar（两条件）+ Cochran's Q（k≥3 条件，McNemar 的推广，
+> 与 Friedman 在二分场景下平行）填补此空白。
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P24-1 | McNemar 检验 / Cochran's Q（配对·重复测量二分数据） | **已落地** `psyclaw/psych/paired_categorical.py`（stdlib only，与 `chisquare.py`/`nonparametric.py` 同构）：`mcnemar_test(table, correction, exact)`——配对 2×2，仅不一致对 b/c 携带信息，χ²=(b−c)²/(b+c)（连续性校正 Edwards 1948：(|b−c|−1)²/(b+c)）+ **精确二项检验**（b~Binom(b+c,0.5)，双尾 p=2·P(X≤min(b,c)) 封顶 1；不一致对 b+c<25 时默认采用，Sheskin 2011）；效应量 OR=b/c + 边际比例差 (b−c)/N；同时返回 p_exact/p_chi2/p_chi2_corrected 全套。`cochran_q(conditions, post_hoc)`——k≥3 重复测量二分，Q=(k−1)(k·ΣC²−N²)/(k·N−ΣR²)，df=k−1；全 0/全 1 行对分母贡献 R_i(k−R_i)=0 自动不计入；k=2 代数退化为未校正 McNemar χ²（恒等式已测）；分母≤0（无被试内变异）退化 Q=0/p=1；`post_hoc=True` 附成对 McNemar + Holm 校正。`format_apa_paircat`（McNemar 精确/χ² 双分支 + Cochran 分支，APA-7 段落 + 各条件阳性比例）；`write_paircat_report` MD+JSON sidecar（含配对 2×2 表/条件描述统计表/事后比较表）；`analyze_paircat` CSV 宽表主入口（mcnemar 用 `--cond1/--cond2`，cochran 用 `--conditions`；完整案例筛选 + 二分校验 + n_excluded）；`paircat_cli`；`psyclaw paired-cat <data.csv> --test mcnemar\|cochran [--cond1 --cond2 \| --conditions c1,c2,c3] [--no-correction] [--exact] [--post-hoc] [--alpha] [--json] [--out]`（`cli.py` `cmd_paircat` + `ppaircat` 子解析器）。理论依据：McNemar (1947)；Cochran (1950)；Edwards (1948)；Sheskin (2011) Handbook of Parametric and Nonparametric Statistical Procedures (5th ed.)。测试 `tests/test_paired_categorical.py`（约 55 例）。 | `tests/test_paired_categorical.py` ≥40例，McNemar χ²=(b−c)²/(b+c) 手算精确（b=2,c=8→χ²=3.6/校正 2.5/精确 p=0.109375），Cochran Q 手算金标准（6 被试 3 条件 Q=16/6、df=2、p=e^(−4/3)）、k=2 退化恒等 McNemar χ²、全常数行退化 Q=0/p=1、列和相等无效应 Q=0、二分校验报错、CSV 完整案例排除、事后 Holm 单调 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。

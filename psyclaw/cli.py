@@ -941,6 +941,30 @@ def cmd_nonpar(args: argparse.Namespace) -> int:
     return nonpar_cli(argv)
 
 
+def cmd_paircat(args: argparse.Namespace) -> int:
+    from psyclaw.psych.paired_categorical import paircat_cli
+    argv = [args.csv, "--test", args.test]
+    if getattr(args, "cond1_col", None):
+        argv += ["--cond1", args.cond1_col]
+    if getattr(args, "cond2_col", None):
+        argv += ["--cond2", args.cond2_col]
+    if getattr(args, "conditions", None):
+        argv += ["--conditions", args.conditions]
+    if getattr(args, "correction", True) is False:
+        argv += ["--no-correction"]
+    if getattr(args, "exact", False):
+        argv += ["--exact"]
+    if getattr(args, "post_hoc", False):
+        argv += ["--post-hoc"]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return paircat_cli(argv)
+
+
 def cmd_describe(args: argparse.Namespace) -> int:
     from psyclaw.psych.descriptives import descriptives_cli
     argv = [args.csv]
@@ -1648,6 +1672,35 @@ def build_parser() -> argparse.ArgumentParser:
     pnonpar.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     pnonpar.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pnonpar.set_defaults(func=cmd_nonpar)
+
+    ppaircat = sub.add_parser(
+        "paired-cat",
+        help="配对/重复测量二分检验：McNemar / Cochran's Q",
+    )
+    ppaircat.add_argument("csv", help="输入数据 CSV 路径")
+    ppaircat.add_argument(
+        "--test",
+        required=True,
+        choices=["mcnemar", "cochran"],
+        help="检验类型：mcnemar（配对两条件）| cochran（≥3 重复测量条件）",
+    )
+    ppaircat.add_argument("--cond1", dest="cond1_col", default=None,
+                          help="第一个二分列名（mcnemar 必需）")
+    ppaircat.add_argument("--cond2", dest="cond2_col", default=None,
+                          help="第二个二分列名（mcnemar 必需）")
+    ppaircat.add_argument("--conditions", default=None,
+                          help="重复测量条件列名，逗号分隔（cochran 必需，≥3 列）")
+    ppaircat.add_argument("--no-correction", dest="correction", action="store_false",
+                          help="mcnemar 关闭连续性校正（默认开启）")
+    ppaircat.add_argument("--exact", dest="exact", action="store_true", default=None,
+                          help="mcnemar 强制使用精确二项检验")
+    ppaircat.add_argument("--post-hoc", dest="post_hoc", action="store_true",
+                          help="cochran 显著后做成对 McNemar 事后比较（Holm 校正）")
+    ppaircat.add_argument("--alpha", type=float, default=0.05,
+                          help="显著性水平（默认 .05）")
+    ppaircat.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    ppaircat.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    ppaircat.set_defaults(func=cmd_paircat)
 
     plogit = sub.add_parser(
         "logit",
