@@ -251,6 +251,19 @@
 
 ---
 
+## P19 · 统计纵深扩展 XIV（自我扩展）
+
+> **动机**：`poisson.py` 在 φ>1.5 时已显式建议改用负二项 / quasi-Poisson，但此前无实现。
+> 心理学计数结局（症状频次、攻击事件、错误数等）几乎总是**过度离散**（Var > Mean），
+> 泊松会低估 SE、夸大显著性。NB2 用色散参数 α（=1/θ）建模 Var(y)=μ+αμ²，θ→∞ 时退化为泊松。
+> **核心增值**：α=0 的 LR 边界检验直接告诉用户「到底需不需要 NB」（泊松 vs NB 嵌套检验）。
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P19-1 | 负二项回归（NB2，过度离散计数） | **已落地** `psyclaw/psych/negbin.py`（stdlib only，与 `poisson.py` 同构，复用其矩阵/分布工具模式）：`negbin_regression`——NB2 对数连接 GLM，**交替优化**（给定 θ 用 Fisher scoring 拟合 β：工作权重 W=θμ/(θ+μ)、score=Σx·θ(y−μ)/(θ+μ)；给定 μ 用黄金分割最大化 θ 条件对数似然）；色散参数 θ + α=1/θ + θ 的数值 SE（条件 ll 二阶差分）；Wald *z*/*p*/IRR=exp(β)/95% CI；NB 偏差 + 零模型 NB + LR χ² 检验；**α=0 边界 LR 检验**（泊松 vs NB，p=½·P(χ²₁>LR)，Cameron & Trivedi 2013）；McFadden 伪 *R*²（NB 基线）；AIC/BIC（参数计 k+1，含 θ）；`_nb_loglik`；`format_apa_negbin`（APA-7 三线系数表 + 模型拟合段 + θ/α 色散段 + 泊松-NB 检验段 + 显著预测变量文字）；`write_negbin_report` MD+JSON sidecar（NaN/inf→null）；`analyze_negbin` CSV 主入口（非负整数校验 + 缺失排除 + n_excluded）；`negbin_cli`；`psyclaw negbin <data.csv> --dv <col> --iv col1,col2,... [--alpha .05] [--json] [--out]`；CLI 注册 `cli.py`。理论依据：Cameron & Trivedi (2013) Regression Analysis of Count Data；Hilbe (2011) Negative Binomial Regression。测试 `tests/test_negbin.py`（≥45 例）。 | `tests/test_negbin.py` ≥40例，仅截距模型 exp(β₀)=ȳ 误差<1e-6，饱和二元模型 β₀=log(ȳ₀)/β₁=log(ȳ₁/ȳ₀)/IRR=ȳ₁/ȳ₀ 误差<1e-6（与 θ 无关），ll_NB≥ll_Poisson，α=0 LR≥0，过度离散数据 θ 有限且 α>0、α=0 检验显著，IRR=exp(B) 精确，偏差非负 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
