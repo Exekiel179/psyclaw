@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # nostop.sh — PsyClaw 过夜自主循环 (macOS / Linux)。nostop.ps1 的 bash 等价版。
-# Sonnet 编码轮：每轮选 TODO.md 一个任务→实现→测试→提交，跑到额度耗尽才停。
+# 编码轮：每轮选 TODO.md 一个任务→实现→测试→提交，跑到额度耗尽才停。
 # 用法:  cd ~/psyclaw && ./nostop.sh        (首次需 chmod +x nostop.sh)
 # 停止:  Ctrl-C；或额度跑完连续失败后自动退出。
 # 建议在 tmux 里跑，Mac 防休眠见文末注释。
@@ -11,7 +11,7 @@ mkdir -p logs
 
 # ─── 可调参数（对应 nostop.ps1）────────────────────────────────
 MODE="acceptEdits"          # acceptEdits(安全默认) | auto | skip(危险,仅容器内)
-MODEL="sonnet"              # 编码用 Sonnet；复杂推理可 "claude-opus-4-8"
+MODEL="claude-opus-4-8"     # 改用 Opus 4.8（更强推理；订阅额度消耗更快）
 FALLBACK="sonnet"           # 过载自动降级；置空字符串关闭
 MAX_TURNS=150               # 单轮上限，防失控；循环本身不受限（80 对大任务偏紧）
 MAX_FAILS=5                 # 连续失败这么多次≈额度耗尽，自动退出
