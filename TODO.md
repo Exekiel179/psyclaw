@@ -243,6 +243,14 @@
 
 ---
 
+## P18 · 统计纵深扩展 XIII（自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P18-1 | 泊松回归（计数结局） | **已落地** `psyclaw/psych/poisson.py`（stdlib only，填补计数结局回归空白——心理学常见错误数/症状频次/攻击事件计数，此前只有 OLS/Logistic，无对数线性计数模型）：`poisson_regression`（IRLS = Newton-Raphson 精确 Hessian，对数连接 μ=exp(Xβ)，工作权重 w=μ）；Wald *z*/*p*/IRR(发生率比=exp(β))/95% CI；偏差 deviance + 零模型偏差 + LR χ² 检验；McFadden 伪 *R*²；AIC/BIC；**过度离散检测**（Pearson χ²/df 离散参数 φ，φ≳1.5 告警建议负二项/quasi-Poisson）；`_safe_exp` 防分离溢出；`format_apa_poisson`（APA-7 Markdown 三线系数表 *B*/SE/*z*/*p*/IRR/95%CI + 模型拟合段落 + 显著预测变量文字 + 过度离散告警）；`write_poisson_report` MD+JSON sidecar（NaN/inf→null）；`analyze_poisson` CSV 主入口（非负整数校验 + 缺失排除 + n_excluded）；`poisson_cli`；`psyclaw poisson <data.csv> --dv <col> --iv col1,col2,... [--alpha .05] [--json] [--out]`；CLI 注册 `cli.py`。理论依据：McCullagh & Nelder (1989) Generalized Linear Models；Cameron & Trivedi (2013) Regression Analysis of Count Data。测试 `tests/test_poisson.py`（约 55 例）。 | `tests/test_poisson.py` ≥35例，单二元预测变量饱和模型 β₀=log(ȳ₀)/β₁=log(ȳ₁/ȳ₀) 误差<1e-6，IRR=exp(B) 精确，偏差非负，LR χ²=null_dev−resid_dev，过度离散数据 φ>1 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
