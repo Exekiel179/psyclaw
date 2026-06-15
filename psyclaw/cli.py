@@ -1791,7 +1791,7 @@ def build_parser() -> argparse.ArgumentParser:
         "partial-corr",
         help=(
             "偏相关分析 / 半偏相关 / 偏相关矩阵（stdlib only）："
-            "控制协变量后的 r / t / p / 95% CI（Fisher z）/ APA-7 报告"
+            "控制协变量后的 r / t / p / 95%% CI（Fisher z）/ APA-7 报告"
         ),
     )
     ppartial.add_argument("csv", help="输入数据 CSV 路径")
@@ -1836,7 +1836,7 @@ def build_parser() -> argparse.ArgumentParser:
         "roc",
         help=(
             "ROC 曲线 / AUC 诊断准确性分析（stdlib only）：量表截断值验证 / "
-            "AUC + Hanley-McNeil 95% CI / Youden's J 最优截断 / 敏感度·特异度·PPV·NPV·LR / APA-7 报告"
+            "AUC + Hanley-McNeil 95%% CI / Youden's J 最优截断 / 敏感度·特异度·PPV·NPV·LR / APA-7 报告"
         ),
     )
     proc.add_argument("csv", help="输入数据 CSV 路径")

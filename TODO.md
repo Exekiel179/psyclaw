@@ -30,7 +30,7 @@
 
 | # | 任务 | 说明 | 验收 | 文件 |
 |---|------|------|------|------|
-| 📋 BUG-1 | `--help` 崩溃 | `python -m psyclaw --help`（及涉及该命令的子命令 help）抛 `ValueError: unsupported format character 'C' (0x43)`——某命令的 help 文本里有未转义的 `%`（如 `%C`），argparse 用 `%` 做插值时崩。先前 `72f3392` 已转义部分 `%%` 但仍有残留。 | 全部 `--help` 与各子命令 `-h` 都能正常输出；新增 `tests/test_cli_help.py` 遍历所有 subparser 调 `format_help()` 均不抛错（防回归） | `psyclaw/cli.py` |
+| ✅ BUG-1 | `--help` 崩溃 | **已修复** `psyclaw/cli.py`：`partial-corr`（行 1794）与 `roc`（行 1839）的 subparser `help=` 文本含裸 `95% CI` → argparse 把 `% C` 当 `%C` 格式符，顶层 `--help` 展开短 help 时崩 `ValueError: unsupported format character 'C'`。两处转义为 `95%% CI`（与已转义的行 1497 一致）。新增 `tests/test_cli_help.py`（约 8 例）：遍历所有 subparser 调 `format_help()`/`format_usage()` 不抛错 + 直接断言无裸 `%`（`h.replace("%%","").count("%")==0`）防回归。 | `psyclaw/cli.py` |
 | 📋 UX-1 | REPL 方向键/历史失效 | 兜底 `input()` 路径未 `import readline`：非 TTY 或终端兼容降级时，方向键漏出 `[B`/`[A`，且无行内编辑、无 ↑↓ 历史。 | `ui_input.read_line` 兜底前 `import readline`（stdlib，缺失 try/except 静默降级）；方向键移动光标、↑↓ 翻历史、Ctrl-A/E 可用 | `psyclaw/ui_input.py` |
 
 > 注：`nostop.sh` 在 macOS 自带 bash 3.2 + `set -u` 下失败分支崩溃的问题已在 `bf1b1c5` 修复（去 `set -u`、紧跟管道取退出码、MAX_TURNS 80→150），此处不再列。
