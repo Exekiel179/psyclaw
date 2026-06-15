@@ -965,6 +965,20 @@ def cmd_paircat(args: argparse.Namespace) -> int:
     return paircat_cli(argv)
 
 
+def cmd_survival(args: argparse.Namespace) -> int:
+    from psyclaw.psych.survival import survival_cli
+    argv = [args.csv, "--time", args.time_col, "--event", args.event_col]
+    if getattr(args, "group_col", None):
+        argv += ["--group", args.group_col]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return survival_cli(argv)
+
+
 def cmd_describe(args: argparse.Namespace) -> int:
     from psyclaw.psych.descriptives import descriptives_cli
     argv = [args.csv]
@@ -1701,6 +1715,23 @@ def build_parser() -> argparse.ArgumentParser:
     ppaircat.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     ppaircat.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     ppaircat.set_defaults(func=cmd_paircat)
+
+    psurvival = sub.add_parser(
+        "survival",
+        help="生存分析：Kaplan-Meier 曲线 + Log-rank 检验",
+    )
+    psurvival.add_argument("csv", help="输入数据 CSV 路径")
+    psurvival.add_argument("--time", dest="time_col", required=True,
+                           help="生存时间列名（数值）")
+    psurvival.add_argument("--event", dest="event_col", required=True,
+                           help="事件指示列名（0=删失，1=事件发生）")
+    psurvival.add_argument("--group", dest="group_col", default=None,
+                           help="分组列名（指定后做 Log-rank 组间比较）")
+    psurvival.add_argument("--alpha", type=float, default=0.05,
+                           help="显著性水平（默认 .05）")
+    psurvival.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    psurvival.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    psurvival.set_defaults(func=cmd_survival)
 
     plogit = sub.add_parser(
         "logit",
