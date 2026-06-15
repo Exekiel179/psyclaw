@@ -185,10 +185,33 @@ def _clear_suggestions(prev_lines: int) -> None:
 # 主入口
 # ---------------------------------------------------------------------------
 
+_readline_ready: bool | None = None     # None=未尝试 True=已挂接 False=不可用
+
+
+def _fallback_input(prompt: str) -> str:
+    """裸 input() 兜底：先尝试 import readline 启用行内编辑/↑↓ 历史。
+
+    readline 是 stdlib（POSIX 自带 GNU/libedit readline；Windows 无该模块）。
+    **导入一次即全局挂接 builtins.input** —— 之后方向键移动光标、↑↓ 翻会话历史、
+    Ctrl-A/E/K 等键位均可用，否则 input() 下方向键会漏出裸 `^[[A`/`^[[B` 转义。
+    缺失（Windows 等）或任何异常静默降级为纯 input()，绝不阻断脚本化调用。
+    """
+    global _readline_ready
+    if _readline_ready is None:
+        try:
+            import readline  # noqa: F401 — 导入即挂接 input()，无需直接引用
+            _readline_ready = True
+        except Exception:  # noqa: BLE001 — 无 readline（Windows 等）静默降级
+            _readline_ready = False
+    return input(prompt).strip()
+
+
 def read_line(prompt: str, commands: dict) -> str:
     """带 slash 联想的行输入。commands: {"/cmd": "描述"}。
 
     优先 prompt_toolkit（若已安装且 TTY）→ 降级 stdlib 交互输入 → 降级 input()。
+    最末级 input() 兜底前会 import readline（见 `_fallback_input`），让方向键/
+    历史在终端兼容降级时仍可用。
     """
     if _PTK_AVAILABLE and sys.stdin.isatty() and sys.stdout.isatty():
         try:
@@ -198,13 +221,13 @@ def read_line(prompt: str, commands: dict) -> str:
         except Exception:  # noqa: BLE001 — ptk 失败时降级 stdlib
             pass
     if not sys.stdin.isatty() or not sys.stdout.isatty():
-        return input(prompt).strip()
+        return _fallback_input(prompt)
     try:
         return _read_line_interactive(prompt, commands)
     except (KeyboardInterrupt, EOFError):
         raise
     except Exception:  # noqa: BLE001 — 任何终端兼容问题都降级
-        return input(prompt).strip()
+        return _fallback_input(prompt)
 
 
 def _suggest(buf: str, commands: dict) -> list:
