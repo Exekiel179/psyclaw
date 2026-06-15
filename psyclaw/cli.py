@@ -741,6 +741,26 @@ def cmd_chi2(args: argparse.Namespace) -> int:
     return chi2_cli(argv)
 
 
+def cmd_partial_corr(args: argparse.Namespace) -> int:
+    from psyclaw.psych.partial_corr import partial_corr_cli
+    argv = [args.csv, "--x", args.x_col, "--y", args.y_col]
+    if getattr(args, "controls", ""):
+        argv += ["--controls", args.controls]
+    if getattr(args, "semi", False):
+        argv += ["--semi"]
+    if getattr(args, "which", "x") != "x":
+        argv += ["--which", args.which]
+    if getattr(args, "matrix", None):
+        argv += ["--matrix", args.matrix]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return partial_corr_cli(argv)
+
+
 def cmd_ancova(args: argparse.Namespace) -> int:
     from psyclaw.psych.ancova import ancova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group, "--cov", args.cov]
@@ -1648,6 +1668,31 @@ def build_parser() -> argparse.ArgumentParser:
     pancova.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     pancova.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pancova.set_defaults(func=cmd_ancova)
+
+    ppartial = sub.add_parser(
+        "partial-corr",
+        help=(
+            "偏相关分析 / 半偏相关 / 偏相关矩阵（stdlib only）："
+            "控制协变量后的 r / t / p / 95% CI（Fisher z）/ APA-7 报告"
+        ),
+    )
+    ppartial.add_argument("csv", help="输入数据 CSV 路径")
+    ppartial.add_argument("--x", required=True, dest="x_col", help="变量 x 列名")
+    ppartial.add_argument("--y", required=True, dest="y_col", help="变量 y 列名")
+    ppartial.add_argument("--controls", default="",
+                          help="控制变量列名，逗号分隔（可为空）")
+    ppartial.add_argument("--semi", action="store_true",
+                          help="计算半偏相关（part correlation）")
+    ppartial.add_argument("--which", default="x", choices=["x", "y"],
+                          help="半偏相关中对哪个变量去除控制变量影响（默认 x）")
+    ppartial.add_argument("--matrix",
+                          help="同时输出偏相关矩阵的变量列名（逗号分隔，≥2 列）")
+    ppartial.add_argument("--alpha", type=float, default=0.05,
+                          help="显著性水平（默认 .05）")
+    ppartial.add_argument("--out", default="notes",
+                          help="报告输出目录（默认 notes/）")
+    ppartial.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    ppartial.set_defaults(func=cmd_partial_corr)
 
     pcfa = sub.add_parser(
         "cfa",
