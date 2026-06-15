@@ -227,6 +227,14 @@
 
 ---
 
+## P16 · 统计纵深扩展 XI（自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P16-1 | ROC 曲线 / AUC 诊断准确性分析 | **已落地** `psyclaw/psych/roc.py`（stdlib only，填补量表筛查截断值验证空白；连续预测分 × 二元金标准结局）：`roc_auc`（AUC = Wilcoxon-Mann-Whitney 一致性法，秩排序 O(n log n) 含 .5 平局；Hanley & McNeil 1982 渐近 SE → Wald z/p 检验 H0:AUC=.5 + 正态 95% CI，完美分离 SE→0 特判）；`roc_curve`（全阈值 ROC 点：敏感度/特异度/FPR/Youden J，含 (0,0)(1,1) 端点，FPR 升序）；`optimal_cutoff`（Youden's J 最大化最优截断 + 该点敏感度/特异度/PPV/NPV/准确率/LR+/LR−/混淆矩阵）；`interpret_auc`（Hosmer, Lemeshow & Sturdivant 2013 五档，AUC<.5 对称反向）；`direction higher\|lower` 支持低分→阳性；正态 CDF(erf)/双尾 p/Acklam 分位数；`format_apa_roc`（AUC 汇总三线表 + 最优截断表 + 文字段落 + PPV/NPV 患病率告警 + 参考文献）；`write_roc_report` MD+JSON sidecar（NaN/inf→null）；`analyze_roc` CSV 主入口（positive_label 二值化 + 缺失/非数值排除 + n_excluded + 曲线点）；`psyclaw roc <data.csv> --score col --outcome col [--direction higher\|lower] [--positive 1] [--alpha] [--json] [--out]`；CLI 注册 `cli.py`。理论依据：Hanley & McNeil (1982)；Youden (1950)；Hosmer, Lemeshow & Sturdivant (2013)；DeLong et al. (1988)。测试 `tests/test_roc.py`（约 65 例）。 | `tests/test_roc.py` ≥40例，AUC 一致性法对手算金标准（pos=[2,3,4]/neg=[1,2] → 5.5/6）精确，完美分离 AUC=1 且 p=0，Youden 最优截断手算（cutoff=3, sens=2/3, spec=1）精确，AUC<.5 解读对称 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。

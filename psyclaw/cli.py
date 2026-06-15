@@ -781,6 +781,22 @@ def cmd_irr(args: argparse.Namespace) -> int:
     return irr_cli(argv)
 
 
+def cmd_roc(args: argparse.Namespace) -> int:
+    from psyclaw.psych.roc import roc_cli
+    argv = [args.csv, "--score", args.score_col, "--outcome", args.outcome_col]
+    if getattr(args, "direction", "higher") != "higher":
+        argv += ["--direction", args.direction]
+    if getattr(args, "positive_label", "1") != "1":
+        argv += ["--positive", args.positive_label]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return roc_cli(argv)
+
+
 def cmd_ancova(args: argparse.Namespace) -> int:
     from psyclaw.psych.ancova import ancova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group, "--cov", args.cov]
@@ -1733,6 +1749,26 @@ def build_parser() -> argparse.ArgumentParser:
     pirr.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     pirr.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pirr.set_defaults(func=cmd_irr)
+
+    proc = sub.add_parser(
+        "roc",
+        help=(
+            "ROC 曲线 / AUC 诊断准确性分析（stdlib only）：量表截断值验证 / "
+            "AUC + Hanley-McNeil 95% CI / Youden's J 最优截断 / 敏感度·特异度·PPV·NPV·LR / APA-7 报告"
+        ),
+    )
+    proc.add_argument("csv", help="输入数据 CSV 路径")
+    proc.add_argument("--score", required=True, dest="score_col", help="连续预测分列名")
+    proc.add_argument("--outcome", required=True, dest="outcome_col",
+                      help="二元结局列名（金标准诊断）")
+    proc.add_argument("--direction", default="higher", choices=["higher", "lower"],
+                      help="高分→阳性(higher，默认) | 低分→阳性(lower)")
+    proc.add_argument("--positive", default="1", dest="positive_label",
+                      help="结局列中代表「阳性」的值（默认 '1'）")
+    proc.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
+    proc.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    proc.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    proc.set_defaults(func=cmd_roc)
 
     pcfa = sub.add_parser(
         "cfa",
