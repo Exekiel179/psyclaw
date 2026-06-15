@@ -277,6 +277,19 @@
 
 ---
 
+## P21 · 统计纵深扩展 XVI（自我扩展）
+
+> **动机**：回归族已有二元（P7 logistic）、有序（P20 ordinal）、计数（P18/19 poisson/negbin）模型，
+> 唯独缺**无序多分类结局**。心理学常见无序多类别结局（诊断分组、依恋类型、所属亚群、
+> 强迫选择类别）既非二元亦无自然顺序——误用 OLS 不当、塌缩为二元 Logistic 需两两比较
+> （丢信息且参照不一致）、误当有序处理违反「无序」前提。需基线类别 logit 模型。
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P21-1 | 多项 Logistic 回归（无序多分类结局，基线类别 logit） | **已落地** `psyclaw/psych/multinomial.py`（stdlib only，与 `logistic.py`/`ordinal.py` 同构，复用其矩阵/分布工具）：`multinomial_regression`——Agresti (2013) 基线类别 logit 模型 log(P(Y=j)/P(Y=ref))=β_j′x（J−1 组系数向量，参照类别系数恒 0；softmax 数值稳健）；**全块 Newton-Raphson**（堆叠 (J−1)·k 维参数，观测信息阵 block (c,d)=Σ p_ic(δ_cd−p_id)x x′，step-halving 保证 ll 单调上升）；信息阵求逆 → 各系数 SE；Wald *z*/*p*/OR=exp(β)/95% CI（按非参照类别分组）；零模型（仅截距 MLE p_j=n_j/n）+ LR χ²（df=(J−1)(k−1)）；McFadden/Cox-Snell/Nagelkerke 伪 *R*²；AIC/BIC（参数计 (J−1)·k）；完全分离检测；`predict_probs`（各类别预测概率，和=1）；`format_apa_multinomial`（每个非参照类别一张 APA-7 三线系数表 + 模型拟合段 LR/McFadden/Nagelkerke/AIC + 显著预测变量文字，注明对比类别 vs 参照）；`write_multinomial_report` MD+JSON sidecar（`_json_safe` 递归 NaN/inf→null + 字典键转字符串）；`analyze_multinomial` CSV 主入口（无序标签→1..J 映射[数值优先否则字典序] + 自定义 `--ref` 参照 + 缺失整行排除 + n_excluded + ≥3 类校验[2 类提示改用二元 Logistic]）；`multinomial_cli`；`psyclaw multinom <data.csv> --dv <col> --iv col1,col2,... [--ref <label>] [--alpha .05] [--json] [--out]`；CLI 注册（`cli.py` `cmd_multinom` + `pmultinom` 子解析器，与 logit/ordinal 同构）。理论依据：Agresti (2013) Categorical Data Analysis §8；Hosmer, Lemeshow & Sturdivant (2013) §8；McFadden (1974)；Nagelkerke (1991)。测试 `tests/test_multinomial.py`（约 55 例）。 | `tests/test_multinomial.py` ≥40例，仅截距模型截距=log(n_j/n_ref) 误差<1e-5 且 ll_model=ll_null，单二元预测变量饱和模型截距/斜率由各单元格经验对数优势精确恢复（intercept=0/slope=log2/log4，OR=2/4），J=2 退化与二元 Logistic 交叉验证（β/SE 一致，误差<1e-3），predict_probs 各类概率和=1，OR=exp(B) 精确，单调（重叠非分离）预测变量 β 显著为正，LR χ²≥0，伪 R²∈[0,1]，AIC/BIC 公式精确 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。

@@ -719,6 +719,20 @@ def cmd_ordinal(args: argparse.Namespace) -> int:
     return ordinal_cli(argv)
 
 
+def cmd_multinom(args: argparse.Namespace) -> int:
+    from psyclaw.psych.multinomial import multinomial_cli
+    argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
+    if getattr(args, "ref", None):
+        argv += ["--ref", args.ref]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return multinomial_cli(argv)
+
+
 def cmd_anova(args: argparse.Namespace) -> int:
     from psyclaw.psych.anova import anova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group]
@@ -1687,6 +1701,24 @@ def build_parser() -> argparse.ArgumentParser:
                           help="sidecar 输出目录（写 ordinal_report.{md,json}）")
     pordinal.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
     pordinal.set_defaults(func=cmd_ordinal)
+
+    pmultinom = sub.add_parser(
+        "multinom",
+        help="多项 Logistic 回归（基线类别 logit；无序多分类结局；OR/Wald/LR；APA-7）",
+    )
+    pmultinom.add_argument("csv", help="输入数据 CSV 路径")
+    pmultinom.add_argument("--dv",    required=True,
+                           help="无序多分类因变量列名（≥3 个类别）")
+    pmultinom.add_argument("--iv",    required=True,
+                           help="预测变量列名，逗号分隔（如 age,sex,score）")
+    pmultinom.add_argument("--ref",   default=None,
+                           help="参照类别原始标签（默认 = 最小/首个类别）")
+    pmultinom.add_argument("--alpha", type=float, default=0.05,
+                           help="显著性水平（默认 .05）")
+    pmultinom.add_argument("--out",   default=None,
+                           help="sidecar 输出目录（写 multinomial_report.{md,json}）")
+    pmultinom.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
+    pmultinom.set_defaults(func=cmd_multinom)
 
     pefa = sub.add_parser(
         "efa",
