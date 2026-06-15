@@ -1,10 +1,13 @@
 """评分者间信度 / 组间一致性（Inter-Rater Reliability, IRR）— APA-7（stdlib only）。
 
-提供四类一致性指标：
+提供五类一致性指标：
   - cohens_kappa: 两评分者名义/有序一致性（Cohen's κ，含线性/二次加权）
   - fleiss_kappa: 多评分者名义一致性（Fleiss' κ）
+  - krippendorff_alpha: 任意评分者数/缺失数据/任意测量层级（名义/有序/等距/等比），
+    内容分析编码者间信度标准量；自助法 95% CI
   - intraclass_correlation: 连续评分组内相关系数（ICC，6 种 Shrout & Fleiss 1979 模型）
-  - interpret_kappa / interpret_icc: 言语解读（Landis & Koch 1977；Koo & Li 2016）
+  - interpret_kappa / interpret_icc / interpret_krippendorff: 言语解读
+    （Landis & Koch 1977；Koo & Li 2016；Krippendorff 2004）
   - APA-7 Markdown 段落 + 汇总表
   - CSV 主入口 + MD/JSON sidecar + CLI
 
@@ -32,7 +35,16 @@ CLI:
           [--weights linear|quadratic]
   psyclaw irr <data.csv> --method fleiss --raters c1,c2,c3,...
   psyclaw irr <data.csv> --method icc --raters c1,c2,c3,...
+  psyclaw irr <data.csv> --method krippendorff --raters c1,c2,c3,...
+          [--metric nominal|ordinal|interval|ratio] [--n-boot 2000]
           [--alpha .05] [--json] [--out dir]
+
+理论依据（续）：
+  Krippendorff, K. (2004). Content analysis: An introduction to its methodology
+    (2nd ed.). Sage.
+  Hayes, A. F., & Krippendorff, K. (2007). Answering the call for a standard
+    reliability measure for coding data. Communication Methods and Measures,
+    1(1), 77–89.
 """
 
 from __future__ import annotations
@@ -410,6 +422,212 @@ def ratings_to_fleiss_counts(
 
 
 # ---------------------------------------------------------------------------
+# Krippendorff's alpha（任意评分者数 / 缺失数据 / 任意测量层级）
+# ---------------------------------------------------------------------------
+
+def _kripp_delta2(metric: str, vals: list[Any], c: int, k: int,
+                  n_marg: list[float]) -> float:
+    """值索引 c、k 之间的差异函数 δ²（Krippendorff 2004）。
+
+    nominal  : δ² = 0 if c==k else 1
+    interval : δ² = (v_c − v_k)²
+    ratio    : δ² = ((v_c − v_k)/(v_c + v_k))²
+    ordinal  : δ² = (Σ_{g=c..k} n_g − (n_c + n_k)/2)²（n_g 为边际频数）
+    """
+    if c == k:
+        return 0.0
+    if metric == "nominal":
+        return 1.0
+    vc, vk = float(vals[c]), float(vals[k])
+    if metric == "interval":
+        return (vc - vk) ** 2
+    if metric == "ratio":
+        s = vc + vk
+        if s == 0:
+            return 0.0
+        return ((vc - vk) / s) ** 2
+    if metric == "ordinal":
+        lo, hi = (c, k) if c < k else (k, c)
+        g = sum(n_marg[t] for t in range(lo, hi + 1))
+        half = (n_marg[c] + n_marg[k]) / 2.0
+        d = g - half
+        return d * d
+    raise ValueError(f"未知 metric: {metric!r}（应为 nominal/ordinal/interval/ratio）")
+
+
+def _krippendorff_core(
+    units: list[list[Any]],
+    metric: str,
+    vals: list[Any],
+) -> dict[str, float]:
+    """Krippendorff's alpha 点估计（基于一致性/重合矩阵）。
+
+    units : 单位（行）× 评分者（列）；缺失项为 None/""，自动按可配对处理。
+    vals  : 固定的取值域（顺序对 ordinal/interval/ratio 有意义；bootstrap 复用）。
+
+    返回 {alpha, n_total, n_units_pairable, d_o, d_e}。
+    """
+    idx = {v: i for i, v in enumerate(vals)}
+    K = len(vals)
+    o = [[0.0] * K for _ in range(K)]
+    n_units_pairable = 0
+    for u in units:
+        valid = [v for v in u if v is not None and v != ""]
+        m = len(valid)
+        if m < 2:
+            continue
+        n_units_pairable += 1
+        w = 1.0 / (m - 1)
+        for a in range(m):
+            ia = idx[valid[a]]
+            for b in range(m):
+                if a == b:
+                    continue
+                o[ia][idx[valid[b]]] += w
+
+    n_marg = [sum(row) for row in o]
+    n_total = sum(n_marg)
+    if n_total < 2:
+        return {"alpha": float("nan"), "n_total": n_total,
+                "n_units_pairable": n_units_pairable,
+                "d_o": float("nan"), "d_e": float("nan")}
+
+    num = 0.0
+    den = 0.0
+    for c in range(K):
+        nc = n_marg[c]
+        for kk in range(K):
+            if c == kk:
+                continue
+            d2 = _kripp_delta2(metric, vals, c, kk, n_marg)
+            num += o[c][kk] * d2
+            den += nc * n_marg[kk] * d2
+
+    if den <= 0:
+        # 无变异（仅单一取值）：期望不一致为 0，α 无定义
+        return {"alpha": float("nan"), "n_total": n_total,
+                "n_units_pairable": n_units_pairable,
+                "d_o": num / n_total, "d_e": 0.0}
+
+    d_obs = num / n_total
+    d_exp = den / (n_total * (n_total - 1))
+    a = 1.0 - d_obs / d_exp
+    return {"alpha": a, "n_total": n_total, "n_units_pairable": n_units_pairable,
+            "d_o": d_obs, "d_e": d_exp}
+
+
+def _percentile(sorted_vals: list[float], q: float) -> float:
+    """线性插值分位数（sorted_vals 已升序，q∈[0,1]）。"""
+    if not sorted_vals:
+        return float("nan")
+    if len(sorted_vals) == 1:
+        return sorted_vals[0]
+    pos = q * (len(sorted_vals) - 1)
+    lo = int(math.floor(pos))
+    hi = int(math.ceil(pos))
+    if lo == hi:
+        return sorted_vals[lo]
+    frac = pos - lo
+    return sorted_vals[lo] * (1.0 - frac) + sorted_vals[hi] * frac
+
+
+def krippendorff_alpha(
+    units: list[list[Any]],
+    metric: str = "nominal",
+    value_domain: list[Any] | None = None,
+    n_boot: int = 2000,
+    seed: int = 20240601,
+    alpha: float = 0.05,
+) -> dict[str, Any]:
+    """Krippendorff's alpha（任意评分者数 / 缺失数据 / 任意测量层级）。
+
+    参数
+    ----
+    units        : 单位（行）× 评分者（列）的标签表；缺失用 None/""。
+                   一个单位需 ≥2 个有效评分才「可配对」，否则不计入。
+    metric       : "nominal"（默认）/ "ordinal" / "interval" / "ratio"
+                   ——ordinal/interval/ratio 要求取值可转 float。
+    value_domain : 自定义取值域（顺序对 ordinal/interval/ratio 有意义）；
+                   缺省自数据抽取（数值升序 / 名义按类型+字符串序）。
+    n_boot       : 自助法重抽样次数（>0 时给出 95% 百分位 CI）；0 关闭。
+    seed         : 自助法随机种子（默认固定，保证结果可复现）。
+    alpha        : 置信区间显著性水平（双尾，默认 .05）。
+
+    返回
+    ----
+    {alpha, ci_lower, ci_upper, metric, n_units, n_units_pairable,
+     n_pairable_values, n_categories, categories, d_observed, d_expected,
+     n_boot, alpha_level, interpretation}
+    """
+    if metric not in ("nominal", "ordinal", "interval", "ratio"):
+        raise ValueError(
+            f"未知 metric: {metric!r}（应为 nominal/ordinal/interval/ratio）")
+    if not units:
+        raise ValueError("无数据")
+
+    if value_domain is not None:
+        vals = list(value_domain)
+    else:
+        seen = set()
+        for u in units:
+            for v in u:
+                if v is not None and v != "":
+                    seen.add(v)
+        if not seen:
+            raise ValueError("无有效评分")
+        if metric == "nominal":
+            vals = sorted(seen, key=lambda v: (str(type(v)), str(v)))
+        else:
+            vals = sorted(seen)  # 数值升序（ordinal 距离依赖取值顺序）
+
+    domain_set = set(vals)
+    for u in units:
+        for v in u:
+            if v is not None and v != "" and v not in domain_set:
+                raise ValueError(f"值 {v!r} 不在 value_domain 中")
+
+    core = _krippendorff_core(units, metric, vals)
+    point = core["alpha"]
+
+    ci_lower = ci_upper = float("nan")
+    n_boot_used = 0
+    usable = [u for u in units
+              if sum(1 for v in u if v is not None and v != "") >= 2]
+    if math.isfinite(point) and len(usable) >= 2 and n_boot and n_boot > 0:
+        import random
+        rng = random.Random(seed)
+        U = len(usable)
+        boot_vals: list[float] = []
+        for _ in range(n_boot):
+            sample = [usable[rng.randrange(U)] for _ in range(U)]
+            c2 = _krippendorff_core(sample, metric, vals)
+            if math.isfinite(c2["alpha"]):
+                boot_vals.append(c2["alpha"])
+        if boot_vals:
+            boot_vals.sort()
+            ci_lower = _percentile(boot_vals, alpha / 2.0)
+            ci_upper = _percentile(boot_vals, 1.0 - alpha / 2.0)
+            n_boot_used = len(boot_vals)
+
+    return {
+        "alpha": _r(point),
+        "ci_lower": _r(ci_lower),
+        "ci_upper": _r(ci_upper),
+        "metric": metric,
+        "n_units": len(units),
+        "n_units_pairable": core["n_units_pairable"],
+        "n_pairable_values": _r(core["n_total"]),
+        "n_categories": len(vals),
+        "categories": [str(v) for v in vals],
+        "d_observed": _r(core["d_o"]),
+        "d_expected": _r(core["d_e"]),
+        "n_boot": n_boot_used,
+        "alpha_level": alpha,
+        "interpretation": interpret_krippendorff(point),
+    }
+
+
+# ---------------------------------------------------------------------------
 # ICC（Shrout & Fleiss 1979；McGraw & Wong 1996）
 # ---------------------------------------------------------------------------
 
@@ -584,6 +802,17 @@ def interpret_icc(v: float) -> str:
     return "优秀（Excellent）"
 
 
+def interpret_krippendorff(a: float) -> str:
+    """Krippendorff (2004) α 经验门槛解读。"""
+    if not math.isfinite(a):
+        return "无法计算"
+    if a >= 0.80:
+        return "可靠（≥.80，Reliable）"
+    if a >= 0.667:
+        return "暂定可靠（.667–.80，需谨慎，Tentative）"
+    return "不可靠（<.667，Unreliable）"
+
+
 # ---------------------------------------------------------------------------
 # APA-7 格式化
 # ---------------------------------------------------------------------------
@@ -718,6 +947,43 @@ def format_apa_icc(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+_KRIPP_METRIC_LABELS = {
+    "nominal": "名义", "ordinal": "有序", "interval": "等距", "ratio": "等比",
+}
+
+
+def format_apa_krippendorff(result: dict[str, Any]) -> str:
+    """Krippendorff's alpha 的 APA-7 Markdown 段落。"""
+    a = result["alpha"]
+    metric = result.get("metric", "nominal")
+    mlabel = _KRIPP_METRIC_LABELS.get(metric, metric)
+    ci_lo, ci_hi = result.get("ci_lower"), result.get("ci_upper")
+    lines = ["## Krippendorff's alpha（评分者间一致性）", ""]
+    lines.append(
+        f"- 编码单位 *N* = {result['n_units']}"
+        f"（可配对 {result['n_units_pairable']}），"
+        f"测量层级 = {mlabel}，取值/类别数 = {result['n_categories']}"
+    )
+    lines.append("")
+    has_ci = (isinstance(ci_lo, (int, float)) and math.isfinite(ci_lo)
+              and isinstance(ci_hi, (int, float)) and math.isfinite(ci_hi))
+    ci_str = (f"，95% CI [{_f3(ci_lo)}, {_f3(ci_hi)}]"
+              f"（{result.get('n_boot', 0)} 次自助重抽样）" if has_ci else "")
+    lines.append(
+        f"以 Krippendorff's α（{mlabel}差异函数）评估编码者间一致性，"
+        f"α = {_f3(a)}{ci_str}，一致性水平为「{result.get('interpretation', '')}」。"
+        f"Krippendorff (2004) 建议 α ≥ .80 为可靠，.667–.80 仅可作暂定结论。"
+    )
+    lines += ["", "### 参考文献", "",
+              "Krippendorff, K. (2004). *Content analysis: An introduction to its "
+              "methodology* (2nd ed.). Sage.",
+              "",
+              "Hayes, A. F., & Krippendorff, K. (2007). Answering the call for a "
+              "standard reliability measure for coding data. *Communication Methods "
+              "and Measures, 1*(1), 77–89."]
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # JSON sidecar
 # ---------------------------------------------------------------------------
@@ -775,15 +1041,19 @@ def analyze_irr(
     rater_b: str | None = None,
     raters: list[str] | None = None,
     weights: str | None = None,
+    metric: str = "nominal",
+    n_boot: int = 2000,
+    seed: int = 20240601,
     alpha: float = 0.05,
     out_dir: str = "notes",
     return_json: bool = False,
 ) -> dict[str, Any]:
     """CSV 主入口：读取数据 → 计算 IRR → 写 sidecar。
 
-    method="kappa"  : 需 rater_a/rater_b 两列
-    method="fleiss" : 需 raters（≥2 列，类别标签）
-    method="icc"    : 需 raters（≥2 列，连续评分）
+    method="kappa"        : 需 rater_a/rater_b 两列
+    method="fleiss"       : 需 raters（≥2 列，类别标签）
+    method="icc"          : 需 raters（≥2 列，连续评分）
+    method="krippendorff" : 需 raters（≥2 列）；metric 决定差异函数
     """
     rows = _read_csv(csv_path)
     header = set(rows[0].keys())
@@ -850,8 +1120,40 @@ def analyze_irr(
         result["method"] = "icc"
         formatted = format_apa_icc(result)
 
+    elif method in ("krippendorff", "alpha"):
+        if not raters or len(raters) < 2:
+            raise ValueError("krippendorff 需要 --raters 指定至少 2 列")
+        for c in raters:
+            if c not in header:
+                raise ValueError(f"CSV 中找不到列: {c}")
+        units = []
+        n_excluded = 0
+        for row in rows:
+            vals: list[Any] = []
+            for c in raters:
+                v = row.get(c, "")
+                if v is None or v == "":
+                    vals.append(None)
+                elif metric == "nominal":
+                    vals.append(v)
+                else:
+                    try:
+                        vals.append(_to_float(v))
+                    except (ValueError, TypeError):
+                        vals.append(None)
+            if all(v is None for v in vals):
+                n_excluded += 1
+                continue
+            units.append(vals)
+        result = krippendorff_alpha(
+            units, metric=metric, n_boot=n_boot, seed=seed, alpha=alpha)
+        result["n_excluded"] = n_excluded
+        result["method"] = "krippendorff"
+        formatted = format_apa_krippendorff(result)
+
     else:
-        raise ValueError(f"未知 method: {method!r}（应为 kappa/fleiss/icc）")
+        raise ValueError(
+            f"未知 method: {method!r}（应为 kappa/fleiss/icc/krippendorff）")
 
     result["raters"] = raters
     paths = write_irr_report(result, formatted, out_dir)
@@ -876,13 +1178,20 @@ def irr_cli(argv: list[str]) -> int:
         description="评分者间信度（Cohen's / Fleiss' kappa / ICC，APA-7，stdlib only）",
     )
     ap.add_argument("csv", help="输入数据 CSV 路径")
-    ap.add_argument("--method", required=True, choices=["kappa", "fleiss", "icc"],
-                    help="kappa(两评分者) | fleiss(多评分者名义) | icc(连续评分)")
+    ap.add_argument("--method", required=True,
+                    choices=["kappa", "fleiss", "icc", "krippendorff"],
+                    help="kappa(两评分者) | fleiss(多评分者名义) | icc(连续评分) | "
+                         "krippendorff(任意评分者/缺失/层级)")
     ap.add_argument("--rater-a", dest="rater_a", help="kappa：评分者 A 列名")
     ap.add_argument("--rater-b", dest="rater_b", help="kappa：评分者 B 列名")
-    ap.add_argument("--raters", help="fleiss/icc：评分者列名，逗号分隔（≥2 列）")
+    ap.add_argument("--raters", help="fleiss/icc/krippendorff：评分者列名，逗号分隔（≥2 列）")
     ap.add_argument("--weights", choices=["linear", "quadratic"],
                     help="kappa：有序加权方案（默认名义未加权）")
+    ap.add_argument("--metric", choices=["nominal", "ordinal", "interval", "ratio"],
+                    default="nominal",
+                    help="krippendorff：差异函数/测量层级（默认 nominal）")
+    ap.add_argument("--n-boot", dest="n_boot", type=int, default=2000,
+                    help="krippendorff：自助法 CI 重抽样次数（默认 2000，0 关闭）")
     ap.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
     ap.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     ap.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
@@ -894,7 +1203,8 @@ def irr_cli(argv: list[str]) -> int:
         result = analyze_irr(
             args.csv, args.method,
             rater_a=args.rater_a, rater_b=args.rater_b, raters=raters,
-            weights=args.weights, alpha=args.alpha, out_dir=args.out,
+            weights=args.weights, metric=args.metric, n_boot=args.n_boot,
+            alpha=args.alpha, out_dir=args.out,
         )
     except (FileNotFoundError, ValueError) as exc:
         print(ui.err(str(exc)))
@@ -916,6 +1226,20 @@ def irr_cli(argv: list[str]) -> int:
             icc = m["icc"]
             icc_s = f"{icc:.4f}" if isinstance(icc, (int, float)) and math.isfinite(icc) else "—"
             print(f"  {_ICC_LABELS[key]:<34} {icc_s}  ({interpret_icc(icc) if isinstance(icc,(int,float)) else ''})")
+    elif args.method == "krippendorff":
+        a = result["alpha"]
+        print(ui.title("Krippendorff's alpha"))
+        print(ui.rule())
+        print(f"  单位 N      : {result['n_units']}  |  可配对: {result['n_units_pairable']}"
+              f"  |  层级: {result['metric']}  |  取值: {result['n_categories']}"
+              f"  |  排除: {result.get('n_excluded', 0)}")
+        print()
+        a_s = f"{a:.4f}" if isinstance(a, (int, float)) and math.isfinite(a) else "—"
+        print(f"  alpha       : {a_s}  ({result.get('interpretation', '')})")
+        ci_lo = result.get("ci_lower")
+        if isinstance(ci_lo, (int, float)) and math.isfinite(ci_lo):
+            print(f"  95% CI      : [{ci_lo:.4f}, {result['ci_upper']:.4f}]"
+                  f"  ({result.get('n_boot', 0)} 次自助)")
     else:
         kappa = result["kappa"]
         title = "Cohen's kappa" if args.method == "kappa" else "Fleiss' kappa"

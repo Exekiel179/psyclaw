@@ -290,6 +290,22 @@
 
 ---
 
+## P22 · 统计纵深扩展 XVII（自我扩展）
+
+> **动机**：评分者间信度（P15 irr.py）已覆盖 Cohen's/Fleiss' κ + ICC 六模型，但仍缺
+> **Krippendorff's α**——内容分析/质性编码领域的*事实标准*一致性量（Hayes & Krippendorff
+> 2007 即题为「为编码数据回答标准信度量的呼声」）。κ 的固有局限：Cohen's κ 仅限两评分者、
+> Fleiss' κ 要求各对象评分者数相等且仅名义层级、二者对缺失数据无优雅处理。Krippendorff's α
+> 单一公式同时支持**任意评分者数 + 缺失数据 + 任意测量层级（名义/有序/等距/等比）**，
+> 是观察编码、开放问卷编码、行为标注研究的首选。此前误用只能塌缩为成对 κ（丢信息、参照不一致）
+> 或忽略缺失（删整个对象，损失样本）。
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P22-1 | Krippendorff's alpha（任意评分者数/缺失/任意层级一致性） | **已落地** `psyclaw/psych/irr.py` 扩展（stdlib only，与既有 κ/ICC 同模块同构）：`krippendorff_alpha`——基于一致性/重合矩阵的标准算法（Krippendorff 2004）：每个可配对单位（≥2 有效评分）按 1/(mᵤ−1) 权重累加全部有序值对入重合矩阵 o，行边际 n_c、总配对值数 n=Σn_c；α=1−D_o/D_e=1−(n−1)·Σo_ck·δ²_ck / Σn_c·n_k·δ²_ck。差异函数 `_kripp_delta2` 四层级：名义 δ²=[c≠k]、等距 δ²=(v_c−v_k)²、等比 δ²=((v_c−v_k)/(v_c+v_k))²、有序 δ²=(Σ_{g=c..k}n_g−(n_c+n_k)/2)²（边际依赖，bootstrap 每次重算）。**自助法 95% CI**（`_percentile` 线性插值分位数；固定种子 → 结果可复现；n_boot=0 关闭）；缺失数据天然处理（仅 1 有效值的单位不可配对自动跳过，n_units vs n_units_pairable 双计数）；评分者数可不等。`interpret_krippendorff`（Krippendorff 2004：α≥.80 可靠 / .667–.80 暂定 / <.667 不可靠）；`format_apa_krippendorff`（APA-7 段落 + 层级标签 + CI + 参考文献 Krippendorff 2004 / Hayes & Krippendorff 2007）；`analyze_irr` 新增 `krippendorff` 路由（CSV：名义保留标签、有序/等距/等比转 float、缺失→None、全缺失行排除）+ `--metric`/`--n-boot` 参数；CLI 显示分支 + `psyclaw irr <data.csv> --method krippendorff --raters c1,c2,... [--metric nominal\|ordinal\|interval\|ratio] [--n-boot 2000] [--alpha] [--json] [--out]`（`cli.py` `cmd_irr` + `pirr` 子解析器扩展）。理论依据：Krippendorff (2004) Content Analysis (2nd ed.)；Hayes & Krippendorff (2007) Communication Methods and Measures。测试 `tests/test_irr.py` 新增约 35 例（差异函数 7 / 点估计手算金标准 10 / 缺失·可配对 6 / 自助 CI 4 / 解读·格式·CSV 入口 8）。 | `tests/test_irr.py` 新增 ≥25例，名义完美一致 α=1、[[1,2],[2,1]]→α=−0.5、[[1,1],[1,1],[1,2]]→α=0、三类名义数据 α=5/11、同数据有序 α=0.70（相邻分歧给部分信用 → 有序>名义）、单一配对等距 α=0、缺失单位自动跳过（n_units≠n_pairable）、自助 CI 同种子可复现且 lower≤upper、α≤1 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
