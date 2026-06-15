@@ -754,3 +754,264 @@ def test_analyze_kappa_missing_column_raises(tmp_path):
     with pytest.raises(ValueError):
         irr.analyze_irr(str(csv_path), "kappa", rater_a="ra", rater_b="zz",
                         out_dir=str(tmp_path))
+
+
+# ---------------------------------------------------------------------------
+# Krippendorff's alpha — 差异函数 δ²
+# ---------------------------------------------------------------------------
+
+def test_kripp_delta2_nominal():
+    assert irr._kripp_delta2("nominal", [1, 2, 3], 0, 1, [1, 1, 1]) == 1.0
+    assert irr._kripp_delta2("nominal", [1, 2, 3], 1, 1, [1, 1, 1]) == 0.0
+
+
+def test_kripp_delta2_interval():
+    assert irr._kripp_delta2("interval", [1, 2, 5], 0, 2, [1, 1, 1]) == 16.0
+
+
+def test_kripp_delta2_ratio():
+    # ((1-3)/(1+3))² = (−2/4)² = 0.25
+    assert abs(irr._kripp_delta2("ratio", [1, 3], 0, 1, [1, 1]) - 0.25) < 1e-12
+
+
+def test_kripp_delta2_ratio_zero_sum():
+    assert irr._kripp_delta2("ratio", [0, 0], 0, 1, [1, 1]) == 0.0
+
+
+def test_kripp_delta2_ordinal():
+    # vals=[1,2,3], marg=[3,4,3]; δ²(0,2) = (3+4+3 − (3+3)/2)² = (10−3)² = 49
+    assert abs(irr._kripp_delta2("ordinal", [1, 2, 3], 0, 2, [3, 4, 3]) - 49.0) < 1e-9
+
+
+def test_kripp_delta2_self_zero():
+    assert irr._kripp_delta2("ordinal", [1, 2, 3], 2, 2, [3, 4, 3]) == 0.0
+
+
+def test_kripp_delta2_unknown_raises():
+    with pytest.raises(ValueError):
+        irr._kripp_delta2("bogus", [1, 2], 0, 1, [1, 1])
+
+
+# ---------------------------------------------------------------------------
+# Krippendorff's alpha — 点估计金标准（手算）
+# ---------------------------------------------------------------------------
+
+def test_kripp_perfect_agreement_nominal():
+    units = [[1, 1], [2, 2], [3, 3], [1, 1]]
+    res = irr.krippendorff_alpha(units, metric="nominal", n_boot=0)
+    assert abs(res["alpha"] - 1.0) < 1e-9
+
+
+def test_kripp_total_swap_nominal():
+    # [[1,2],[2,1]] → α = −0.5（手算）
+    res = irr.krippendorff_alpha([[1, 2], [2, 1]], metric="nominal", n_boot=0)
+    assert abs(res["alpha"] - (-0.5)) < 1e-9
+
+
+def test_kripp_chance_level_nominal():
+    # [[1,1],[1,1],[1,2]] → α = 0.0（手算：观测不一致=期望不一致）
+    res = irr.krippendorff_alpha([[1, 1], [1, 1], [1, 2]], metric="nominal", n_boot=0)
+    assert abs(res["alpha"] - 0.0) < 1e-9
+
+
+def test_kripp_three_cat_nominal_goldstandard():
+    # [[1,1],[2,2],[3,3],[1,2],[2,3]] → α = 5/11 ≈ 0.454545（手算）
+    units = [[1, 1], [2, 2], [3, 3], [1, 2], [2, 3]]
+    res = irr.krippendorff_alpha(units, metric="nominal", n_boot=0)
+    assert abs(res["alpha"] - 5.0 / 11.0) < 1e-6
+
+
+def test_kripp_three_cat_ordinal_goldstandard():
+    # 同上数据，有序差异函数 → α = 0.70（手算，相邻分歧给部分信用）
+    units = [[1, 1], [2, 2], [3, 3], [1, 2], [2, 3]]
+    res = irr.krippendorff_alpha(units, metric="ordinal", n_boot=0)
+    assert abs(res["alpha"] - 0.70) < 1e-9
+
+
+def test_kripp_ordinal_beats_nominal_for_adjacent():
+    # 相邻类别分歧：有序 α 应高于名义 α（有序给部分信用）
+    units = [[1, 1], [2, 2], [3, 3], [1, 2], [2, 3]]
+    a_nom = irr.krippendorff_alpha(units, metric="nominal", n_boot=0)["alpha"]
+    a_ord = irr.krippendorff_alpha(units, metric="ordinal", n_boot=0)["alpha"]
+    assert a_ord > a_nom
+
+
+def test_kripp_single_pair_interval_zero():
+    # 单一可配对单位，两评分互不相同 → α = 0
+    res = irr.krippendorff_alpha([[1, 2]], metric="interval", n_boot=0)
+    assert abs(res["alpha"] - 0.0) < 1e-9
+
+
+def test_kripp_interval_perfect():
+    res = irr.krippendorff_alpha([[1, 1], [2, 2], [3, 3]], metric="interval", n_boot=0)
+    assert abs(res["alpha"] - 1.0) < 1e-9
+
+
+def test_kripp_ratio_perfect():
+    res = irr.krippendorff_alpha([[2, 2], [4, 4], [6, 6]], metric="ratio", n_boot=0)
+    assert abs(res["alpha"] - 1.0) < 1e-9
+
+
+def test_kripp_alpha_at_most_one():
+    units = [[1, 1, 1], [2, 2, 2], [1, 1, 2], [3, 3, 3]]
+    res = irr.krippendorff_alpha(units, metric="nominal", n_boot=0)
+    assert res["alpha"] <= 1.0 + 1e-12
+
+
+# ---------------------------------------------------------------------------
+# Krippendorff — 缺失数据 / 可配对计数 / 任意评分者数
+# ---------------------------------------------------------------------------
+
+def test_kripp_missing_skips_unpairable():
+    # 仅 1 个有效值的单位不可配对，自动跳过
+    units = [[1, None], [1, 1], [2, 2]]
+    res = irr.krippendorff_alpha(units, metric="nominal", n_boot=0)
+    assert res["n_units"] == 3
+    assert res["n_units_pairable"] == 2
+    assert abs(res["alpha"] - 1.0) < 1e-9
+
+
+def test_kripp_variable_rater_count():
+    # 评分者数可不等（缺失），仍可计算
+    units = [[1, 1, 1], [2, 2, None], [3, None, 3]]
+    res = irr.krippendorff_alpha(units, metric="nominal", n_boot=0)
+    assert abs(res["alpha"] - 1.0) < 1e-9
+    assert res["n_units_pairable"] == 3
+
+
+def test_kripp_pairable_values_count():
+    # n_pairable_values = Σ_u m_u（可配对单位）
+    units = [[1, 1], [2, 2, 2]]  # m=2 + m=3 → 5
+    res = irr.krippendorff_alpha(units, metric="nominal", n_boot=0)
+    assert abs(res["n_pairable_values"] - 5.0) < 1e-9
+
+
+def test_kripp_value_not_in_domain_raises():
+    with pytest.raises(ValueError):
+        irr.krippendorff_alpha([[1, 2], [3, 1]], metric="nominal",
+                               value_domain=[1, 2], n_boot=0)
+
+
+def test_kripp_unknown_metric_raises():
+    with pytest.raises(ValueError):
+        irr.krippendorff_alpha([[1, 1]], metric="bogus", n_boot=0)
+
+
+def test_kripp_empty_raises():
+    with pytest.raises(ValueError):
+        irr.krippendorff_alpha([], metric="nominal", n_boot=0)
+
+
+# ---------------------------------------------------------------------------
+# Krippendorff — 自助法 CI
+# ---------------------------------------------------------------------------
+
+def test_kripp_bootstrap_ci_ordered():
+    units = [[1, 1], [2, 2], [1, 2], [2, 1], [1, 1], [2, 2]]
+    res = irr.krippendorff_alpha(units, metric="nominal", n_boot=500, seed=1)
+    assert math.isfinite(res["ci_lower"])
+    assert math.isfinite(res["ci_upper"])
+    assert res["ci_lower"] <= res["ci_upper"]
+
+
+def test_kripp_bootstrap_deterministic():
+    units = [[1, 1], [2, 2], [1, 2], [2, 1], [1, 1], [2, 2]]
+    r1 = irr.krippendorff_alpha(units, metric="nominal", n_boot=300, seed=7)
+    r2 = irr.krippendorff_alpha(units, metric="nominal", n_boot=300, seed=7)
+    assert r1["ci_lower"] == r2["ci_lower"]
+    assert r1["ci_upper"] == r2["ci_upper"]
+
+
+def test_kripp_no_bootstrap_nan_ci():
+    res = irr.krippendorff_alpha([[1, 1], [2, 2]], metric="nominal", n_boot=0)
+    assert math.isnan(res["ci_lower"])
+    assert res["n_boot"] == 0
+
+
+def test_kripp_percentile_helper():
+    vals = [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert abs(irr._percentile(vals, 0.5) - 2.0) < 1e-12
+    assert math.isnan(irr._percentile([], 0.5))
+    assert irr._percentile([5.0], 0.9) == 5.0
+
+
+# ---------------------------------------------------------------------------
+# Krippendorff — 解读 / 格式化 / CSV 入口
+# ---------------------------------------------------------------------------
+
+def test_interpret_krippendorff_thresholds():
+    assert "可靠" in irr.interpret_krippendorff(0.85)
+    assert "暂定" in irr.interpret_krippendorff(0.70)
+    assert "不可靠" in irr.interpret_krippendorff(0.50)
+    assert irr.interpret_krippendorff(float("nan")) == "无法计算"
+
+
+def test_format_apa_krippendorff_contains_key_parts():
+    units = [[1, 1], [2, 2], [3, 3], [1, 2], [2, 3]]
+    res = irr.krippendorff_alpha(units, metric="ordinal", n_boot=200, seed=3)
+    txt = irr.format_apa_krippendorff(res)
+    assert isinstance(txt, str)
+    assert "Krippendorff" in txt
+    assert "α" in txt
+    assert "有序" in txt  # metric label
+    assert "2004" in txt
+
+
+def test_analyze_krippendorff_nominal(tmp_path):
+    csv_path = tmp_path / "kr.csv"
+    rows = [["1", "1"], ["2", "2"], ["3", "3"], ["1", "2"], ["2", "3"]]
+    _write_csv(csv_path, ["r1", "r2"], rows)
+    res = irr.analyze_irr(str(csv_path), "krippendorff", raters=["r1", "r2"],
+                          metric="nominal", n_boot=0, out_dir=str(tmp_path))
+    assert abs(res["alpha"] - 5.0 / 11.0) < 1e-5
+    assert res["method"] == "krippendorff"
+
+
+def test_analyze_krippendorff_ordinal(tmp_path):
+    csv_path = tmp_path / "kr.csv"
+    rows = [["1", "1"], ["2", "2"], ["3", "3"], ["1", "2"], ["2", "3"]]
+    _write_csv(csv_path, ["r1", "r2"], rows)
+    res = irr.analyze_irr(str(csv_path), "krippendorff", raters=["r1", "r2"],
+                          metric="ordinal", n_boot=0, out_dir=str(tmp_path))
+    assert abs(res["alpha"] - 0.70) < 1e-6
+
+
+def test_analyze_krippendorff_missing(tmp_path):
+    csv_path = tmp_path / "kr.csv"
+    rows = [["1", ""], ["1", "1"], ["2", "2"]]
+    _write_csv(csv_path, ["r1", "r2"], rows)
+    res = irr.analyze_irr(str(csv_path), "krippendorff", raters=["r1", "r2"],
+                          metric="nominal", n_boot=0, out_dir=str(tmp_path))
+    assert res["n_units_pairable"] == 2
+    assert abs(res["alpha"] - 1.0) < 1e-9
+
+
+def test_analyze_krippendorff_writes_sidecar(tmp_path):
+    csv_path = tmp_path / "kr.csv"
+    rows = [["1", "1"], ["2", "2"], ["1", "2"]]
+    _write_csv(csv_path, ["r1", "r2"], rows)
+    res = irr.analyze_irr(str(csv_path), "krippendorff", raters=["r1", "r2"],
+                          metric="nominal", n_boot=50, out_dir=str(tmp_path))
+    paths = res["_paths"]
+    assert (tmp_path / "irr_report.md").exists()
+    data = json.loads((tmp_path / "irr_report.json").read_text(encoding="utf-8"))
+    assert "alpha" in data
+
+
+def test_analyze_krippendorff_too_few_raters_raises(tmp_path):
+    csv_path = tmp_path / "kr.csv"
+    _write_csv(csv_path, ["r1"], [["1"], ["2"]])
+    with pytest.raises(ValueError):
+        irr.analyze_irr(str(csv_path), "krippendorff", raters=["r1"],
+                        out_dir=str(tmp_path))
+
+
+def test_analyze_krippendorff_json_clean(tmp_path):
+    csv_path = tmp_path / "kr.csv"
+    rows = [["1", "1"], ["2", "2"], ["1", "2"]]
+    _write_csv(csv_path, ["r1", "r2"], rows)
+    res = irr.analyze_irr(str(csv_path), "krippendorff", raters=["r1", "r2"],
+                          metric="nominal", n_boot=0, out_dir=str(tmp_path),
+                          return_json=True)
+    # NaN CI（n_boot=0）应被 _clean_json 转为 None
+    assert res["ci_lower"] is None

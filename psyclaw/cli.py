@@ -824,6 +824,10 @@ def cmd_irr(args: argparse.Namespace) -> int:
         argv += ["--raters", args.raters]
     if getattr(args, "weights", None):
         argv += ["--weights", args.weights]
+    if getattr(args, "metric", "nominal") != "nominal":
+        argv += ["--metric", args.metric]
+    if getattr(args, "n_boot", 2000) != 2000:
+        argv += ["--n-boot", str(args.n_boot)]
     if getattr(args, "alpha", 0.05) != 0.05:
         argv += ["--alpha", str(args.alpha)]
     if getattr(args, "out", "notes") != "notes":
@@ -1880,17 +1884,25 @@ def build_parser() -> argparse.ArgumentParser:
         "irr",
         help=(
             "评分者间信度（stdlib only）：Cohen's κ（含线性/二次加权）/ "
-            "Fleiss' κ（多评分者）/ ICC 六模型（Shrout & Fleiss 1979）/ APA-7 报告"
+            "Fleiss' κ（多评分者）/ Krippendorff's α（任意层级+缺失）/ "
+            "ICC 六模型（Shrout & Fleiss 1979）/ APA-7 报告"
         ),
     )
     pirr.add_argument("csv", help="输入数据 CSV 路径")
-    pirr.add_argument("--method", required=True, choices=["kappa", "fleiss", "icc"],
-                      help="kappa(两评分者) | fleiss(多评分者名义) | icc(连续评分)")
+    pirr.add_argument("--method", required=True,
+                      choices=["kappa", "fleiss", "icc", "krippendorff"],
+                      help="kappa(两评分者) | fleiss(多评分者名义) | icc(连续评分) | "
+                           "krippendorff(任意评分者/缺失/层级)")
     pirr.add_argument("--rater-a", dest="rater_a", help="kappa：评分者 A 列名")
     pirr.add_argument("--rater-b", dest="rater_b", help="kappa：评分者 B 列名")
-    pirr.add_argument("--raters", help="fleiss/icc：评分者列名，逗号分隔（≥2 列）")
+    pirr.add_argument("--raters", help="fleiss/icc/krippendorff：评分者列名，逗号分隔（≥2 列）")
     pirr.add_argument("--weights", choices=["linear", "quadratic"],
                       help="kappa：有序加权方案（默认名义未加权）")
+    pirr.add_argument("--metric", choices=["nominal", "ordinal", "interval", "ratio"],
+                      default="nominal",
+                      help="krippendorff：差异函数/测量层级（默认 nominal）")
+    pirr.add_argument("--n-boot", dest="n_boot", type=int, default=2000,
+                      help="krippendorff：自助法 CI 重抽样次数（默认 2000，0 关闭）")
     pirr.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
     pirr.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     pirr.add_argument("--json", action="store_true", help="输出机器可读 JSON")
