@@ -705,6 +705,20 @@ def cmd_negbin(args: argparse.Namespace) -> int:
     return negbin_cli(argv)
 
 
+def cmd_ordinal(args: argparse.Namespace) -> int:
+    from psyclaw.psych.ordinal import ordinal_cli
+    argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "no_po_check", False):
+        argv += ["--no-po-check"]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return ordinal_cli(argv)
+
+
 def cmd_anova(args: argparse.Namespace) -> int:
     from psyclaw.psych.anova import anova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group]
@@ -1655,6 +1669,24 @@ def build_parser() -> argparse.ArgumentParser:
                          help="sidecar 输出目录（写 negbin_report.{md,json}）")
     pnegbin.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
     pnegbin.set_defaults(func=cmd_negbin)
+
+    pordinal = sub.add_parser(
+        "ordinal",
+        help="有序 Logistic 回归（比例优势/累积 logit；OR/Wald/LR/比例优势诊断；APA-7）",
+    )
+    pordinal.add_argument("csv", help="输入数据 CSV 路径")
+    pordinal.add_argument("--dv",    required=True,
+                          help="有序因变量列名（≥3 个有序类别）")
+    pordinal.add_argument("--iv",    required=True,
+                          help="预测变量列名，逗号分隔（如 age,sex,score）")
+    pordinal.add_argument("--alpha", type=float, default=0.05,
+                          help="显著性水平（默认 .05）")
+    pordinal.add_argument("--no-po-check", action="store_true", dest="no_po_check",
+                          help="跳过比例优势假设诊断")
+    pordinal.add_argument("--out",   default=None,
+                          help="sidecar 输出目录（写 ordinal_report.{md,json}）")
+    pordinal.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
+    pordinal.set_defaults(func=cmd_ordinal)
 
     pefa = sub.add_parser(
         "efa",

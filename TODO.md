@@ -264,6 +264,19 @@
 
 ---
 
+## P20 · 统计纵深扩展 XV（自我扩展）
+
+> **动机**：心理学结局极常见**有序分类**（Likert 单题、严重度分级、同意程度 1–5）。
+> `evidence.json` 已引 Liddell & Kruschke (2018) 主张有序数据应按有序模型分析，
+> `decision_tree.py` 也把 Likert 单题标为有序，但此前**无有序回归模型**——
+> 只能误用 OLS（违反等距假设、可预测出界值）或塌缩为二元 Logistic（丢信息）。
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P20-1 | 有序 Logistic 回归（比例优势 / 累积 logit 模型） | **已落地** `psyclaw/psych/ordinal.py`（stdlib only，与 `logistic.py` 同构，复用其矩阵/分布工具）：`ordinal_regression`——McCullagh (1980) 比例优势模型 logit(P(Y≤j))=θ_j−β′x（J−1 个有序阈值 θ + 共享斜率 β）；**阻尼 Newton-Raphson**（解析梯度 + 中心差分数值 Hessian，step-halving 保证 ll 单调上升）；起始阈值=经验累积比例 logit；观测信息阵求逆 → 阈值/β 的 SE；Wald *z*/*p*/比例优势比 OR=exp(β)/95% CI；零模型（仅阈值）对数似然 + LR χ² 检验（df=k）；McFadden/Cox-Snell/Nagelkerke 伪 *R*²；AIC/BIC；阈值有序性校验；**比例优势假设诊断** `proportional_odds_check`（对 J−1 个二分切点各拟合二元 Logistic，复用 `logistic.logistic_regression`，比较各切点斜率离散度——Brant 思路）；`format_apa_ordinal`（APA-7 三线系数表 *B*/SE/*z*/*p*/OR/95%CI + 阈值段 + 模型拟合段 + 比例优势诊断段 + 显著预测变量文字）；`write_ordinal_report` MD+JSON sidecar（NaN/inf→null）；`analyze_ordinal` CSV 主入口（有序标签→1..J 映射 + 缺失排除 + n_excluded + ≥3 类校验）；`ordinal_cli`；`psyclaw ordinal <data.csv> --dv <col> --iv col1,col2,... [--alpha .05] [--no-po-check] [--json] [--out]`；CLI 注册 `cli.py`。理论依据：McCullagh (1980)；Agresti (2010) Analysis of Ordinal Categorical Data；Liddell & Kruschke (2018)。测试 `tests/test_ordinal.py`（≥45 例）。 | `tests/test_ordinal.py` ≥40例，仅阈值模型 θ_j=logit(累积比例) 误差<1e-5，J=2 退化时 β=二元 Logistic 斜率/θ₁=−二元截距 误差<1e-3，预测各类概率和=1，OR=exp(B) 精确，单调预测变量 β 显著为正，LR χ²≥0，伪 R²∈[0,1] |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
