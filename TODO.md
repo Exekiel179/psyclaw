@@ -26,6 +26,17 @@
 
 ---
 
+## P0.5 · Bug / 体验修复（2026-06-15 实跑发现）
+
+| # | 任务 | 说明 | 验收 | 文件 |
+|---|------|------|------|------|
+| 📋 BUG-1 | `--help` 崩溃 | `python -m psyclaw --help`（及涉及该命令的子命令 help）抛 `ValueError: unsupported format character 'C' (0x43)`——某命令的 help 文本里有未转义的 `%`（如 `%C`），argparse 用 `%` 做插值时崩。先前 `72f3392` 已转义部分 `%%` 但仍有残留。 | 全部 `--help` 与各子命令 `-h` 都能正常输出；新增 `tests/test_cli_help.py` 遍历所有 subparser 调 `format_help()` 均不抛错（防回归） | `psyclaw/cli.py` |
+| 📋 UX-1 | REPL 方向键/历史失效 | 兜底 `input()` 路径未 `import readline`：非 TTY 或终端兼容降级时，方向键漏出 `[B`/`[A`，且无行内编辑、无 ↑↓ 历史。 | `ui_input.read_line` 兜底前 `import readline`（stdlib，缺失 try/except 静默降级）；方向键移动光标、↑↓ 翻历史、Ctrl-A/E 可用 | `psyclaw/ui_input.py` |
+
+> 注：`nostop.sh` 在 macOS 自带 bash 3.2 + `set -u` 下失败分支崩溃的问题已在 `bf1b1c5` 修复（去 `set -u`、紧跟管道取退出码、MAX_TURNS 80→150），此处不再列。
+
+---
+
 ## P1 · 心理学专业纵深（📋 待实现）
 
 ### 1. 测量层（`psyclaw/psych/`）
@@ -197,6 +208,14 @@
 | # | 任务 | 说明 | 验收 |
 |---|------|------|------|
 | ✅ P13-1 | 混合 ANOVA（between × within） | **已落地** `psyclaw/psych/mixed_anova.py`：一个被试间因素 × 一个被试内因素 Split-plot ANOVA；标准 SS 分解（SS_A/SS_S(A)/SS_B/SS_AB/SS_BS(A)）+ 可加性验证；F_A=MS_A/MS_S(A)，F_B=F_AB=MS/MS_BS(A)；Mauchly 球形检验（W/χ²/p）+ GG/HF ε 校正（被试内及交互效应 df）；partial η²（Lakens 2013）+ partial ω²（Olejnik & Algina 2003）；`simple_effects_within`（各 between 水平上被试内简单主效应，配对 t + Holm 校正）；`format_apa_mixed`（单元格均值表 / Mauchly 段 / ANOVA 汇总表 / APA-7 文字段落 / 参考文献）；`write_mixed_report` MD+JSON sidecar（NaN/inf→null）；`analyze_mixed` CSV 主入口（完整案例筛选 + 非均衡警告）；`psyclaw mixed-anova <data.csv> --dv <col> --between <col> --within <col> --subject <col> [--post-hoc] [--alpha] [--json] [--out]`；CLI 注册 `cli.py`；stdlib only。理论依据：Kirk (2013)；Maxwell et al. (2017)；Olejnik & Algina (2003)；Greenhouse & Geisser (1959)；Huynh & Feldt (1976)。测试 `tests/test_mixed_anova.py`（70 例）。 | `tests/test_mixed_anova.py` ≥50例，SS 加和等于 SS_total，df 公式正确，手算已知值误差<1e-8 |
+
+---
+
+## P14 · 统计纵深扩展 IX（自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P14-1 | 偏相关 / 半偏相关 / 偏相关矩阵 | **已落地** `psyclaw/psych/partial_corr.py`：回归残差法偏相关 `r_xy.controls`（OLS 残差 → Pearson r，控制任意个协变量，k=0 退化为 Pearson）；半偏相关 `semipartial_correlation`（仅对 x 或 y 去除控制影响，which=x/y）；偏相关矩阵 `partial_correlation_matrix`（同一协变量集对所有变量对，上三角对称填充，对角 r=1）；统计：t=r√df/√(1−r²)、双尾 p（不完全 Beta）、df=n−2−k、Fisher z 95% CI（SE=1/√(n−k−3)，Olkin & Finn 1995）；矩阵奇异（多重共线）报错；`format_apa_partial_corr`（文字段落 + 汇总表 + 参考文献）/ `format_apa_partial_matrix`（三线表 *** /** /* 显著性标注）；`write_partial_corr_report` MD+JSON sidecar（NaN/inf→null）；`analyze_partial_corr` CSV 主入口（缺失行排除 + n_excluded + 可选矩阵）；`psyclaw partial-corr <data.csv> --x <col> --y <col> [--controls c1,c2] [--semi] [--which x\|y] [--matrix c1,c2,...] [--alpha] [--json] [--out]`；CLI 注册 `cli.py`；stdlib only。理论依据：Cohen, Cohen, West & Aiken (2003)；Olkin & Finn (1995)。测试 `tests/test_partial_corr.py`（55 例）。 | `tests/test_partial_corr.py` ≥40例，k=0 等于 Pearson r，代数公式 r_xy.z 误差<1e-5，df=n−2−k，CI 含 r，奇异矩阵报错 |
 
 ---
 
