@@ -693,6 +693,18 @@ def cmd_poisson(args: argparse.Namespace) -> int:
     return poisson_cli(argv)
 
 
+def cmd_negbin(args: argparse.Namespace) -> int:
+    from psyclaw.psych.negbin import negbin_cli
+    argv = [args.csv, "--dv", args.dv, "--iv", args.iv]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", None):
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return negbin_cli(argv)
+
+
 def cmd_anova(args: argparse.Namespace) -> int:
     from psyclaw.psych.anova import anova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group]
@@ -1627,6 +1639,22 @@ def build_parser() -> argparse.ArgumentParser:
                           help="sidecar 输出目录（写 poisson_report.{md,json}）")
     ppoisson.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
     ppoisson.set_defaults(func=cmd_poisson)
+
+    pnegbin = sub.add_parser(
+        "negbin",
+        help="负二项回归（NB2，过度离散计数；IRR/Wald/泊松-NB 边界检验；APA-7）",
+    )
+    pnegbin.add_argument("csv", help="输入数据 CSV 路径")
+    pnegbin.add_argument("--dv",    required=True,
+                         help="因变量列名（非负整数计数）")
+    pnegbin.add_argument("--iv",    required=True,
+                         help="预测变量列名，逗号分隔（如 age,sex,score）")
+    pnegbin.add_argument("--alpha", type=float, default=0.05,
+                         help="显著性水平（默认 .05）")
+    pnegbin.add_argument("--out",   default=None,
+                         help="sidecar 输出目录（写 negbin_report.{md,json}）")
+    pnegbin.add_argument("--json",  action="store_true", help="输出机器可读 JSON")
+    pnegbin.set_defaults(func=cmd_negbin)
 
     pefa = sub.add_parser(
         "efa",
