@@ -306,6 +306,20 @@
 
 ---
 
+## P23 · 统计纵深扩展 XVIII（自我扩展）
+
+> **动机**：非参数套件（`nonparametric.py`）已有 Mann-Whitney U（两独立样本）、Wilcoxon
+> signed-rank（配对两条件）、Kruskal-Wallis H（多独立组）、Spearman ρ，但缺**重复测量
+> 单因素 ANOVA 的非参数替代**——Friedman 检验。心理学重复测量/被试内设计极常见（同一批
+> 被试在 3+ 条件/时点的有序或偏态评分），正态/球形性不满足时（小样本、Likert、强偏态）
+> RM-ANOVA 不适用，此前只能误用（塌缩为多次 Wilcoxon 两两比较，丢失整体检验且不控 FWER）。
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P23-1 | Friedman 检验（重复测量单因素 ANOVA 非参数替代） | **已落地** `psyclaw/psych/nonparametric.py` 扩展（stdlib only，与既有 KW/Wilcoxon 同模块同构）：`friedman_test(conditions, post_hoc=False)`——逐被试在 k 个相关条件间赋秩（升序，同值取平均秩），采用 Conover (1999) 对同值稳健的统计量 χ²_F=(k−1)(Σ R_j²−n·C1)/(A1−C1)（C1=n·k(k+1)²/4，A1=ΣΣ R_ij²；无同值时代数化简退化为标准 Friedman χ²，已证）；Kendall's *W*=χ²_F/(n(k−1))∈[0,1] 效应量；df=k−1 → χ² 生存函数 p；完全同值（无秩变异）退化分支返回 χ²=0/p=1/W=0。**Conover 事后两两比较** `_friedman_post_hoc`（t=(R_i−R_j)/√(2(n·A1−ΣR_j²)/((n−1)(k−1)))，df=(n−1)(k−1)，`_holm_adjust` Holm 校正）。`_interpret_w`（强/中/弱/微弱一致性）；`format_apa_nonpar` 新增 Friedman 分支（*χ*²(df, N) + Kendall's *W* + 言语标签）；`write_nonpar_report` 渲染各条件描述统计表（中位数/平均秩/秩和）+ 事后比较表；`analyze_nonpar` 新增 `friedman` 路由（CSV 宽表 `--conditions c1,c2,c3,...` 完整案例筛选 + n_excluded，`--dv` 改为非 friedman 检验必需）；CLI `psyclaw nonpar <data.csv> --test friedman --conditions c1,c2,c3 [--post-hoc] [--alpha] [--json] [--out]`（`cli.py` `cmd_nonpar` + `pnonpar` 子解析器扩展，新增 `--conditions`/`--post-hoc`，`--dv` 放宽为可选）。理论依据：Friedman (1937)；Conover (1999) Practical Nonparametric Statistics (3rd ed.)；Kendall & Babington Smith (1939)。测试 `tests/test_nonparametric.py` 新增约 30 例。 | `tests/test_nonparametric.py` 新增 ≥25例，完美一致（4 被试 3 条件严格分离）χ²=8/W=1/p=e⁻⁴、拉丁方无效应 χ²=0/W=0/p=1、部分同值手算金标准 χ²=3.7143/W=0.9286、恒等式 χ²=n(k−1)W、完全同值退化、k<3/n<2/列不等长报错、Conover 事后 t 手算（A vs C t≈−4.9497）+ Holm 单调、CSV 入口完整案例排除、W≤1 恒成立 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。

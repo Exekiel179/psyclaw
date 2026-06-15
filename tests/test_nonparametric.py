@@ -22,10 +22,13 @@ from psyclaw.psych.nonparametric import (
     mann_whitney_u,
     wilcoxon_signed_rank,
     kruskal_wallis,
+    friedman_test,
     spearman_rho,
     format_apa_nonpar,
     write_nonpar_report,
     analyze_nonpar,
+    _holm_adjust,
+    _interpret_w,
 )
 
 
@@ -481,6 +484,342 @@ def test_analyze_unknown_test():
             assert False
         except ValueError:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Friedman 检验（重复测量单因素 ANOVA 的非参数替代）
+# ---------------------------------------------------------------------------
+
+def _friedman_perfect():
+    """4 名被试在 3 条件上完全一致排序 A>B>C → χ²=8, W=1。"""
+    return {
+        "A": [10.0, 10.0, 10.0, 10.0],
+        "B": [8.0, 8.0, 8.0, 8.0],
+        "C": [5.0, 5.0, 5.0, 5.0],
+    }
+
+
+def test_friedman_perfect_concordance_chi2():
+    r = friedman_test(_friedman_perfect())
+    assert abs(r["chi2"] - 8.0) < 1e-9
+
+
+def test_friedman_perfect_concordance_W():
+    r = friedman_test(_friedman_perfect())
+    assert abs(r["W"] - 1.0) < 1e-9
+
+
+def test_friedman_perfect_concordance_p():
+    # p = chi2_sf(8, 2) = exp(-4) ≈ 0.018316
+    r = friedman_test(_friedman_perfect())
+    assert abs(r["p"] - math.exp(-4.0)) < 1e-4
+
+
+def test_friedman_perfect_significant():
+    r = friedman_test(_friedman_perfect(), alpha=0.05)
+    assert r["significant"] is True
+
+
+def test_friedman_df_correct():
+    r = friedman_test(_friedman_perfect())
+    assert r["df"] == 2  # k - 1
+
+
+def test_friedman_no_effect_latin_square():
+    # 拉丁方：各条件秩和相等 → χ²=0, W=0, p=1
+    conds = {
+        "A": [1.0, 2.0, 3.0],
+        "B": [2.0, 3.0, 1.0],
+        "C": [3.0, 1.0, 2.0],
+    }
+    r = friedman_test(conds)
+    assert abs(r["chi2"]) < 1e-9
+    assert abs(r["W"]) < 1e-9
+    assert abs(r["p"] - 1.0) < 1e-9
+    assert r["significant"] is False
+
+
+def test_friedman_partial_ties_golden():
+    # n=2,k=3：行 [1,2,3] 与 [1,1,2]（前两值同值）
+    # R=[2.5,3.5,6], A1=27.5, C1=24 → χ²=2·(54.5−48)/3.5=3.714286
+    conds = {
+        "A": [1.0, 1.0],
+        "B": [2.0, 1.0],
+        "C": [3.0, 2.0],
+    }
+    r = friedman_test(conds)
+    assert abs(r["chi2"] - 3.714286) < 1e-4
+    # W = χ²/(n(k-1)) = 3.714286/4 = 0.928571
+    assert abs(r["W"] - 0.928571) < 1e-4
+    # p = exp(-3.714286/2) ≈ 0.15613
+    assert abs(r["p"] - 0.15613) < 1e-3
+
+
+def test_friedman_W_in_range():
+    r = friedman_test(_friedman_perfect())
+    assert 0.0 <= r["W"] <= 1.0
+
+
+def test_friedman_chi2_nonnegative():
+    conds = {
+        "A": [3.0, 1.0, 4.0, 1.0, 5.0],
+        "B": [2.0, 7.0, 1.0, 8.0, 2.0],
+        "C": [8.0, 1.0, 8.0, 2.0, 8.0],
+    }
+    r = friedman_test(conds)
+    assert r["chi2"] >= 0.0
+    assert 0.0 <= r["p"] <= 1.0
+
+
+def test_friedman_all_tied_degenerate():
+    # 每名被试在所有条件上完全同值 → 无秩变异 → χ²=0, p=1
+    conds = {
+        "A": [5.0, 3.0],
+        "B": [5.0, 3.0],
+        "C": [5.0, 3.0],
+    }
+    r = friedman_test(conds)
+    assert abs(r["chi2"]) < 1e-9
+    assert abs(r["p"] - 1.0) < 1e-9
+    assert abs(r["W"]) < 1e-9
+
+
+def test_friedman_chi2_equals_n_k_minus_1_times_W():
+    # 恒等式 χ² = n(k-1)·W
+    conds = {
+        "A": [3.0, 1.0, 4.0, 1.0, 5.0],
+        "B": [2.0, 7.0, 1.0, 8.0, 2.0],
+        "C": [8.0, 1.0, 8.0, 2.0, 9.0],
+    }
+    r = friedman_test(conds)
+    assert abs(r["chi2"] - r["n"] * (r["k"] - 1) * r["W"]) < 1e-3
+
+
+def test_friedman_too_few_conditions():
+    try:
+        friedman_test({"A": [1.0, 2.0], "B": [2.0, 3.0]})
+        assert False, "应抛出 ValueError（k<3）"
+    except ValueError:
+        pass
+
+
+def test_friedman_unequal_lengths():
+    try:
+        friedman_test({"A": [1.0, 2.0], "B": [2.0, 3.0], "C": [1.0]})
+        assert False, "应抛出 ValueError（列不等长）"
+    except ValueError:
+        pass
+
+
+def test_friedman_too_few_subjects():
+    try:
+        friedman_test({"A": [1.0], "B": [2.0], "C": [3.0]})
+        assert False, "应抛出 ValueError（n<2）"
+    except ValueError:
+        pass
+
+
+def test_friedman_condition_stats():
+    r = friedman_test(_friedman_perfect())
+    assert len(r["condition_stats"]) == 3
+    names = {c["name"] for c in r["condition_stats"]}
+    assert names == {"A", "B", "C"}
+    # A 始终最高 → 平均秩最高（升序赋秩，最大值=最高秩）
+    by_name = {c["name"]: c["mean_rank"] for c in r["condition_stats"]}
+    assert by_name["A"] == 3.0
+    assert by_name["B"] == 2.0
+    assert by_name["C"] == 1.0
+
+
+def test_friedman_rank_sums_sum_correct():
+    # 每名被试的秩和恒为 k(k+1)/2，全体秩和 = n·k(k+1)/2
+    r = friedman_test(_friedman_perfect())
+    total = sum(c["rank_sum"] for c in r["condition_stats"])
+    n, k = r["n"], r["k"]
+    assert abs(total - n * k * (k + 1) / 2.0) < 1e-9
+
+
+def test_friedman_post_hoc_present():
+    r = friedman_test(_friedman_perfect(), post_hoc=True)
+    assert "post_hoc" in r
+    assert len(r["post_hoc"]) == 3  # C(3,2)
+
+
+def test_friedman_post_hoc_absent_by_default():
+    r = friedman_test(_friedman_perfect())
+    assert "post_hoc" not in r
+
+
+def test_friedman_post_hoc_fields():
+    conds = {
+        "A": [1.0, 1.0],
+        "B": [2.0, 1.0],
+        "C": [3.0, 2.0],
+    }
+    r = friedman_test(conds, post_hoc=True)
+    ph = r["post_hoc"][0]
+    for key in ("cond1", "cond2", "rank_diff", "t", "df", "p_raw", "p_holm", "significant"):
+        assert key in ph
+    # df = (n-1)(k-1) = 1·2 = 2
+    assert ph["df"] == 2
+
+
+def test_friedman_post_hoc_t_arithmetic():
+    # n=2,k=3 部分同值：R=[2.5,3.5,6], A1=27.5, sum_R2=54.5
+    # var = 2·(2·27.5−54.5)/2 = 0.5, se=√0.5; A vs C: diff=-3.5 → t=-3.5/√0.5≈-4.9497
+    conds = {
+        "A": [1.0, 1.0],
+        "B": [2.0, 1.0],
+        "C": [3.0, 2.0],
+    }
+    r = friedman_test(conds, post_hoc=True)
+    ac = [p for p in r["post_hoc"] if {p["cond1"], p["cond2"]} == {"A", "C"}][0]
+    assert abs(abs(ac["t"]) - 4.94975) < 1e-3
+    assert abs(abs(ac["rank_diff"]) - 3.5) < 1e-9
+
+
+def test_friedman_post_hoc_holm_ge_raw():
+    conds = {
+        "A": [3.0, 1.0, 4.0, 1.0, 5.0],
+        "B": [5.0, 7.0, 6.0, 8.0, 7.0],
+        "C": [9.0, 8.0, 9.0, 9.0, 8.0],
+    }
+    r = friedman_test(conds, post_hoc=True)
+    for ph in r["post_hoc"]:
+        assert ph["p_holm"] >= ph["p_raw"] - 1e-9
+        assert 0.0 <= ph["p_holm"] <= 1.0
+
+
+def test_holm_adjust_monotone_and_bounds():
+    adj = _holm_adjust([0.01, 0.02, 0.03])
+    assert adj == sorted(adj)  # 单调非降（输入已升序）
+    for a in adj:
+        assert 0.0 <= a <= 1.0
+    # m=3：第一个校正 = min(3·0.01,1)=0.03
+    assert abs(adj[0] - 0.03) < 1e-12
+
+
+def test_holm_adjust_empty():
+    assert _holm_adjust([]) == []
+
+
+def test_interpret_w_labels():
+    assert _interpret_w(0.6) == "强一致性"
+    assert _interpret_w(0.4) == "中等一致性"
+    assert _interpret_w(0.2) == "弱一致性"
+    assert _interpret_w(0.05) == "微弱一致性"
+
+
+def test_friedman_apa_format():
+    r = friedman_test(_friedman_perfect())
+    txt = format_apa_nonpar(r)
+    assert "Friedman" in txt
+    assert "χ" in txt
+    assert "Kendall" in txt
+    assert "W" in txt
+
+
+def test_friedman_write_report():
+    r = friedman_test(_friedman_perfect(), post_hoc=True)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        md_path, json_path = write_nonpar_report(r, out_dir=tmpdir, filename="fried")
+        assert md_path.exists()
+        assert json_path.exists()
+        text = md_path.read_text(encoding="utf-8")
+        assert "各条件描述统计" in text
+        assert "事后两两比较" in text
+        loaded = json.loads(json_path.read_text(encoding="utf-8"))
+        assert loaded["test"] == "Friedman"
+
+
+def test_analyze_friedman_csv():
+    # 宽表：每行一名被试，三个条件列
+    rows = [
+        {"t1": "10", "t2": "8", "t3": "5"},
+        {"t1": "12", "t2": "9", "t3": "6"},
+        {"t1": "11", "t2": "7", "t3": "4"},
+        {"t1": "13", "t2": "10", "t3": "5"},
+    ]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csv_path = os.path.join(tmpdir, "data.csv")
+        _make_csv(rows, csv_path)
+        result = analyze_nonpar(csv_path, test="friedman",
+                                conditions="t1,t2,t3", write_files=False)
+        assert result["test"] == "Friedman"
+        # 三条件严格分离 → 完美一致 → χ²=8, W=1
+        assert abs(result["chi2"] - 8.0) < 1e-9
+        assert abs(result["W"] - 1.0) < 1e-9
+        assert result["n"] == 4
+        assert result["n_excluded"] == 0
+
+
+def test_analyze_friedman_excludes_incomplete_rows():
+    rows = [
+        {"t1": "10", "t2": "8", "t3": "5"},
+        {"t1": "12", "t2": "", "t3": "6"},      # 缺失 → 排除
+        {"t1": "11", "t2": "7", "t3": "4"},
+        {"t1": "x", "t2": "10", "t3": "5"},     # 非数值 → 排除
+    ]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csv_path = os.path.join(tmpdir, "data.csv")
+        _make_csv(rows, csv_path)
+        result = analyze_nonpar(csv_path, test="friedman",
+                                conditions="t1,t2,t3", write_files=False)
+        assert result["n"] == 2
+        assert result["n_excluded"] == 2
+
+
+def test_analyze_friedman_requires_conditions():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csv_path = os.path.join(tmpdir, "data.csv")
+        _make_csv([{"t1": "1", "t2": "2", "t3": "3"}], csv_path)
+        try:
+            analyze_nonpar(csv_path, test="friedman", write_files=False)
+            assert False, "应抛出 ValueError（缺少 conditions）"
+        except ValueError:
+            pass
+
+
+def test_analyze_friedman_too_few_condition_cols():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csv_path = os.path.join(tmpdir, "data.csv")
+        _make_csv([{"t1": "1", "t2": "2"}], csv_path)
+        try:
+            analyze_nonpar(csv_path, test="friedman",
+                           conditions="t1,t2", write_files=False)
+            assert False, "应抛出 ValueError（<3 条件）"
+        except ValueError:
+            pass
+
+
+def test_analyze_non_friedman_requires_dv():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csv_path = os.path.join(tmpdir, "data.csv")
+        _make_csv([{"x": "1", "g": "A"}], csv_path)
+        try:
+            analyze_nonpar(csv_path, test="kruskal", group_col="g",
+                           write_files=False)
+            assert False, "应抛出 ValueError（缺少 dv）"
+        except ValueError:
+            pass
+
+
+def test_analyze_friedman_post_hoc_via_csv():
+    rows = [
+        {"t1": "3", "t2": "5", "t3": "9"},
+        {"t1": "1", "t2": "7", "t3": "8"},
+        {"t1": "4", "t2": "6", "t3": "9"},
+        {"t1": "1", "t2": "8", "t3": "9"},
+        {"t1": "5", "t2": "7", "t3": "8"},
+    ]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csv_path = os.path.join(tmpdir, "data.csv")
+        _make_csv(rows, csv_path)
+        result = analyze_nonpar(csv_path, test="friedman",
+                                conditions="t1,t2,t3", post_hoc=True,
+                                write_files=False)
+        assert "post_hoc" in result
+        assert len(result["post_hoc"]) == 3
 
 
 # ---------------------------------------------------------------------------

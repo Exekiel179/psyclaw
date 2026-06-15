@@ -921,11 +921,17 @@ def cmd_anova2(args: argparse.Namespace) -> int:
 
 def cmd_nonpar(args: argparse.Namespace) -> int:
     from psyclaw.psych.nonparametric import nonpar_cli
-    argv = [args.csv, "--test", args.test, "--dv", args.dv]
+    argv = [args.csv, "--test", args.test]
+    if getattr(args, "dv", None):
+        argv += ["--dv", args.dv]
     if getattr(args, "group_col", None):
         argv += ["--group", args.group_col]
     if getattr(args, "y_col", None):
         argv += ["--y", args.y_col]
+    if getattr(args, "conditions", None):
+        argv += ["--conditions", args.conditions]
+    if getattr(args, "post_hoc", False):
+        argv += ["--post-hoc"]
     if getattr(args, "alpha", 0.05) != 0.05:
         argv += ["--alpha", str(args.alpha)]
     if getattr(args, "out", "notes") != "notes":
@@ -1618,20 +1624,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     pnonpar = sub.add_parser(
         "nonpar",
-        help="非参数检验：Mann-Whitney U / Wilcoxon / Kruskal-Wallis / Spearman ρ",
+        help="非参数检验：Mann-Whitney U / Wilcoxon / Kruskal-Wallis / Friedman / Spearman ρ",
     )
     pnonpar.add_argument("csv", help="输入数据 CSV 路径")
     pnonpar.add_argument(
         "--test",
         required=True,
-        choices=["mwu", "wilcoxon", "kruskal", "spearman"],
-        help="检验类型：mwu | wilcoxon | kruskal | spearman",
+        choices=["mwu", "wilcoxon", "kruskal", "spearman", "friedman"],
+        help="检验类型：mwu | wilcoxon | kruskal | spearman | friedman",
     )
-    pnonpar.add_argument("--dv", required=True, help="因变量列名（或第一变量）")
+    pnonpar.add_argument("--dv", default=None,
+                         help="因变量列名（或第一变量；friedman 用 --conditions）")
     pnonpar.add_argument("--group", dest="group_col", default=None,
                          help="分组列名（mwu/kruskal 必需）")
     pnonpar.add_argument("--y", dest="y_col", default=None,
                          help="第二变量列名（wilcoxon/spearman 必需）")
+    pnonpar.add_argument("--conditions", default=None,
+                         help="重复测量条件列名，逗号分隔（friedman 必需，≥3 列）")
+    pnonpar.add_argument("--post-hoc", dest="post_hoc", action="store_true",
+                         help="friedman 显著后做 Conover 事后两两比较（Holm 校正）")
     pnonpar.add_argument("--alpha", type=float, default=0.05,
                          help="显著性水平（默认 .05）")
     pnonpar.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
