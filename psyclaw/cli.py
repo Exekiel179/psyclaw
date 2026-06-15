@@ -761,6 +761,26 @@ def cmd_partial_corr(args: argparse.Namespace) -> int:
     return partial_corr_cli(argv)
 
 
+def cmd_irr(args: argparse.Namespace) -> int:
+    from psyclaw.psych.irr import irr_cli
+    argv = [args.csv, "--method", args.method]
+    if getattr(args, "rater_a", None):
+        argv += ["--rater-a", args.rater_a]
+    if getattr(args, "rater_b", None):
+        argv += ["--rater-b", args.rater_b]
+    if getattr(args, "raters", None):
+        argv += ["--raters", args.raters]
+    if getattr(args, "weights", None):
+        argv += ["--weights", args.weights]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return irr_cli(argv)
+
+
 def cmd_ancova(args: argparse.Namespace) -> int:
     from psyclaw.psych.ancova import ancova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group, "--cov", args.cov]
@@ -1693,6 +1713,26 @@ def build_parser() -> argparse.ArgumentParser:
                           help="报告输出目录（默认 notes/）")
     ppartial.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     ppartial.set_defaults(func=cmd_partial_corr)
+
+    pirr = sub.add_parser(
+        "irr",
+        help=(
+            "评分者间信度（stdlib only）：Cohen's κ（含线性/二次加权）/ "
+            "Fleiss' κ（多评分者）/ ICC 六模型（Shrout & Fleiss 1979）/ APA-7 报告"
+        ),
+    )
+    pirr.add_argument("csv", help="输入数据 CSV 路径")
+    pirr.add_argument("--method", required=True, choices=["kappa", "fleiss", "icc"],
+                      help="kappa(两评分者) | fleiss(多评分者名义) | icc(连续评分)")
+    pirr.add_argument("--rater-a", dest="rater_a", help="kappa：评分者 A 列名")
+    pirr.add_argument("--rater-b", dest="rater_b", help="kappa：评分者 B 列名")
+    pirr.add_argument("--raters", help="fleiss/icc：评分者列名，逗号分隔（≥2 列）")
+    pirr.add_argument("--weights", choices=["linear", "quadratic"],
+                      help="kappa：有序加权方案（默认名义未加权）")
+    pirr.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
+    pirr.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    pirr.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pirr.set_defaults(func=cmd_irr)
 
     pcfa = sub.add_parser(
         "cfa",
