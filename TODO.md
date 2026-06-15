@@ -31,7 +31,7 @@
 | # | 任务 | 说明 | 验收 | 文件 |
 |---|------|------|------|------|
 | ✅ BUG-1 | `--help` 崩溃 | **已修复** `psyclaw/cli.py`：`partial-corr`（行 1794）与 `roc`（行 1839）的 subparser `help=` 文本含裸 `95% CI` → argparse 把 `% C` 当 `%C` 格式符，顶层 `--help` 展开短 help 时崩 `ValueError: unsupported format character 'C'`。两处转义为 `95%% CI`（与已转义的行 1497 一致）。新增 `tests/test_cli_help.py`（约 8 例）：遍历所有 subparser 调 `format_help()`/`format_usage()` 不抛错 + 直接断言无裸 `%`（`h.replace("%%","").count("%")==0`）防回归。 | `psyclaw/cli.py` |
-| 📋 UX-1 | REPL 方向键/历史失效 | 兜底 `input()` 路径未 `import readline`：非 TTY 或终端兼容降级时，方向键漏出 `[B`/`[A`，且无行内编辑、无 ↑↓ 历史。 | `ui_input.read_line` 兜底前 `import readline`（stdlib，缺失 try/except 静默降级）；方向键移动光标、↑↓ 翻历史、Ctrl-A/E 可用 | `psyclaw/ui_input.py` |
+| ✅ UX-1 | REPL 方向键/历史失效 | **已修复** `psyclaw/ui_input.py`：新增 `_fallback_input(prompt)`——裸 `input()` 兜底前惰性 `import readline`（POSIX stdlib，导入一次即全局挂接 `builtins.input`，方向键移动光标 + ↑↓ 翻会话历史 + Ctrl-A/E/K 键位生效），结果缓存 `_readline_ready`（None/True/False 三态，不重复 import）；无 readline（Windows 等）或任何异常 try/except 静默降级为纯 `input()`，绝不阻断脚本化调用。`read_line` 两处裸 `input(prompt).strip()`（非 TTY 路径 + 交互降级路径）均改走 `_fallback_input`。新增 `tests/test_repl_ptk.py::TestFallbackReadline`（7 例）：惰性 import 仅一次 / strip / 缺失 readline 降级 / 缓存 False 不重试 / 非 TTY 与交互异常两路均路由经 `_fallback_input`。 | `psyclaw/ui_input.py` |
 
 > 注：`nostop.sh` 在 macOS 自带 bash 3.2 + `set -u` 下失败分支崩溃的问题已在 `bf1b1c5` 修复（去 `set -u`、紧跟管道取退出码、MAX_TURNS 80→150），此处不再列。
 

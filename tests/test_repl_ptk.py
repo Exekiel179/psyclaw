@@ -262,6 +262,115 @@ class TestReadLineNonTty:
 
 
 # ===========================================================================
+# UX-1 — 兜底 input() 前 import readline（方向键/历史）
+# ===========================================================================
+
+class TestFallbackReadline:
+
+    def _reset(self):
+        # 每例重置惰性挂接标志，避免跨例污染
+        uin._readline_ready = None
+
+    def test_fallback_input_imports_readline_once(self):
+        """首次调用 _fallback_input 应尝试 import readline 并缓存结果。"""
+        self._reset()
+        import_calls = []
+        real_import = __import__
+
+        def _spy_import(name, *a, **k):
+            if name == "readline":
+                import_calls.append(name)
+            return real_import(name, *a, **k)
+
+        with patch("builtins.__import__", side_effect=_spy_import), \
+             patch("builtins.input", return_value="x"):
+            uin._fallback_input("p> ")
+            uin._fallback_input("p> ")          # 第二次不应再 import
+
+        assert import_calls.count("readline") == 1
+        # POSIX 上 readline 应成功挂接
+        assert uin._readline_ready is True
+
+    def test_fallback_input_strips(self):
+        self._reset()
+        with patch("builtins.input", return_value="  hi  "):
+            assert uin._fallback_input("p> ") == "hi"
+
+    def test_fallback_survives_missing_readline(self):
+        """无 readline（Windows 等）：ImportError 被吞，仍返回 input() 结果。"""
+        self._reset()
+        real_import = __import__
+
+        def _no_readline(name, *a, **k):
+            if name == "readline":
+                raise ImportError("no readline on this platform")
+            return real_import(name, *a, **k)
+
+        with patch("builtins.__import__", side_effect=_no_readline), \
+             patch("builtins.input", return_value="ok"):
+            result = uin._fallback_input("p> ")
+
+        assert result == "ok"
+        assert uin._readline_ready is False     # 缓存为不可用，不再重试
+
+    def test_fallback_caches_unavailable(self):
+        """readline 不可用时缓存 False，后续不再尝试 import。"""
+        self._reset()
+        uin._readline_ready = False
+        import_calls = []
+        real_import = __import__
+
+        def _spy_import(name, *a, **k):
+            if name == "readline":
+                import_calls.append(name)
+            return real_import(name, *a, **k)
+
+        with patch("builtins.__import__", side_effect=_spy_import), \
+             patch("builtins.input", return_value="z"):
+            uin._fallback_input("p> ")
+
+        assert import_calls == []                # 已缓存 False，不再 import
+
+    def test_read_line_non_tty_routes_through_fallback(self):
+        """非 TTY 路径应走 _fallback_input（而非裸 input），确保 readline 生效。"""
+        self._reset()
+        called = []
+
+        def _spy(prompt):
+            called.append(prompt)
+            return "routed"
+
+        with patch.object(uin, "_fallback_input", _spy), \
+             patch("sys.stdin") as mock_stdin, \
+             patch("sys.stdout") as mock_stdout:
+            mock_stdin.isatty.return_value = False
+            mock_stdout.isatty.return_value = False
+            result = uin.read_line("np> ", _CMDS)
+
+        assert result == "routed"
+        assert called == ["np> "]
+
+    def test_read_line_interactive_error_routes_through_fallback(self):
+        """交互路径抛非中断异常时降级 _fallback_input。"""
+        self._reset()
+        called = []
+
+        with patch.object(uin, "_PTK_AVAILABLE", False), \
+             patch.object(uin, "_read_line_interactive",
+                          side_effect=RuntimeError("tty broken")), \
+             patch.object(uin, "_fallback_input",
+                          side_effect=lambda p: called.append(p) or "fb"), \
+             patch("sys.stdin") as mock_stdin, \
+             patch("sys.stdout") as mock_stdout:
+            mock_stdin.isatty.return_value = True
+            mock_stdout.isatty.return_value = True
+            result = uin.read_line("ip> ", _CMDS)
+
+        assert result == "fb"
+        assert called == ["ip> "]
+
+
+# ===========================================================================
 # 现有 REPL 命令不回归
 # ===========================================================================
 
@@ -310,6 +419,7 @@ if __name__ == "__main__":
         TestPtkAvailableFlag,
         TestReadLinePtkDispatch,
         TestReadLineNonTty,
+        TestFallbackReadline,
         TestReplImportNotBroken,
     ]
 
