@@ -335,6 +335,20 @@
 
 ---
 
+## P25 · 统计纵深扩展 XX（自我扩展）
+
+> **动机**：统计套件此前覆盖回归族、方差分析族、非参数、分类、信度、ROC，唯独缺
+> **时间到事件（time-to-event / survival）分析**。临床与纵向心理学极常见此类结局：
+> 治疗后到复发的时间、研究中到脱落（attrition）的时间、到首次发作/达标的时间。这类数据
+> 含**删失（censoring）**——被试在观察结束时仍未发生事件，或中途失访——普通 t 检验/
+> 回归无法正确处理删失，会丢弃或曲解信息。Kaplan-Meier 曲线 + Log-rank 检验填补此空白。
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P25-1 | 生存分析：Kaplan-Meier + Log-rank | **已落地** `psyclaw/psych/survival.py`（stdlib only，分布工具与 `chisquare.py`/`roc.py` 同款）：`kaplan_meier(times, events, alpha)`——乘积极限生存曲线 S(t)=Π(1−d_i/n_i)，删失（event=0）在其时间前一直计入风险集但不掉 S；**Greenwood (1926) 方差** Var[S]=S²·Σd_i/(n_i(n_i−d_i))；**complementary log-log 变换 95% CI**（保证界 ∈[0,1]，朴素 Greenwood CI 可能出界）；中位生存=使 S(t)≤0.5 的最小事件时间（重删失则「未达到」None）。`logrank_test(groups, alpha)`——Mantel-Haenszel Log-rank 比较 2+ 组：合并事件时间逐点算期望 e_ij=d_i·n_ij/n_i，(k−1) 维约化二次型 χ²=(O−E)'V⁻¹(O−E)，df=k−1；同分校正因子 c_i=d_i(n_i−d_i)/(n_i−1)（n_i=1 取 0）；k=2 退化为标量 (O₁−E₁)²/V，k>2 用 Gauss-Jordan 求逆协方差阵（奇异时回落 χ²=0）。`format_apa_survival`（KM/Log-rank 双分支 APA-7 段落 + 中位生存 + 末次生存概率 CI）；`write_survival_report` MD+JSON sidecar（KM 生存函数表 / Log-rank 各组 O/E 表 + 各组 KM 表，`_json_safe` 递归 NaN/inf→null）；`analyze_survival` CSV 主入口（`--time/--event` 单组 KM、加 `--group` 做 Log-rank；完整案例筛选 time≥0/event∈{0,1} + n_excluded，<2 有效分组报错）；`survival_cli`；`psyclaw survival <data.csv> --time <col> --event <col> [--group <col>] [--alpha] [--json] [--out]`（`cli.py` `cmd_survival` + `psurvival` 子解析器）。理论依据：Kaplan & Meier (1958)；Mantel (1966)；Peto & Peto (1972)；Greenwood (1926)；Collett (2015) Modelling Survival Data in Medical Research (3rd ed.)。测试 `tests/test_survival.py`（约 45 例）。 | `tests/test_survival.py` ≥40例，KM 无删失 [6,7,10,15,19,25]→S=5/6,4/6,1/2,1/3,1/6,0 手算精确/中位=10、含删失 [2,3,4,5,6]/[1,1,0,1,1]→S=.8,.6,.3,0/删失计入风险集 n_risk(t=3)=4、Greenwood SE₁=(5/6)√(1/30)、log-log CI∈[0,1]/S 单调不增、中位未达到 None、Log-rank A=[1,2,3] vs B=[4,5,6] 手算金标准 O_A=3/E_A=1.15/V_AA=0.6775/χ²=5.0517/p=0.0246、同分布两组 χ²=0/p=1、k=3 df=2、CSV 完整案例排除（空/非数 time + event=2→3 排除）、<2 组报错、CLI KM/Log-rank/JSON/坏文件 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。
