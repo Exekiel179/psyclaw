@@ -235,6 +235,14 @@
 
 ---
 
+## P17 · 统计纵深扩展 XII（自我扩展）
+
+| # | 任务 | 说明 | 验收 |
+|---|------|------|------|
+| ✅ P17-1 | 相关系数差异检验（比较两个 *r*） | **已落地** `psyclaw/psych/compare_corr.py`（stdlib only，填补「两个相关系数是否显著不同」空白——此前仅能各自检验 *r*≠0，无法比较 *r*₁ vs *r*₂）：`compare_independent_corrs`（两独立样本，Fisher *z* 检验 + Zou 2007 MOVER 差异 CI）；`compare_dependent_overlapping`（同一样本、共享一个变量，*r*_jk vs *r*_jh：Williams 1959 *t* 检验 df=*n*−3 + Zou 2007 重叠 CI，估计量相关 c 由 Olkin 公式）；`compare_dependent_nonoverlapping`（同一样本、四个不同变量，*r*_jk vs *r*_hm：Steiger 1980 / Dunn & Clark 1969 *Z* 检验 + Zou 2007 非重叠 CI，协方差六相关式）；Fisher *z* CI 工具 `_fisher_z_ci`；正态 CDF(erf)/双尾 p/Acklam 分位数 + 不完全 Beta *t* 分布；`interpret_compare`（差异方向 + 显著性叙述）；`format_apa_compare_corr`（APA-7 三类分支文字段落 + 汇总表 + 参考文献）；`write_compare_corr_report` MD+JSON sidecar（NaN/inf→null）；`analyze_compare_corr` CSV 主入口（独立=按 group 二分计算各组 *r*(x,y)；重叠=列 x/y/z 计算 *r*_xy vs *r*_xz；非重叠=四列计算 *r*_ab vs *r*_cd + 四交叉相关；缺失排除 + n_excluded）；`compare_corr_cli`（支持 CSV 与手填 *r* 双模式）；`psyclaw compare-corr --kind independent\|overlapping\|nonoverlapping [data.csv ...\|手填 r/n]`；CLI 注册 `cli.py`。理论依据：Fisher (1921)；Williams (1959)；Steiger (1980)；Dunn & Clark (1969)；Zou (2007)。测试 `tests/test_compare_corr.py`（约 60 例）。 | `tests/test_compare_corr.py` ≥40例，独立 *r*₁=*r*₂→*z*=0/p=1，Fisher *z* 手算（*r*₁=.7/n=103, *r*₂=.5/n=103 → *z*≈2.249）精确，Williams 手算（*r*_jk=.6/*r*_jh=.4/*r*_kh=.5/n=103 → *t*≈2.486）精确，Steiger 全交叉=0 退化（*r*_jk=.5/*r*_hm=.2/n=103 → *Z*≈2.451）精确，相等相关→检验量=0/p=1，CI 含差值 |
+
+---
+
 ## 建议的下一步执行顺序
 
 1. ~~**P0-1 审稿模拟**~~ ✅ 已闭合「写作 → 评审 → 修复」回路（`psyclaw/review.py`）。

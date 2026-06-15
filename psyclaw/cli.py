@@ -797,6 +797,32 @@ def cmd_roc(args: argparse.Namespace) -> int:
     return roc_cli(argv)
 
 
+def cmd_compare_corr(args: argparse.Namespace) -> int:
+    from psyclaw.psych.compare_corr import compare_corr_cli
+    argv: list[str] = []
+    if getattr(args, "csv", None):
+        argv.append(args.csv)
+    argv += ["--kind", args.kind]
+    for flag, attr in (
+        ("--x", "x_col"), ("--y", "y_col"), ("--z", "z_col"),
+        ("--group", "group_col"), ("--vars", "vars"),
+        ("--r1", "r1"), ("--n1", "n1"), ("--r2", "r2"), ("--n2", "n2"),
+        ("--r-jk", "r_jk"), ("--r-jh", "r_jh"), ("--r-kh", "r_kh"),
+        ("--r-hm", "r_hm"), ("--r-jm", "r_jm"), ("--r-km", "r_km"),
+        ("--n", "n"),
+    ):
+        val = getattr(args, attr, None)
+        if val is not None:
+            argv += [flag, str(val)]
+    if getattr(args, "alpha", 0.05) != 0.05:
+        argv += ["--alpha", str(args.alpha)]
+    if getattr(args, "out", "notes") != "notes":
+        argv += ["--out", args.out]
+    if getattr(args, "json", False):
+        argv += ["--json"]
+    return compare_corr_cli(argv)
+
+
 def cmd_ancova(args: argparse.Namespace) -> int:
     from psyclaw.psych.ancova import ancova_cli
     argv = [args.csv, "--dv", args.dv, "--group", args.group, "--cov", args.cov]
@@ -1769,6 +1795,38 @@ def build_parser() -> argparse.ArgumentParser:
     proc.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
     proc.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     proc.set_defaults(func=cmd_roc)
+
+    pcmpc = sub.add_parser(
+        "compare-corr",
+        help=(
+            "相关系数差异检验（stdlib only）：两个 r 是否显著不同 / "
+            "独立样本 Fisher z / 重叠 Williams t / 非重叠 Steiger Z / Zou 2007 差异 CI / APA-7 报告"
+        ),
+    )
+    pcmpc.add_argument("csv", nargs="?", help="输入数据 CSV 路径（省略则用手填相关值）")
+    pcmpc.add_argument("--kind", required=True,
+                       choices=["independent", "overlapping", "nonoverlapping"],
+                       help="independent(两独立样本) | overlapping(共享一变量) | nonoverlapping(四个变量)")
+    pcmpc.add_argument("--x", dest="x_col", help="CSV：变量 x（重叠时为共享变量）")
+    pcmpc.add_argument("--y", dest="y_col", help="CSV：变量 y")
+    pcmpc.add_argument("--z", dest="z_col", help="CSV overlapping：变量 z")
+    pcmpc.add_argument("--group", dest="group_col", help="CSV independent：分组列（恰 2 水平）")
+    pcmpc.add_argument("--vars", help="CSV nonoverlapping：四列名 a,b,c,d（比较 r_ab vs r_cd）")
+    pcmpc.add_argument("--r1", type=float, help="手填：r₁ / r_jk")
+    pcmpc.add_argument("--n1", type=float, help="手填：n₁（independent）")
+    pcmpc.add_argument("--r2", type=float, help="手填：r₂ / r_jh")
+    pcmpc.add_argument("--n2", type=float, help="手填：n₂（independent）")
+    pcmpc.add_argument("--r-jk", dest="r_jk", type=float, help="dependent 手填：r_jk")
+    pcmpc.add_argument("--r-jh", dest="r_jh", type=float, help="overlapping 手填：r_jh")
+    pcmpc.add_argument("--r-kh", dest="r_kh", type=float, help="overlapping 手填：r_kh")
+    pcmpc.add_argument("--r-hm", dest="r_hm", type=float, help="nonoverlapping 手填：r_hm")
+    pcmpc.add_argument("--r-jm", dest="r_jm", type=float, help="nonoverlapping 手填：r_jm")
+    pcmpc.add_argument("--r-km", dest="r_km", type=float, help="nonoverlapping 手填：r_km")
+    pcmpc.add_argument("--n", type=float, help="dependent 手填：样本量 n")
+    pcmpc.add_argument("--alpha", type=float, default=0.05, help="显著性水平（默认 .05）")
+    pcmpc.add_argument("--out", default="notes", help="报告输出目录（默认 notes/）")
+    pcmpc.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pcmpc.set_defaults(func=cmd_compare_corr)
 
     pcfa = sub.add_parser(
         "cfa",
