@@ -22,130 +22,36 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import stats
+
 
 # ---------------------------------------------------------------------------
-# 共用：正态近似 / 分布工具
+# 共用：分布 p 值（scipy）/ 平均秩（scipy.stats.rankdata）
 # ---------------------------------------------------------------------------
 
-def _norm_sf(z: float) -> float:
-    """正态分布 P(Z > |z|) × 2（双尾），使用误差函数近似。"""
-    return math.erfc(abs(z) / math.sqrt(2))
+def _norm_sf2(z: float) -> float:
+    """正态分布双尾 p = 2·P(Z > |z|)。"""
+    return 2.0 * float(stats.norm.sf(abs(z)))
 
 
 def _chi2_sf(h: float, df: float) -> float:
-    """χ² 生存函数（Poisson 级数近似）。"""
+    """χ² 上尾 p。"""
     if h <= 0 or df <= 0:
         return 1.0
-    # 使用不完全伽马函数 P(a, x)：
-    # chi2_sf(h, df) = 1 - P(df/2, h/2) = Q(df/2, h/2)
-    a = df / 2.0
-    x = h / 2.0
-    return 1.0 - _regularized_gamma_lower(a, x)
+    return float(stats.chi2.sf(h, df))
 
 
-def _regularized_gamma_lower(a: float, x: float) -> float:
-    """正则化下不完全伽马函数 P(a, x) = γ(a,x)/Γ(a)。"""
-    if x < 0:
-        return 0.0
-    if x == 0:
-        return 0.0
-    if x < a + 1:
-        # 级数展开
-        ap = a
-        s = 1.0 / a
-        delta = s
-        for _ in range(300):
-            ap += 1
-            delta *= x / ap
-            s += delta
-            if abs(delta) < 1e-14 * abs(s):
-                break
-        return s * math.exp(-x + a * math.log(x) - math.lgamma(a))
-    else:
-        # 连分数展开（Lentz 法）
-        fpmin = 1e-300
-        b = x + 1.0 - a
-        c = 1.0 / fpmin
-        d = 1.0 / b
-        h_cf = d
-        for i in range(1, 301):
-            an = -i * (i - a)
-            b += 2.0
-            d = an * d + b
-            c = b + an / c
-            if abs(d) < fpmin: d = fpmin
-            if abs(c) < fpmin: c = fpmin
-            d = 1.0 / d
-            delta = d * c
-            h_cf *= delta
-            if abs(delta - 1.0) < 1e-14:
-                break
-        return 1.0 - math.exp(-x + a * math.log(x) - math.lgamma(a)) * h_cf
-
-
-def _t_sf(t: float, df: float) -> float:
-    """t 分布双尾 p 值（不完全贝塔函数）。"""
+def _t_sf2(t: float, df: float) -> float:
+    """t 分布双尾 p。"""
     if df <= 0:
         return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
-
-
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c = 1.0
-    d = 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def _rank_data(data: list[float]) -> list[float]:
-    """为列表赋秩（平均秩处理同值）。"""
-    n = len(data)
-    indexed = sorted(range(n), key=lambda i: data[i])
-    ranks = [0.0] * n
-    i = 0
-    while i < n:
-        j = i
-        while j < n - 1 and data[indexed[j + 1]] == data[indexed[j]]:
-            j += 1
-        avg_rank = (i + j) / 2.0 + 1.0  # 1-indexed 平均秩
-        for k in range(i, j + 1):
-            ranks[indexed[k]] = avg_rank
-        i = j + 1
-    return ranks
+    """为列表赋平均秩（同值取平均，1-indexed）—— scipy.stats.rankdata。"""
+    return [float(r) for r in stats.rankdata(np.asarray(data, dtype=float))]
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +86,7 @@ def mann_whitney_u(
     sigma_U = math.sqrt(n1 * n2 * (n1 + n2 + 1) / 12)
 
     Z = (U1 - mean_U) / sigma_U if sigma_U > 0 else 0.0
-    p = _norm_sf(Z)  # 双尾
+    p = _norm_sf2(Z)  # 双尾
 
     N = n1 + n2
     r_effect = abs(Z) / math.sqrt(N)
@@ -239,7 +145,7 @@ def wilcoxon_signed_rank(
     sigma_W = math.sqrt(n * (n + 1) * (2 * n + 1) / 24)
     W = min(W_plus, W_minus)
     Z = (W - mean_W) / sigma_W if sigma_W > 0 else 0.0
-    p = _norm_sf(Z)
+    p = _norm_sf2(Z)
 
     N_total = len(x) if y is not None else len(x)
     r_effect = abs(Z) / math.sqrt(n)
@@ -385,7 +291,7 @@ def _friedman_post_hoc(
             diff = R[a] - R[b]
             if se > 0:
                 t = diff / se
-                p = _t_sf(abs(t), df_ph)
+                p = _t_sf2(abs(t),df_ph)
             else:
                 t = 0.0
                 p = 1.0
@@ -528,7 +434,7 @@ def spearman_rho(
         p = 0.0
     else:
         t = rho * math.sqrt(n - 2) / math.sqrt(1 - rho ** 2)
-        p = _t_sf(abs(t), n - 2)
+        p = _t_sf2(abs(t),n - 2)
 
     return {
         "test": "Spearman rho",
