@@ -11,14 +11,18 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "PsyClaw" }]
 
-# 核心依赖：pingouin(心理学统计"一次出全")及其统计栈默认装。
-# CLI 骨架本身仍可在缺依赖时降级到纯 stdlib 实现(stats_core),保证处处可跑。
+# 核心依赖（硬依赖，配置时安装）：成熟统计库栈——pingouin/scipy 为主干，
+# statsmodels(回归族/GLM)、lifelines(生存)、factor_analyzer(EFA)、semopy(CFA/SEM)。
+# 各分析模块直接调用这些库，不再手写或降级到 stdlib 统计实现。
 dependencies = [
     "pingouin>=0.5",
     "pandas>=2.0",
     "numpy>=1.22",
     "scipy>=1.8",
     "statsmodels>=0.14",
+    "lifelines>=0.27",
+    "factor_analyzer>=0.4",
+    "semopy>=2.3",
 ]
 
 [project.optional-dependencies]
