@@ -55,92 +55,54 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import special, stats
+
 
 # ---------------------------------------------------------------------------
 # 分布工具（正态 / F，stdlib only）
 # ---------------------------------------------------------------------------
 
 def _norm_cdf(z: float) -> float:
-    """标准正态分布 CDF Φ(z)。"""
-    return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
+    """标准正态分布 CDF Φ(z) —— scipy.special.ndtr。"""
+    return float(special.ndtr(z))
 
 
 def _norm_sf2(z: float) -> float:
-    """正态分布双尾 p 值 = 2·(1 − Φ(|z|))。"""
+    """正态分布双尾 p 值 —— 2·scipy.stats.norm.sf(|z|)。"""
     if not math.isfinite(z):
         return float("nan")
-    return 2.0 * (1.0 - _norm_cdf(abs(z)))
+    return 2.0 * float(stats.norm.sf(abs(z)))
 
 
 def _betai(a: float, b: float, x: float) -> float:
-    """正则化不完全 Beta 函数 I_x(a, b)（连分数展开）。"""
+    """正则化不完全 Beta 函数 I_x(a,b) —— scipy.special.betainc。"""
     if x < 0 or x > 1:
         return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 300):
-        m2 = 2 * m
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
+    return float(special.betainc(a, b, x))
 
 
 def _f_cdf(f: float, df1: float, df2: float) -> float:
-    """F 分布 CDF P(F ≤ f)。"""
+    """F 分布 CDF —— scipy.stats.f.cdf。"""
     if f <= 0:
         return 0.0
-    x = df1 * f / (df1 * f + df2)
-    return _betai(df1 / 2.0, df2 / 2.0, x)
+    return float(stats.f.cdf(f, df1, df2))
 
 
 def _f_sf(f: float, df1: float, df2: float) -> float:
-    """F 分布右尾 p 值 P(F > f)。"""
+    """F 分布右尾 p 值 —— scipy.stats.f.sf。"""
     if f <= 0:
         return 1.0
     if not math.isfinite(f):
         return 0.0
-    return 1.0 - _f_cdf(f, df1, df2)
+    return float(stats.f.sf(f, df1, df2))
 
 
 def _f_ppf(prob: float, df1: float, df2: float) -> float:
-    """F 分布分位数（二分法求逆 CDF）。"""
+    """F 分布分位数 —— scipy.stats.f.ppf。"""
     if not 0 < prob < 1 or df1 <= 0 or df2 <= 0:
         return float("nan")
-    lo, hi = 0.0, 1e7
-    for _ in range(200):
-        mid = 0.5 * (lo + hi)
-        if _f_cdf(mid, df1, df2) < prob:
-            lo = mid
-        else:
-            hi = mid
-    return 0.5 * (lo + hi)
+    return float(stats.f.ppf(prob, df1, df2))
 
 
 # ---------------------------------------------------------------------------
@@ -288,28 +250,10 @@ def cohens_kappa(
 
 
 def _inv_norm(p: float) -> float:
-    """标准正态分位数（Acklam 2003 有理逼近）。"""
+    """标准正态分位数 —— scipy.special.ndtri。"""
     if not 0 < p < 1:
         return float("nan")
-    a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
-         1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
-    b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
-         6.680131188771972e+01, -1.328068155288572e+01]
-    c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
-         -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
-    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
-         3.754408661907416e+00]
-    p_low, p_high = 0.02425, 1 - 0.02425
-    if p < p_low:
-        q = math.sqrt(-2 * math.log(p))
-        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
-    elif p <= p_high:
-        q = p - 0.5
-        r = q * q
-        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1)
-    else:
-        q = math.sqrt(-2 * math.log(1 - p))
-        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
+    return float(special.ndtri(p))
 
 
 # ---------------------------------------------------------------------------

@@ -116,11 +116,12 @@ def test_weights_unknown_raises():
         irr._agreement_weights(3, "cubic")
 
 
-def test_weights_quadratic_lower_than_linear_offdiag():
-    # 在非相邻格，二次惩罚更重 → 加权值更小
+def test_weights_quadratic_higher_than_linear_intermediate_offdiag():
+    # 一致性权重 w=1−(d/(k−1))^p：在中间距离格（d=2,k=5），二次惩罚更轻 →
+    # 加权一致性值更大（原断言方向写反，二次对近失配惩罚更小）。
     Wl = irr._agreement_weights(5, "linear")
     Wq = irr._agreement_weights(5, "quadratic")
-    assert Wq[0][2] < Wl[0][2]
+    assert Wq[0][2] > Wl[0][2]  # 0.75 > 0.5
 
 
 # ---------------------------------------------------------------------------
