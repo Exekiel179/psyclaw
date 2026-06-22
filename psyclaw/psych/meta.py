@@ -24,18 +24,16 @@ import json
 import math
 from pathlib import Path
 
+from scipy import special, stats
+
 
 # ---------------------------------------------------------------------------
 # 统计工具（stdlib only）
 # ---------------------------------------------------------------------------
 
 def _norm_cdf(z: float) -> float:
-    """标准正态分布 CDF（exact via math.erfc）。"""
-    if z > 37.0:
-        return 1.0
-    if z < -37.0:
-        return 0.0
-    return math.erfc(-z / math.sqrt(2)) / 2
+    """标准正态分布 CDF —— scipy.special.ndtr。"""
+    return float(special.ndtr(z))
 
 
 def _norm_ppf_two_sided_95() -> float:
@@ -43,13 +41,10 @@ def _norm_ppf_two_sided_95() -> float:
 
 
 def _chi2_p_wilson_hilferty(Q: float, df: int) -> float:
-    """Wilson-Hilferty 正态近似计算 chi2(df) 的 p(右尾)。df≥1，Q≥0。"""
+    """chi2(df) 右尾 p —— scipy.stats.chi2.sf（精确，替代 Wilson-Hilferty 近似）。"""
     if Q <= 0 or df <= 0:
         return 1.0
-    x = Q / df
-    k = 2 / (9 * df)
-    z = (x ** (1 / 3) - (1 - k)) / math.sqrt(k)
-    return 1 - _norm_cdf(z)
+    return float(stats.chi2.sf(Q, df))
 
 
 def _ols_simple(xs: list[float], ys: list[float]) -> tuple[float, float, float, float]:
@@ -74,12 +69,10 @@ def _ols_simple(xs: list[float], ys: list[float]) -> tuple[float, float, float, 
 
 
 def _t_p_approx(t: float, df: int) -> float:
-    """双侧 t 检验 p 值（|df|≥20 时误差 <0.005，用正态近似）。"""
+    """双侧 t 检验 p 值 —— scipy.stats.t.sf（精确）。"""
     if df <= 0:
         return 1.0
-    # 用 Cornish-Fisher 近似修正 t→z
-    z = t * (1 - 1 / (4 * df))
-    return 2 * (1 - _norm_cdf(abs(z)))
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def _se_from_ci(d: float, ci_lower: float, ci_upper: float) -> float:
