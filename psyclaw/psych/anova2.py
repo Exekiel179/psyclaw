@@ -19,56 +19,7 @@ import math
 import pathlib
 from typing import Any
 
-
-# ---------------------------------------------------------------------------
-# 分布工具（与 anova.py 相同实现）
-# ---------------------------------------------------------------------------
-
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c = 1.0
-    d = 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
-
-def _f_sf(f: float, df1: float, df2: float) -> float:
-    if f <= 0 or df1 <= 0 or df2 <= 0:
-        return float("nan")
-    x = df2 / (df2 + df1 * f)
-    return _betai(df2 / 2.0, df1 / 2.0, x)
+from scipy import stats
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +148,7 @@ def two_way_anova(
         elif not math.isfinite(F):
             p = 0.0
         else:
-            p = _f_sf(F, df, df_e)
+            p = float(stats.f.sf(F, df, df_e))
         eta2 = SS / SS_t if SS_t > 0 else 0.0
         omega2 = max((SS - df * MS_e) / (SS_t + MS_e), 0.0) if SS_t + MS_e > 0 else 0.0
         return {
