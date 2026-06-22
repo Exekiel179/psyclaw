@@ -4,7 +4,7 @@
 >
 > Fork 自 AutoResearchClaw，特化为心理学方向：可复现优先，APA7 + 预注册 + 效应量 + 不 p-hacking 全部是机器门禁。
 
-**当前进度:M1 已完成**(REPL + Provider + 心理学模块)。完整设计见 [`DESIGN.md`](DESIGN.md),心理学优化见 [`docs/PSYCH_OPTIMIZATIONS.md`](docs/PSYCH_OPTIMIZATIONS.md)。零运行时依赖,stdlib 即可跑。
+**当前进度:M1 已完成**(REPL + Provider + 心理学模块)。完整设计见 [`DESIGN.md`](DESIGN.md),心理学优化见 [`docs/PSYCH_OPTIMIZATIONS.md`](docs/PSYCH_OPTIMIZATIONS.md)。统计计算复用成熟库(scipy/pingouin/statsmodels/lifelines/factor_analyzer/semopy),配置时安装为硬依赖。
 
 ## 快速试跑（无需安装）
 
@@ -133,8 +133,8 @@ ANSI 配色全局统一,`NO_COLOR=1` 降级纯文本。
 4. **APA7 结果段**:可直接入论文,含限定性措辞("显著≠重要""相关≠因果")
 5. **可复现脚本**:生成独立 `.py`(scipy 实现)+ 数据指纹校验,落 `outputs/`
 
-**数值全部对照 scipy 校验**(Welch/Student/配对 t、Pearson、Mann-Whitney、卡方、ANOVA 误差 <1e-3);
-分布函数(t/卡方/F/正态)纯 stdlib 自实现。复现脚本独立运行结果与引擎完全一致(t=3.87/d=.83 闭环验证)。
+**数值全部由成熟统计库计算**(Welch/Student/配对 t、Pearson、Mann-Whitney、卡方、ANOVA 等);
+分布函数(t/卡方/F/正态/非中心)统一由 scipy 提供。复现脚本独立运行结果与引擎完全一致(t=3.87/d=.83 闭环验证)。
 
 ## 统计引擎:Pingouin(默认核心)
 
@@ -145,7 +145,8 @@ PSYCLAW "效应量+CI 必报" 门禁。封装见 `psych/pingouin_backend.py`,函
 相关(含偏/稳健)、bootstrap 中介、信度、功效分析、FDR 多重比较——全部对照 live pingouin 验证。
 
 > 搜遍 skill/plugin 生态,没有现成的 pingouin 心理学封装,故纳入 PsyClaw 自建。
-> pingouin 缺失时自动回落纯 stdlib 实现(stats_core,已对照 scipy),保证处处可跑。
+> 统计计算统一复用成熟库——scipy/pingouin 为主干,statsmodels(回归族/GLM)、lifelines(生存)、
+> factor_analyzer(EFA)、semopy(CFA/SEM)按需,均为配置时安装的硬依赖。
 
 ## 选装(开箱即用)
 
