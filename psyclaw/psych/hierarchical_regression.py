@@ -25,10 +25,7 @@ import math
 import pathlib
 from typing import Any
 
-from psyclaw.psych.regression import (
-    _mat_transpose, _mat_mult, _mat_vec, _mat_invert,
-    _betai, _t_sf2, _f_sf, _t_ppf, compute_ols,
-)
+from psyclaw.psych.regression import _f_sf, compute_ols
 
 
 # ---------------------------------------------------------------------------
