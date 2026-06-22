@@ -389,9 +389,9 @@ def test_optimal_cutoff_value():
 def test_optimal_cutoff_metrics():
     scores, out = _toy()
     c = optimal_cutoff(scores, out)
-    assert abs(c["sensitivity"] - 2 / 3) < 1e-9
+    assert abs(c["sensitivity"] - 2 / 3) < 1e-6  # 指标舍入到 6 位
     assert c["specificity"] == 1.0
-    assert abs(c["youden_j"] - 2 / 3) < 1e-9
+    assert abs(c["youden_j"] - 2 / 3) < 1e-6  # 指标舍入到 6 位
 
 
 def test_optimal_cutoff_confusion():
