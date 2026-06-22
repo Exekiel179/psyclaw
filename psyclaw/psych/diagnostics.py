@@ -15,71 +15,32 @@ import csv
 import math
 from pathlib import Path
 
+from scipy import special, stats
+
 
 # ---------------------------------------------------------------------------
-# 特殊函数:正则化不完全 Beta → F 分布 p 值
+# 分布 p 值（scipy；betai 被测试 import）
 # ---------------------------------------------------------------------------
-
-def _betacf(a: float, b: float, x: float) -> float:
-    """不完全 Beta 的连分式(Lentz 法)。"""
-    MAXIT, EPS, FPMIN = 200, 3e-12, 1e-300
-    qab, qap, qam = a + b, a + 1.0, a - 1.0
-    c = 1.0
-    d = 1.0 - qab * x / qap
-    if abs(d) < FPMIN:
-        d = FPMIN
-    d = 1.0 / d
-    h = d
-    for m in range(1, MAXIT + 1):
-        m2 = 2 * m
-        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
-        d = 1.0 + aa * d
-        if abs(d) < FPMIN:
-            d = FPMIN
-        c = 1.0 + aa / c
-        if abs(c) < FPMIN:
-            c = FPMIN
-        d = 1.0 / d
-        h *= d * c
-        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
-        d = 1.0 + aa * d
-        if abs(d) < FPMIN:
-            d = FPMIN
-        c = 1.0 + aa / c
-        if abs(c) < FPMIN:
-            c = FPMIN
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < EPS:
-            break
-    return h
-
 
 def betai(a: float, b: float, x: float) -> float:
-    """正则化不完全 Beta I_x(a,b)。"""
+    """正则化不完全 Beta I_x(a,b) —— scipy.special.betainc。"""
     if x <= 0.0:
         return 0.0
     if x >= 1.0:
         return 1.0
-    ln_bt = (math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
-             + a * math.log(x) + b * math.log(1.0 - x))
-    bt = math.exp(ln_bt)
-    if x < (a + 1.0) / (a + b + 2.0):
-        return bt * _betacf(a, b, x) / a
-    return 1.0 - bt * _betacf(b, a, 1.0 - x) / b
+    return float(special.betainc(a, b, x))
 
 
 def f_sf(f_stat: float, df1: float, df2: float) -> float:
-    """F 分布生存函数 P(F > f)。"""
+    """F 分布生存函数 P(F > f) —— scipy.stats.f.sf。"""
     if f_stat <= 0:
         return 1.0
-    return betai(df2 / 2.0, df1 / 2.0, df2 / (df2 + df1 * f_stat))
+    return float(stats.f.sf(f_stat, df1, df2))
 
 
 def z_sf2(z: float) -> float:
-    """标准正态双尾 p。"""
-    return math.erfc(abs(z) / math.sqrt(2.0))
+    """标准正态双尾 p —— 2·scipy.stats.norm.sf(|z|)。"""
+    return 2.0 * float(stats.norm.sf(abs(z)))
 
 
 # ---------------------------------------------------------------------------
