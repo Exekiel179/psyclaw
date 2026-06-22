@@ -1,7 +1,8 @@
-"""t 检验套件 — 单样本 / 独立样本（Welch）/ 配对，APA-7 报告，stdlib only。
+"""t 检验套件 — 单样本 / 独立样本（Welch）/ 配对，APA-7 报告。
 
-包装 stats_core.py 的低级函数，提供与其他分析命令一致的 CLI 接口、
-APA-7 段落/表格格式化和 MD+JSON sidecar。
+数值引擎复用 scipy.stats（t / 自由度 / p / 置信区间）+ numpy（描述统计）；
+效应量用标准 Cohen's d / dz 公式。不再手写分布函数。对外提供与其他分析
+命令一致的 CLI 接口、APA-7 段落/表格格式化和 MD+JSON sidecar。
 
 提供：
   - ttest_one_sample(x, mu0)          → t/df/p/d/CI（单样本）
@@ -23,71 +24,20 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import stats
+
 
 # ---------------------------------------------------------------------------
-# 共用数学工具（独立实现，不依赖 stats_core 以避免循环导入）
+# 描述统计（numpy）
 # ---------------------------------------------------------------------------
 
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin: d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        for j in range(2):
-            if j == 0:
-                num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-            else:
-                num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-            d = 1.0 + num * d
-            c = 1.0 + num / c
-            if abs(d) < fpmin: d = fpmin
-            if abs(c) < fpmin: c = fpmin
-            d = 1.0 / d
-            delta = d * c
-            h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
-
-def _t_sf2(t: float, df: float) -> float:
-    if df <= 0:
-        return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
-
-
-def _norm_ppf(p: float) -> float:
-    """正态分布分位数（Beasley-Springer-Moro 近似）。"""
-    if p <= 0 or p >= 1:
-        return float("nan")
-    if p > 0.5:
-        return -_norm_ppf(1 - p)
-    t = math.sqrt(-2 * math.log(p))
-    c = [2.515517, 0.802853, 0.010328]
-    d = [1.432788, 0.189269, 0.001308]
-    num = c[0] + c[1] * t + c[2] * t * t
-    den = 1 + d[0] * t + d[1] * t * t + d[2] * t * t * t
-    return -(t - num / den)
-
-
-def _mean_sd_n(vals: list[float]) -> tuple[float, float, int]:
-    n = len(vals)
-    m = sum(vals) / n
-    s = math.sqrt(sum((v - m) ** 2 for v in vals) / (n - 1)) if n > 1 else 0.0
+def _desc(vals) -> tuple[float, float, int]:
+    """返回 (mean, sd_ddof1, n)。"""
+    arr = np.asarray(vals, dtype=float)
+    n = int(arr.size)
+    m = float(arr.mean()) if n else float("nan")
+    s = float(arr.std(ddof=1)) if n > 1 else 0.0
     return m, s, n
 
 
@@ -107,22 +57,23 @@ def ttest_one_sample(
     n = len(x)
     if n < 2:
         raise ValueError(f"单样本 t 检验需要至少 2 个观测（当前 {n}）")
-    m, s, _ = _mean_sd_n(x)
+    arr = np.asarray(x, dtype=float)
+    m, s, _ = _desc(arr)
     se = s / math.sqrt(n)
     if se == 0:
         raise ValueError("样本标准差为 0，无法计算 t 统计量")
-    t = (m - mu0) / se
-    df = n - 1
-    p = _t_sf2(t, df)
+
+    res = stats.ttest_1samp(arr, mu0)
+    t = float(res.statistic)
+    df = int(n - 1)
+    p = float(res.pvalue)
+
     d = (m - mu0) / s
-    # CI for d (Cohen's d_s, one-sample)
-    zc = _norm_ppf(1 - alpha / 2)
+    zc = float(stats.norm.ppf(1 - alpha / 2))
     se_d = math.sqrt((1 / n) + d ** 2 / (2 * n))
     d_lo, d_hi = d - zc * se_d, d + zc * se_d
-    # CI for mean
-    t_crit = _norm_ppf(1 - alpha / 2)  # 近似（大样本 n≥30 时精度足够）
-    m_lo = m - _t_quantile(df, alpha / 2) * se
-    m_hi = m + _t_quantile(df, alpha / 2) * se
+    ci = res.confidence_interval(confidence_level=1 - alpha)
+    m_lo, m_hi = float(ci.low), float(ci.high)
 
     return {
         "test": "one_sample",
@@ -140,20 +91,6 @@ def ttest_one_sample(
         "alpha": alpha,
         "significant": p < alpha,
     }
-
-
-def _t_quantile(df: float, p: float) -> float:
-    """t 分布上 p 分位数（二分法）。"""
-    lo, hi = 0.0, 100.0
-    target = 1 - p  # 1 - alpha/2 对应 t_crit
-    for _ in range(60):
-        mid = (lo + hi) / 2
-        val = 1 - _t_sf2(mid, df) / 2  # upper tail
-        if val < target:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2
 
 
 # ---------------------------------------------------------------------------
@@ -175,40 +112,36 @@ def ttest_independent(
     n1, n2 = len(x), len(y)
     if n1 < 2 or n2 < 2:
         raise ValueError(f"每组至少需要 2 个观测（n1={n1}, n2={n2}）")
-    m1, s1, _ = _mean_sd_n(x)
-    m2, s2, _ = _mean_sd_n(y)
+    ax, ay = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    m1, s1, _ = _desc(ax)
+    m2, s2, _ = _desc(ay)
 
+    # 标准误（同时用于零方差守卫）
     if welch:
         se = math.sqrt(s1 ** 2 / n1 + s2 ** 2 / n2)
-        if se == 0:
-            raise ValueError("标准误为 0，无法计算 t 统计量")
-        t = (m1 - m2) / se
-        num = (s1 ** 2 / n1 + s2 ** 2 / n2) ** 2
-        den = (s1 ** 2 / n1) ** 2 / (n1 - 1) + (s2 ** 2 / n2) ** 2 / (n2 - 1)
-        df = num / den if den > 0 else n1 + n2 - 2
         test_type = "welch"
     else:
-        df = n1 + n2 - 2
-        sp = math.sqrt(((n1 - 1) * s1 ** 2 + (n2 - 1) * s2 ** 2) / df)
-        se = sp * math.sqrt(1 / n1 + 1 / n2)
-        if se == 0:
-            raise ValueError("标准误为 0，无法计算 t 统计量")
-        t = (m1 - m2) / se
+        sp_pooled = math.sqrt(((n1 - 1) * s1 ** 2 + (n2 - 1) * s2 ** 2) / (n1 + n2 - 2))
+        se = sp_pooled * math.sqrt(1 / n1 + 1 / n2)
         test_type = "student"
+    if se == 0:
+        raise ValueError("标准误为 0，无法计算 t 统计量")
 
-    p = _t_sf2(t, df)
+    res = stats.ttest_ind(ax, ay, equal_var=not welch)
+    t = float(res.statistic)
+    df = float(res.df)
+    p = float(res.pvalue)
 
     sp = math.sqrt(((n1 - 1) * s1 ** 2 + (n2 - 1) * s2 ** 2) / (n1 + n2 - 2)) if n1 + n2 > 2 else 0.0
     d = (m1 - m2) / sp if sp > 0 else float("nan")
-    zc = _norm_ppf(1 - alpha / 2)
+    zc = float(stats.norm.ppf(1 - alpha / 2))
     se_d = math.sqrt((n1 + n2) / (n1 * n2) + d ** 2 / (2 * (n1 + n2))) if math.isfinite(d) else float("nan")
     d_lo = d - zc * se_d if math.isfinite(se_d) else float("nan")
     d_hi = d + zc * se_d if math.isfinite(se_d) else float("nan")
 
-    t_crit = _t_quantile(df, alpha / 2)
     diff = m1 - m2
-    diff_lo = diff - t_crit * se
-    diff_hi = diff + t_crit * se
+    ci = res.confidence_interval(confidence_level=1 - alpha)
+    diff_lo, diff_hi = float(ci.low), float(ci.high)
 
     return {
         "test": test_type,
@@ -245,24 +178,28 @@ def ttest_paired(
     n = len(x)
     if n < 2:
         raise ValueError(f"配对 t 检验需要至少 2 对观测（当前 {n}）")
-    diffs = [a - b for a, b in zip(x, y)]
-    m_d, s_d, _ = _mean_sd_n(diffs)
+    ax, ay = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    diffs = ax - ay
+    m_d = float(diffs.mean())
+    s_d = float(diffs.std(ddof=1)) if n > 1 else 0.0
     se = s_d / math.sqrt(n)
     if se == 0:
         raise ValueError("差值标准差为 0，无法计算 t 统计量")
-    t = m_d / se
-    df = n - 1
-    p = _t_sf2(t, df)
+
+    res = stats.ttest_rel(ax, ay)
+    t = float(res.statistic)
+    df = int(n - 1)
+    p = float(res.pvalue)
+
     dz = m_d / s_d
-    zc = _norm_ppf(1 - alpha / 2)
+    zc = float(stats.norm.ppf(1 - alpha / 2))
     se_dz = math.sqrt(1 / n + dz ** 2 / (2 * n))
     dz_lo, dz_hi = dz - zc * se_dz, dz + zc * se_dz
-    t_crit = _t_quantile(df, alpha / 2)
-    m_d_lo = m_d - t_crit * se
-    m_d_hi = m_d + t_crit * se
+    ci = res.confidence_interval(confidence_level=1 - alpha)
+    m_d_lo, m_d_hi = float(ci.low), float(ci.high)
 
-    m1, s1, _ = _mean_sd_n(x)
-    m2, s2, _ = _mean_sd_n(y)
+    m1, s1, _ = _desc(ax)
+    m2, s2, _ = _desc(ay)
 
     return {
         "test": "paired",
