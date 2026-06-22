@@ -578,7 +578,7 @@ def analyze(path: str, dv: str, group: str | None = None,
         apa = f"{plan_label} {apa}"
     if plan_status in ("exploratory", "undeclared"):
         apa += ("\n\n[探索性结果须知] 本分析未预先注册或标注为探索性，"
-                "结论应视作假设生成。建议：①报告时明确标注"探索性"；"
+                "结论应视作假设生成。建议：①报告时明确标注「探索性」；"
                 "②在独立样本或 split-half 折分上重复验证后再作推断。")
 
     # —— 输出 APA7 段 ——
