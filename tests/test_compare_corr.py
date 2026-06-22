@@ -468,7 +468,9 @@ def test_analyze_nonoverlapping_csv(tmp_path):
 
 def test_analyze_excludes_missing_rows(tmp_path):
     p = tmp_path / "d.csv"
-    rows = [[i, i + 1, i + 2] for i in range(20)]
+    # 非共线数据（原 [i, i+1, i+2] 三列完全共线→Williams 检验分母非正而报错；
+    # 本测试只为验证缺失行计数，故改用相关明确但非奇异的数据）
+    rows = [[i, i + (i % 3), 19 - i + (i % 4)] for i in range(20)]
     rows.append(["", "5", "6"])      # 缺失行
     _write_csv(p, ["x", "y", "z"], rows)
     r = analyze_compare_corr("overlapping", str(p), x_col="x", y_col="y",
