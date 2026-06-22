@@ -81,6 +81,55 @@ def term_width(default: int = 80) -> int:
         return default
 
 
+def _char_width(ch: str) -> int:
+    """单字符显示列宽：组合符 0，东亚宽/全角 2，其余 1。"""
+    import unicodedata
+    if unicodedata.combining(ch):
+        return 0
+    return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+
+
+_ANSI_RE = None
+
+
+def display_width(s: str) -> int:
+    """字符串显示列宽（剥离 ANSI、中日韩按 2 列）。"""
+    import re
+    global _ANSI_RE
+    if _ANSI_RE is None:
+        _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+    return sum(_char_width(c) for c in _ANSI_RE.sub("", s))
+
+
+def wrap_display(line: str, width: int) -> list:
+    """按显示宽度折行：跳过 ANSI 转义（不计宽、不切断），中日韩按 2 列。"""
+    if width <= 0:
+        return [line]
+    import re
+    global _ANSI_RE
+    if _ANSI_RE is None:
+        _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+    out, cur, cw, i = [], "", 0, 0
+    n = len(line)
+    while i < n:
+        m = _ANSI_RE.match(line, i)
+        if m:                       # ANSI 序列：原样保留，不计入宽度
+            cur += m.group(0)
+            i = m.end()
+            continue
+        ch = line[i]
+        w = _char_width(ch)
+        if cw + w > width and cur:  # 放不下了，断行
+            out.append(cur)
+            cur, cw = "", 0
+        cur += ch
+        cw += w
+        i += 1
+    if cur or not out:
+        out.append(cur)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # 渲染块(claude-code 风格圆角面板)
 # ---------------------------------------------------------------------------
@@ -91,8 +140,10 @@ def panel(title: str, content: str, color: str = "brcyan") -> str:
     head = paint("╭─ ", color) + paint(title, color, "bold") + " " \
         + paint("─" * max(0, w - len(title) - 4), color)
     lines = [head]
+    inner = max(1, w - 2)            # 减去 "│ " 前缀两列
     for ln in content.splitlines() or [""]:
-        lines.append(paint("│ ", color) + ln)
+        for seg in wrap_display(ln, inner) or [""]:
+            lines.append(paint("│ ", color) + seg)
     lines.append(paint("╰" + "─" * max(0, w - 1), color))
     return "\n".join(lines)
 
@@ -135,8 +186,10 @@ class StreamBlock:
             self._out.write("\033[1A\033[J")
         rendered = render_md(self._buf)
         prefix = paint("│ ", self.color)
+        inner = max(1, term_width() - 4)   # "│ " 前缀 2 列 + 右侧留白
         for ln in (rendered.splitlines() if rendered else [""]):
-            self._out.write(prefix + ln + "\n")
+            for seg in wrap_display(ln, inner) or [""]:
+                self._out.write(prefix + seg + "\n")
         w = term_width() - 2
         self._out.write(paint("╰" + "─" * max(0, w - 1), self.color) + "\n")
         self._out.flush()
