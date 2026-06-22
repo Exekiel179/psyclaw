@@ -21,47 +21,18 @@ import pathlib
 import random
 from typing import Any
 
+from scipy import stats
+
 
 # ---------------------------------------------------------------------------
-# 分布工具
+# 分布工具（scipy）
 # ---------------------------------------------------------------------------
 
 def _chi2_sf(x: float, df: float) -> float:
-    """χ² 分布生存函数 P(X > x)，df 自由度。"""
+    """χ² 分布上尾 P(X > x)，df 自由度。"""
     if x <= 0 or df <= 0:
         return 1.0 if x <= 0 else 0.0
-    return 1.0 - _regularized_gamma_lower(df / 2.0, x / 2.0)
-
-
-def _regularized_gamma_lower(a: float, x: float) -> float:
-    """正则化下不完全伽马函数 P(a, x)。"""
-    if x <= 0:
-        return 0.0
-    if x < a + 1:
-        ap, s, delta = a, 1.0 / a, 1.0 / a
-        for _ in range(300):
-            ap += 1
-            delta *= x / ap
-            s += delta
-            if abs(delta) < 1e-14 * abs(s):
-                break
-        return s * math.exp(-x + a * math.log(x) - math.lgamma(a))
-    else:
-        fpmin = 1e-300
-        b, c, d = x + 1.0 - a, 1.0 / fpmin, 1.0 / (x + 1.0 - a)
-        h = d
-        for i in range(1, 301):
-            an = -i * (i - a)
-            b += 2.0
-            d = an * d + b
-            c = b + an / c
-            if abs(d) < fpmin: d = fpmin
-            if abs(c) < fpmin: c = fpmin
-            d, delta = 1.0 / d, (1.0 / d) * c
-            h *= delta
-            if abs(delta - 1.0) < 1e-14:
-                break
-        return 1.0 - math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
+    return float(stats.chi2.sf(x, df))
 
 
 # ---------------------------------------------------------------------------
@@ -227,35 +198,15 @@ def fisher_exact_2x2(
     if N <= 0:
         raise ValueError("列联表总频率之和必须 > 0")
 
-    row1 = a + b
-    row2 = c + d
-    col1 = a + c
-    col2 = b + d
-
     # 比值比（Odds Ratio）
     if b * c == 0:
         OR = float("inf") if a * d > 0 else float("nan")
     else:
         OR = (a * d) / (b * c)
 
-    # 超几何概率 P(X = k) 用对数计算
-    def _log_hyper(k: int) -> float:
-        return (
-            math.lgamma(row1 + 1) - math.lgamma(k + 1) - math.lgamma(row1 - k + 1) +
-            math.lgamma(row2 + 1) - math.lgamma(col1 - k + 1) - math.lgamma(row2 - col1 + k + 1) -
-            math.lgamma(N + 1) + math.lgamma(col1 + 1) + math.lgamma(col2 + 1)
-        )
-
-    # 所有可能的 k 值（k = 数量 A 格的范围）
-    k_min = max(0, col1 - row2)
-    k_max = min(row1, col1)
-    log_p_obs = _log_hyper(a)
-    p_value = sum(
-        math.exp(lp)
-        for k in range(k_min, k_max + 1)
-        if (lp := _log_hyper(k)) <= log_p_obs + 1e-10
-    )
-    p_value = min(p_value * 2, 1.0)  # 双尾
+    # 双尾精确 p（超几何分布，条件于边缘合计）—— scipy
+    _, p_value = stats.fisher_exact([[a, b], [c, d]], alternative="two-sided")
+    p_value = float(p_value)
 
     return {
         "test": "fisher_exact",
