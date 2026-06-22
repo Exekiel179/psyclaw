@@ -21,63 +21,8 @@ import math
 import pathlib
 from typing import Any
 
-
-# ---------------------------------------------------------------------------
-# 分布工具（来自 descriptives.py 同款 _betai / _t_sf2）
-# ---------------------------------------------------------------------------
-
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c = 1.0
-    d = 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
-
-def _t_sf2(t: float, df: float) -> float:
-    if df <= 0:
-        return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
-
-
-def _f_sf(f: float, df1: float, df2: float) -> float:
-    if f <= 0 or df1 <= 0 or df2 <= 0:
-        return float("nan")
-    x = df2 / (df2 + df1 * f)
-    return _betai(df2 / 2.0, df1 / 2.0, x)
+import numpy as np
+from scipy import stats
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +78,7 @@ def one_way_anova(
     MS_b = SS_b / df_b
     MS_w = SS_w / df_w
     F = MS_b / MS_w
-    p = _f_sf(F, df_b, df_w)
+    p = float(stats.f.sf(F, df_b, df_w))
 
     # eta² = SS_b / SS_t
     eta2 = SS_b / SS_t if SS_t > 0 else 0.0
@@ -217,22 +162,19 @@ def post_hoc_pairwise(
     pairs = []
     for i in range(k):
         for j in range(i + 1, k):
-            g1, g2 = groups[names[i]], groups[names[j]]
-            n1, n2 = len(g1), len(g2)
-            m1 = sum(g1) / n1
-            m2 = sum(g2) / n2
-            var1 = sum((v - m1) ** 2 for v in g1) / (n1 - 1) if n1 > 1 else 0.0
-            var2 = sum((v - m2) ** 2 for v in g2) / (n2 - 1) if n2 > 1 else 0.0
+            a1 = np.asarray(groups[names[i]], dtype=float)
+            a2 = np.asarray(groups[names[j]], dtype=float)
+            n1, n2 = a1.size, a2.size
+            m1, m2 = float(a1.mean()), float(a2.mean())
+            var1 = float(a1.var(ddof=1)) if n1 > 1 else 0.0
+            var2 = float(a2.var(ddof=1)) if n2 > 1 else 0.0
             se = math.sqrt(var1 / n1 + var2 / n2)
             if se == 0:
                 t, df, p = float("nan"), n1 + n2 - 2, float("nan")
             else:
-                t = (m1 - m2) / se
-                # Welch–Satterthwaite df
-                num = (var1 / n1 + var2 / n2) ** 2
-                den = (var1 / n1) ** 2 / (n1 - 1) + (var2 / n2) ** 2 / (n2 - 1)
-                df = num / den if den > 0 else n1 + n2 - 2
-                p = _t_sf2(abs(t), df)
+                # Welch t（不等方差）— t/自由度/p 由 scipy 提供
+                res = stats.ttest_ind(a1, a2, equal_var=False)
+                t, df, p = float(res.statistic), float(res.df), float(res.pvalue)
             # Cohen's d（合并 SD）
             sp2 = ((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2) if n1 + n2 > 2 else 0.0
             sp = math.sqrt(sp2)
