@@ -28,181 +28,28 @@ import math
 import pathlib
 from typing import Any
 
-
-# ---------------------------------------------------------------------------
-# 分布工具（从 ttest.py 独立拷贝，避免循环导入）
-# ---------------------------------------------------------------------------
-
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        for j in range(2):
-            if j == 0:
-                num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-            else:
-                num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-            d = 1.0 + num * d
-            c = 1.0 + num / c
-            if abs(d) < fpmin:
-                d = fpmin
-            if abs(c) < fpmin:
-                c = fpmin
-            d = 1.0 / d
-            delta = d * c
-            h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
-
-def _f_sf(f: float, df1: float, df2: float) -> float:
-    """F 分布上尾 P(F > f)，接受非整数 df（用于 GG/HF 校正后）。"""
-    if not math.isfinite(f) or f <= 0 or df1 <= 0 or df2 <= 0:
-        return 1.0 if f <= 0 else 0.0
-    x = df2 / (df2 + df1 * f)
-    return _betai(df2 / 2.0, df1 / 2.0, x)
-
-
-def _t_sf2(t: float, df: float) -> float:
-    """学生 t 双尾 p。"""
-    if df <= 0:
-        return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
-
-
-def _gammainc(a: float, x: float) -> float:
-    """正则化下不完全 Gamma P(a, x)（级数 + 连分式）。"""
-    if x < 0 or a <= 0:
-        return float("nan")
-    if x < a + 1.0:
-        ap, s, d = a, 1.0 / a, 1.0 / a
-        for _ in range(200):
-            ap += 1
-            d *= x / ap
-            s += d
-            if abs(d) < abs(s) * 1e-14:
-                break
-        return s * math.exp(-x + a * math.log(x) - math.lgamma(a))
-    fpmin = 1e-300
-    b = x + 1.0 - a
-    c, d, h = 1.0 / fpmin, 1.0 / b, 1.0 / b
-    for i in range(1, 200):
-        an = -i * (i - a)
-        b += 2.0
-        d = an * d + b
-        if abs(d) < fpmin:
-            d = fpmin
-        c = b + an / c
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return 1.0 - math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
-
-
-def _chi2_sf(x: float, df: float) -> float:
-    if x <= 0:
-        return 1.0
-    return 1.0 - _gammainc(df / 2.0, x / 2.0)
-
-
-def _norm_ppf(p: float) -> float:
-    if p <= 0 or p >= 1:
-        return float("nan")
-    if p > 0.5:
-        return -_norm_ppf(1 - p)
-    t = math.sqrt(-2 * math.log(p))
-    c = [2.515517, 0.802853, 0.010328]
-    d = [1.432788, 0.189269, 0.001308]
-    return -(t - (c[0] + c[1] * t + c[2] * t * t) /
-             (1 + d[0] * t + d[1] * t * t + d[2] * t * t * t))
-
-
-def _t_ppf(p: float, df: float) -> float:
-    """t 分位数（二分法，对称分布）。"""
-    if df > 1e6:
-        return _norm_ppf(p)
-    target = 2 * (1 - p) if p > 0.5 else 2 * p
-    lo, hi = 0.0, 100.0
-    for _ in range(80):
-        mid = (lo + hi) / 2
-        if _t_sf2(mid, df) > target:
-            lo = mid
-        else:
-            hi = mid
-    val = (lo + hi) / 2
-    return val if p > 0.5 else -val
+import numpy as np
+from scipy import stats
 
 
 # ---------------------------------------------------------------------------
-# 小矩阵工具（所有矩阵均以 list[list[float]] 表示）
+# 小矩阵工具（保持 list[list[float]] 返回契约，内部用 numpy/scipy）
+# 分布函数（F/t/χ²）一律用 scipy.stats，见各调用点；不再手写。
 # ---------------------------------------------------------------------------
 
 def _mat_mul(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
-    m, p, n = len(A), len(A[0]), len(B[0])
-    C = [[0.0] * n for _ in range(m)]
-    for i in range(m):
-        for j in range(n):
-            C[i][j] = sum(A[i][kk] * B[kk][j] for kk in range(p))
-    return C
+    return (np.asarray(A, dtype=float) @ np.asarray(B, dtype=float)).tolist()
 
 
 def _mat_det(mat: list[list[float]]) -> float:
-    """行主元 LU 分解求行列式（就地操作副本）。"""
-    n = len(mat)
-    m = [row[:] for row in mat]
-    sign = 1.0
-    for col in range(n):
-        pivot = max(range(col, n), key=lambda r: abs(m[r][col]))
-        if abs(m[pivot][col]) < 1e-300:
-            return 0.0
-        if pivot != col:
-            m[col], m[pivot] = m[pivot], m[col]
-            sign *= -1
-        for row in range(col + 1, n):
-            f = m[row][col] / m[col][col]
-            for j in range(col, n):
-                m[row][j] -= f * m[col][j]
-    det = sign
-    for i in range(n):
-        det *= m[i][i]
-    return det
+    """行列式（numpy LU 分解）。"""
+    return float(np.linalg.det(np.asarray(mat, dtype=float)))
 
 
 def _cov_matrix(data: list[list[float]]) -> list[list[float]]:
-    """计算 n×k 数据矩阵的 k×k 样本协方差矩阵。"""
-    n, k = len(data), len(data[0])
-    means = [sum(data[i][j] for i in range(n)) / n for j in range(k)]
-    cov = [[0.0] * k for _ in range(k)]
-    for i in range(n):
-        for a in range(k):
-            for b in range(a, k):
-                cov[a][b] += (data[i][a] - means[a]) * (data[i][b] - means[b])
-    for a in range(k):
-        for b in range(a, k):
-            cov[a][b] /= (n - 1)
-            cov[b][a] = cov[a][b]
-    return cov
+    """n×k 数据矩阵的 k×k 样本协方差矩阵（ddof=1）。"""
+    cov = np.cov(np.asarray(data, dtype=float), rowvar=False, ddof=1)
+    return np.atleast_2d(cov).tolist()
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +109,7 @@ def _mauchly_test(Y: list[list[float]], k: int, n: int) -> dict[str, Any]:
     p_val = k - 1
     bias = (n - 1) - (2 * p_val ** 2 + p_val + 2) / (6 * p_val)
     chi2 = -bias * math.log(W)
-    p = _chi2_sf(chi2, df_W)
+    p = float(stats.chi2.sf(chi2, df_W))
     return {"W": W, "chi2": chi2, "df": df_W, "p": p, "spherical": p > 0.05}
 
 
@@ -375,7 +222,7 @@ def one_way_rm_anova(
         p_uncorr = float("nan")
     else:
         F = MS_between / MS_error
-        p_uncorr = _f_sf(F, df_between, df_error)
+        p_uncorr = float(stats.f.sf(F, df_between, df_error))
 
     # 效应量
     eta2 = SS_between / SS_total if SS_total > 0 else 0.0
@@ -393,10 +240,10 @@ def one_way_rm_anova(
     eps_hf = _epsilon_hf(eps_gg, n, k)
 
     df1_gg, df2_gg = eps_gg * df_between, eps_gg * df_error
-    p_gg = _f_sf(F, df1_gg, df2_gg) if not math.isnan(F) else float("nan")
+    p_gg = float(stats.f.sf(F, df1_gg, df2_gg)) if not math.isnan(F) else float("nan")
 
     df1_hf, df2_hf = eps_hf * df_between, eps_hf * df_error
-    p_hf = _f_sf(F, df1_hf, df2_hf) if not math.isnan(F) else float("nan")
+    p_hf = float(stats.f.sf(F, df1_hf, df2_hf)) if not math.isnan(F) else float("nan")
 
     # APA 建议：违反球形性时 eps_gg≥.75 报 HF，否则报 GG
     report_correction = "none"
@@ -474,7 +321,7 @@ def pairwise_rm(
 ) -> list[dict[str, Any]]:
     """所有条件对做配对 t 检验，Holm 法校正多重比较。"""
     pairs: list[dict] = []
-    t_crit = _t_ppf(1 - alpha / 2, n - 1)
+    t_crit = float(stats.t.ppf(1 - alpha / 2, n - 1))
 
     for j1 in range(k):
         for j2 in range(j1 + 1, k):
@@ -487,7 +334,7 @@ def pairwise_rm(
                 p_raw = 0.0 if abs(m_d) > 0 else 1.0
             else:
                 t = m_d / se_d
-                p_raw = _t_sf2(t, n - 1)
+                p_raw = 2.0 * float(stats.t.sf(abs(t), n - 1))
             d_z = m_d / sd_d if sd_d > 0 else float("nan")
             ci_lo = m_d - t_crit * se_d
             ci_hi = m_d + t_crit * se_d
