@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import math
 
-from psyclaw.psych.diagnostics import betai, describe, _median  # 复用
+from scipy import special, stats
+
+from psyclaw.psych.diagnostics import betai, describe, _median  # 复用（betai 已弃用）
 
 
 # ---------------------------------------------------------------------------
@@ -18,101 +20,38 @@ from psyclaw.psych.diagnostics import betai, describe, _median  # 复用
 # ---------------------------------------------------------------------------
 
 def t_sf2(t: float, df: float) -> float:
-    """学生 t 双尾 p = P(|T| > |t|)。用 I_x(df/2, 1/2)。"""
+    """学生 t 双尾 p = P(|T| > |t|) —— scipy.stats.t.sf。"""
     if df <= 0:
         return float("nan")
-    x = df / (df + t * t)
-    return betai(df / 2.0, 0.5, x)
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def chi2_sf(x: float, df: float) -> float:
-    """卡方上尾 P(X > x) = 1 - 正则化下不完全 Gamma。"""
+    """卡方上尾 P(X > x) —— scipy.stats.chi2.sf。"""
     if x <= 0:
         return 1.0
-    return 1.0 - _gammainc(df / 2.0, x / 2.0)
-
-
-def _gammainc(a: float, x: float) -> float:
-    """正则化下不完全 Gamma P(a,x)(级数 + 连分式,Numerical Recipes)。"""
-    if x < 0 or a <= 0:
-        return float("nan")
-    if x < a + 1.0:
-        # 级数
-        ap = a
-        s = 1.0 / a
-        d = s
-        for _ in range(200):
-            ap += 1
-            d *= x / ap
-            s += d
-            if abs(d) < abs(s) * 1e-14:
-                break
-        return s * math.exp(-x + a * math.log(x) - math.lgamma(a))
-    # 连分式 → Q,再 1-Q
-    fpmin = 1e-300
-    b = x + 1.0 - a
-    c = 1.0 / fpmin
-    d = 1.0 / b
-    h = d
-    for i in range(1, 200):
-        an = -i * (i - a)
-        b += 2.0
-        d = an * d + b
-        if abs(d) < fpmin:
-            d = fpmin
-        c = b + an / c
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    q = math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
-    return 1.0 - q
+    return float(stats.chi2.sf(x, df))
 
 
 def norm_ppf(p: float) -> float:
-    """标准正态分位数(Acklam 近似)。"""
+    """标准正态分位数 —— scipy.special.ndtri。"""
     if not 0 < p < 1:
         return float("nan")
-    a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
-         1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
-    b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
-         6.680131188771972e+01, -1.328068155288572e+01]
-    c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
-         -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
-    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
-         3.754408661907416e+00]
-    plow, phigh = 0.02425, 1 - 0.02425
-    if p < plow:
-        q = math.sqrt(-2 * math.log(p))
-        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
-               ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
-    if p > phigh:
-        q = math.sqrt(-2 * math.log(1 - p))
-        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / \
-               ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
-    q = p - 0.5
-    r = q * q
-    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / \
-           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1)
+    return float(special.ndtri(p))
 
 
 def t_ppf(p: float, df: float) -> float:
-    """t 分位数(对称,二分求解双尾)。"""
-    if df > 1e6:
-        return norm_ppf(p)
-    target = 2 * (1 - p) if p > 0.5 else 2 * p
-    lo, hi = 0.0, 100.0
-    for _ in range(100):
-        mid = (lo + hi) / 2
-        if t_sf2(mid, df) > target:
-            lo = mid
-        else:
-            hi = mid
-    val = (lo + hi) / 2
-    return val if p > 0.5 else -val
+    """t 分位数 —— scipy.stats.t.ppf。"""
+    if not 0 < p < 1:
+        return float("nan")
+    return float(stats.t.ppf(p, df))
+
+
+def _gammainc(a: float, x: float) -> float:
+    """正则化下不完全 Gamma P(a,x) —— scipy.special.gammainc。"""
+    if x < 0 or a <= 0:
+        return float("nan")
+    return float(special.gammainc(a, x))
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +214,7 @@ def chisquare_independence(table: list) -> dict:
 
 
 def _norm_cdf(z: float) -> float:
-    return 0.5*(1 + math.erf(z/math.sqrt(2)))
+    return float(special.ndtr(z))
 
 
 # ---------------------------------------------------------------------------
