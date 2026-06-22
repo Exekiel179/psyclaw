@@ -75,6 +75,9 @@ def classify(path: Path) -> str:
 
 
 def _is_num(s: str) -> bool:
+    # 'nan'/'inf' 虽能被 float() 解析，但在数据列类型判定里应视为非数值文本
+    if s.strip().lower().lstrip("+-") in ("nan", "inf", "infinity"):
+        return False
     try:
         float(s)
         return True
