@@ -29,87 +29,42 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+
 
 # ─── 矩阵工具（Gauss-Jordan 求逆，stdlib only）────────────────────────────────
 
 def _mat_invert(M: list[list[float]]) -> list[list[float]] | None:
-    """Gauss-Jordan 矩阵逆（n×n）；奇异返回 None。"""
-    n = len(M)
-    aug = [row[:] + [1.0 if i == j else 0.0 for j in range(n)]
-           for i, row in enumerate(M)]
-    for col in range(n):
-        pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[pivot] = aug[pivot], aug[col]
-        pv = aug[col][col]
-        if abs(pv) < 1e-14:
-            return None
-        s = 1.0 / pv
-        aug[col] = [v * s for v in aug[col]]
-        for row in range(n):
-            if row != col and aug[row][col]:
-                f = aug[row][col]
-                aug[row] = [aug[row][k] - f * aug[col][k] for k in range(2 * n)]
-    return [row[n:] for row in aug]
+    """矩阵逆（numpy）；奇异返回 None。"""
+    try:
+        return np.linalg.inv(np.asarray(M, dtype=float)).tolist()
+    except np.linalg.LinAlgError:
+        return None
 
 
-# ─── 循环式 Jacobi 特征值分解（对称矩阵）────────────────────────────────────
+# ─── 对称矩阵特征值分解（numpy）──────────────────────────────────────────────
 
 def _jacobi_eig(
     A: list[list[float]], max_sweeps: int = 60
 ) -> tuple[list[float], list[list[float]]]:
-    """循环 Jacobi 法求对称矩阵的特征值与特征向量，按特征值降序返回。
+    """对称矩阵特征值/特征向量 —— numpy.linalg.eigh，按特征值降序返回。
 
-    返回 (eigenvalues, eigenvectors)：
-      eigenvalues[i]       — 第 i 大特征值
-      eigenvectors[row][i] — 第 i 个特征向量（列向量）的第 row 分量
-
-    Ref: Golub & Van Loan (2013) Matrix Computations §8.4.
+    返回 (eigenvalues 降序, eigenvectors[row][col])。
+    符号约定：每个特征向量绝对值最大的分量取正，保证可复现。
     """
-    n = len(A)
-    S = [row[:] for row in A]
-    V = [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
-
-    for _sweep in range(max_sweeps):
-        # 检查是否收敛（非对角元素平方和）
-        off = sum(S[i][j] ** 2 for i in range(n) for j in range(i + 1, n))
-        if off < 1e-22:
-            break
-
-        for p in range(n - 1):
-            for q in range(p + 1, n):
-                if abs(S[p][q]) < 1e-15:
-                    continue
-
-                diff = S[p][p] - S[q][q]
-                if abs(diff) < 1e-14:
-                    theta = math.pi / 4.0
-                else:
-                    theta = 0.5 * math.atan2(2.0 * S[p][q], diff)
-                c = math.cos(theta)
-                s = math.sin(theta)
-
-                # 就地更新 S（第 p、q 行列）
-                for i in range(n):
-                    if i != p and i != q:
-                        sip, siq = S[i][p], S[i][q]
-                        S[i][p] = S[p][i] = c * sip + s * siq
-                        S[i][q] = S[q][i] = -s * sip + c * siq
-                spp, sqq, spq = S[p][p], S[q][q], S[p][q]
-                S[p][p] = c * c * spp + 2.0 * c * s * spq + s * s * sqq
-                S[q][q] = s * s * spp - 2.0 * c * s * spq + c * c * sqq
-                S[p][q] = S[q][p] = 0.0
-
-                # 就地更新 V（旋转矩阵列）
-                for i in range(n):
-                    vip, viq = V[i][p], V[i][q]
-                    V[i][p] = c * vip + s * viq
-                    V[i][q] = -s * vip + c * viq
-
-    evals = [S[i][i] for i in range(n)]
-    order = sorted(range(n), key=lambda i: -evals[i])
-    evals_sorted = [evals[i] for i in order]
-    evecs_sorted = [[V[row][order[col]] for col in range(n)] for row in range(n)]
-    return evals_sorted, evecs_sorted
+    vals, vecs = np.linalg.eigh(np.asarray(A, dtype=float))
+    order = np.argsort(vals)[::-1]
+    vals = vals[order]
+    vecs = vecs[:, order]
+    for col in range(vecs.shape[1]):
+        v = vecs[:, col]
+        k = int(np.argmax(np.abs(v)))
+        if v[k] < 0:
+            vecs[:, col] = -v
+    return (
+        [float(x) for x in vals],
+        [[float(vecs[r][c]) for c in range(vecs.shape[1])] for r in range(vecs.shape[0])],
+    )
 
 
 # ─── Pearson 相关矩阵 ─────────────────────────────────────────────────────────
