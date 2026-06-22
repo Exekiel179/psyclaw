@@ -29,7 +29,8 @@ from __future__ import annotations
 
 import math
 
-from psyclaw.psych.diagnostics import betai
+from scipy import stats
+
 from psyclaw.psych.stats_core import _gammainc, _norm_cdf, norm_ppf, t_ppf
 
 
@@ -55,44 +56,10 @@ def _chi_scaled_logpdf(s: float, df: float) -> float:
 
 
 def nct_cdf(t: float, df: float, ncp: float, n_panels: int = 2400) -> float:
-    """非中心 t 分布 CDF:P(T ≤ t | df, ncp)。
-
-    用积分表示 P(T≤t)=∫_0^∞ Φ(t·s − ncp)·f_s(s) ds(s=√(V/ν)),
-    Simpson 复合求积。积分窗口按 χ²_ν 的上下尾自适应。
-    """
+    """非中心 t 分布 CDF —— scipy.stats.nct.cdf。"""
     if df <= 0:
         return float("nan")
-    if ncp == 0.0:
-        # 退化为中心 t:复用对称双尾
-        from psyclaw.psych.stats_core import t_sf2
-        if t == 0.0:
-            return 0.5
-        p2 = t_sf2(abs(t), df)
-        return 1.0 - p2 / 2.0 if t > 0 else p2 / 2.0
-    # 积分窗口:由 χ²_ν 的近似上下界换算到 s=√(χ²/ν)
-    spread = math.sqrt(2.0 * df)
-    chi_lo = max(0.0, df - 8.0 * spread - 4.0)
-    chi_hi = df + 10.0 * spread + 30.0
-    s_lo = math.sqrt(chi_lo / df)
-    s_hi = math.sqrt(chi_hi / df)
-    if n_panels % 2:
-        n_panels += 1
-    h = (s_hi - s_lo) / n_panels
-    if h <= 0:
-        return float("nan")
-
-    def integrand(s: float) -> float:
-        lp = _chi_scaled_logpdf(s, df)
-        if lp == float("-inf"):
-            return 0.0
-        return _norm_cdf(t * s - ncp) * math.exp(lp)
-
-    total = integrand(s_lo) + integrand(s_hi)
-    for i in range(1, n_panels):
-        s = s_lo + i * h
-        total += (4.0 if i % 2 else 2.0) * integrand(s)
-    val = total * h / 3.0
-    return min(1.0, max(0.0, val))
+    return float(stats.nct.cdf(t, df, ncp))
 
 
 def _chi_scaled_mass(df: float, n_panels: int = 2400) -> float:
@@ -117,97 +84,45 @@ def _chi_scaled_mass(df: float, n_panels: int = 2400) -> float:
 
 
 def _f_cdf_central(f: float, df1: float, df2: float) -> float:
-    """中心 F 的 CDF = I_x(df1/2, df2/2),x = df1 f/(df1 f + df2)。"""
+    """中心 F 的 CDF —— scipy.stats.f.cdf。"""
     if f <= 0:
         return 0.0
-    x = df1 * f / (df1 * f + df2)
-    return betai(df1 / 2.0, df2 / 2.0, x)
+    return float(stats.f.cdf(f, df1, df2))
 
 
 def f_ppf(p: float, df1: float, df2: float) -> float:
-    """中心 F 分位数(二分)。"""
+    """中心 F 分位数 —— scipy.stats.f.ppf。"""
     if not 0.0 < p < 1.0:
         return float("nan")
-    lo, hi = 0.0, 10.0
-    while _f_cdf_central(hi, df1, df2) < p and hi < 1e8:
-        hi *= 2.0
-    for _ in range(200):
-        mid = (lo + hi) / 2.0
-        if _f_cdf_central(mid, df1, df2) < p:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2.0
+    return float(stats.f.ppf(p, df1, df2))
 
 
 def ncf_sf(f: float, df1: float, df2: float, ncp: float) -> float:
-    """非中心 F 生存函数 P(F > f | df1, df2, ncp)。
-
-    CDF = Σ_j Pois(j; ncp/2) · I_x(df1/2 + j, df2/2),x = df1 f/(df1 f + df2)。
-    精确收敛级数(Poisson 权在 j≈ncp/2 处取峰,尾权可忽略后停)。
-    """
+    """非中心 F 生存函数 —— scipy.stats.ncf.sf（nc≤0 退化为中心 F）。"""
     if f <= 0:
         return 1.0
-    if ncp < 0:
-        ncp = 0.0
-    x = df1 * f / (df1 * f + df2)
-    half = ncp / 2.0
-    term = math.exp(-half)  # j=0 的 Poisson 权
-    wsum = 0.0
-    cdf = 0.0
-    j = 0
-    while j < 10000:
-        ib = betai(df1 / 2.0 + j, df2 / 2.0, x)
-        cdf += term * ib
-        wsum += term
-        j += 1
-        term *= half / j
-        if j > half and (1.0 - wsum) < 1e-13:
-            break
-    return min(1.0, max(0.0, 1.0 - cdf))
+    if ncp <= 0:
+        # scipy.stats.ncf 在 nc=0 处有数值缺陷，退化为中心 F
+        return float(stats.f.sf(f, df1, df2))
+    return float(stats.ncf.sf(f, df1, df2, ncp))
 
 
 def ncx2_sf(x: float, df: float, ncp: float) -> float:
-    """非中心 χ² 生存函数 P(X > x | df, ncp)。
-
-    CDF = Σ_j Pois(j; ncp/2) · P_central_χ²(x | df+2j),
-    其中 P_central = 正则化下不完全 Gamma = _gammainc((df+2j)/2, x/2)。
-    """
+    """非中心 χ² 生存函数 —— scipy.stats.ncx2.sf。"""
     if x <= 0:
         return 1.0
     if ncp < 0:
         ncp = 0.0
-    half = ncp / 2.0
-    term = math.exp(-half)
-    wsum = 0.0
-    cdf = 0.0
-    j = 0
-    while j < 10000:
-        gi = _gammainc((df + 2 * j) / 2.0, x / 2.0)
-        cdf += term * gi
-        wsum += term
-        j += 1
-        term *= half / j
-        if j > half and (1.0 - wsum) < 1e-13:
-            break
-    return min(1.0, max(0.0, 1.0 - cdf))
+    return float(stats.ncx2.sf(x, df, ncp))
 
 
 def ncx2_ppf(p: float, df: float, ncp: float) -> float:
-    """非中心 χ² 分位数(二分;生存函数单调递减)。"""
+    """非中心 χ² 分位数 —— scipy.stats.ncx2.ppf。"""
     if not 0.0 < p < 1.0:
         return float("nan")
-    target = 1.0 - p  # 目标生存概率
-    lo, hi = 0.0, df + ncp + 10.0
-    while ncx2_sf(hi, df, ncp) > target and hi < 1e9:
-        hi *= 2.0
-    for _ in range(200):
-        mid = (lo + hi) / 2.0
-        if ncx2_sf(mid, df, ncp) > target:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2.0
+    if ncp < 0:
+        ncp = 0.0
+    return float(stats.ncx2.ppf(p, df, ncp))
 
 
 # ===========================================================================
