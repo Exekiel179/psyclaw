@@ -29,49 +29,18 @@ import math
 import pathlib
 from typing import Any
 
+from scipy import stats
+
 
 # ---------------------------------------------------------------------------
-# 分布工具（与 chisquare.py 同款，stdlib only）
+# 分布工具（scipy）
 # ---------------------------------------------------------------------------
 
 def _chi2_sf(x: float, df: float) -> float:
-    """χ² 分布生存函数 P(X > x)，df 自由度。"""
+    """χ² 分布上尾 P(X > x)，df 自由度。"""
     if x <= 0 or df <= 0:
         return 1.0 if x <= 0 else 0.0
-    return 1.0 - _regularized_gamma_lower(df / 2.0, x / 2.0)
-
-
-def _regularized_gamma_lower(a: float, x: float) -> float:
-    """正则化下不完全伽马函数 P(a, x)。"""
-    if x <= 0:
-        return 0.0
-    if x < a + 1:
-        ap, s, delta = a, 1.0 / a, 1.0 / a
-        for _ in range(300):
-            ap += 1
-            delta *= x / ap
-            s += delta
-            if abs(delta) < 1e-14 * abs(s):
-                break
-        return s * math.exp(-x + a * math.log(x) - math.lgamma(a))
-    else:
-        fpmin = 1e-300
-        b, c, d = x + 1.0 - a, 1.0 / fpmin, 1.0 / (x + 1.0 - a)
-        h = d
-        for i in range(1, 301):
-            an = -i * (i - a)
-            b += 2.0
-            d = an * d + b
-            c = b + an / c
-            if abs(d) < fpmin:
-                d = fpmin
-            if abs(c) < fpmin:
-                c = fpmin
-            d, delta = 1.0 / d, (1.0 / d) * c
-            h *= delta
-            if abs(delta - 1.0) < 1e-14:
-                break
-        return 1.0 - math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
+    return float(stats.chi2.sf(x, df))
 
 
 def _binom_two_tailed_p(b: int, c: int) -> float:
