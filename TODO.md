@@ -37,6 +37,23 @@
 
 ---
 
+## P0.6 · clarify 澄清重构（2026-06-16，用户反馈「澄清部分不够好」，四方面全中）
+
+> 目标：把 `clarify` 从「固定 17 题脚本、照单全收」升级为真正的 grill-me 澄清向导。
+> 真源 `psyclaw/psych/clarify.py`（现状：`SLOTS` 17 槽位全开放式 + 裸 `input()` 逐题收集，无评估/无追问/无分支）。
+> 铁律照旧：stdlib 零依赖优先（无 provider/key 时必须降级回当前静态行为）、一轮一任务一提交、带测试。
+
+| # | 任务 | 说明 | 验收 | 文件 |
+|---|------|------|------|------|
+| 📋 CLAR-1 | LLM 驱动追问（核心） | 每个槽位收到回答后，调当前 provider 评估「是否足够具体可检验」；模糊/空泛则生成**针对性追问**，最多追问 2–3 轮直到达标或用户 `skip`。评估标准取自各槽位已有的 `why`（重要性）。**无 provider/无 key 时 fail-safe 降级**到现在的「照单收集」。 | 有 provider（可 mock）时：对空泛回答（如 dv 槽位答「问卷」）会触发追问；达标回答不追问；`skip` 立即跳过。`tests/test_clarify.py` 用 MockProvider 覆盖：触发追问/不触发/追问上限/降级路径 | `psyclaw/psych/clarify.py` |
+| 📋 CLAR-2 | 交互体验 | 裸 `input()` → 项目 `ui_input.read_line`（拿到 prompt_toolkit/readline 的行内编辑+历史）；每题显示进度 `[3/17 · D.设计]`；支持 `back` 回退改上一题、`?` 看缘由（保留）、`skip`。 | 方向键可编辑当前答案、↑↓ 可翻历史；`back` 能回到并覆盖上一槽位；进度计数正确；非 TTY 仍可脚本化（降级 `input()`）。测试覆盖 back 回退与进度边界 | `psyclaw/psych/clarify.py` |
+| 📋 CLAR-3 | 按研究类型动态裁剪 | 先问「研究目标类型（实验因果/相关/描述/质性）」，据此**跳过无关槽位、追加相关槽位**：如相关/描述设计跳过 `randomization`、操纵检查；实验设计强制 `randomization`+操纵检查。给 `SLOTS` 加 `applies_when` 条件字段，保持向后兼容。 | 选「相关研究」时 `randomization` 不出现且不计入未解决；选「实验」时强制出现；门禁 `CLARIFY.complete` 只校验**适用**槽位。测试覆盖三种类型的槽位集差异 | `psyclaw/psych/clarify.py` + `gates/rules.yaml` |
+| 📋 CLAR-4 | 产出与衔接 | 澄清卡 `notes/clarification.md` 增加：研究类型、每槽「达标/追问轮次」痕迹、未解决项的**具体补全指引**；与 `/preregister`（假设确证/探索映射）、`/research`（①前置门禁）衔接处复用同一份卡，避免重复问。 | 澄清卡含研究类型与各槽状态；`preregister` 能直接读卡填充假设分类；`research` 启动前若卡不全给出逐项指引。测试校验卡结构 + preregister 读取 | `psyclaw/psych/clarify.py` · `preregister.py` · `pipeline.py` |
+
+> 建议执行顺序：CLAR-2（最稳、立即改善体验）→ CLAR-1（核心价值）→ CLAR-3 → CLAR-4。
+
+---
+
 ## P1 · 心理学专业纵深（📋 待实现）
 
 ### 1. 测量层（`psyclaw/psych/`）
