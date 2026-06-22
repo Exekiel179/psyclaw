@@ -38,147 +38,46 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import stats
+
 
 # ---------------------------------------------------------------------------
 # 分布工具
 # ---------------------------------------------------------------------------
 
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        for j in range(2):
-            if j == 0:
-                num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-            else:
-                num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-            d = 1.0 + num * d
-            c = 1.0 + num / c
-            if abs(d) < fpmin:
-                d = fpmin
-            if abs(c) < fpmin:
-                c = fpmin
-            d = 1.0 / d
-            delta = d * c
-            h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
-
 def _f_sf(f: float, df1: float, df2: float) -> float:
-    """F 分布上尾 P(F > f)，接受非整数 df（用于 GG/HF 校正后）。"""
-    if not math.isfinite(f) or f < 0 or df1 <= 0 or df2 <= 0:
+    """F 分布上尾 P(F > f)（scipy 适配）。"""
+    if not math.isfinite(f) or f <= 0 or df1 <= 0 or df2 <= 0:
         return 1.0 if (not math.isfinite(f) or f <= 0) else 0.0
-    if f == 0:
-        return 1.0
-    x = df2 / (df2 + df1 * f)
-    return _betai(df2 / 2.0, df1 / 2.0, x)
+    return float(stats.f.sf(f, df1, df2))
 
 
 def _t_sf2(t: float, df: float) -> float:
+    """学生 t 双尾 p（scipy 适配）。"""
     if not math.isfinite(t) or df <= 0:
         return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
-
-
-def _igammap(a: float, x: float) -> float:
-    if x <= 0 or a <= 0:
-        return 0.0
-    lga = math.lgamma(a)
-    ap, delta, s = a, 1.0 / a, 1.0 / a
-    for _ in range(300):
-        ap += 1
-        delta *= x / ap
-        s += delta
-        if abs(delta) < abs(s) * 1e-14:
-            break
-    return math.exp(-x + a * math.log(x) - lga) * s
-
-
-def _igammac(a: float, x: float) -> float:
-    if x < 0 or a <= 0:
-        return 1.0
-    if x < a + 1:
-        return 1.0 - _igammap(a, x)
-    lga = math.lgamma(a)
-    b = x + 1 - a
-    c, d = 1e300, 1.0 / b if b != 0 else 1e300
-    h = d
-    for i in range(1, 200):
-        num = -i * (i - a)
-        b += 2
-        d = num * d + b
-        if abs(d) < 1e-300:
-            d = 1e-300
-        c = b + num / c
-        if abs(c) < 1e-300:
-            c = 1e-300
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return math.exp(-x + a * math.log(x) - lga) * h
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def _chi2_sf(x: float, df: float) -> float:
     if x <= 0 or df <= 0:
         return 1.0
-    return _igammac(df / 2.0, x / 2.0)
+    return float(stats.chi2.sf(x, df))
 
 
 # ---------------------------------------------------------------------------
-# 矩阵 / 球形检验工具
+# 矩阵 / 球形检验工具（numpy）
 # ---------------------------------------------------------------------------
 
 def _mat_cov(rows: list[list[float]]) -> list[list[float]]:
-    n = len(rows)
-    k = len(rows[0])
-    means = [sum(rows[i][j] for i in range(n)) / n for j in range(k)]
-    cov = [[0.0] * k for _ in range(k)]
-    for i in range(n):
-        for r in range(k):
-            for c in range(k):
-                cov[r][c] += (rows[i][r] - means[r]) * (rows[i][c] - means[c])
-    for r in range(k):
-        for c in range(k):
-            cov[r][c] /= (n - 1)
-    return cov
+    cov = np.cov(np.asarray(rows, dtype=float), rowvar=False, ddof=1)
+    return np.atleast_2d(cov).tolist()
 
 
 def _log_det_chol(M: list[list[float]]) -> float:
-    n = len(M)
-    L = [[0.0] * n for _ in range(n)]
-    for i in range(n):
-        for j in range(i + 1):
-            s = sum(L[i][k] * L[j][k] for k in range(j))
-            if i == j:
-                v = M[i][i] - s
-                if v <= 0:
-                    return float("-inf")
-                L[i][j] = math.sqrt(v)
-            else:
-                if L[j][j] == 0:
-                    return float("-inf")
-                L[i][j] = (M[i][j] - s) / L[j][j]
-    return 2.0 * sum(math.log(L[i][i]) for i in range(n))
+    sign, logabsdet = np.linalg.slogdet(np.asarray(M, dtype=float))
+    return float(logabsdet) if sign > 0 else float("-inf")
 
 
 def _helmert(k: int) -> list[list[float]]:
