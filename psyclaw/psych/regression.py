@@ -20,156 +20,53 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+import statsmodels.api as sm
+from scipy import stats
+
 
 # ---------------------------------------------------------------------------
-# 矩阵工具（stdlib only）
+# 矩阵工具（numpy；测试直接 import 这些 helper）
 # ---------------------------------------------------------------------------
 
 def _mat_transpose(A: list[list[float]]) -> list[list[float]]:
-    m, n = len(A), len(A[0])
-    return [[A[i][j] for i in range(m)] for j in range(n)]
+    return np.asarray(A, dtype=float).T.tolist()
 
 
 def _mat_mult(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
     """矩阵乘法 A(m×n) × B(n×p) → C(m×p)。"""
-    m, n = len(A), len(A[0])
-    p = len(B[0])
-    C = [[0.0] * p for _ in range(m)]
-    for i in range(m):
-        for k in range(n):
-            if A[i][k] == 0.0:
-                continue
-            for j in range(p):
-                C[i][j] += A[i][k] * B[k][j]
-    return C
+    return (np.asarray(A, dtype=float) @ np.asarray(B, dtype=float)).tolist()
 
 
 def _mat_vec(A: list[list[float]], v: list[float]) -> list[float]:
     """矩阵 × 向量。"""
-    return [sum(A[i][j] * v[j] for j in range(len(v))) for i in range(len(A))]
+    return (np.asarray(A, dtype=float) @ np.asarray(v, dtype=float)).tolist()
 
 
 def _mat_invert(M: list[list[float]]) -> list[list[float]] | None:
-    """Gauss-Jordan 消去求 n×n 矩阵逆，奇异返回 None。"""
-    n = len(M)
-    aug = [M[i][:] + [1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
-    for col in range(n):
-        # 部分主元选取
-        pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[pivot] = aug[pivot], aug[col]
-        p = aug[col][col]
-        if abs(p) < 1e-14:
-            return None
-        scale = 1.0 / p
-        aug[col] = [v * scale for v in aug[col]]
-        for row in range(n):
-            if row != col and aug[row][col] != 0.0:
-                f = aug[row][col]
-                aug[row] = [aug[row][k] - f * aug[col][k] for k in range(2 * n)]
-    return [row[n:] for row in aug]
+    """n×n 矩阵逆（numpy），奇异返回 None。"""
+    try:
+        return np.linalg.inv(np.asarray(M, dtype=float)).tolist()
+    except np.linalg.LinAlgError:
+        return None
 
 
 # ---------------------------------------------------------------------------
-# t 分布双尾 p 值（复用 descriptives 中的 _betai）
+# 分布 p 值（scipy；测试直接 import _t_sf2/_f_sf）
 # ---------------------------------------------------------------------------
-
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c = 1.0
-    d = 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin:
-            d = fpmin
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin:
-            d = fpmin
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
 
 def _t_sf2(t: float, df: float) -> float:
+    """学生 t 双尾 p。"""
     if df <= 0:
         return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def _f_sf(f_stat: float, df1: float, df2: float) -> float:
     """F 分布上尾 p 值。"""
     if f_stat <= 0 or df1 <= 0 or df2 <= 0:
         return float("nan")
-    x = df2 / (df2 + df1 * f_stat)
-    return _betai(df2 / 2.0, df1 / 2.0, x)
-
-
-def _norm_ppf(p: float) -> float:
-    if not 0 < p < 1:
-        return float("nan")
-    a = [-3.969683028665376e+01, 2.209460984245205e+02,
-         -2.759285104469687e+02, 1.383577518672690e+02,
-         -3.066479806614716e+01, 2.506628277459239e+00]
-    b = [-5.447609879822406e+01, 1.615858368580409e+02,
-         -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01]
-    c = [-7.784894002430293e-03, -3.223964580411365e-01,
-         -2.400758277161838e+00, -2.549732539343734e+00,
-         4.374664141464968e+00, 2.938163982698783e+00]
-    d = [7.784695709041462e-03, 3.224671290700398e-01,
-         2.445134137142996e+00, 3.754408661907416e+00]
-    p_low, p_high = 0.02425, 1 - 0.02425
-    if p < p_low:
-        q = math.sqrt(-2 * math.log(p))
-        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
-    elif p <= p_high:
-        q = p - 0.5
-        r = q*q
-        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1)
-    else:
-        q = math.sqrt(-2 * math.log(1 - p))
-        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
-
-
-def _t_ppf(p: float, df: float) -> float:
-    """t 分布双尾 α 对应的 |t| 临界值（二分搜索）。"""
-    if df <= 0:
-        return float("nan")
-    lo, hi = 0.0, 1000.0
-    for _ in range(60):
-        mid = (lo + hi) / 2.0
-        if _t_sf2(mid, df) < p:
-            hi = mid
-        else:
-            lo = mid
-    return (lo + hi) / 2.0
+    return float(stats.f.sf(f_stat, df1, df2))
 
 
 # ---------------------------------------------------------------------------
@@ -200,33 +97,30 @@ def compute_ols(
     if n < k + 2:
         raise ValueError(f"有效数据行数 ({n}) 不足以拟合 {k} 个预测变量 + 截距")
 
-    # 设计矩阵：截距列 + IV 列
+    # 设计矩阵：截距列 + IV 列；先用 numpy 检测奇异（保留 ValueError 契约）
     Xd = [[1.0] + list(X[i]) for i in range(n)]
-    Xt = _mat_transpose(Xd)
-    XtX = _mat_mult(Xt, Xd)
-    XtX_inv = _mat_invert(XtX)
-    if XtX_inv is None:
+    XtX = _mat_mult(_mat_transpose(Xd), Xd)
+    if _mat_invert(XtX) is None:
         raise ValueError("设计矩阵奇异（预测变量完全多重共线），无法求逆")
 
-    Xty = _mat_vec(Xt, y)
-    betas = _mat_vec(XtX_inv, Xty)  # [intercept, b1, b2, ...]
-
-    # 残差 & 拟合值
-    y_hat = [sum(betas[j] * Xd[i][j] for j in range(k + 1)) for i in range(n)]
-    residuals = [y[i] - y_hat[i] for i in range(n)]
-    SSE = sum(r ** 2 for r in residuals)
-    y_mean = sum(y) / n
-    SST = sum((yi - y_mean) ** 2 for yi in y)
-    SSR = SST - SSE
+    # statsmodels OLS 拟合
+    model = sm.OLS(np.asarray(y, dtype=float), np.asarray(Xd, dtype=float)).fit()
+    betas = [float(v) for v in model.params]
+    ses = [float(v) for v in model.bse]
+    tvals = [float(v) for v in model.tvalues]
+    pvals = [float(v) for v in model.pvalues]
+    ci = np.asarray(model.conf_int(alpha), dtype=float)  # (k+1, 2)
 
     df_model = k
     df_resid = n - k - 1
-    MSE = SSE / df_resid if df_resid > 0 else float("nan")
-    R2 = 1.0 - SSE / SST if SST > 0 else 0.0
-    R2_adj = 1.0 - (1.0 - R2) * (n - 1) / df_resid if df_resid > 0 else float("nan")
-    MSR = SSR / df_model if df_model > 0 else float("nan")
-    F = MSR / MSE if MSE > 0 else float("nan")
-    F_p = _f_sf(F, df_model, df_resid)
+    SSE = float(model.ssr)
+    SST = float(model.centered_tss)
+    SSR = float(model.ess)
+    MSE = float(model.mse_resid) if df_resid > 0 else float("nan")
+    R2 = float(model.rsquared)
+    R2_adj = float(model.rsquared_adj) if df_resid > 0 else float("nan")
+    F = float(model.fvalue) if model.fvalue is not None else float("nan")
+    F_p = float(model.f_pvalue) if model.f_pvalue is not None else float("nan")
 
     # 标准化系数 β（基于标准化 X 和 y）
     def _sd(xs: list[float]) -> float:
@@ -236,40 +130,24 @@ def compute_ols(
     sd_y = _sd(y) if n > 1 else 1.0
     sd_ivs = [_sd([X[i][j] for i in range(n)]) for j in range(k)]
 
-    # SE for each coefficient
-    t_crit = _t_ppf(alpha, df_resid)
-    coefficients = []
-    # 截距
-    se_int = math.sqrt(MSE * XtX_inv[0][0]) if math.isfinite(MSE) else float("nan")
-    t_int = betas[0] / se_int if se_int > 0 else float("nan")
-    p_int = _t_sf2(abs(t_int), df_resid) if math.isfinite(t_int) else float("nan")
-    coefficients.append({
-        "name": "截距 (Intercept)",
-        "B": round(betas[0], 4),
-        "SE": round(se_int, 4),
-        "t": round(t_int, 4),
-        "p": round(p_int, 4) if math.isfinite(p_int) else None,
-        "ci_lower": round(betas[0] - t_crit * se_int, 4) if math.isfinite(se_int) else None,
-        "ci_upper": round(betas[0] + t_crit * se_int, 4) if math.isfinite(se_int) else None,
-        "beta": None,  # 截距无标准化系数
-    })
-    # 各 IV
-    for j, name in enumerate(iv_names):
-        b = betas[j + 1]
-        se_b = math.sqrt(MSE * XtX_inv[j + 1][j + 1]) if math.isfinite(MSE) and XtX_inv[j+1][j+1] >= 0 else float("nan")
-        t_val = b / se_b if se_b > 0 else float("nan")
-        p_val = _t_sf2(abs(t_val), df_resid) if math.isfinite(t_val) else float("nan")
-        beta = (b * sd_ivs[j] / sd_y) if sd_y > 0 and sd_ivs[j] > 0 else None
-        coefficients.append({
+    def _coef(idx: int, name: str, beta: float | None) -> dict[str, Any]:
+        lo, hi = float(ci[idx][0]), float(ci[idx][1])
+        p_val = pvals[idx]
+        return {
             "name": name,
-            "B": round(b, 4),
-            "SE": round(se_b, 4),
-            "t": round(t_val, 4),
+            "B": round(betas[idx], 4),
+            "SE": round(ses[idx], 4),
+            "t": round(tvals[idx], 4),
             "p": round(p_val, 4) if math.isfinite(p_val) else None,
-            "ci_lower": round(b - t_crit * se_b, 4) if math.isfinite(se_b) else None,
-            "ci_upper": round(b + t_crit * se_b, 4) if math.isfinite(se_b) else None,
+            "ci_lower": round(lo, 4) if math.isfinite(lo) else None,
+            "ci_upper": round(hi, 4) if math.isfinite(hi) else None,
             "beta": round(beta, 4) if beta is not None else None,
-        })
+        }
+
+    coefficients = [_coef(0, "截距 (Intercept)", None)]
+    for j, name in enumerate(iv_names):
+        beta = (betas[j + 1] * sd_ivs[j] / sd_y) if sd_y > 0 and sd_ivs[j] > 0 else None
+        coefficients.append(_coef(j + 1, name, beta))
 
     return {
         "n": n,
