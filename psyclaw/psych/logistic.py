@@ -27,43 +27,17 @@ import math
 import pathlib
 from typing import Any
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 矩阵工具（Gauss-Jordan，stdlib only，与 regression.py 同款）
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _mat_invert(M: list[list[float]]) -> list[list[float]] | None:
-    """Gauss-Jordan 消去求 n×n 矩阵逆，奇异返回 None。"""
-    n = len(M)
-    aug = [M[i][:] + [1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
-    for col in range(n):
-        pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[pivot] = aug[pivot], aug[col]
-        p = aug[col][col]
-        if abs(p) < 1e-14:
-            return None
-        scale = 1.0 / p
-        aug[col] = [v * scale for v in aug[col]]
-        for row in range(n):
-            if row != col and aug[row][col] != 0.0:
-                f = aug[row][col]
-                aug[row] = [aug[row][k] - f * aug[col][k] for k in range(2 * n)]
-    return [row[n:] for row in aug]
-
-
-def _mat_vec(A: list[list[float]], v: list[float]) -> list[float]:
-    return [sum(A[i][j] * v[j] for j in range(len(v))) for i in range(len(A))]
+import numpy as np
+import statsmodels.api as sm
+from scipy import special, stats
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 数学工具
+# 数学工具（scipy 适配；测试直接 import _sigmoid/_normal_sf/_normal_quantile/_chi2_sf）
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _sigmoid(x: float) -> float:
-    if x >= 0:
-        return 1.0 / (1.0 + math.exp(-x))
-    e = math.exp(x)
-    return e / (1.0 + e)
+    return float(special.expit(x))
 
 
 def _safe_exp(x: float) -> float:
@@ -75,89 +49,25 @@ def _safe_exp(x: float) -> float:
     return math.exp(x)
 
 
-def _log_sigmoid(x: float) -> float:
-    if x >= 0:
-        return -math.log1p(math.exp(-x))
-    return x - math.log1p(math.exp(x))
-
-
-def _erfc_approx(x: float) -> float:
-    """互补误差函数近似（Abramowitz & Stegun 7.1.26）。"""
-    t = 1.0 / (1.0 + 0.3275911 * abs(x))
-    poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741
-           + t * (-1.453152027 + t * 1.061405429))))
-    erfc_pos = poly * math.exp(-x * x)
-    return erfc_pos if x >= 0 else 2.0 - erfc_pos
-
-
 def _normal_sf(z: float) -> float:
-    """标准正态上尾概率 P(Z > |z|)。"""
-    return _erfc_approx(abs(z) / math.sqrt(2)) / 2.0
+    """标准正态上尾概率 P(Z > |z|) —— scipy.stats.norm.sf。"""
+    return float(stats.norm.sf(abs(z)))
 
 
 def _normal_quantile(p: float) -> float:
-    """标准正态分位数（二分法，精度 1e-10）。"""
+    """标准正态分位数 —— scipy.special.ndtri。"""
     if p <= 0.0:
         return -1e300
     if p >= 1.0:
         return 1e300
-    lo, hi = -10.0, 10.0
-    for _ in range(80):
-        mid = (lo + hi) / 2.0
-        cdf = 1.0 - _erfc_approx(mid / math.sqrt(2)) / 2.0
-        if cdf < p:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2.0
-
-
-def _gammainc_series(a: float, x: float) -> float:
-    """正则化下不完全 Gamma 函数 P(a, x) 级数展开。"""
-    if x == 0.0:
-        return 0.0
-    ap, delta, summ = a, 1.0 / a, 1.0 / a
-    for _ in range(300):
-        ap += 1.0
-        delta *= x / ap
-        summ += delta
-        if abs(delta) < abs(summ) * 1e-12:
-            break
-    return summ * math.exp(-x + a * math.log(x) - math.lgamma(a))
-
-
-def _gammainc_cf(a: float, x: float) -> float:
-    """Q(a, x) 连分式展开（Lentz 算法）。"""
-    fpmin = 1e-300
-    b, c, d = x + 1.0 - a, 1.0 / fpmin, 1.0 / max(abs(x + 1.0 - a), fpmin)
-    if x + 1.0 - a < 0:
-        d = 1.0 / fpmin
-    h = d
-    for i in range(1, 301):
-        an = -i * (i - a)
-        b += 2.0
-        d = an * d + b
-        if abs(d) < fpmin:
-            d = fpmin
-        c = b + an / c
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-12:
-            break
-    return math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
+    return float(special.ndtri(p))
 
 
 def _chi2_sf(x: float, df: float) -> float:
-    """χ² 分布上尾概率（生存函数）。"""
+    """χ² 分布上尾概率（生存函数）—— scipy.stats.chi2.sf。"""
     if x <= 0:
         return 1.0
-    a, x2 = df / 2.0, x / 2.0
-    if x2 < a + 1:
-        return 1.0 - _gammainc_series(a, x2)
-    return _gammainc_cf(a, x2)
+    return float(stats.chi2.sf(x, df))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -199,78 +109,18 @@ def logistic_regression(
         predictor_names = [f"X{i}" for i in range(1, k)]
     term_names = ["(Intercept)"] + list(predictor_names)
 
-    # 零模型对数似然（仅截距）
-    p_null = max(1e-15, min(1.0 - 1e-15, sum(y) / n))
-    ll_null = sum(y) * math.log(p_null) + (n - sum(y)) * math.log(1.0 - p_null)
+    n_pos = int(sum(y))
+    # 零模型对数似然（仅截距，闭式）
+    p_null = max(1e-15, min(1.0 - 1e-15, n_pos / n))
+    ll_null = n_pos * math.log(p_null) + (n - n_pos) * math.log(1.0 - p_null)
 
-    # ── IRLS ──────────────────────────────────────────────────────────────────
-    beta = [0.0] * k
-    ll_prev = -1e300
-    converged = False
-    n_iter = 0
-
-    for iteration in range(max_iter):
-        n_iter = iteration + 1
-        eta = [sum(X[i][j] * beta[j] for j in range(k)) for i in range(n)]
-        mu  = [_sigmoid(e) for e in eta]
-        w   = [max(m * (1.0 - m), 1e-10) for m in mu]
-
-        ll = sum(
-            y[i] * _log_sigmoid(eta[i]) + (1.0 - y[i]) * _log_sigmoid(-eta[i])
-            for i in range(n)
-        )
-
-        # X^T W X
-        XtWX = [[0.0] * k for _ in range(k)]
-        for i in range(n):
-            wi = w[i]
-            for a in range(k):
-                xa = X[i][a]
-                for b in range(k):
-                    XtWX[a][b] += wi * xa * X[i][b]
-
-        # score = X^T (y - mu)
-        score = [
-            sum(X[i][j] * (y[i] - mu[i]) for i in range(n))
-            for j in range(k)
-        ]
-
-        inv_H = _mat_invert(XtWX)
-        if inv_H is None:
-            break  # 矩阵奇异，停止
-
-        beta = [beta[j] + d for j, d in enumerate(_mat_vec(inv_H, score))]
-
-        if abs(ll - ll_prev) < tol:
-            converged = True
-            break
-        ll_prev = ll
-
-    # ── 最终估计量 ─────────────────────────────────────────────────────────────
-    eta = [sum(X[i][j] * beta[j] for j in range(k)) for i in range(n)]
-    mu  = [_sigmoid(e) for e in eta]
-    w   = [max(m * (1.0 - m), 1e-10) for m in mu]
-
-    XtWX = [[0.0] * k for _ in range(k)]
-    for i in range(n):
-        wi = w[i]
-        for a in range(k):
-            xa = X[i][a]
-            for b in range(k):
-                XtWX[a][b] += wi * xa * X[i][b]
-
-    inv_H = _mat_invert(XtWX)
-    se_list = (
-        [math.sqrt(max(inv_H[j][j], 0.0)) for j in range(k)]
-        if inv_H is not None
-        else [float("nan")] * k
+    # ── statsmodels Logit（X 已含截距列）─────────────────────────────────────────
+    model = sm.Logit(np.asarray(y, dtype=float), np.asarray(X, dtype=float)).fit(
+        disp=0, maxiter=max_iter
     )
 
-    ll_model = sum(
-        y[i] * _log_sigmoid(eta[i]) + (1.0 - y[i]) * _log_sigmoid(-eta[i])
-        for i in range(n)
-    )
-
+    beta = [float(v) for v in model.params]
+    se_list = [float(v) for v in model.bse]
     z_vals = [
         beta[j] / se_list[j] if (se_list[j] > 0 and math.isfinite(se_list[j]))
         else float("nan")
@@ -281,16 +131,22 @@ def logistic_regression(
         for z in z_vals
     ]
 
-    z_crit = _normal_quantile(1.0 - alpha / 2.0)
-    ci_lower = [beta[j] - z_crit * se_list[j] for j in range(k)]
-    ci_upper = [beta[j] + z_crit * se_list[j] for j in range(k)]
-    or_      = [_safe_exp(beta[j]) for j in range(k)]
+    ci = np.asarray(model.conf_int(alpha), dtype=float)
+    ci_lower = [float(ci[j][0]) for j in range(k)]
+    ci_upper = [float(ci[j][1]) for j in range(k)]
+    or_      = [_safe_exp(b) for b in beta]
     or_ci_lo = [_safe_exp(c) for c in ci_lower]
     or_ci_hi = [_safe_exp(c) for c in ci_upper]
 
     # 完全分离检测（任意 OR = ∞ 是强烈信号）
     complete_separation = any(math.isinf(o) for o in or_)
 
+    mu = [float(m) for m in model.predict()]
+    retvals = getattr(model, "mle_retvals", None) or {}
+    converged = bool(retvals.get("converged", True))
+    n_iter = int(retvals.get("iterations", 0) or 0)
+
+    ll_model = float(model.llf)
     lr_chi2 = max(0.0, 2.0 * (ll_model - ll_null))
     lr_df   = k - 1  # 预测变量个数（不含截距）
     lr_p    = _chi2_sf(lr_chi2, lr_df) if lr_df > 0 else float("nan")
