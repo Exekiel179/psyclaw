@@ -37,32 +37,24 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import special, stats
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 矩阵工具（Gauss-Jordan，stdlib only，与 logistic.py 同款）
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _mat_invert(M: list[list[float]]) -> list[list[float]] | None:
-    """Gauss-Jordan 消去求 n×n 矩阵逆，奇异返回 None。"""
-    n = len(M)
-    aug = [M[i][:] + [1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
-    for col in range(n):
-        pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[pivot] = aug[pivot], aug[col]
-        p = aug[col][col]
-        if abs(p) < 1e-14:
-            return None
-        scale = 1.0 / p
-        aug[col] = [v * scale for v in aug[col]]
-        for row in range(n):
-            if row != col and aug[row][col] != 0.0:
-                f = aug[row][col]
-                aug[row] = [aug[row][k] - f * aug[col][k] for k in range(2 * n)]
-    return [row[n:] for row in aug]
+    """n×n 矩阵逆（numpy），奇异返回 None。"""
+    try:
+        return np.linalg.inv(np.asarray(M, dtype=float)).tolist()
+    except np.linalg.LinAlgError:
+        return None
 
 
 def _mat_vec(A: list[list[float]], v: list[float]) -> list[float]:
-    return [sum(A[i][j] * v[j] for j in range(len(v))) for i in range(len(A))]
+    return (np.asarray(A, dtype=float) @ np.asarray(v, dtype=float)).tolist()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -78,81 +70,25 @@ def _safe_exp(x: float) -> float:
     return math.exp(x)
 
 
-def _erfc_approx(x: float) -> float:
-    """互补误差函数近似（Abramowitz & Stegun 7.1.26）。"""
-    t = 1.0 / (1.0 + 0.3275911 * abs(x))
-    poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741
-           + t * (-1.453152027 + t * 1.061405429))))
-    erfc_pos = poly * math.exp(-x * x)
-    return erfc_pos if x >= 0 else 2.0 - erfc_pos
-
-
 def _normal_sf(z: float) -> float:
-    """标准正态上尾概率 P(Z > |z|)。"""
-    return _erfc_approx(abs(z) / math.sqrt(2)) / 2.0
+    """标准正态上尾概率 P(Z > |z|) —— scipy.stats.norm.sf。"""
+    return float(stats.norm.sf(abs(z)))
 
 
 def _normal_quantile(p: float) -> float:
-    """标准正态分位数（二分法，精度 1e-10）。"""
+    """标准正态分位数 —— scipy.special.ndtri。"""
     if p <= 0.0:
         return -1e300
     if p >= 1.0:
         return 1e300
-    lo, hi = -10.0, 10.0
-    for _ in range(80):
-        mid = (lo + hi) / 2.0
-        cdf = 1.0 - _erfc_approx(mid / math.sqrt(2)) / 2.0
-        if cdf < p:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2.0
-
-
-def _gammainc_series(a: float, x: float) -> float:
-    """正则化下不完全 Gamma 函数 P(a, x) 级数展开。"""
-    if x == 0.0:
-        return 0.0
-    ap, delta, summ = a, 1.0 / a, 1.0 / a
-    for _ in range(300):
-        ap += 1.0
-        delta *= x / ap
-        summ += delta
-        if abs(delta) < abs(summ) * 1e-12:
-            break
-    return summ * math.exp(-x + a * math.log(x) - math.lgamma(a))
-
-
-def _gammainc_cf(a: float, x: float) -> float:
-    """Q(a, x) 连分式展开（Lentz 算法）。"""
-    fpmin = 1e-300
-    b, c, d = x + 1.0 - a, 1.0 / fpmin, 1.0 / max(abs(x + 1.0 - a), fpmin)
-    h = d
-    for i in range(1, 301):
-        an = -i * (i - a)
-        b += 2.0
-        d = an * d + b
-        if abs(d) < fpmin:
-            d = fpmin
-        c = b + an / c
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-12:
-            break
-    return math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
+    return float(special.ndtri(p))
 
 
 def _chi2_sf(x: float, df: float) -> float:
-    """χ² 分布上尾概率（生存函数）。"""
+    """χ² 分布上尾概率（生存函数）—— scipy.stats.chi2.sf。"""
     if x <= 0:
         return 1.0
-    a, x2 = df / 2.0, x / 2.0
-    if x2 < a + 1:
-        return 1.0 - _gammainc_series(a, x2)
-    return _gammainc_cf(a, x2)
+    return float(stats.chi2.sf(x, df))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
