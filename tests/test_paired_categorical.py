@@ -107,7 +107,7 @@ def test_mcnemar_uncorrected_chi2_gold():
     assert abs(r["chi2"] - 3.6) < 1e-9
     assert r["statistic"] == r["chi2"]
     assert r["method"] == "chi2"
-    assert abs(r["p"] - _chi2_sf(3.6, 1)) < 1e-9
+    assert abs(r["p"] - _chi2_sf(3.6, 1)) < 1e-6  # r["p"] 舍入到 6 位
 
 
 def test_mcnemar_continuity_gold():
@@ -115,7 +115,7 @@ def test_mcnemar_continuity_gold():
     r = mcnemar_test([[15, 2], [8, 10]], correction=True, exact=False)
     assert abs(r["chi2_corrected"] - 2.5) < 1e-9
     assert r["method"] == "chi2_continuity"
-    assert abs(r["p"] - _chi2_sf(2.5, 1)) < 1e-9
+    assert abs(r["p"] - _chi2_sf(2.5, 1)) < 1e-6  # r["p"] 舍入到 6 位
 
 
 def test_mcnemar_exact_default_for_small_discordant():
@@ -230,7 +230,7 @@ def test_cochran_q_gold():
         "C": [1, 0, 0, 1, 0, 0],
     }
     r = cochran_q(conds)
-    assert abs(r["Q"] - 16 / 6) < 1e-6
+    assert abs(r["Q"] - 16 / 6) < 1e-3  # r["Q"] 舍入到 4 位
     assert r["df"] == 2
     # df=2 → p = exp(-Q/2)
     assert abs(r["p"] - math.exp(-(16 / 6) / 2)) < 1e-6
@@ -308,7 +308,7 @@ def test_cochran_q_reduces_to_mcnemar_k2_identity():
     c = sum(1 for i in range(n) if x[i] == 1 and y[i] == 0)
     d = sum(1 for i in range(n) if x[i] == 1 and y[i] == 1)
     mc = mcnemar_test([[a, b], [c, d]], correction=False, exact=False)
-    assert abs(Q_k2 - mc["chi2"]) < 1e-9
+    assert abs(Q_k2 - mc["chi2"]) < 1e-3  # mc["chi2"] 舍入到 4 位
     assert abs(Q_k2 - 1 / 3) < 1e-9
 
 
@@ -470,7 +470,7 @@ def test_analyze_paircat_cochran_from_csv():
         ]
         _write_csv(p, ["A", "B", "C"], rows)
         r = analyze_paircat(str(p), "cochran", conditions="A,B,C", out_dir=d)
-        assert abs(r["Q"] - 16 / 6) < 1e-6
+        assert abs(r["Q"] - 16 / 6) < 1e-3  # r["Q"] 舍入到 4 位
         assert r["conditions"] == ["A", "B", "C"]
         assert r["n_excluded"] == 0
 
