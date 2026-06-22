@@ -34,88 +34,41 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import stats
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 矩阵工具 (Gauss-Jordan, stdlib only)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _mat_invert(M: list[list[float]]) -> list[list[float]] | None:
-    n = len(M)
-    aug = [M[i][:] + [1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
-    for col in range(n):
-        pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[pivot] = aug[pivot], aug[col]
-        p = aug[col][col]
-        if abs(p) < 1e-14:
-            return None
-        s = 1.0 / p
-        aug[col] = [v * s for v in aug[col]]
-        for row in range(n):
-            if row != col and aug[row][col] != 0.0:
-                f = aug[row][col]
-                aug[row] = [aug[row][k] - f * aug[col][k] for k in range(2 * n)]
-    return [row[n:] for row in aug]
+    try:
+        return np.linalg.inv(np.asarray(M, dtype=float)).tolist()
+    except np.linalg.LinAlgError:
+        return None
 
 
 def _mat_vec(A: list[list[float]], v: list[float]) -> list[float]:
-    return [sum(A[i][j] * v[j] for j in range(len(v))) for i in range(len(A))]
+    return (np.asarray(A, dtype=float) @ np.asarray(v, dtype=float)).tolist()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 分布工具 (不完全 Beta / t-CDF, stdlib only)
+# 分布工具（scipy）
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _betai(a: float, b: float, x: float) -> float:
-    if x <= 0.0:
-        return 0.0
-    if x >= 1.0:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1.0 - x) * b - lbeta) / a
-    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        for num, sign in [
-            (m * (b - m) * x / ((a + m2 - 1) * (a + m2)), 1),
-            (-(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1)), 1),
-        ]:
-            d = 1.0 + num * d
-            c = 1.0 + num / c
-            if abs(d) < fpmin: d = fpmin
-            if abs(c) < fpmin: c = fpmin
-            d = 1.0 / d
-            h *= d * c
-    return front * h
-
 
 def _t_sf2(t: float, df: float) -> float:
-    """双尾 t 检验 p 值 (两倍单尾)。"""
+    """双尾 t 检验 p 值 —— scipy.stats.t.sf。"""
     if not math.isfinite(t) or not math.isfinite(df) or df <= 0:
         return float("nan")
-    t = abs(t)
-    x = df / (df + t * t)
-    return _betai(df / 2, 0.5, x)
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def _t_quantile(p: float, df: float) -> float:
-    """t 分布临界值（双尾 p 对应的 |t|），二分法求根。"""
+    """t 分布临界值（双尾 p 对应的 |t|）—— scipy.stats.t.ppf。"""
     if df <= 0 or not (0 < p < 1):
         return float("nan")
-    lo, hi = 0.0, 1e6
-    for _ in range(60):
-        mid = (lo + hi) / 2
-        if _t_sf2(mid, df) > p:
-            lo = mid
-        else:
-            hi = mid
-    return (lo + hi) / 2
+    return float(stats.t.ppf(1.0 - p / 2.0, df))
 
 
 def _chi2_sf(x: float, df: float) -> float:
@@ -123,36 +76,7 @@ def _chi2_sf(x: float, df: float) -> float:
         return 1.0
     if not math.isfinite(x) or df <= 0:
         return float("nan")
-    return 1.0 - _gammainc(df / 2, x / 2)
-
-
-def _gammainc(a: float, x: float) -> float:
-    if x <= 0:
-        return 0.0
-    if x < a + 1:
-        s = ap = 1.0 / a
-        for _ in range(200):
-            ap += 1
-            s += (1.0 / ap)
-            if abs(1.0 / ap) < s * 1e-12:
-                break
-        return s * math.exp(-x + a * math.log(x) - math.lgamma(a))
-    fpmin = 1e-300
-    b, c, d = x + 1 - a, 1.0 / fpmin, 1.0 / (x + 1 - a)
-    h = d
-    for i in range(1, 201):
-        an = -i * (i - a)
-        b += 2
-        d = an * d + b
-        c = b + an / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-12:
-            break
-    return 1.0 - math.exp(-x + a * math.log(x) - math.lgamma(a)) * h
+    return float(stats.chi2.sf(x, df))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
