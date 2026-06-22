@@ -34,117 +34,56 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import stats
+
 
 # ---------------------------------------------------------------------------
 # 矩阵工具（stdlib only，同 regression.py）
 # ---------------------------------------------------------------------------
 
 def _mat_transpose(A: list[list[float]]) -> list[list[float]]:
-    m, n = len(A), len(A[0])
-    return [[A[i][j] for i in range(m)] for j in range(n)]
+    return np.asarray(A, dtype=float).T.tolist()
 
 
 def _mat_mult(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
-    m, n = len(A), len(A[0])
-    p = len(B[0])
-    C = [[0.0] * p for _ in range(m)]
-    for i in range(m):
-        for k in range(n):
-            if A[i][k] == 0.0:
-                continue
-            for j in range(p):
-                C[i][j] += A[i][k] * B[k][j]
-    return C
+    return (np.asarray(A, dtype=float) @ np.asarray(B, dtype=float)).tolist()
 
 
 def _mat_vec(A: list[list[float]], v: list[float]) -> list[float]:
-    return [sum(A[i][j] * v[j] for j in range(len(v))) for i in range(len(A))]
+    return (np.asarray(A, dtype=float) @ np.asarray(v, dtype=float)).tolist()
 
 
 def _mat_invert(M: list[list[float]]) -> list[list[float]] | None:
-    n = len(M)
-    aug = [M[i][:] + [1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
-    for col in range(n):
-        pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[pivot] = aug[pivot], aug[col]
-        p = aug[col][col]
-        if abs(p) < 1e-14:
-            return None
-        scale = 1.0 / p
-        aug[col] = [v * scale for v in aug[col]]
-        for row in range(n):
-            if row != col and aug[row][col] != 0.0:
-                f = aug[row][col]
-                aug[row] = [aug[row][k] - f * aug[col][k] for k in range(2 * n)]
-    return [row[n:] for row in aug]
+    arr = np.asarray(M, dtype=float)
+    try:
+        return np.linalg.inv(arr).tolist()
+    except np.linalg.LinAlgError:
+        return None
 
 
 # ---------------------------------------------------------------------------
-# 统计分布（来自 regression.py 同款实现）
+# 统计分布（scipy 适配；不再手写分布函数）
 # ---------------------------------------------------------------------------
-
-def _betai(a: float, b: float, x: float) -> float:
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d; c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d; c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
 
 def _t_sf2(t: float, df: float) -> float:
+    """学生 t 双尾 p。"""
     if df <= 0:
         return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def _f_sf(f: float, df1: float, df2: float) -> float:
     if f <= 0 or df1 <= 0 or df2 <= 0:
         return float("nan")
-    x = df2 / (df2 + df1 * f)
-    return _betai(df2 / 2.0, df1 / 2.0, x)
+    return float(stats.f.sf(f, df1, df2))
 
 
 def _t_ppf(p: float, df: float) -> float:
+    """返回双尾 p = p 对应的 t（即 t.ppf(1 - p/2)）。"""
     if df <= 0:
         return float("nan")
-    lo, hi = 0.0, 1000.0
-    for _ in range(60):
-        mid = (lo + hi) / 2.0
-        if _t_sf2(mid, df) < p:
-            hi = mid
-        else:
-            lo = mid
-    return (lo + hi) / 2.0
+    return float(stats.t.ppf(1 - p / 2.0, df))
 
 
 # ---------------------------------------------------------------------------
