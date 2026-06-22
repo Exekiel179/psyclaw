@@ -14,6 +14,8 @@ import math
 import pathlib
 from typing import Any
 
+from scipy import special, stats
+
 
 # ---------------------------------------------------------------------------
 # 数值工具
@@ -41,102 +43,35 @@ def _median(xs: list[float]) -> float:
 
 
 def _skewness(xs: list[float]) -> float:
-    """Fisher's g1（偏度），使用 n 矩（样本调整）。"""
-    n = len(xs)
-    if n < 3:
+    """Fisher-Pearson 样本偏度 G1（bias-corrected）—— scipy.stats.skew。"""
+    if len(xs) < 3:
         return float("nan")
-    m = _mean(xs)
-    m2 = sum((v - m) ** 2 for v in xs) / n
-    m3 = sum((v - m) ** 3 for v in xs) / n
-    if m2 == 0:
-        return float("nan")
-    g1 = m3 / m2 ** 1.5
-    # 样本偏度调整（G1）
-    return g1 * math.sqrt(n * (n - 1)) / (n - 2)
+    return float(stats.skew(xs, bias=False))
 
 
 def _kurtosis(xs: list[float]) -> float:
-    """超峰度（excess kurtosis）G2，与 SPSS/Excel KURT() 一致。
-
-    公式：G2 = (n-1)/((n-2)(n-3)) * [(n+1)*g2 + 6]，g2 = m4/m2^2 - 3
-    正态分布期望值为 0；比正态更尖峰 > 0，更平坦 < 0。
-    """
-    n = len(xs)
-    if n < 4:
+    """样本超峰度 G2（Fisher，bias-corrected，与 SPSS/Excel KURT() 一致）—— scipy.stats.kurtosis。"""
+    if len(xs) < 4:
         return float("nan")
-    m = _mean(xs)
-    m2 = sum((v - m) ** 2 for v in xs) / n
-    m4 = sum((v - m) ** 4 for v in xs) / n
-    if m2 == 0:
-        return float("nan")
-    g2 = m4 / m2 ** 2 - 3.0
-    return (n - 1) * ((n + 1) * g2 + 6) / ((n - 2) * (n - 3))
+    return float(stats.kurtosis(xs, fisher=True, bias=False))
 
 
 def _t_ppf(p: float, df: float) -> float:
-    """t 分布上α分位数（简化二分搜索）。"""
+    """双尾 p = p 对应的 t（即 t.ppf(1 - p/2)）。"""
     if df <= 0:
         return float("nan")
-    lo, hi = 0.0, 1000.0
-    for _ in range(60):
-        mid = (lo + hi) / 2.0
-        if _t_sf2(mid, df) < p:
-            hi = mid
-        else:
-            lo = mid
-    return (lo + hi) / 2.0
+    return float(stats.t.ppf(1 - p / 2.0, df))
 
 
 def _betai(a: float, b: float, x: float) -> float:
-    """正则化不完全 Beta 函数（Numerical Recipes 连分式 + 对称）。"""
+    """正则化不完全 Beta 函数 I_x(a,b) —— scipy.special.betainc。"""
     if x < 0 or x > 1:
         return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    # Lentz continued fraction
-    c = 1.0
-    d = 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        # even
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin:
-            d = fpmin
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        # odd
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin:
-            d = fpmin
-        if abs(c) < fpmin:
-            c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
+    return float(special.betainc(a, b, x))
 
 
 def _t_sf2(t: float, df: float) -> float:
-    """学生 t 双尾 p 值。"""
+    """学生 t 双尾 p 值（经 _betai → scipy）。"""
     if df <= 0:
         return float("nan")
     x = df / (df + t * t)
@@ -298,33 +233,10 @@ def compute_correlation_matrix(
 
 
 def _norm_ppf(p: float) -> float:
-    """标准正态分位数（Acklam 近似）。"""
+    """标准正态分位数 —— scipy.special.ndtri。"""
     if not 0 < p < 1:
         return float("nan")
-    a = [-3.969683028665376e+01, 2.209460984245205e+02,
-         -2.759285104469687e+02, 1.383577518672690e+02,
-         -3.066479806614716e+01, 2.506628277459239e+00]
-    b = [-5.447609879822406e+01, 1.615858368580409e+02,
-         -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01]
-    c = [-7.784894002430293e-03, -3.223964580411365e-01,
-         -2.400758277161838e+00, -2.549732539343734e+00,
-         4.374664141464968e+00, 2.938163982698783e+00]
-    d = [7.784695709041462e-03, 3.224671290700398e-01,
-         2.445134137142996e+00, 3.754408661907416e+00]
-    p_low, p_high = 0.02425, 1 - 0.02425
-    if p < p_low:
-        q = math.sqrt(-2 * math.log(p))
-        return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
-               ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
-    elif p <= p_high:
-        q = p - 0.5
-        r = q * q
-        return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / \
-               (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
-    else:
-        q = math.sqrt(-2 * math.log(1 - p))
-        return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / \
-                ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+    return float(special.ndtri(p))
 
 
 # ---------------------------------------------------------------------------
