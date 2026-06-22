@@ -191,7 +191,7 @@ class TestPartialCorrWithControls:
         x = list(range(1, n + 1))
         z1 = [0.5 * xi for xi in x]
         z2 = [0.3 * xi + 0.2 for xi in x]
-        y = [xi - 0.2 * z1[i] for i in range(n)]
+        y = [x[i] - 0.2 * z1[i] for i in range(n)]
         ctrl = _ctrl(z1, z2)
         res = partial_correlation(x, y, ctrl)
         assert res["df"] == n - 2 - 2  # 8

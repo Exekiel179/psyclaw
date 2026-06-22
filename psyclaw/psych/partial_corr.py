@@ -29,126 +29,49 @@ import math
 import pathlib
 from typing import Any
 
+import numpy as np
+from scipy import special, stats
+
 
 # ---------------------------------------------------------------------------
 # 矩阵工具（Gauss-Jordan，stdlib only）
 # ---------------------------------------------------------------------------
 
 def _mat_transpose(A: list[list[float]]) -> list[list[float]]:
-    m, n = len(A), len(A[0])
-    return [[A[i][j] for i in range(m)] for j in range(n)]
+    return np.asarray(A, dtype=float).T.tolist()
 
 
 def _mat_mult(A: list[list[float]], B: list[list[float]]) -> list[list[float]]:
-    m, n = len(A), len(A[0])
-    p = len(B[0])
-    C = [[0.0] * p for _ in range(m)]
-    for i in range(m):
-        for k in range(n):
-            if A[i][k] == 0.0:
-                continue
-            for j in range(p):
-                C[i][j] += A[i][k] * B[k][j]
-    return C
+    return (np.asarray(A, dtype=float) @ np.asarray(B, dtype=float)).tolist()
 
 
 def _mat_vec(A: list[list[float]], v: list[float]) -> list[float]:
-    return [sum(A[i][j] * v[j] for j in range(len(v))) for i in range(len(A))]
+    return (np.asarray(A, dtype=float) @ np.asarray(v, dtype=float)).tolist()
 
 
 def _mat_invert(M: list[list[float]]) -> list[list[float]] | None:
-    n = len(M)
-    aug = [M[i][:] + [1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
-    for col in range(n):
-        pivot = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[pivot] = aug[pivot], aug[col]
-        p = aug[col][col]
-        if abs(p) < 1e-14:
-            return None
-        scale = 1.0 / p
-        aug[col] = [v * scale for v in aug[col]]
-        for row in range(n):
-            if row != col and aug[row][col] != 0.0:
-                f = aug[row][col]
-                aug[row] = [aug[row][k] - f * aug[col][k] for k in range(2 * n)]
-    return [row[n:] for row in aug]
+    try:
+        return np.linalg.inv(np.asarray(M, dtype=float)).tolist()
+    except np.linalg.LinAlgError:
+        return None
 
 
 # ---------------------------------------------------------------------------
 # 统计工具（t 分布、正态分布分位数，stdlib only）
 # ---------------------------------------------------------------------------
 
-def _betai(a: float, b: float, x: float) -> float:
-    """不完全 Beta 函数 I_x(a, b) — 连分数展开。"""
-    if x < 0 or x > 1:
-        return float("nan")
-    if x == 0:
-        return 0.0
-    if x == 1:
-        return 1.0
-    if x > (a + 1) / (a + b + 2):
-        return 1.0 - _betai(b, a, 1.0 - x)
-    fpmin = 1e-300
-    lbeta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
-    front = math.exp(math.log(x) * a + math.log(1 - x) * b - lbeta) / a
-    c, d = 1.0, 1.0 - (a + b) * x / (a + 1)
-    if abs(d) < fpmin:
-        d = fpmin
-    d = 1.0 / d
-    h = d
-    for m in range(1, 200):
-        m2 = 2 * m
-        num = m * (b - m) * x / ((a + m2 - 1) * (a + m2))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        h *= d * c
-        num = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1))
-        d = 1.0 + num * d
-        c = 1.0 + num / c
-        if abs(d) < fpmin: d = fpmin
-        if abs(c) < fpmin: c = fpmin
-        d = 1.0 / d
-        delta = d * c
-        h *= delta
-        if abs(delta - 1.0) < 1e-14:
-            break
-    return front * h
-
-
 def _t_sf2(t: float, df: float) -> float:
-    """t 分布双尾 p 值。"""
+    """t 分布双尾 p 值 —— scipy.stats.t.sf。"""
     if df <= 0:
         return float("nan")
-    x = df / (df + t * t)
-    return _betai(df / 2.0, 0.5, x)
+    return 2.0 * float(stats.t.sf(abs(t), df))
 
 
 def _norm_ppf(p: float) -> float:
-    """标准正态分布分位数（Rational approximation, Acklam 2003）。"""
+    """标准正态分布分位数 —— scipy.special.ndtri。"""
     if not 0 < p < 1:
         return float("nan")
-    a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02,
-         1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
-    b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02,
-         6.680131188771972e+01, -1.328068155288572e+01]
-    c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
-         -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
-    d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00,
-         3.754408661907416e+00]
-    p_low, p_high = 0.02425, 1 - 0.02425
-    if p < p_low:
-        q = math.sqrt(-2 * math.log(p))
-        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
-    elif p <= p_high:
-        q = p - 0.5
-        r = q * q
-        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1)
-    else:
-        q = math.sqrt(-2 * math.log(1 - p))
-        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1)
+    return float(special.ndtri(p))
 
 
 # ---------------------------------------------------------------------------
@@ -263,17 +186,22 @@ def partial_correlation(
         raise ValueError(f"x 长度 {n} 与 y 长度 {len(y)} 不一致")
 
     k = len(controls[0]) if controls else 0
+    df = n - 2 - k
 
     if controls:
         if len(controls) != n:
             raise ValueError(f"controls 行数 {len(controls)} 与 x 长度 {n} 不一致")
-        e_x = _ols_residuals(x, controls)
-        e_y = _ols_residuals(y, controls)
+        try:
+            e_x = _ols_residuals(x, controls)
+            e_y = _ols_residuals(y, controls)
+            r = _pearson_r_raw(e_x, e_y)
+        except ValueError:
+            if df > 0:
+                raise  # df 充足却奇异属真实错误，照常抛
+            r = float("nan")  # df<=0 且控制变量共线 → 无法推断，优雅返回
     else:
-        e_x = x
-        e_y = y
+        r = _pearson_r_raw(x, y)
 
-    r = _pearson_r_raw(e_x, e_y)
     stats = _r_to_stats(r, n, k, alpha)
 
     return {
