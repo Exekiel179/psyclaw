@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import re
 from pathlib import Path
 
@@ -22,8 +23,9 @@ TEXT_SUFFIXES: frozenset[str] = frozenset({
 
 
 def _build_path_re() -> re.Pattern[str]:
-    quoted = r'"([^"\\]{3,250})"'
-    single = r"'([^'\\]{3,250})'"
+    # 引号内允许反斜杠：Windows 绝对路径 "C:\dir\my file.csv" 必须能整段匹配
+    quoted = r'"([^"]{3,250})"'
+    single = r"'([^']{3,250})'"
     win_abs = r'([A-Za-z]:[/\\][^\s,;()\[\]"\'<>]{2,250})'
     unix_abs = r'(/(?:[^\s,;()\[\]"\'<>]{1,249}))'
     tilde = r'(~[^\s,;()\[\]"\'<>@\n]{1,250})'
@@ -40,6 +42,20 @@ _PATH_RE = _build_path_re()
 _STRIP_TRAIL = re.compile(r'[.,;:!?)\'\"。！？、，：；「」『』【】〔〕]+$')
 
 
+def _expand_user(raw: str) -> Path:
+    """展开前导 ~。优先用 $HOME(跨平台一致);否则退回 Path.expanduser()。
+
+    Windows 的 Path.expanduser() 只认 USERPROFILE 而忽略 HOME,显式优先 HOME
+    可让行为在三大平台一致(真实 Windows 用户通常无 HOME,自然退回 USERPROFILE)。
+    """
+    if raw == "~" or raw.startswith(("~/", "~\\")):
+        home = os.environ.get("HOME")
+        if home:
+            rest = raw[1:].lstrip("/\\")
+            return Path(home, rest) if rest else Path(home)
+    return Path(raw).expanduser()
+
+
 def extract_paths(text: str, cwd: Path | None = None) -> list[Path]:
     """从文本中提取所有候选本地文件路径（去重，按首次出现顺序）。
 
@@ -54,7 +70,7 @@ def extract_paths(text: str, cwd: Path | None = None) -> list[Path]:
         raw = _STRIP_TRAIL.sub("", raw).strip()
         if not raw:
             continue
-        p = Path(raw).expanduser()
+        p = _expand_user(raw)
         if not p.is_absolute():
             p = (base / p).resolve()
         if p in seen or not p.exists():
@@ -146,7 +162,7 @@ def process_message(
         raw = _STRIP_TRAIL.sub("", raw).strip()
         if not raw:
             continue
-        p = Path(raw).expanduser()
+        p = _expand_user(raw)
         if not p.is_absolute():
             p = (base / p).resolve()
         if not p.exists() and p.suffix.lower() in DATA_SUFFIXES | TEXT_SUFFIXES:
