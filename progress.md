@@ -4,7 +4,7 @@
 
 **Last Updated:** 2026-06-24
 **Current Objective:** 按 learn-harness-engineering / learn-hermes-agent 两份指南，把 PsyClaw 补到成熟 harness 水准
-**Active Feature:** feat-008 harness 工程化契约（见 `feature_list.json`）
+**Active Feature:** feat-010 clarify LLM 驱动追问（feat-008/009 已 done，见 `feature_list.json`）
 
 > 状态真源：`feature_list.json`（机器可读）。本文件是人读的"接续上下文"快照。
 > 计划真源仍是 `TODO.md`（81 个 ✅，统计纵深细目）。
@@ -20,13 +20,12 @@
 - [x] feat-005 ARS 四象限端到端流水线（`psyclaw research`）
 - [x] feat-006 审稿模拟 review panel
 - [x] feat-007 REPL + 路径注入 + Markdown 渲染（含跨平台引号/~ 修复）
+- [x] feat-008 harness 工程化契约（validate-harness 24→100）
+- [x] feat-009 端到端集成测试（`tests/test_e2e_analysis.py`，5 例对照 scipy/statsmodels）
 
 ### What's In Progress
 
-- [ ] feat-008 harness 工程化契约
-  - Details: 物化 5 子系统工件（feature_list.json / init.sh / progress.md / session-handoff.md / CLAUDE.md harness 段）
-  - Blockers: 无
-- [ ] feat-009 端到端集成测试（`tests/test_e2e_analysis.py`，CLI 子进程对照 scipy）
+- [ ] （空）下一轮选 feat-010
 
 ### What's Next
 
