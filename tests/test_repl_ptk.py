@@ -288,8 +288,13 @@ class TestFallbackReadline:
             uin._fallback_input("p> ")          # 第二次不应再 import
 
         assert import_calls.count("readline") == 1
-        # POSIX 上 readline 应成功挂接
-        assert uin._readline_ready is True
+        # readline 可用(POSIX)则挂接成功;不可用(Windows stdlib 无该模块)则缓存 False
+        try:
+            import readline  # noqa: F401
+            readline_available = True
+        except Exception:  # noqa: BLE001
+            readline_available = False
+        assert uin._readline_ready is readline_available
 
     def test_fallback_input_strips(self):
         self._reset()
