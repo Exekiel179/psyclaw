@@ -4,7 +4,7 @@
 
 **Last Updated:** 2026-06-24
 **Current Objective:** 按 learn-harness-engineering / learn-hermes-agent 两份指南，把 PsyClaw 补到成熟 harness 水准
-**Active Feature:** feat-010 clarify LLM 驱动追问（feat-008/009 已 done，见 `feature_list.json`）
+**Active Feature:** feat-010 clarify LLM 驱动追问（CLAR-1 已 done；CLAR-2/3/4 待续）
 
 > 状态真源：`feature_list.json`（机器可读）。本文件是人读的"接续上下文"快照。
 > 计划真源仍是 `TODO.md`（81 个 ✅，统计纵深细目）。
@@ -25,11 +25,13 @@
 
 ### What's In Progress
 
-- [ ] （空）下一轮选 feat-010
+- [ ] feat-010 clarify LLM 驱动追问
+  - Details: CLAR-1（LLM 评估+追问+fail-safe 降级）已 done；剩 CLAR-2（read_line UI/back/进度）、CLAR-3（按研究类型动态裁剪槽位）、CLAR-4（卡片追问痕迹 + preregister/research 衔接）
+  - Blockers: 无
 
 ### What's Next
 
-1. feat-010 clarify LLM 驱动追问（CLAR-1..4）—— 流水线前门，最高杠杆
+1. feat-010 余下 CLAR-2/3/4
 2. feat-011 会话持久化 session store（SQLite+FTS5，Hermes s03）
 3. feat-012 判断层评估 harness（eval suite，Hermes s23）—— 商业化"可信"护城河
 
