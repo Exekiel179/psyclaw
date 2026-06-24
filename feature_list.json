@@ -62,16 +62,16 @@
       "name": "harness 工程化契约 (feature_list/init/progress/handoff)",
       "description": "把 learn-harness-engineering 的 5 子系统 (instructions/state/verification/scope/lifecycle) 物化为机器可校验工件",
       "dependencies": [],
-      "status": "in-progress",
-      "evidence": "本工件 + init.sh + progress.md + session-handoff.md + CLAUDE.md harness 契约段；validate-harness.mjs 评分"
+      "status": "done",
+      "evidence": "commit 9a1aa8e；validate-harness.mjs 5 子系统全 5/5 → 100/100 (基线 24)"
     },
     {
       "id": "feat-009",
       "name": "端到端集成测试 (e2e)",
       "description": "通过 CLI 子进程在合成数据上跑核心分析命令，断言 APA 输出 + 数值对照 scipy (learn-harness-engineering L10)",
       "dependencies": ["feat-001"],
-      "status": "in-progress",
-      "evidence": "tests/test_e2e_analysis.py"
+      "status": "done",
+      "evidence": "tests/test_e2e_analysis.py 5 passed：ttest/anova/regress/chi2 经 CLI 子进程对照 scipy/statsmodels + 无仓库污染"
     },
     {
       "id": "feat-010",
