@@ -1,0 +1,101 @@
+{
+  "_comment": "PsyClaw 能力/特性清单 — harness 一等原语 (learn-harness-engineering L08)。每轮只推进 ONE 个 status != done 的 feature；done 必须带 evidence。schema: .agents/skills/harness-creator/templates/feature-list.schema.json",
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "统计分析命令族 (40+ commands)",
+      "description": "describe/ttest/anova/regress/logit/poisson/negbin/ordinal/multinom/efa/mlm/survival/irr/roc 等 40+ 条确定性 CLI 分析命令，输出 APA-7 + 效应量+CI + 报告落盘",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "3131 tests pass (C:\\Python314 -m pytest); 端到端 smoke 对照 scipy/statsmodels 8 命令数值吻合"
+    },
+    {
+      "id": "feat-002",
+      "name": "成熟统计库迁移 (scipy/pingouin/statsmodels/...)",
+      "description": "删除手写分布/特殊函数/估计器，统计核改用成熟库；保留 CLI/IO/APA-7/报告胶水层",
+      "dependencies": ["feat-001"],
+      "status": "done",
+      "evidence": "commit 6b1d2ca..376854a 迁移 ~17 模块 + stats_core/diagnostics 共享核，删 ~2000 行；失败 22→0"
+    },
+    {
+      "id": "feat-003",
+      "name": "学术规范门禁 gates",
+      "description": "效应量+CI 必报、前提诊断、预注册/探索区分、APA7、复现脚本等机器可校验门禁，不达标阻断",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "gates/PSYCLAW.md + rules.yaml + checker.py；psyclaw gates 自检；累计 17 条"
+    },
+    {
+      "id": "feat-004",
+      "name": "三层自进化记忆 (画像/惯性/教训卡)",
+      "description": "profile 显式 + habits 带半衰期自动学习 + lessons HITL 确认；纯 JSON 可审计，只存方法学偏好",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/memory.py + tests/test_audit_memory.py (48 例)"
+    },
+    {
+      "id": "feat-005",
+      "name": "ARS 四象限端到端流水线",
+      "description": "psyclaw research <topic>：澄清门禁→文献→设计→ARS-Stat→APA-JARS 写作→同行评审→门禁汇总，fail-closed verdict",
+      "dependencies": ["feat-001", "feat-003"],
+      "status": "done",
+      "evidence": "psyclaw/pipeline.py + tests/test_pipeline.py (11 例)"
+    },
+    {
+      "id": "feat-006",
+      "name": "审稿模拟 review panel",
+      "description": "EIC + R1/R2/R3 + Devil's Advocate 多视角同行评审，保守 fail-closed 编辑决定，产可解析意见 + response letter",
+      "dependencies": ["feat-005"],
+      "status": "done",
+      "evidence": "psyclaw/review.py + agents/reviewer.md + tests/test_review.py (20 例)"
+    },
+    {
+      "id": "feat-007",
+      "name": "REPL + 路径注入 + Markdown 渲染",
+      "description": "三级降级 REPL (ptk→stdlib→input)、对话自动检测本地数据路径(原始数据不入上下文)、Markdown→ANSI",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/{repl,ui_input,path_ingest,md_render}.py；path_ingest 跨平台引号/~ 修复 (commit 5840386)"
+    },
+    {
+      "id": "feat-008",
+      "name": "harness 工程化契约 (feature_list/init/progress/handoff)",
+      "description": "把 learn-harness-engineering 的 5 子系统 (instructions/state/verification/scope/lifecycle) 物化为机器可校验工件",
+      "dependencies": [],
+      "status": "in-progress",
+      "evidence": "本工件 + init.sh + progress.md + session-handoff.md + CLAUDE.md harness 契约段；validate-harness.mjs 评分"
+    },
+    {
+      "id": "feat-009",
+      "name": "端到端集成测试 (e2e)",
+      "description": "通过 CLI 子进程在合成数据上跑核心分析命令，断言 APA 输出 + 数值对照 scipy (learn-harness-engineering L10)",
+      "dependencies": ["feat-001"],
+      "status": "in-progress",
+      "evidence": "tests/test_e2e_analysis.py"
+    },
+    {
+      "id": "feat-010",
+      "name": "clarify LLM 驱动追问 (CLAR-1..4)",
+      "description": "把固定 17 题脚本升级为 grill-me 式 LLM 评估+追问、按研究类型动态裁剪槽位、与 preregister/research 复用同卡",
+      "dependencies": ["feat-005"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-011",
+      "name": "会话持久化 session store (SQLite+FTS5)",
+      "description": "Hermes s03：可全文检索的跨会话对话持久化，替代当前纯内存 compact_history",
+      "dependencies": ["feat-007"],
+      "status": "not-started",
+      "evidence": ""
+    },
+    {
+      "id": "feat-012",
+      "name": "判断层评估 harness (eval suite)",
+      "description": "Hermes s23：对'选对检验/写对结果段/抓 p-hacking'这层判断力建 benchmark + 一致率度量，防换模型回归",
+      "dependencies": ["feat-005", "feat-006"],
+      "status": "not-started",
+      "evidence": ""
+    }
+  ]
+}
