@@ -78,8 +78,8 @@
       "name": "clarify LLM 驱动追问 (CLAR-1..4)",
       "description": "把固定 17 题脚本升级为 grill-me 式 LLM 评估+追问、按研究类型动态裁剪槽位、与 preregister/research 复用同卡",
       "dependencies": ["feat-005"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "in-progress",
+      "evidence": "CLAR-1 已落地：clarify.py LLM 驱动追问(evaluate_answer/clarify_one)+ fail-safe 降级(无 provider/mock/异常→照单收集)；tests/test_clarify.py 21 例。CLAR-2(read_line UI/back)、CLAR-3(按研究类型裁剪槽位)、CLAR-4(卡片追问痕迹+衔接) 待续"
     },
     {
       "id": "feat-011",

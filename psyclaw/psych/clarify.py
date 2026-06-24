@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from pathlib import Path
 
@@ -71,36 +72,151 @@ SLOTS: list = [
 CARD_NAME = "clarification.md"
 
 
-def run_clarify_interactive(project_dir: str | Path = ".") -> int:
-    """交互式澄清问询(一次一题;'?'看缘由;'skip'留空=未解决)。"""
+# ---------------------------------------------------------------------------
+# CLAR-1：LLM 驱动追问 —— 对空泛回答评估并生成针对性追问
+#   评估标准取自各槽位的 `why`（重要性）。无 provider / mock / 异常 → fail-safe
+#   降级为「照单收集」（视为 PASS，绝不卡住用户）。
+# ---------------------------------------------------------------------------
+
+# 冒号类含 ASCII ':' 与全角 '：'(U+FF1A);用显式转义避免编辑器归一化歧义
+_COLON = "[:：]"
+_EVAL_RE = re.compile("(?im)^\\s*CLARIFY_VERDICT\\s*" + _COLON + "\\s*(PASS|PROBE)")
+_FOLLOWUP_RE = re.compile("(?im)^\\s*FOLLOWUP\\s*" + _COLON + "\\s*(.+)$")
+
+
+def _build_eval_prompt(slot, answer: str) -> str:
+    _sid, _group, q, why, _hint = slot
+    return (
+        "判断研究者对下面澄清问题的回答是否【足够具体、可检验】。\n\n"
+        f"问题：{q}\n"
+        f"评估标准（此槽为何重要）：{why}\n"
+        f"研究者回答：{answer}\n\n"
+        "判据：能据此推出统计假设 / 操作化 / 可复现设计 → 足够；"
+        "空泛、缺关键信息（对象/工具/数值/操作化）→ 不够。\n"
+        "只输出以下标记行，不要寒暄、不要解释：\n"
+        "CLARIFY_VERDICT: PASS\n"
+        "或\n"
+        "CLARIFY_VERDICT: PROBE\n"
+        "FOLLOWUP: <一句针对性追问，点明缺什么、该怎么补>"
+    )
+
+
+def _ask_provider(provider, task: str) -> str:
+    """调 provider 取整段文本；任何异常 fail-safe 视为放行（PASS）。"""
+    sysmsg = "你是严格的研究方法学审稿人，只按要求的标记行输出。"
+    try:
+        return "".join(provider.chat([{"role": "user", "content": task}], system=sysmsg))
+    except Exception:  # noqa: BLE001
+        return "CLARIFY_VERDICT: PASS"
+
+
+def _parse_eval(text: str) -> tuple[str, str]:
+    """解析评估结果。fail-safe：解析不到裁决 → PASS（不卡用户）。取最后一个裁决。"""
+    verdict = "PASS"
+    for m in _EVAL_RE.finditer(text or ""):
+        verdict = m.group(1).upper()
+    fm = _FOLLOWUP_RE.search(text or "")
+    followup = fm.group(1).strip() if fm else ""
+    return verdict, followup
+
+
+def evaluate_answer(provider, slot, answer: str) -> dict:
+    """评估单个回答。返回 {verdict: PASS|PROBE|SKIP, followup}。空回答 → SKIP。"""
+    if not (answer or "").strip():
+        return {"verdict": "SKIP", "followup": ""}
+    verdict, followup = _parse_eval(_ask_provider(provider, _build_eval_prompt(slot, answer)))
+    if verdict == "PROBE" and not followup:
+        followup = "请把回答说得更具体、可检验（点明对象/变量/工具/操作化/数值）。"
+    return {"verdict": verdict, "followup": followup}
+
+
+def clarify_one(provider, slot, ask, max_probes: int = 2,
+                out=print, probing: bool = True) -> dict:
+    """澄清单个槽位（含 `?` 看缘由 / `skip` 跳过 / LLM 追问环）。
+
+    ask(prompt)->str 为输入回调（便于测试/非 TTY 注入）。
+    返回 {answer, rounds, resolved}。probing=False 时退化为一问一答（不追问）。
+    """
+    _sid, _group, q, why, hint = slot
+    ans = ask(f"\n▶ {q}\n  ({hint})\n  > ")
+    while (ans or "").strip() == "?":
+        out(f"  ※ 为什么重要：{why}")
+        ans = ask("  > ")
+    ans = (ans or "").strip()
+    if ans.lower() in ("skip", ""):
+        return {"answer": "", "rounds": 0, "resolved": False}
+
+    rounds = 0
+    while probing and rounds < max_probes:
+        ev = evaluate_answer(provider, slot, ans)
+        if ev["verdict"] != "PROBE":
+            break
+        out(f"  ↪ 追问[{rounds + 1}/{max_probes}]：{ev['followup']}")
+        more = (ask("  > ") or "").strip()
+        rounds += 1
+        if more.lower() in ("skip", ""):
+            break
+        ans = f"{ans}；{more}"
+    return {"answer": ans, "rounds": rounds, "resolved": True}
+
+
+def _default_ask(prompt: str) -> str:
+    try:
+        return input(prompt)
+    except EOFError:
+        return "skip"
+
+
+def run_clarify_interactive(project_dir: str | Path = ".", provider=None,
+                            ask=None, max_probes: int = 2) -> int:
+    """交互式澄清问询（一次一题；`?` 看缘由；`skip` 留空=未解决）。
+
+    配置了真实 provider 时启用 LLM 追问（空泛回答最多追问 max_probes 轮）；
+    无 provider / mock / 异常时 fail-safe 降级为照单收集。
+    provider/ask 可注入便于测试。
+    """
+    if provider is None:
+        try:
+            from psyclaw import config as cfg
+            from psyclaw.providers import get_provider
+            provider = get_provider(cfg.load_config())
+        except Exception:  # noqa: BLE001
+            provider = None
+    probing = provider is not None and getattr(provider, "name", "mock") != "mock"
+    if ask is None:
+        ask = _default_ask
+
     answers: dict = {}
+    probe_rounds: dict = {}
     print("PsyClaw 研究澄清(grill-me 式) — 不澄清完不开工")
     print("=" * 56)
-    print("逐题回答;输入 ? 看为什么重要;输入 skip 暂跳(标记未解决)\n")
+    if probing:
+        print(f"已启用 LLM 追问：空泛回答最多追问 {max_probes} 轮；? 看缘由；skip 跳过。")
+    else:
+        print("未配真实 provider，降级为照单收集（配 provider 后启用 LLM 追问）；? 看缘由；skip 跳过。")
+
     cur_group = None
-    for sid, group, q, why, hint in SLOTS:
+    total = len(SLOTS)
+    for idx, slot in enumerate(SLOTS, 1):
+        sid, group = slot[0], slot[1]
         if group != cur_group:
             cur_group = group
-            print(f"\n── {group} " + "─" * (50 - len(group)))
-        while True:
-            try:
-                ans = input(f"\n▶ {q}\n  ({hint})\n  > ").strip()
-            except EOFError:
-                ans = "skip"
-            if ans == "?":
-                print(f"  ※ 为什么重要:{why}")
-                continue
-            break
-        answers[sid] = "" if ans.lower() == "skip" else ans
+            print(f"\n── [{idx}/{total}] {group} " + "─" * max(0, 44 - len(group)))
+        r = clarify_one(provider, slot, ask, max_probes=max_probes, probing=probing)
+        answers[sid] = r["answer"]
+        probe_rounds[sid] = r["rounds"]
 
     path = write_card(answers, project_dir)
     unresolved = [sid for sid, *_ in SLOTS if not answers.get(sid)]
     print(f"\n澄清卡已写入 {path}")
+    probed = sum(1 for v in probe_rounds.values() if v)
+    if probing and probed:
+        print(f"  （LLM 追问触发 {probed} 个槽位以提高可检验性）")
     if unresolved:
-        print(f"⚠ 未解决槽位 {len(unresolved)} 个:{', '.join(unresolved)}")
-        print("  门禁 CLARIFY.complete 不会放行 /research。继续澄清:psyclaw clarify")
+        print(f"⚠ 未解决槽位 {len(unresolved)} 个：{', '.join(unresolved)}")
+        print("  门禁 CLARIFY.complete 不会放行 /research。继续澄清：psyclaw clarify")
         return 1
-    print("✓ 全部澄清完毕,CLARIFY.complete 放行,可以开工。")
+    print("✓ 全部澄清完毕，CLARIFY.complete 放行，可以开工。")
     return 0
 
 
