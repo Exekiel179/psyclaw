@@ -1065,16 +1065,17 @@ def cmd_tasks(args: argparse.Namespace) -> int:
     return tasks_cli(args.args or ["list"])
 
 
-def cmd_loop(args: argparse.Namespace) -> int:
-    from psyclaw.loop import run_loop
-    try:
-        return run_loop(topic=getattr(args, "topic", None), auto=getattr(args, "auto", False))
-    except KeyboardInterrupt:
-        print("\n回路已中断。已落盘的产物保留在 notes/ outputs/。")
-        return 0
-
-
 def cmd_research(args: argparse.Namespace) -> int:
+    # --freeform → 通用 HITL 回路(run_loop);默认 → 固定四象限流水线(run_pipeline)。
+    # 两者同源:pipeline 本就搭在 loop 的 planner/executor 积木之上,此处只在 CLR 层分流。
+    if getattr(args, "freeform", False):
+        from psyclaw.loop import run_loop
+        try:
+            return run_loop(topic=getattr(args, "topic", None),
+                            auto=getattr(args, "auto", False))
+        except KeyboardInterrupt:
+            print("\n回路已中断。已落盘的产物保留在 notes/ outputs/。")
+            return 0
     from psyclaw.pipeline import run_pipeline
     try:
         return run_pipeline(topic=getattr(args, "topic", None),
@@ -1109,10 +1110,63 @@ def _stub(name: str):
 # 解析器
 # --------------------------------------------------------------------------
 
+# 渐进式披露(progressive disclosure):默认 `--help` 只展示「常用」命令,降低上手门槛;
+# 其余进阶/内部命令照常可调用,完整分类清单见 `psyclaw commands`(★ 标常用)。
+# 调常用集只需改这一个集合——隐藏≠删除,不破坏任何既有命令契约。
+CORE_COMMANDS = {
+    "research", "stat", "clarify", "review",
+    "describe", "ttest", "anova", "regress", "chi2", "nonpar",
+    "score", "scale", "screen", "export", "lit", "power",
+    "memory", "gates", "config", "setup", "doctor", "repl", "commands",
+}
+
+# 职能分类(每个命令恰好出现一次;`psyclaw commands` 按此展示)。write/init 两个
+# 占位 stub 故意不列入——不向用户广告未实现命令(它们仍可解析,只打印占位提示)。
+COMMAND_CATEGORIES = [
+    ("环境 / 系统", ["repl", "version", "doctor", "config", "setup",
+                  "skills", "mcp", "gates", "commands"]),
+    ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite"]),
+    ("数据准备 / 量表", ["score", "screen", "ethics", "missing"]),
+    ("研究前规划 / 预注册", ["clarify", "declare-test", "power", "preregister", "jars"]),
+    ("工作流 / 编排", ["goal", "plan", "tasks", "research", "review", "stat"]),
+    ("记忆 / 消息 / IO", ["memory", "serve", "notify", "lit", "auth", "export", "figures"]),
+    ("统计 · 描述/相关", ["describe", "partial-corr", "compare-corr"]),
+    ("统计 · 均值比较", ["ttest", "anova", "anova2", "rm-anova", "mixed-anova", "ancova"]),
+    ("统计 · 非参/分类", ["chi2", "nonpar", "paired-cat"]),
+    ("统计 · 回归/GLM", ["regress", "hreg", "logit", "poisson", "negbin",
+                      "ordinal", "multinom", "mlm"]),
+    ("统计 · 因子/SEM", ["efa", "cfa", "invariance"]),
+    ("统计 · 专门方法", ["survival", "irr", "roc", "meta", "mediation",
+                    "moderation", "tost", "bayes", "sensitivity"]),
+    ("统计 · 工具", ["effect-size", "correct-p", "check"]),
+]
+
+
+def cmd_commands(args: argparse.Namespace) -> int:
+    """按职能分类打印全部命令(★=常用)。配合默认 `--help` 仅示常用做渐进式披露。"""
+    from psyclaw import ui
+    p = build_parser()
+    helps = getattr(p, "_psyclaw_help", {})
+    print(ui.title("PsyClaw 命令清单") +
+          ui.dim("（★ = 常用，默认 `--help` 只显示这些；其余命令照常可用）\n"))
+    for title, names in COMMAND_CATEGORIES:
+        print(ui.accent(title))
+        for n in names:
+            mark = ui.ok("★") if n in CORE_COMMANDS else " "
+            h = helps.get(n, "").replace("%%", "%")  # 还原 argparse 转义
+            if len(h) > 42:                            # 目录视图截断,详情看 -h
+                h = h[:41] + "…"
+            print(f"  {mark} {n:<13} {ui.dim(h)}")
+        print()
+    print(ui.dim("任意命令加 -h 看详细参数，如 `psyclaw ttest -h`。"))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="psyclaw",
         description="心理学研究全流程 Agent CLI（文献·设计·统计·写作，规范门禁内置）",
+        epilog="上方为常用命令；完整分类清单运行  psyclaw commands （任意命令加 -h 看参数）。",
     )
     p.add_argument("-v", "--version", action="store_true", help="打印版本")
     p.add_argument("--approval", choices=["suggest", "auto"], default="suggest",
@@ -1332,15 +1386,10 @@ def build_parser() -> argparse.ArgumentParser:
     prs.add_argument("--revise", "-r", action="store_true",
                      help="评审阶段闭合写作→评审→修复(把 BLOCKING/MAJOR 回灌修订)")
     prs.add_argument("--rounds", type=int, default=3, help="评审修订最大轮次(默认 3)")
+    prs.add_argument("--freeform", "-f", action="store_true",
+                     help="改走通用 HITL 回路(planner→执行→critic→修复),不按固定四象限")
     prs.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
     prs.set_defaults(func=cmd_research)
-
-    # research-loop → 通用 HITL 回路(planner→执行→critic→修复→交付)
-    prl = sub.add_parser("research-loop",
-                         help="通用 HITL 回路:planner→执行→critic→修复→交付")
-    prl.add_argument("topic", nargs="?", default=None, help="研究主题(可空,读 notes/goal.md)")
-    prl.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
-    prl.set_defaults(func=cmd_loop)
 
     prv = sub.add_parser("review", help="审稿模拟(EIC+3审稿人+Devil's Advocate,产可解析意见)")
     prv.add_argument("draft", nargs="?", default=None,
@@ -2076,12 +2125,27 @@ def build_parser() -> argparse.ArgumentParser:
     pcfa.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pcfa.set_defaults(func=cmd_cfa)
 
+    sub.add_parser(
+        "commands", help="按职能分类列出全部命令（★=常用，进阶命令在此查）"
+    ).set_defaults(func=cmd_commands)
+
     for name, helptext in [
         ("write", "按 APA JARS 写作"),
         ("init", "为研究项目铺设标准结构+PSYCLAW.md"),
     ]:
         sp = sub.add_parser(name, help=helptext)
         sp.set_defaults(func=_stub(name))
+
+    # 渐进式披露:快照各命令短 help(供 `commands` 用),再从顶层 --help 的列表里
+    # 摘除非常用命令——只动 _choices_actions(帮助展示),choices(分发)原样保留,
+    # 故被隐藏的命令仍能正常 `psyclaw <cmd>` 调用,不破坏任何契约。
+    for action in p._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            helps = {pa.dest: (pa.help or "") for pa in action._choices_actions}
+            action._choices_actions = [
+                pa for pa in action._choices_actions if pa.dest in CORE_COMMANDS
+            ]
+            p._psyclaw_help = helps
 
     return p
 
