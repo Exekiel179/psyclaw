@@ -70,15 +70,20 @@ def _mean_sd(xs: list) -> tuple:
 # ---------------------------------------------------------------------------
 
 def welch_ttest(g1: list, g2: list) -> dict:
-    """Welch 独立样本 t(默认推荐)+ Cohen's d(汇合 SD)+ 95%CI。"""
+    """Welch 独立样本 t(默认推荐)+ Cohen's d(汇合 SD)+ 95%CI。
+
+    t/df/p 取自 scipy.stats.ttest_ind(equal_var=False)——与 `ttest` 命令同一核,
+    本函数只在其上补 Cohen's d 与 95% CI(单一统计量来源,杜绝双实现漂移)。
+    """
     m1, s1, n1 = _mean_sd(g1)
     m2, s2, n2 = _mean_sd(g2)
     se = math.sqrt(s1**2 / n1 + s2**2 / n2)
     if se == 0:
         return {"error": "零方差"}
-    t = (m1 - m2) / se
-    df = se**4 / ((s1**2/n1)**2/(n1-1) + (s2**2/n2)**2/(n2-1))
-    p = t_sf2(t, df)
+    res = stats.ttest_ind(g1, g2, equal_var=False)
+    t = float(res.statistic)
+    df = float(res.df)
+    p = float(res.pvalue)
     sp = math.sqrt(((n1-1)*s1**2 + (n2-1)*s2**2) / (n1+n2-2))
     d = (m1 - m2) / sp if sp else float("nan")
     se_d = math.sqrt((n1+n2)/(n1*n2) + d**2/(2*(n1+n2)))
@@ -89,6 +94,7 @@ def welch_ttest(g1: list, g2: list) -> dict:
 
 
 def student_ttest(g1: list, g2: list) -> dict:
+    """Student 等方差 t——t/p 取自 scipy.stats.ttest_ind(equal_var=True)。"""
     m1, s1, n1 = _mean_sd(g1)
     m2, s2, n2 = _mean_sd(g2)
     df = n1 + n2 - 2
@@ -96,8 +102,9 @@ def student_ttest(g1: list, g2: list) -> dict:
     se = sp * math.sqrt(1/n1 + 1/n2)
     if se == 0:
         return {"error": "零方差"}
-    t = (m1 - m2) / se
-    p = t_sf2(t, df)
+    res = stats.ttest_ind(g1, g2, equal_var=True)
+    t = float(res.statistic)
+    p = float(res.pvalue)
     d = (m1 - m2) / sp
     se_d = math.sqrt((n1+n2)/(n1*n2) + d**2/(2*(n1+n2)))
     zc = norm_ppf(0.975)
@@ -107,14 +114,16 @@ def student_ttest(g1: list, g2: list) -> dict:
 
 
 def paired_ttest(x: list, y: list) -> dict:
+    """配对样本 t——t/p 取自 scipy.stats.ttest_rel,再补 Cohen's dz 与 CI。"""
     diff = [a - b for a, b in zip(x, y)]
     m, s, n = _mean_sd(diff)
     se = s / math.sqrt(n)
     if se == 0:
         return {"error": "差值零方差"}
-    t = m / se
+    res = stats.ttest_rel(x, y)
+    t = float(res.statistic)
     df = n - 1
-    p = t_sf2(t, df)
+    p = float(res.pvalue)
     dz = m / s if s else float("nan")
     se_d = math.sqrt(1/n + dz**2/(2*n))
     zc = norm_ppf(0.975)
@@ -124,18 +133,19 @@ def paired_ttest(x: list, y: list) -> dict:
 
 
 def pearson_r(x: list, y: list) -> dict:
+    """Pearson 相关——r/p 取自 scipy.stats.pearsonr,再补 Fisher-z 95% CI。"""
     n = len(x)
     mx = sum(x)/n
     my = sum(y)/n
-    sxy = sum((a-mx)*(b-my) for a, b in zip(x, y))
     sxx = sum((a-mx)**2 for a in x)
     syy = sum((b-my)**2 for b in y)
     if sxx == 0 or syy == 0:
         return {"error": "零方差"}
-    r = sxy / math.sqrt(sxx*syy)
+    pr = stats.pearsonr(x, y)
+    r = float(pr.statistic)
+    p = float(pr.pvalue)
     df = n - 2
     t = r * math.sqrt(df / (1 - r**2)) if abs(r) < 1 else float("inf")
-    p = t_sf2(t, df)
     # Fisher z CI
     z = 0.5 * math.log((1+r)/(1-r)) if abs(r) < 1 else float("inf")
     se = 1 / math.sqrt(n - 3) if n > 3 else float("nan")
