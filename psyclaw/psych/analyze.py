@@ -1,4 +1,7 @@
-"""ARS-Stat — 自动统计分析引擎(纯 stdlib,可选 pingouin)。
+"""ARS-Stat — 自动统计分析引擎(基于 stats_core/diagnostics 共享核,可选 pingouin)。
+
+统计量与 p 值统一经 stats_core(内部封装 scipy.stats)与 diagnostics 计算——
+与 `ttest`/`anova`/`describe` 等专用命令同源,不再各写一份(避免双引擎数值漂移)。
 
 把 assume 决策树变成可执行流程:
   数据形态 + 用户指定角色(dv/group/with)→ 自动选检验族
