@@ -37,8 +37,25 @@
 
 ## Blockers / Risks
 
-- [ ] 文档去债：DESIGN.md / TODO.md / 部分 docstring（如 diagnostics.py 第 1 行）仍写"纯 stdlib"，迁移后已过时
+- [ ] 文档去债：DESIGN.md / TODO.md / 部分 docstring 仍写"纯 stdlib"，迁移后已过时（`analyze.py` 第 1 行本轮已修）
 - [ ] 部分迁移残留：negbin/ordinal/multinomial/mlm 仍保留手写估计器（测试钉住内部 helper），未来改用 statsmodels 需同步重写测试
+
+## 本轮维护(2)：`research` 合并 + 渐进式披露（应"合并命令/降低观感复杂度"诉求）
+
+- **合并**：`research-loop` 并入 `research --freeform`（同源——pipeline 本就搭在 loop 引擎上）；删 `cmd_loop` 与 `research-loop` 子命令，`loop.run_loop` 引擎与 REPL `/research-loop` 保留。命令面 74→合并后再加 `commands`=74。
+- **渐进式披露**：默认 `psyclaw --help` 只列 23 个常用命令（`CORE_COMMANDS`），其余 51 个隐藏但**仍可调用**（只摘 `_choices_actions`，`choices` 分发不动）；新增 `psyclaw commands` 按职能分类打印全部（★标常用）；两个坏死 stub `write`/`init` 一并从帮助隐藏。
+- 文档：`docs/COMMANDS.md` 加渐进式披露说明 + `research --freeform`；`README.md` 命令行更新。
+- 测试：`tests/test_cli_help.py` +4 例（合并/披露/分发/分类覆盖）；全量 **3162 passed**。
+- 未提交。
+
+## 本轮维护(1)：`stat` 双引擎收敛 + 命令地图（应"整理命令/查重合"诉求）
+
+- 盘清 cli.py 全部 ~72 子命令，定位唯一真冗余：`stat`(→analyze→stats_core 手写检验统计量) 与 `ttest`/`anova`(→scipy 直算) 双实现。
+- **收敛**：`stats_core.{welch,student,paired}_ttest`+`pearson_r` 的 t/F/p/r 改取自 scipy `ttest_ind/rel/1samp`+`pearsonr`（与专用命令同核），保留 Cohen's d/Fisher-z CI 增量与字典结构；修 `analyze.py` 过时 docstring。
+- 新增一致性门禁 `tests/test_stat_engine_consistency.py`（5 例，三方对照 stats_core/专用核/scipy），未来任一侧重新手写即变红。
+- 命令地图 `docs/COMMANDS.md`：分组清单 + 选择指南（相关 6 入口/ANOVA 五选一/三种推断框架/stat-vs-专用/回归选型/前置三件套/编排回路）+ 重合速查。
+- 验证：`C:\Python314\python -m pytest -q` → **3162 passed**（原 3157 + 5 一致性门禁）。
+- 未提交（待用户指示）。
 
 ## Decisions Made
 

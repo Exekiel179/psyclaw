@@ -107,7 +107,7 @@ ANSI 配色全局统一,`NO_COLOR=1` 降级纯文本。
 | **内置 MCP** | `psyclaw mcp --serve mne\|spss` | MNE(ERP 成分规范/预处理脚本/簇置换检验)+ SPSS(语法生成含 Welch/eta²/VIF,批处理执行);标准 stdio MCP,可挂 Claude Desktop |
 | **长上下文** | `psyclaw/context.py` | 知识按需注入(30k→~200字符);历史滚动压缩留决策备忘;`@file` 智能摘录(CSV 79KB→240字符) |
 | **严谨性协议** | `gates/rigor.md` + `STAT.rigor` | 蒸馏 psycho-vibe:先质疑识别假设、信息不足就停、强制 Step0-6、限定措辞 |
-| **研究回路(真跑)** | `psyclaw research-loop` | planner→确认→executor→critic→修复环→审批门→交付,产物全落盘 |
+| **研究回路(真跑)** | `psyclaw research --freeform` | planner→确认→executor→critic→修复环→审批门→交付,产物全落盘(旧 `research-loop` 已并入 `research`) |
 
 门禁累计 **14 条**。
 
