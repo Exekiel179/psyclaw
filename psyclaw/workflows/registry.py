@@ -22,6 +22,11 @@ from psyclaw.workflows.steps import (
     step_screen,
     step_synthesize,
 )
+from psyclaw.workflows.steps_meta import (
+    step_load_effects,
+    step_meta_script,
+    step_write_meta,
+)
 
 # 文献综述 / 系统综述
 LIT_REVIEW = {
@@ -39,8 +44,26 @@ LIT_REVIEW = {
     ],
 }
 
+# 元分析(从效应量表起;统计计算外移到 statsmodels 脚本)
+META = {
+    "id": "meta",
+    "name": "元分析",
+    "research_type": "元分析 (meta-analysis)",
+    "command": "meta",
+    "steps": [
+        Step("clarify", "澄清门禁", run=lambda ctx: {},
+             gate=gate_clarify_complete),
+        Step("load_effects", "载入并校验效应量表", run=step_load_effects),
+        Step("meta_script", "生成可复现元分析脚本(委托 statsmodels)",
+             run=step_meta_script),
+        Step("write", "写元分析稿", run=step_write_meta),
+        Step("review", "同行评审", run=step_review, optional=True),
+    ],
+}
+
 WORKFLOWS: dict[str, dict] = {
     LIT_REVIEW["id"]: LIT_REVIEW,
+    META["id"]: META,
 }
 
 # 顶层命令名 → workflow id(L0 路由:每类研究一条显式命令)

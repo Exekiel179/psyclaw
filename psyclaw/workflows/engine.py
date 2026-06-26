@@ -65,10 +65,12 @@ def _ask_continue(ctx: WorkflowContext, step: Step) -> bool:
 
 
 def run_workflow(workflow: dict, topic: str | None = None,
-                 project_dir: str = ".", auto: bool = False) -> int:
+                 project_dir: str = ".", auto: bool = False,
+                 seed: dict | None = None) -> int:
     """按 workflow 定义跑研究流程。
 
     workflow: {"id", "name", "research_type", "steps": [Step, ...]}
+    seed:     预填 ctx.data 的输入(如 {"effects_csv": "..."}),供需要数据文件的流程用。
     返回 0=跑通(总验收落 notes/workflow_summary.json);1=fail-closed 中断(门禁未过 / 无目标 / 步骤硬失败)。
     """
     from psyclaw import config as cfg, ui
@@ -92,6 +94,8 @@ def run_workflow(workflow: dict, topic: str | None = None,
         topic=goal, project=project, provider=provider, auto=auto,
         clar=_read(project / "notes" / "clarification.md"),
     )
+    if seed:
+        ctx.data.update(seed)
 
     steps: list[Step] = workflow["steps"]
     print(ui.panel(
