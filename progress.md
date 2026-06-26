@@ -24,8 +24,19 @@
 
 ## What's Next
 
-1. feat-012 Workflow 层余下三条流程:empirical(实证)/ meta(元分析)/ qualitative(质性),分析步对接 MCP
+1. feat-012 Workflow 层余下两条流程:empirical(实证,补生成式实验设计 + 分析步对接 MCP)/ qualitative(质性,编码/主题分析)
 2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
+
+## 本轮(3):meta 元分析流程(验证"统计外移"端到端)
+
+- `meta <effects.csv>`:clarify门禁→载入校验效应量表→**生成可复现元分析脚本**→写→评审
+- 统计外移落地:`generate_meta_script` 产出委托 statsmodels 的脚本(随机效应 DL + I²/τ²/Q + Egger),
+  仓内**不算任何统计**;脚本由用户在 [stats] 环境跑或交 MCP
+- 新子功能:`validate_effects`(效应量表校验,自动识别 effect 列 + variance/se/ci 方差来源)、
+  `generate_meta_script`——均独立纯函数可单用
+- 引擎加 `seed` 参数(把 effects_csv 喂进 ctx.data);`step_review` 泛化用 ctx.data['draft_path']
+- 验证:生成脚本经 C:\Python314 实跑 → 合并效应 0.347 / I² 27% / Egger p=.008 / exit 0;
+  `tests/test_workflows.py` 20 例;全量 **934 passed**
 
 ## 本轮(2):Workflow 层 — 按研究类型路由的可组合流程引擎
 

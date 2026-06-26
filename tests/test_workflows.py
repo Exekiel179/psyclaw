@@ -11,6 +11,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from psyclaw.workflows.engine import (  # noqa: E402
@@ -164,3 +166,87 @@ def test_registry_lit_review_present():
 def test_registry_command_maps_to_workflow():
     assert COMMAND_TO_WORKFLOW["review-lit"] == "lit-review"
     assert get_workflow("review-lit") is WORKFLOWS["lit-review"]
+
+
+# --- 元分析子功能:validate_effects / generate_meta_script ------------------
+
+import csv as _csv  # noqa: E402
+
+from psyclaw.workflows.steps_meta import (  # noqa: E402
+    generate_meta_script, validate_effects,
+)
+
+
+def _eff_csv(tmp_path, name, rows, header):
+    p = tmp_path / name
+    with p.open("w", encoding="utf-8", newline="") as f:
+        w = _csv.DictWriter(f, fieldnames=header)
+        w.writeheader()
+        w.writerows(rows)
+    return str(p)
+
+
+def test_validate_effects_se(tmp_path):
+    p = _eff_csv(tmp_path, "se.csv",
+                 [{"study": "A", "d": "0.3", "se": "0.1"},
+                  {"study": "B", "d": "0.5", "se": "0.12"}],
+                 ["study", "d", "se"])
+    info = validate_effects(p)
+    assert info["n_studies"] == 2
+    assert info["effect_col"] == "d"
+    assert info["variance_kind"] == "se"
+    assert info["study_col"] == "study"
+
+
+def test_validate_effects_variance(tmp_path):
+    p = _eff_csv(tmp_path, "var.csv",
+                 [{"yi": "0.3", "vi": "0.01"}, {"yi": "0.5", "vi": "0.02"}],
+                 ["yi", "vi"])
+    info = validate_effects(p)
+    assert info["variance_kind"] == "variance" and info["effect_col"] == "yi"
+
+
+def test_validate_effects_ci(tmp_path):
+    p = _eff_csv(tmp_path, "ci.csv",
+                 [{"g": "0.3", "ci_lower": "0.1", "ci_upper": "0.5"},
+                  {"g": "0.5", "ci_lower": "0.2", "ci_upper": "0.8"}],
+                 ["g", "ci_lower", "ci_upper"])
+    assert validate_effects(p)["variance_kind"] == "ci"
+
+
+def test_validate_effects_no_effect_col_raises(tmp_path):
+    p = _eff_csv(tmp_path, "bad.csv", [{"foo": "1", "se": "0.1"}], ["foo", "se"])
+    with pytest.raises(ValueError, match="效应量列"):
+        validate_effects(p)
+
+
+def test_validate_effects_too_few_raises(tmp_path):
+    p = _eff_csv(tmp_path, "one.csv", [{"d": "0.3", "se": "0.1"}], ["d", "se"])
+    with pytest.raises(ValueError, match="至少需 2"):
+        validate_effects(p)
+
+
+def test_validate_effects_missing_file_raises():
+    with pytest.raises(ValueError, match="不存在"):
+        validate_effects("nope_does_not_exist.csv")
+
+
+def test_generate_meta_script_delegates_to_statsmodels(tmp_path):
+    p = _eff_csv(tmp_path, "se.csv",
+                 [{"study": "A", "d": "0.3", "se": "0.1"},
+                  {"study": "B", "d": "0.5", "se": "0.12"}],
+                 ["study", "d", "se"])
+    info = validate_effects(p)
+    script = generate_meta_script(p, info)
+    # 统计外移:脚本委托 statsmodels,不在仓内算
+    assert "combine_effects" in script
+    assert 'method_re="dl"' in script
+    assert info["effect_col"] in script
+    assert "** 2" in script          # se → 方差 = se²
+
+
+def test_registry_meta_present():
+    wf = get_workflow("meta")
+    assert wf is not None and wf["command"] == "meta"
+    assert [s.id for s in wf["steps"]] == [
+        "clarify", "load_effects", "meta_script", "write", "review"]

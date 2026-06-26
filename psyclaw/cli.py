@@ -462,6 +462,21 @@ def cmd_review_lit(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_meta(args: argparse.Namespace) -> int:
+    # L0 路由:元分析顶层命令 → 跑 meta workflow(输入 = 效应量 CSV)。
+    import pathlib
+
+    from psyclaw.workflows import get_workflow, run_workflow
+    topic = getattr(args, "topic", None) or f"针对 {pathlib.Path(args.effects_csv).stem} 的随机效应元分析"
+    try:
+        return run_workflow(get_workflow("meta"), topic=topic, project_dir=".",
+                            auto=getattr(args, "auto", False),
+                            seed={"effects_csv": args.effects_csv})
+    except KeyboardInterrupt:
+        print("\n流程已中断。已落盘的产物保留在 notes/ outputs/。")
+        return 0
+
+
 def cmd_review(args: argparse.Namespace) -> int:
     from psyclaw.review import run_review
     try:
@@ -482,7 +497,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 其余进阶/内部命令照常可调用,完整分类清单见 `psyclaw commands`(★ 标常用)。
 # 调常用集只需改这一个集合——隐藏≠删除,不破坏任何既有命令契约。
 CORE_COMMANDS = {
-    "research", "review-lit", "review", "clarify", "lit", "export",
+    "research", "review-lit", "meta", "review", "clarify", "lit", "export",
     "score", "scale", "jars", "preregister", "declare-test",
     "plan", "goal", "tasks", "memory",
     "gates", "config", "setup", "doctor", "repl", "commands",
@@ -496,7 +511,7 @@ COMMAND_CATEGORIES = [
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics"]),
     ("量表 / 数据准备", ["score"]),
     ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars"]),
-    ("研究流程(按类型路由)", ["review-lit", "research"]),
+    ("研究流程(按类型路由)", ["review-lit", "meta", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("记忆 / 消息 / IO", ["memory", "serve", "notify", "lit", "auth", "export", "figures"]),
 ]
@@ -693,6 +708,14 @@ def build_parser() -> argparse.ArgumentParser:
     prl.add_argument("topic", nargs="?", default=None, help="综述主题(可空,读 notes/goal.md)")
     prl.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     prl.set_defaults(func=cmd_review_lit)
+
+    # meta → 元分析 workflow(输入效应量表;统计由生成的脚本在外部 statsmodels 跑)
+    pma = sub.add_parser("meta",
+                         help="元分析流程:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审")
+    pma.add_argument("effects_csv", help="效应量 CSV(含 study / 效应量(d/g/r/yi) / variance|se|ci 列)")
+    pma.add_argument("--topic", default=None, help="元分析主题(可空,默认据文件名)")
+    pma.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
+    pma.set_defaults(func=cmd_meta)
 
     prv = sub.add_parser("review", help="审稿模拟(EIC+3审稿人+Devil's Advocate,产可解析意见)")
     prv.add_argument("draft", nargs="?", default=None,

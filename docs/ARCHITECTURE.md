@@ -21,8 +21,8 @@ L3  实现 Skill + MCP    每个 Step 是薄壳,真正干活委托既有命令 /
 | 命令 | 研究类型 | 状态 |
 |---|---|---|
 | `review-lit <主题>` | 文献综述 / 系统综述 | ✅ 已实现 |
+| `meta <effects.csv>` | 元分析(统计委托外部 statsmodels 脚本) | ✅ 已实现 |
 | `empirical <主题>` | 实证研究(含实验设计;分析交外部统计/MCP) | 规划中 |
-| `meta <effects.csv>` | 元分析 | 规划中 |
 | `qualitative <主题>` | 质性研究 | 规划中 |
 
 `research <主题>` 是不分类型的通用编排(沿用旧 pipeline);`--freeform` 走通用 HITL 回路。
@@ -85,5 +85,9 @@ Step 之下是真正的实现层:
 
 ## 现状
 
-- ✅ 引擎 + 注册表 + 文献综述流程(`review-lit`)+ PRISMA 筛选子功能;`tests/test_workflows.py` 12 例。
-- 下一步:逐条灌 empirical / meta / qualitative,补对应子功能(生成式实验设计、效应量提取、质性编码),分析步对接 MCP。
+- ✅ 引擎 + 注册表 + 两条流程:**文献综述**(`review-lit`)、**元分析**(`meta`);
+  子功能 `screen_papers`(PRISMA 初筛)、`validate_effects` + `generate_meta_script`(元分析脚本)。
+- 元分析体现"统计外移":`meta` 不在仓内算,而是生成委托 statsmodels 的可复现脚本
+  (`outputs/meta_analysis.py`,随机效应 DL + I²/τ²/Q + Egger),用户在 [stats] 环境跑/交 MCP。
+- `tests/test_workflows.py` 20 例;生成脚本经 C:\Python314 实跑产出合并效应/异质性/Egger,exit 0。
+- 下一步:empirical(生成式实验设计 + 分析步对接 MCP)、qualitative(编码/主题分析)。

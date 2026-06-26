@@ -150,17 +150,20 @@ def step_synthesize(ctx) -> dict:
         json.dumps(syn["evidence_map"], ensure_ascii=False, indent=2),
         encoding="utf-8")
     ctx.artifacts["synthesize"] = "notes/lit_review.md"
+    ctx.data["draft_path"] = str(notes / "lit_review.md")
     tag = "有据叙事" if syn["grounded"] else "确定性骨架(LLM 未接入)"
     print(ui.dim(f"  综述 {syn['n_papers']} 篇 · {tag}"))
     return {"n_papers": syn["n_papers"], "grounded": syn["grounded"]}
 
 
 def step_review(ctx) -> dict:
-    """同行评审合成综述(EIC + 审稿人 + Devil's Advocate)。复用 review.run_review。"""
+    """同行评审产出稿(EIC + 审稿人 + Devil's Advocate)。复用 review.run_review。
+
+    评审对象 = ctx.data['draft_path'](各流程在写作步设置);缺省取 notes/lit_review.md。
+    """
     from psyclaw.review import run_review
-    draft = ctx.project / "notes" / "lit_review.md"
-    run_review(draft=str(draft), project_dir=str(ctx.project), auto=ctx.auto)
-    rj = ctx.project / "notes" / "review_panel.md"
-    if rj.exists():
+    draft = ctx.data.get("draft_path") or str(ctx.project / "notes" / "lit_review.md")
+    run_review(draft=draft, project_dir=str(ctx.project), auto=ctx.auto)
+    if (ctx.project / "notes" / "review_panel.md").exists():
         ctx.artifacts["review"] = "notes/review_panel.md"
     return {}

@@ -45,13 +45,22 @@
 | `preregister` | OSF/AsPredicted 双格式预注册模板(据澄清卡抽取;样本量依据填澄清卡 power 槽位) |
 | `jars <draft>` | APA 2018 JARS 检查清单(quant/qual/mixed) |
 
+### 研究流程(按研究类型路由)
+| 命令 | 作用 |
+|---|---|
+| `review-lit <主题>` | 文献综述流程:澄清→检索→筛选(PRISMA)→合成综述→评审 |
+| `meta <effects.csv>` | 元分析流程:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审 |
+| `research [topic]` | 不分类型的通用编排:文献→设计→写作→评审→总验收;`--freeform` 走通用 HITL 回路 |
+
+> 见 `docs/ARCHITECTURE.md`。每条流程 = 声明式步骤链;子功能可单用/可拼装;
+> empirical(实证)/ qualitative(质性)流程规划中。
+
 ### 工作流 / 编排
 | 命令 | 作用 |
 |---|---|
 | `goal [text]` | 查看/设定研究目标 |
 | `plan [topic]` | planner 产出 notes/plan.md + 任务看板 |
 | `tasks [...]` | 任务看板(list/add/start/done/block/sync/clear) |
-| `research [topic]` | 一句话研究编排:文献→设计→写作→评审→总验收;`--freeform` 走通用 HITL 回路 |
 | `review [draft]` | 审稿模拟(EIC+3 审稿人+Devil's Advocate;`--revise` 闭环修复) |
 
 ### 记忆 / 消息 / IO
