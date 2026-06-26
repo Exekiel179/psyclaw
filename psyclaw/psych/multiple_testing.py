@@ -1,4 +1,7 @@
-"""多重检验校正 — Bonferroni / Holm / Benjamini-Hochberg FDR（stdlib only）。
+"""多重检验校正 — Bonferroni / Holm / Benjamini-Hochberg FDR。
+
+p 值校正核委托 statsmodels.stats.multitest.multipletests（成熟库优先）；
+本模块只做 reject 阈值判定、报告 dict 组装、APA-7/CSV/CLI 胶水。
 
 心理学研究常同时进行多个假设检验（多个相关、多个组间比较），需控制
 家族错误率（FWER）或虚假发现率（FDR）。
@@ -25,9 +28,55 @@ from __future__ import annotations
 
 import csv
 import json
-import math
 import pathlib
 from typing import Any
+
+from statsmodels.stats.multitest import multipletests
+
+# 本模块方法名 → statsmodels.multipletests 的 method 参数
+_SM_METHOD = {
+    "bonferroni": "bonferroni",
+    "holm": "holm",
+    "benjamini_hochberg": "fdr_bh",
+}
+
+
+def _assemble(
+    method: str,
+    pvals: list[float],
+    alpha: float,
+    labels: list[str] | None,
+    reject_strict: bool,
+) -> dict[str, Any]:
+    """p 值校正核委托 statsmodels.multipletests；本函数只做 reject 阈值判定
+    （bonferroni 用严格 < 与历史一致，Holm/BH 用 ≤）、四舍五入与报告 dict 组装。
+    """
+    m = len(pvals)
+    if m == 0:
+        return _empty_result(method, alpha)
+
+    _, p_adj, _, _ = multipletests(pvals, alpha=alpha, method=_SM_METHOD[method])
+    lbs = labels or [f"检验{i + 1}" for i in range(m)]
+
+    tests = []
+    n_rejected = 0
+    for i in range(m):
+        adj = min(float(p_adj[i]), 1.0)
+        rej = (adj < alpha) if reject_strict else (adj <= alpha)
+        n_rejected += rej
+        tests.append({
+            "label": lbs[i],
+            "p_orig": round(pvals[i], 6),
+            "p_adj": round(adj, 6),
+            "reject_h0": rej,
+        })
+    return {
+        "method": method,
+        "m": m,
+        "alpha": alpha,
+        "n_rejected": n_rejected,
+        "tests": tests,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -39,36 +88,11 @@ def bonferroni(
     alpha: float = 0.05,
     labels: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Bonferroni 校正：阈值 = alpha / m。
-
-    返回每个检验的调整 p 值（min(p*m, 1)）和显著性决策。
-    """
-    m = len(pvals)
-    if m == 0:
-        return _empty_result("bonferroni", alpha)
-
-    adjusted = [min(p * m, 1.0) for p in pvals]
-    reject = [ap < alpha for ap in adjusted]
-    threshold = alpha / m
-
-    lbs = labels or [f"检验{i + 1}" for i in range(m)]
-    tests = [
-        {
-            "label": lbs[i],
-            "p_orig": round(pvals[i], 6),
-            "p_adj": round(adjusted[i], 6),
-            "reject_h0": reject[i],
-        }
-        for i in range(m)
-    ]
-    return {
-        "method": "bonferroni",
-        "m": m,
-        "alpha": alpha,
-        "threshold": round(threshold, 8),
-        "n_rejected": sum(reject),
-        "tests": tests,
-    }
+    """Bonferroni 校正（p_adj = min(p*m, 1)，委托 multipletests）。"""
+    result = _assemble("bonferroni", pvals, alpha, labels, reject_strict=True)
+    if result["m"]:
+        result["threshold"] = round(alpha / result["m"], 8)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -80,59 +104,8 @@ def holm(
     alpha: float = 0.05,
     labels: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Holm (1979) 逐步降低 FWER 校正。
-
-    按 p 从小到大排序，第 k 步（1-indexed）阈值 = alpha / (m - k + 1)。
-    一旦不显著，后续均不显著（单调性保持）。
-    """
-    m = len(pvals)
-    if m == 0:
-        return _empty_result("holm", alpha)
-
-    lbs = labels or [f"检验{i + 1}" for i in range(m)]
-    order = sorted(range(m), key=lambda i: pvals[i])
-
-    reject_flags = [False] * m
-    stopped = False
-    for rank, idx in enumerate(order):
-        if stopped:
-            reject_flags[idx] = False
-        else:
-            threshold_k = alpha / (m - rank)
-            if pvals[idx] <= threshold_k:
-                reject_flags[idx] = True
-            else:
-                stopped = True
-                reject_flags[idx] = False
-
-    # 调整 p 值：p_adj_i = max_{k ≤ i} min(p_k * (m - k + 1), 1)（单调性保持）
-    adj_p_by_order = [0.0] * m
-    for rank, idx in enumerate(order):
-        adj_p_by_order[rank] = min(pvals[idx] * (m - rank), 1.0)
-    # 强制单调递增
-    for rank in range(1, m):
-        adj_p_by_order[rank] = max(adj_p_by_order[rank], adj_p_by_order[rank - 1])
-
-    adjusted = [0.0] * m
-    for rank, idx in enumerate(order):
-        adjusted[idx] = adj_p_by_order[rank]
-
-    tests = [
-        {
-            "label": lbs[i],
-            "p_orig": round(pvals[i], 6),
-            "p_adj": round(adjusted[i], 6),
-            "reject_h0": reject_flags[i],
-        }
-        for i in range(m)
-    ]
-    return {
-        "method": "holm",
-        "m": m,
-        "alpha": alpha,
-        "n_rejected": sum(reject_flags),
-        "tests": tests,
-    }
+    """Holm (1979) 逐步降低 FWER 校正（委托 multipletests method='holm'）。"""
+    return _assemble("holm", pvals, alpha, labels, reject_strict=False)
 
 
 # ---------------------------------------------------------------------------
@@ -144,57 +117,8 @@ def benjamini_hochberg(
     alpha: float = 0.05,
     labels: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Benjamini & Hochberg (1995) FDR 校正。
-
-    按 p 从小到大排序，第 k 步阈值 = (k/m) * alpha。
-    找最大的 k 使得 p_(k) ≤ (k/m)*alpha，拒绝前 k 个。
-    """
-    m = len(pvals)
-    if m == 0:
-        return _empty_result("benjamini_hochberg", alpha)
-
-    lbs = labels or [f"检验{i + 1}" for i in range(m)]
-    order = sorted(range(m), key=lambda i: pvals[i])
-
-    # 找最大 k（1-indexed）满足 p_(k) ≤ k*alpha/m
-    last_reject = -1
-    for rank, idx in enumerate(order):
-        threshold_k = (rank + 1) * alpha / m
-        if pvals[idx] <= threshold_k:
-            last_reject = rank
-
-    reject_flags = [False] * m
-    for rank in range(last_reject + 1):
-        reject_flags[order[rank]] = True
-
-    # 调整 p 值（BH adjusted = min_{k'≥k} (m/k') * p_(k')，单调降级）
-    adj_p_by_order = [0.0] * m
-    for rank, idx in enumerate(order):
-        adj_p_by_order[rank] = min((m / (rank + 1)) * pvals[idx], 1.0)
-    # 强制单调递减（从大到小累积最小值）
-    for rank in range(m - 2, -1, -1):
-        adj_p_by_order[rank] = min(adj_p_by_order[rank], adj_p_by_order[rank + 1])
-
-    adjusted = [0.0] * m
-    for rank, idx in enumerate(order):
-        adjusted[idx] = adj_p_by_order[rank]
-
-    tests = [
-        {
-            "label": lbs[i],
-            "p_orig": round(pvals[i], 6),
-            "p_adj": round(adjusted[i], 6),
-            "reject_h0": reject_flags[i],
-        }
-        for i in range(m)
-    ]
-    return {
-        "method": "benjamini_hochberg",
-        "m": m,
-        "alpha": alpha,
-        "n_rejected": sum(reject_flags),
-        "tests": tests,
-    }
+    """Benjamini & Hochberg (1995) FDR 校正（委托 multipletests method='fdr_bh'）。"""
+    return _assemble("benjamini_hochberg", pvals, alpha, labels, reject_strict=False)
 
 
 def _empty_result(method: str, alpha: float) -> dict[str, Any]:
