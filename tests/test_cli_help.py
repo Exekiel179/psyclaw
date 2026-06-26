@@ -9,9 +9,11 @@ import argparse
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from psyclaw.cli import build_parser
+from psyclaw.cli import build_parser  # noqa: E402
 
 
 def _iter_subparsers(parser):
@@ -98,19 +100,26 @@ def test_advanced_commands_hidden_but_callable():
     assert "figures" in names
 
 
-# --- research 合并 + 渐进式披露（本轮新增）---------------------------------
+# --- 编排命令:loop(通用)+ <type>-loop(研究流程)+ research(固定全流程)----------
 
-def test_research_loop_merged_into_research():
-    """research-loop 已并入 `research --freeform`，顶层命令不再单列。"""
+def test_loop_is_generic_orchestrator():
+    """`loop` = 通用编排回路(run_loop);research 只做固定全流程,不再有 --freeform。"""
     p = build_parser()
     names = [name for name, _ in _iter_subparsers(p)]
-    assert "research-loop" not in names
+    assert "loop" in names
+    assert p.parse_args(["loop", "任意任务"]).func.__name__ == "cmd_loop"
+    # research 保留为固定全流程;--freeform 已移除(通用回路统一走 loop)
     assert "research" in names
-    args = p.parse_args(["research", "主题", "--freeform"])
-    assert args.freeform is True
-    assert args.func.__name__ == "cmd_research"
-    # 默认（无 --freeform）走流水线
-    assert p.parse_args(["research", "主题"]).freeform is False
+    with pytest.raises(SystemExit):
+        p.parse_args(["research", "主题", "--freeform"])
+
+
+def test_typed_loop_commands_registered():
+    """四条研究流程的顶层命令均为 <type>-loop。"""
+    p = build_parser()
+    names = {name for name, _ in _iter_subparsers(p)}
+    assert {"lit-loop", "meta-loop", "analysis-loop", "qual-loop"} <= names
+    assert {"review-lit", "meta", "analysis", "qualitative"}.isdisjoint(names)
 
 
 def test_progressive_disclosure_core_only_in_help():

@@ -429,16 +429,8 @@ def cmd_tasks(args: argparse.Namespace) -> int:
 
 
 def cmd_research(args: argparse.Namespace) -> int:
-    # --freeform → 通用 HITL 回路(run_loop);默认 → 固定四象限流水线(run_pipeline)。
-    # 两者同源:pipeline 本就搭在 loop 的 planner/executor 积木之上,此处只在 CLR 层分流。
-    if getattr(args, "freeform", False):
-        from psyclaw.loop import run_loop
-        try:
-            return run_loop(topic=getattr(args, "topic", None),
-                            auto=getattr(args, "auto", False))
-        except KeyboardInterrupt:
-            print("\n回路已中断。已落盘的产物保留在 notes/ outputs/。")
-            return 0
+    # 不分类型的固定全流程编排(run_pipeline)。
+    # 通用 agentic 回路改用 `psyclaw loop`(planner→执行→critic→修复)。
     from psyclaw.pipeline import run_pipeline
     try:
         return run_pipeline(topic=getattr(args, "topic", None),
@@ -741,8 +733,6 @@ def build_parser() -> argparse.ArgumentParser:
     prs.add_argument("--revise", "-r", action="store_true",
                      help="评审阶段闭合写作→评审→修复(把 BLOCKING/MAJOR 回灌修订)")
     prs.add_argument("--rounds", type=int, default=3, help="评审修订最大轮次(默认 3)")
-    prs.add_argument("--freeform", "-f", action="store_true",
-                     help="改走通用 HITL 回路(planner→执行→critic→修复),不按固定流程")
     prs.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
     prs.set_defaults(func=cmd_research)
 
