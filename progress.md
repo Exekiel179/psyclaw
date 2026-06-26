@@ -24,8 +24,19 @@
 
 ## What's Next
 
-1. feat-012 Workflow 层余下两条流程:empirical(实证,补生成式实验设计 + 分析步对接 MCP)/ qualitative(质性,编码/主题分析)
+1. feat-012 Workflow 层余下:qualitative(质性,编码/主题分析)流程;各分析步从"生成脚本"升级为可选直连 MCP 统计后端
 2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
+
+## 本轮(4):analysis 实证分析流程(第三条流程,统计外移到 pingouin/scipy)
+
+- `analysis <data.csv>`:clarify门禁→画像数据→研究/分析设计→**推荐分析+生成可复现脚本**→写→评审
+- 统计外移:`generate_analysis_script` 据数据画像推荐分析(t检验/ANOVA/相关/回归/描述统计)
+  并生成委托 pingouin/scipy 的脚本(outputs/analysis.py,含效应量+CI+前提诊断),仓内不算
+- 新子功能(独立纯函数):`profile_data`(逐列判数值/分类+水平)、`recommend_analysis`
+  (确定性选检验)、`generate_analysis_script`;生成式 `step_design`(LLM 写设计备忘)
+- 验证:t检验/ANOVA/相关三种推荐的生成脚本均经 C:\Python314 实跑 exit 0;
+  `tests/test_workflows.py` 28 例;全量 **942 passed**
+- 三条研究流程齐:review-lit / meta / analysis(命名按用户要求 empirical→analysis)
 
 ## 本轮(3):meta 元分析流程(验证"统计外移"端到端)
 
