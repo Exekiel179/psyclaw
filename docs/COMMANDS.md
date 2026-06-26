@@ -15,7 +15,8 @@
 |---|---|
 | `repl` | 交互式 REPL(缺省命令) |
 | `version` / `doctor` | 版本 / 环境自检(配置·MCP·Gates) |
-| `config` / `setup` | 配置向导 / 能力选装 |
+| `config` | 配置向导(API key/模型/环境变量) |
+| `setup` | 项目脚手架+能力选装:建目录 + 据 clarify 生成概览/项目记忆 + 装能力依赖(`--online`)+ 列 MCP/skill |
 | `skills` / `mcp` | 列出 skills / 运行内置 MCP(mne·spss·mplus·stata) |
 | `gates` | 学术规范门禁自检 |
 | `commands` | 按职能分类列出全部命令 |
