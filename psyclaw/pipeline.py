@@ -8,7 +8,7 @@
 统计已外移到成熟库/MCP——本编排不内置统计计算,只做研究流程编排。
 
 与 run_loop(HITL planner→executor→critic 主干)的分工:
-  - `research --freeform`(run_loop):通用 HITL 回路,planner 拆任务、critic 修复环。
+  - `loop`(run_loop):通用 HITL 回路,planner 拆任务、critic 修复环(不绑研究类型)。
   - `research`(run_pipeline,本模块):按研究流程组织,产出一篇结构完整的稿,
     末尾跑同行评审,给出机器可读的总验收(notes/pipeline_summary.json)。
 
