@@ -38,7 +38,7 @@
 ## Blockers / Risks
 
 - [ ] 文档去债：DESIGN.md / TODO.md / 部分 docstring 仍写"纯 stdlib"，迁移后已过时（`analyze.py` 第 1 行本轮已修）
-- [ ] 部分迁移残留：negbin/ordinal/multinomial/mlm 仍保留手写估计器（测试钉住内部 helper），未来改用 statsmodels 需同步重写测试
+- [ ] **成熟库迁移债（全代码审计，真源 `docs/LIBRARY_MIGRATION_AUDIT.md`）**：6 agent 逐模块复查确认——GLM 四件套(regression/logistic/poisson/hierarchical)已合规委托 statsmodels；但 ANOVA 五族 + negbin/ordinal/multinomial/mlm + efa/cfa/survival + multiple_testing/diagnostics/chisquare/bayes/equivalence/partial_corr/irr/nonparametric 等 ~28 模块仍手写库已覆盖的统计核。关键：factor_analyzer/semopy/lifelines 是硬依赖却零 import。分 Tier1 净胜/Tier2 中风险/Tier3 高风险(mlm 的 ML→REML 须先 decision_request)。一次迁一个，胶水保留、只换核。
 
 ## 本轮维护(2)：`research` 合并 + 渐进式披露（应"合并命令/降低观感复杂度"诉求）
 
