@@ -2,7 +2,7 @@
 
 支持:
 - 自然语言对话(流式输出,注入 PSYCLAW.md 学术规范作为 system 提示)
-- slash 命令:/help /model /skills /mcp /gates /scale /screen /clear /compact /cost /config /exit
+- slash 命令:/help /model /skills /mcp /gates /scale /clear /compact /cost /config /exit
 - @<file> 文件引用:把数据/文稿拉进上下文
 - 会话历史与粗略成本统计
 """
@@ -33,9 +33,7 @@ COMMANDS = {
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
     "/audit": "逐轮审计开关(on/off;每轮多一次 LLM 调用)",
     "/clarify": "研究澄清(grill-me 式,不澄清完不开工)",
-    "/preregister": "预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取,可嵌功效分析)",
-    "/check": "可运行假设诊断(正态/Levene/经典F+Welch)",
-    "/screen": "草率作答筛查(longstring/IRV/直线)",
+    "/preregister": "预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取)",
     "/scale": "量表库(DASS/PHQ-9/GAD-7/TIPI…)",
     "/assume": "前提假设知识库(16 检验族)",
     "/method": "复杂方法目录(SEM/MLM/LPA/网络…)",
@@ -52,13 +50,10 @@ COMMANDS = {
     "/clear": "清空上下文",
     "/compact": "压缩上下文",
     "/config": "配置向导",
-    "/research": "一句话端到端流水线:文献→设计→统计→写作→评审→门禁(受澄清门禁约束)",
+    "/research": "一句话研究编排:文献→设计→写作→评审→总验收(受澄清门禁约束)",
     "/research-loop": "通用 HITL 回路(planner→executor→critic)",
     "/review": "审稿模拟(EIC+3审稿人+DA;--revise 回灌修复环)",
     "/lit": "文献检索(M2+)",
-    "/stat": "ARS-Stat 统计分析(M2+)",
-    "/write": "APA JARS 写作(M2+)",
-    "/sensitivity": "敏感性/多元宇宙分析(Multiverse + 规格曲线；P3-3)",
     "/exit": "退出",
 }
 
@@ -234,12 +229,6 @@ class ReplSession:
         elif cmd == "/design":
             from psyclaw.psych.knowledge import print_design
             print_design(arg or None)
-        elif cmd == "/check":
-            from psyclaw.psych.diagnostics import check_cli_args
-            if not arg:
-                print("  用法:/check <data.csv> --dv <列名> [--group <列名>]")
-            else:
-                check_cli_args(arg.split())
         elif cmd == "/clarify":
             from psyclaw.psych.clarify import print_clarify_status, run_clarify_interactive
             if arg == "status":
@@ -328,12 +317,6 @@ class ReplSession:
             print(f"  [逐轮审计 {'开' if self.audit_mode else '关'}]"
                   + (" 每轮回答后 auditor 评分,SCORE<80 草拟教训卡;"
                      "注意每轮多一次 LLM 调用。" if self.audit_mode else ""))
-        elif cmd == "/screen":
-            from psyclaw.psych.careless import screen_csv_cli
-            if not arg:
-                print("  用法:/screen <data.csv> [--prefix Q] [--suffix A]")
-            else:
-                screen_csv_cli(arg.split())
         elif cmd == "/clear":
             self.messages.clear()
             print("  [上下文已清空]")
@@ -361,15 +344,6 @@ class ReplSession:
         elif cmd == "/lit":
             from psyclaw.psych.lit_cli import lit_cli_argv
             lit_cli_argv(arg.split() if arg else [])
-        elif cmd == "/sensitivity":
-            from psyclaw.psych.sensitivity import sensitivity_cli
-            if not arg:
-                print("  用法:/sensitivity <plan.md|forks.yaml> [--data data.csv] "
-                      "[--dv col] [--group col] [--out dir]")
-            else:
-                sensitivity_cli(arg.split())
-        elif cmd in ("/stat", "/write", "/init"):
-            print(f"  [{cmd}] M2+ 实现(见 DESIGN.md 路线图)。当前可直接用自然语言询问,ARS 规范已注入。")
         else:
             print(f"  未知命令 {cmd},输入 /help 查看可用命令")
         return True
@@ -413,20 +387,17 @@ HELP_TEXT = """\
   /assume [t] 前提假设知识库(如 /assume anova-rm)
   /method [m] 复杂方法目录(如 /method clpm)
   /design [d] 实验设计目录(如 /design esm-diary)
-  /check f    可运行假设诊断(/check data.csv --dv 分数 --group 组别)
-  /screen f   数据草率作答筛查
   /clarify    研究澄清(grill-me 式;不澄清完 /research 不放行)
-  /preregister 预注册模板(OSF/AsPredicted;据澄清卡抽取,--test 嵌功效分析)
+  /preregister 预注册模板(OSF/AsPredicted;据澄清卡抽取)
   /cite [t]   方法学背书库(每个设计决策的文献支撑)
   /export f   APA7 输出(Word + Markdown,确定性模板)
   /review f   审稿模拟(EIC+3审稿人+DA;--revise 闭合写作→评审→修复)
   /memory     三层记忆(画像/决策惯性/教训卡)
   /clear      清空上下文         /compact       压缩上下文
   /config     配置向导           /exit          退出
-  /research [t]    一句话端到端流水线:文献→设计→统计→写作→评审→门禁(--revise 闭环)
+  /research [t]    一句话研究编排:文献→设计→写作→评审→总验收(--revise 闭环)
   /research-loop   通用 HITL 回路(planner→executor→critic→修复→交付)
-  /lit [q] [-s]    文献检索(合法 OA;-s 据真实命中一键合成结构化综述)
-  /stat /write     → M2+ 实现"""
+  /lit [q] [-s]    文献检索(合法 OA;-s 据真实命中一键合成结构化综述)"""
 
 
 def run_repl() -> int:

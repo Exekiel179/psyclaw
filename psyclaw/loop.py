@@ -100,66 +100,6 @@ def snapshot_raw(project: Path) -> dict:
     return out
 
 
-# ---------------------------------------------------------------------------
-# 自动分析(只在澄清卡能定位数据列时)
-# ---------------------------------------------------------------------------
-
-def _find_csv(project: Path) -> Path | None:
-    for sub in ("data/clean", "data/raw", "data", "."):
-        d = project / sub
-        if d.exists():
-            hits = sorted(d.glob("*.csv")) + sorted(d.glob("*.tsv"))
-            if hits:
-                return hits[0]
-    return None
-
-
-def _guess_vars(csv_path: Path, clar: str):
-    """从 CSV 表头 + 澄清卡文本定位 dv/group。
-
-    纪律:dv 必须在澄清卡中被**明确提及**(列名出现在澄清文本里),
-    不再有"取第二列"之类的兜底猜测 —— 信息不足就停。
-    """
-    import csv as _csv
-    with csv_path.open(encoding="utf-8", errors="replace", newline="") as f:
-        try:
-            dialect = _csv.Sniffer().sniff(f.read(2048), delimiters=",\t;")
-            f.seek(0)
-        except _csv.Error:
-            dialect = _csv.excel
-            f.seek(0)
-        header = next(_csv.reader(f, dialect), [])
-    if not header:
-        return None, None
-    low = clar.lower()
-    group = next((c for c in header if any(k in c.lower()
-                  for k in ("group", "cond", "组", "性别", "sex", "gender", "arm"))), None)
-    dv = next((c for c in header
-               if c != group and len(c) > 1 and c.lower() in low), None)
-    return dv, group
-
-
-def _auto_analyze(project: Path, clar: str) -> str:
-    """executor 自动跑 ARS-Stat。仅当 dv/group 都能从澄清卡确定。"""
-    csv_path = _find_csv(project)
-    if not csv_path:
-        return ""
-    dv, group = _guess_vars(csv_path, clar)
-    if not dv or not group:
-        print(ui.dim("  跳过自动分析:澄清卡未明确对应到数据列(dv/分组),"
-                     "不猜列名 —— 信息不足就停,可在澄清卡写明列名后重跑。"))
-        return ""
-    try:
-        from psyclaw.psych.analyze import analyze
-        analyze(str(csv_path), dv, group, None, None, project_dir=str(project))
-        res_files = sorted((project / "outputs").glob("result_*.md"))
-        if res_files:
-            return res_files[-1].read_text(encoding="utf-8")
-    except Exception as exc:  # noqa: BLE001
-        return f"[ARS-Stat 自动分析未完成:{exc}]"
-    return ""
-
-
 def _planner_task(goal: str) -> str:
     return (f"研究目标:{goal}\n据澄清卡产出可审计执行计划"
             "(任务/输入输出/依赖/审批节点/停止条件/最小可交付),Markdown 表格。"
@@ -279,11 +219,6 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
 
     # —— 2. executor ——
     print("\n" + ui.accent("② 执行(executor)"))
-    # 2a. 自动跑真分析(ARS-Stat):仅当澄清卡能明确定位 dv/group
-    stat_out = _auto_analyze(project, clar)
-    if stat_out:
-        print(ui.ok("  ✓ ARS-Stat 已对真实数据跑分析,结果落 outputs/"))
-        _log(project, "executor → ARS-Stat 真分析 → outputs/")
     execed = _gen(provider, "executor",
                   "按 plan.md 产出第一阶段分析脚本(数据质量+描述统计)。"
                   "脚本写法遵循严谨性协议;若需删除/重编码数据,不要执行,"
@@ -292,7 +227,7 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
                   "完成计划 `## TASKS` 中的某条任务时,**单独一行、行首**输出 "
                   "`TASK_DONE: <任务标题>`(机器据此更新任务进度;"
                   "不标记不更新,不要虚报未验证的完成)。",
-                  plan + ("\n\n# 已自动完成的 ARS-Stat 结果\n" + stat_out if stat_out else ""))
+                  plan)
     (project / "notes" / "step1_outline.md").write_text(execed, encoding="utf-8")
     _log(project, "executor → notes/step1_outline.md")
     print(ui.panel("executor 产出", execed[:900] + ("…" if len(execed) > 900 else "")))

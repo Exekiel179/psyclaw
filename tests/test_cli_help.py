@@ -43,10 +43,10 @@ def test_top_level_format_usage_does_not_raise():
 def test_has_subparsers():
     p = build_parser()
     names = [name for name, _ in _iter_subparsers(p)]
-    # 至少应包含若干核心命令
+    # 至少应包含若干核心命令（统计命令已外移到成熟库/MCP）
     assert "repl" in names
-    assert "partial-corr" in names  # 含 95%% CI 的命令
-    assert "roc" in names           # 含 95%% CI 的命令
+    assert "research" in names
+    assert "clarify" in names
     assert len(names) > 20
 
 
@@ -89,13 +89,13 @@ def test_no_bare_percent_in_subparser_help():
     assert not offenders, f"subparser help 含未转义 %：{offenders}"
 
 
-def test_partial_corr_help_renders_percent_literally():
-    """进阶命令(partial-corr/roc)已从顶层 --help 隐藏，但仍可调用（渐进式披露）。"""
+def test_advanced_commands_hidden_but_callable():
+    """进阶命令(serve/figures)已从顶层 --help 隐藏，但仍可分发（渐进式披露）。"""
     p = build_parser()
     names = [name for name, _ in _iter_subparsers(p)]
     # choices 仍含它们（可分发），只是不在顶层帮助列表里
-    assert "partial-corr" in names
-    assert "roc" in names
+    assert "serve" in names
+    assert "figures" in names
 
 
 # --- research 合并 + 渐进式披露（本轮新增）---------------------------------
@@ -124,12 +124,12 @@ def test_progressive_disclosure_core_only_in_help():
             callable_all = set(action.choices.keys())
     # 顶层帮助只列常用
     assert shown <= CORE_COMMANDS
-    assert "ttest" in shown
-    assert "logit" not in shown          # 进阶命令不在帮助列表
+    assert "research" in shown
+    assert "figures" not in shown        # 进阶命令不在帮助列表
     # 但隐藏命令仍可解析分发
-    assert "logit" in callable_all
-    args = p.parse_args(["logit", "d.csv", "--dv", "y", "--iv", "a"])
-    assert args.func.__name__ == "cmd_logit"
+    assert "figures" in callable_all
+    args = p.parse_args(["figures"])
+    assert args.func.__name__ == "cmd_figures"
 
 
 def test_commands_catalog_registered_and_covers_all():
@@ -142,5 +142,5 @@ def test_commands_catalog_registered_and_covers_all():
     # 分类清单不重复
     flat = [c for _t, cmds in COMMAND_CATEGORIES for c in cmds]
     assert len(flat) == len(set(flat)), "COMMAND_CATEGORIES 有重复命令"
-    # 除占位 stub(write/init)外，所有命令都被归类
-    assert (names - catalogued) <= {"write", "init"}
+    # 所有注册命令都被归类（统计命令已删，无 stub 例外）
+    assert names == catalogued

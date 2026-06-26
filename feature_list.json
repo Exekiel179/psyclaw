@@ -1,99 +1,99 @@
 {
-  "_comment": "PsyClaw 能力/特性清单 — harness 一等原语 (learn-harness-engineering L08)。每轮只推进 ONE 个 status != done 的 feature；done 必须带 evidence。schema: .agents/skills/harness-creator/templates/feature-list.schema.json",
+  "_comment": "PsyClaw 能力清单 — harness 一等原语 (learn-harness-engineering L08)。2026-06 起 PsyClaw 重定位为纯研究编排 harness:统计计算整体外移到成熟库/MCP,本仓不内置任何统计实现。每轮只推进 ONE 个 status != done 的 feature;done 必须带 evidence。",
   "features": [
     {
       "id": "feat-001",
-      "name": "统计分析命令族 (40+ commands)",
-      "description": "describe/ttest/anova/regress/logit/poisson/negbin/ordinal/multinom/efa/mlm/survival/irr/roc 等 40+ 条确定性 CLI 分析命令，输出 APA-7 + 效应量+CI + 报告落盘",
+      "name": "统计层整体外移 (删除 ~42 手写统计模块)",
+      "description": "删除 psych/ 下全部统计方法模块(anova/ttest/regression/efa/cfa/survival/...)、对应 CLI 子命令与测试;统计交给外部成熟库(scipy/pingouin/statsmodels/lifelines/...)或 MCP。psyclaw 自身零统计库依赖,只留研究编排 harness。",
       "dependencies": [],
       "status": "done",
-      "evidence": "3131 tests pass (C:\\Python314 -m pytest); 端到端 smoke 对照 scipy/statsmodels 8 命令数值吻合"
+      "evidence": "git rm 42 模块 + 41 测试;cli/loop/pipeline/repl/scales/preregister 去统计纠缠;psyclaw/ 零 scipy/numpy/pingouin import;全量 pytest 944 passed;pyproject 统计库降为可选 [stats] extra"
     },
     {
       "id": "feat-002",
-      "name": "成熟统计库迁移 (scipy/pingouin/statsmodels/...)",
-      "description": "删除手写分布/特殊函数/估计器，统计核改用成熟库；保留 CLI/IO/APA-7/报告胶水层",
+      "name": "研究编排流水线 (research)",
+      "description": "psyclaw research <topic>:澄清门禁→文献→设计→写作(APA-JARS)→同行评审→总验收,fail-closed verdict。--freeform 走通用 HITL 回路(planner→executor→critic)。统计外移后不再含内置统计阶段。",
       "dependencies": ["feat-001"],
       "status": "done",
-      "evidence": "commit 6b1d2ca..376854a 迁移 ~17 模块 + stats_core/diagnostics 共享核，删 ~2000 行；失败 22→0"
+      "evidence": "psyclaw/pipeline.py + loop.py;tests/test_pipeline.py 绿;PHASES=[literature,design,writing,review,gates]"
     },
     {
       "id": "feat-003",
-      "name": "学术规范门禁 gates",
-      "description": "效应量+CI 必报、前提诊断、预注册/探索区分、APA7、复现脚本等机器可校验门禁，不达标阻断",
-      "dependencies": [],
+      "name": "审稿模拟 review panel",
+      "description": "EIC + R1/R2/R3 + Devil's Advocate 多视角同行评审,保守 fail-closed 编辑决定,产可解析意见 + response letter",
+      "dependencies": ["feat-002"],
       "status": "done",
-      "evidence": "gates/PSYCLAW.md + rules.yaml + checker.py；psyclaw gates 自检；累计 17 条"
+      "evidence": "psyclaw/review.py + agents/reviewer.md + tests/test_review.py"
     },
     {
       "id": "feat-004",
-      "name": "三层自进化记忆 (画像/惯性/教训卡)",
-      "description": "profile 显式 + habits 带半衰期自动学习 + lessons HITL 确认；纯 JSON 可审计，只存方法学偏好",
+      "name": "研究澄清 clarify (LLM 驱动追问)",
+      "description": "grill-me 式 17 槽位澄清,LLM 评估+追问+fail-safe 降级;不澄清完不开工(CLARIFY.complete 门禁)",
       "dependencies": [],
       "status": "done",
-      "evidence": "psyclaw/memory.py + tests/test_audit_memory.py (48 例)"
+      "evidence": "psyclaw/psych/clarify.py + tests/test_clarify.py (21 例)"
     },
     {
       "id": "feat-005",
-      "name": "ARS 四象限端到端流水线",
-      "description": "psyclaw research <topic>：澄清门禁→文献→设计→ARS-Stat→APA-JARS 写作→同行评审→门禁汇总，fail-closed verdict",
-      "dependencies": ["feat-001", "feat-003"],
+      "name": "预注册 / 分析声明 (preregister + declare-test)",
+      "description": "OSF/AsPredicted 双格式预注册模板(据澄清卡抽取);declare-test 预注册单个计划分析(研究者自由度门禁)。功效计算外移,样本量依据取澄清卡 power 槽位。",
+      "dependencies": ["feat-004"],
       "status": "done",
-      "evidence": "psyclaw/pipeline.py + tests/test_pipeline.py (11 例)"
+      "evidence": "psyclaw/psych/preregister.py + analysis_plan.py;tests/test_preregister.py + test_analysis_plan.py 绿"
     },
     {
       "id": "feat-006",
-      "name": "审稿模拟 review panel",
-      "description": "EIC + R1/R2/R3 + Devil's Advocate 多视角同行评审，保守 fail-closed 编辑决定，产可解析意见 + response letter",
-      "dependencies": ["feat-005"],
+      "name": "知识参考目录 + 量表计分",
+      "description": "scale/norms/assume/method/design/cite/ethics 只读知识目录;score 量表自动计分(反向题翻转+子量表总分,信度计算外移)。纯查阅+数据准备,无统计推断。",
+      "dependencies": [],
       "status": "done",
-      "evidence": "psyclaw/review.py + agents/reviewer.md + tests/test_review.py (20 例)"
+      "evidence": "psyclaw/psych/{knowledge,scales,ethics}.py;tests/test_scale_score.py + test_custom_scales.py + test_ethics.py 绿"
     },
     {
       "id": "feat-007",
-      "name": "REPL + 路径注入 + Markdown 渲染",
-      "description": "三级降级 REPL (ptk→stdlib→input)、对话自动检测本地数据路径(原始数据不入上下文)、Markdown→ANSI",
+      "name": "文献检索 + 写作输出 (lit + export)",
+      "description": "lit 合法 OA 文献检索+全文获取+PRISMA 计数+综述合成;export APA7/心理学报/心理科学 确定性模板(Word docx + Markdown);JARS 检查清单",
       "dependencies": [],
       "status": "done",
-      "evidence": "psyclaw/{repl,ui_input,path_ingest,md_render}.py；path_ingest 跨平台引号/~ 修复 (commit 5840386)"
+      "evidence": "psyclaw/psych/{lit_cli,litsearch,synthesize}.py + output/{apa7,cn_journal,jars}.py;对应测试绿"
     },
     {
       "id": "feat-008",
-      "name": "harness 工程化契约 (feature_list/init/progress/handoff)",
-      "description": "把 learn-harness-engineering 的 5 子系统 (instructions/state/verification/scope/lifecycle) 物化为机器可校验工件",
+      "name": "三层自进化记忆",
+      "description": "profile 显式 + habits 带半衰期自动学习 + lessons HITL 确认;纯 JSON 可审计,只存方法学偏好",
       "dependencies": [],
       "status": "done",
-      "evidence": "commit 9a1aa8e；validate-harness.mjs 5 子系统全 5/5 → 100/100 (基线 24)"
+      "evidence": "psyclaw/memory.py + tests/test_audit_memory.py"
     },
     {
       "id": "feat-009",
-      "name": "端到端集成测试 (e2e)",
-      "description": "通过 CLI 子进程在合成数据上跑核心分析命令，断言 APA 输出 + 数值对照 scipy (learn-harness-engineering L10)",
-      "dependencies": ["feat-001"],
+      "name": "学术规范门禁 gates",
+      "description": "效应量+CI 必报、前提诊断、预注册/探索区分、APA7、复现脚本等机器可校验门禁,不达标阻断。统计虽外移,门禁判据仍在(供写作产出与外部统计结果对照)。",
+      "dependencies": [],
       "status": "done",
-      "evidence": "tests/test_e2e_analysis.py 5 passed：ttest/anova/regress/chi2 经 CLI 子进程对照 scipy/statsmodels + 无仓库污染"
+      "evidence": "gates/PSYCLAW.md + rules.yaml + checker.py;psyclaw gates 自检;tests/test_gates.py 绿"
     },
     {
       "id": "feat-010",
-      "name": "clarify LLM 驱动追问 (CLAR-1..4)",
-      "description": "把固定 17 题脚本升级为 grill-me 式 LLM 评估+追问、按研究类型动态裁剪槽位、与 preregister/research 复用同卡",
-      "dependencies": ["feat-005"],
-      "status": "in-progress",
-      "evidence": "CLAR-1 已落地：clarify.py LLM 驱动追问(evaluate_answer/clarify_one)+ fail-safe 降级(无 provider/mock/异常→照单收集)；tests/test_clarify.py 21 例。CLAR-2(read_line UI/back)、CLAR-3(按研究类型裁剪槽位)、CLAR-4(卡片追问痕迹+衔接) 待续"
+      "name": "REPL + 路径注入 + Markdown 渲染 + 渐进式披露",
+      "description": "三级降级 REPL、对话自动检测本地数据路径(原始数据不入上下文)、Markdown→ANSI;默认 --help 只示常用命令,psyclaw commands 看全部分类",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/{repl,ui_input,path_ingest,md_render,cli}.py;tests/test_{repl_ptk,path_ingest,cli_help}.py 绿"
     },
     {
       "id": "feat-011",
-      "name": "会话持久化 session store (SQLite+FTS5)",
-      "description": "Hermes s03：可全文检索的跨会话对话持久化，替代当前纯内存 compact_history",
-      "dependencies": ["feat-007"],
-      "status": "not-started",
-      "evidence": ""
+      "name": "harness 工程化契约",
+      "description": "feature_list/init/progress/handoff 物化 learn-harness-engineering 5 子系统(instructions/state/verification/scope/lifecycle)",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "feature_list.json + init.sh + progress.md + session-handoff.md + CLAUDE.md Harness 契约段"
     },
     {
       "id": "feat-012",
-      "name": "判断层评估 harness (eval suite)",
-      "description": "Hermes s23：对'选对检验/写对结果段/抓 p-hacking'这层判断力建 benchmark + 一致率度量，防换模型回归",
-      "dependencies": ["feat-005", "feat-006"],
+      "name": "会话持久化 session store (SQLite+FTS5)",
+      "description": "Hermes s03:可全文检索的跨会话对话持久化,替代当前纯内存 compact_history",
+      "dependencies": ["feat-010"],
       "status": "not-started",
       "evidence": ""
     }
