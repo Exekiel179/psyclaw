@@ -21,7 +21,7 @@
 
 | 模块 | 手写核(行号) | 换成 | 风险 | done |
 |---|---|---|---|---|
-| `multiple_testing.py` | bonferroni/holm/BH 排序校正(37-197) | `statsmodels.stats.multitest.multipletests` | 低（已实测口径一致；保留 dict/APA 胶水） | [ ] |
+| `multiple_testing.py` | bonferroni/holm/BH 排序校正(37-197) | `statsmodels.stats.multitest.multipletests` | 低（已实测口径一致；保留 dict/APA 胶水） | [x] 委托 multipletests，reject 按原口径自算；全量 3165 绿 |
 | `diagnostics.py` | levene_bf(122-126)/oneway_f(92-99)/welch_f(102-119) | `scipy.stats.levene(center='median')` / `f_oneway` / `pingouin.welch_anova` | 低-中（签名保留则测试可过；levene 一行替换最干净） | [ ] |
 | `chisquare.py` | GoF/独立性 χ²+期望频数(76,135-148) | `scipy.stats.chisquare` / `chi2_contingency`（Fisher 已委托✅） | 低（测试不钉内部 helper） | [ ] |
 | `careless.py` | `_mat_inv` Gauss-Jordan(98-116) / `chi2_critical` Wilson-Hilferty(164-172) | `numpy.linalg.inv` + `scipy.spatial.distance.mahalanobis` / `scipy.stats.chi2.ppf` | 低（测试仅序关系/区间断言）。longstring/IRV/psychsyn 保留 | [ ] |
