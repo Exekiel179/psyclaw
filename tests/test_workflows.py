@@ -158,14 +158,14 @@ def test_engine_no_topic_no_goal_fails(tmp_path):
 def test_registry_lit_review_present():
     wf = get_workflow("lit-review")
     assert wf is not None
-    assert wf["command"] == "review-lit"
+    assert wf["command"] == "lit-loop"
     step_ids = [s.id for s in wf["steps"]]
     assert step_ids == ["clarify", "lit_search", "screen", "synthesize", "review"]
 
 
 def test_registry_command_maps_to_workflow():
-    assert COMMAND_TO_WORKFLOW["review-lit"] == "lit-review"
-    assert get_workflow("review-lit") is WORKFLOWS["lit-review"]
+    assert COMMAND_TO_WORKFLOW["lit-loop"] == "lit-review"
+    assert get_workflow("lit-loop") is WORKFLOWS["lit-review"]
 
 
 # --- 元分析子功能:validate_effects / generate_meta_script ------------------
@@ -247,7 +247,7 @@ def test_generate_meta_script_delegates_to_statsmodels(tmp_path):
 
 def test_registry_meta_present():
     wf = get_workflow("meta")
-    assert wf is not None and wf["command"] == "meta"
+    assert wf is not None and wf["command"] == "meta-loop"
     assert [s.id for s in wf["steps"]] == [
         "clarify", "load_effects", "meta_script", "write", "review"]
 
@@ -315,7 +315,7 @@ def test_profile_data_missing_file_raises():
 
 def test_registry_analysis_present():
     wf = get_workflow("analysis")
-    assert wf is not None and wf["command"] == "analysis"
+    assert wf is not None and wf["command"] == "analysis-loop"
     assert [s.id for s in wf["steps"]] == [
         "clarify", "inspect_data", "design", "analysis", "write", "review"]
 
@@ -361,7 +361,7 @@ def test_load_transcripts_empty_dir_raises(tmp_path):
 
 def test_registry_qualitative_present():
     wf = get_workflow("qualitative")
-    assert wf is not None and wf["command"] == "qualitative"
+    assert wf is not None and wf["command"] == "qual-loop"
     assert [s.id for s in wf["steps"]] == [
         "clarify", "load_transcripts", "design", "thematic_analysis",
         "write", "review"]

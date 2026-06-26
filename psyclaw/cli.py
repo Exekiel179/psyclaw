@@ -450,8 +450,20 @@ def cmd_research(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_loop(args: argparse.Namespace) -> int:
+    # 通用流程编排器(类 Claude Code 的 agentic loop):planner→执行→critic→修复→交付。
+    # 不绑定研究类型;<type>-loop 是其上预置的具体研究流程(走 workflow 引擎)。
+    from psyclaw.loop import run_loop
+    try:
+        return run_loop(topic=getattr(args, "topic", None),
+                        auto=getattr(args, "auto", False))
+    except KeyboardInterrupt:
+        print("\n回路已中断。已落盘的产物保留在 notes/ outputs/。")
+        return 0
+
+
 def cmd_review_lit(args: argparse.Namespace) -> int:
-    # L0 路由:文献综述顶层命令 → 跑 lit-review workflow(引擎按声明式步骤跑)。
+    # L0 路由:lit-loop → 跑 lit-review workflow(引擎按声明式步骤跑)。
     from psyclaw.workflows import get_workflow, run_workflow
     try:
         return run_workflow(get_workflow("lit-review"),
@@ -527,7 +539,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 其余进阶/内部命令照常可调用,完整分类清单见 `psyclaw commands`(★ 标常用)。
 # 调常用集只需改这一个集合——隐藏≠删除,不破坏任何既有命令契约。
 CORE_COMMANDS = {
-    "research", "review-lit", "meta", "analysis", "qualitative",
+    "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop", "research",
     "review", "clarify", "lit", "export",
     "score", "scale", "jars", "preregister", "declare-test",
     "plan", "goal", "tasks", "memory",
@@ -542,7 +554,8 @@ COMMAND_CATEGORIES = [
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics"]),
     ("量表 / 数据准备", ["score"]),
     ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars"]),
-    ("研究流程(按类型路由)", ["review-lit", "meta", "analysis", "qualitative", "research"]),
+    ("研究流程 / 编排回路", ["loop", "lit-loop", "meta-loop", "analysis-loop",
+                        "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("记忆 / 消息 / IO", ["memory", "serve", "notify", "lit", "auth", "export", "figures"]),
 ]
@@ -733,32 +746,40 @@ def build_parser() -> argparse.ArgumentParser:
     prs.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
     prs.set_defaults(func=cmd_research)
 
-    # review-lit → 文献综述 workflow(L0 路由:每类研究一条顶层命令)
-    prl = sub.add_parser("review-lit",
+    # loop → 通用流程编排器(类 Claude Code 的 agentic loop):planner→执行→critic→修复
+    plp = sub.add_parser("loop",
+                         help="通用流程编排回路(planner→执行→critic→修复→交付),不绑研究类型")
+    plp.add_argument("topic", nargs="?", default=None, help="任务/研究主题(可空,读 notes/goal.md)")
+    plp.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
+    plp.set_defaults(func=cmd_loop)
+
+    # <type>-loop → 按研究类型预置的具体流程(走 workflow 引擎)
+    # lit-loop → 文献综述
+    prl = sub.add_parser("lit-loop",
                          help="文献综述流程:澄清→检索→筛选(PRISMA)→合成综述→评审")
     prl.add_argument("topic", nargs="?", default=None, help="综述主题(可空,读 notes/goal.md)")
     prl.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     prl.set_defaults(func=cmd_review_lit)
 
-    # meta → 元分析 workflow(输入效应量表;统计由生成的脚本在外部 statsmodels 跑)
-    pma = sub.add_parser("meta",
+    # meta-loop → 元分析(输入效应量表;统计由生成的脚本在外部 statsmodels 跑)
+    pma = sub.add_parser("meta-loop",
                          help="元分析流程:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审")
     pma.add_argument("effects_csv", help="效应量 CSV(含 study / 效应量(d/g/r/yi) / variance|se|ci 列)")
     pma.add_argument("--topic", default=None, help="元分析主题(可空,默认据文件名)")
     pma.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     pma.set_defaults(func=cmd_meta)
 
-    # analysis → 实证分析 workflow(输入数据表;统计由生成的脚本在外部 pingouin/scipy 跑)
-    pan = sub.add_parser("analysis",
+    # analysis-loop → 实证分析(输入数据表;统计由生成的脚本在外部 pingouin/scipy 跑)
+    pan = sub.add_parser("analysis-loop",
                          help="实证分析流程:画像数据→设计→推荐分析+生成可复现脚本(委托 pingouin)→写→评审")
     pan.add_argument("data_csv", help="数据 CSV(被试×变量;自动画像列类型并推荐分析)")
     pan.add_argument("--topic", default=None, help="研究主题(可空,默认据文件名)")
     pan.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     pan.set_defaults(func=cmd_analysis)
 
-    # qualitative → 质性研究 workflow(输入转录稿;LLM 辅助编码/主题分析,研究者复核)
-    pq = sub.add_parser("qualitative",
-                        help="质性研究流程:设计→载入转录稿→主题分析(LLM辅助)→写COREQ报告→评审")
+    # qual-loop → 质性研究(输入转录稿;LLM 辅助编码/主题分析,研究者复核)
+    pq = sub.add_parser("qual-loop",
+                        help="质性研究流程:载入转录稿→设计→主题分析(LLM辅助)→写COREQ报告→评审")
     pq.add_argument("transcripts", help="转录稿:单个 .txt/.md 文件,或包含它们的目录")
     pq.add_argument("--topic", default=None, help="研究主题(可空,默认据文件名)")
     pq.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
