@@ -25,7 +25,7 @@
 ## What's Next
 
 1. 后续增强:各分析步从"生成脚本"升级为可选直连 MCP 统计后端;质性编码升级为专用 skill
-2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
+2. 文档去债收尾:DESIGN.md / TODO.md 仍大量描述已删的统计命令,待重写(README 已重写✅)
 3. feat-013 会话持久化 session store(SQLite+FTS5)
 
 ## 本轮(8):`psyclaw setup` 升级为项目脚手架 + 能力选装向导
