@@ -98,10 +98,64 @@ def cmd_config(args: argparse.Namespace) -> int:
     return cfg.run_config_wizard(non_interactive=args.non_interactive)
 
 
+def _setup_print_mcp_skill() -> None:
+    """⑤ 列出可用 MCP 服务器 + 已注册 skill(只读目录;新装 MCP 依赖见能力阶段)。"""
+    from psyclaw import ui
+    from psyclaw.skills.loader import list_skills
+    try:
+        from psyclaw.mcp.manager import list_mcp_catalog
+        cat = list_mcp_catalog()
+    except Exception:  # noqa: BLE001
+        cat = []
+    if cat:
+        print(ui.dim("  内置 MCP 服务器(psyclaw mcp --serve <name>):"))
+        for s in cat:
+            flag = ui.ok("●就绪") if s.get("enabled") else ui.dim("○待依赖")
+            print(f"    {flag}  {s['name']:<8} {ui.dim(s.get('provides', '') or s.get('note', ''))}")
+    skills = list_skills()
+    print(ui.dim(f"  已注册 Skill:{len(skills)} 个(psyclaw skills 看全部)"))
+
+
 def cmd_setup(args: argparse.Namespace) -> int:
-    from psyclaw.bootstrap import run_setup
+    # 项目脚手架 + 能力选装向导:①目录 ②clarify→概览 ③项目记忆 ④能力依赖 ⑤MCP/skill。
+    from psyclaw import ui
+    from psyclaw.scaffold import scaffold_project
+    ni = getattr(args, "non_interactive", False)
+    online = getattr(args, "online", False)
+    print(ui.title("PsyClaw setup — 项目脚手架 + 能力选装"))
+    print(ui.rule())
+
+    # ① 目录结构  ② 据澄清卡生成概览  ③ 项目记忆(均幂等)
+    res = scaffold_project(".")
+    cd = res["created_dirs"]
+    print(ui.ok("① 目录结构就绪") + ui.dim(f"（新建 {len(cd)}：{', '.join(cd)}）" if cd else "（已存在）"))
+    if res["overview"]:
+        print(ui.ok("② 项目概览 → ") + ui.dim(str(res["overview"])))
+    else:
+        print(ui.dim("② 未找到澄清卡;先 `psyclaw clarify` 再重跑 setup 即据此生成项目概览"))
+    print(ui.ok("③ 项目记忆 → ") + ui.dim(str(res["memory"])))
+
+    # ④ 能力依赖(联网安装 opt-in:--online 自动装缺失;交互则 run_setup 内询问;否则只显示矩阵)
+    print(ui.accent("\n④ 能力依赖（跑生成的统计脚本需要 pingouin/statsmodels 等）"))
     groups = args.groups.split(",") if getattr(args, "groups", None) else None
-    return run_setup(non_interactive=getattr(args, "non_interactive", False), groups=groups)
+    if online:
+        from psyclaw.bootstrap import detect, run_setup
+        miss = [g for g, i in detect()["groups"].items() if not i["ready"]]
+        run_setup(non_interactive=True, groups=groups or miss)
+    elif not ni:
+        from psyclaw.bootstrap import run_setup
+        run_setup(non_interactive=False, groups=groups)
+    else:
+        from psyclaw.bootstrap import print_matrix
+        print_matrix()
+        print(ui.dim("  非交互且未 --online:跳过安装。重跑 `psyclaw setup --online` 联网装缺失。"))
+
+    # ⑤ MCP / Skill 目录
+    print(ui.accent("\n⑤ MCP / Skill"))
+    _setup_print_mcp_skill()
+
+    print(ui.ok("\n✓ setup 完成。下一步:psyclaw clarify(没澄清过)或选一条 loop 起跑(psyclaw guide)。"))
+    return 0
 
 
 def cmd_skills(args: argparse.Namespace) -> int:
@@ -573,8 +627,9 @@ def cmd_guide(args: argparse.Namespace) -> int:
 
     print(ui.accent("60 秒上手"))
     print("  1. " + ui.ok("psyclaw clarify") + ui.dim("            先澄清研究问题(17 槽位,不澄清完不开工)"))
-    print("  2. " + ui.ok('psyclaw lit-loop "你的主题"') + ui.dim("  选对应你研究类型的 loop 起跑"))
-    print("  3. " + ui.dim("跟随步间提示;产物落 notes/ 与 outputs/;统计脚本在 [stats] 环境或 MCP 跑"))
+    print("  2. " + ui.ok("psyclaw setup") + ui.dim("              铺目录 + 据澄清生成项目概览/记忆 + 装能力依赖/MCP"))
+    print("  3. " + ui.ok('psyclaw lit-loop "你的主题"') + ui.dim("  选对应你研究类型的 loop 起跑"))
+    print("  4. " + ui.dim("跟随步间提示;产物落 notes/ 与 outputs/;统计脚本在 [stats] 环境或 MCP 跑"))
     print()
 
     print(ui.accent("常用单功能(也可单独直接用)"))
@@ -624,8 +679,11 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--non-interactive", action="store_true", help="只写默认配置不提问")
     pc.set_defaults(func=cmd_config)
 
-    pst = sub.add_parser("setup", help="能力选装(检测缺失依赖,征求同意按组安装)")
+    pst = sub.add_parser("setup",
+                         help="项目脚手架+能力选装:目录/据clarify生成概览/项目记忆/能力依赖/MCP·skill")
     pst.add_argument("--groups", default=None, help="直接装指定组(逗号分隔:stats,viz,eeg,full)")
+    pst.add_argument("--online", action="store_true",
+                     help="联网自动安装缺失的能力依赖(否则交互询问/仅显示矩阵)")
     pst.add_argument("--non-interactive", action="store_true")
     pst.set_defaults(func=cmd_setup)
 

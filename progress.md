@@ -28,6 +28,15 @@
 2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
 3. feat-013 会话持久化 session store(SQLite+FTS5)
 
+## 本轮(8):`psyclaw setup` 升级为项目脚手架 + 能力选装向导
+
+- 新增 `psyclaw/scaffold.py`(确定性、幂等、可单测):
+  ① 标准目录结构(notes/outputs/data/{raw,clean}/logs/figures/scripts)
+  ② 据澄清卡生成 `notes/project_overview.md`(按 A–F 类别组织已澄清内容)
+  ③ 项目记忆 `notes/project_memory.md`(据澄清卡播种目标+方法学决策,幂等不覆盖手写)
+- `cmd_setup` 编排五阶段:①目录 ②clarify→概览 ③项目记忆 ④能力依赖(`--online` 联网装/交互询问/仅显矩阵)⑤列 MCP 服务器+skill 目录
+- `guide` 上手步骤纳入 setup(clarify→setup→loop);`tests/test_scaffold.py` 8 例;全量 **958 passed**
+
 ## 本轮(7):暴露全部顶层命令 + 新增 `guide` 首次上手介绍
 
 - 去掉渐进式披露的隐藏:`psyclaw --help` 现暴露**全部 39 个顶层命令**(不再藏一半);

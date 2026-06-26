@@ -1,0 +1,134 @@
+"""项目脚手架 — `psyclaw setup` 的工程化部分。
+
+三件确定性产物(可单测、幂等):
+  ① 标准目录结构
+  ② 据澄清卡生成项目概览 md(按 A–F 分类组织已澄清内容)
+  ③ 项目记忆文档(据澄清卡播种研究目标 + 关键方法学决策)
+
+不联网、不装依赖——能力依赖/MCP/skill 由 cmd_setup 的能力阶段处理(联网 opt-in)。
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+PROJECT_DIRS = [
+    "notes", "outputs", "data/raw", "data/clean", "logs", "figures", "scripts",
+]
+
+# 澄清卡 sid → 概览里的短字段名
+_LABELS = {
+    "research_question": "研究问题", "theory_base": "理论框架", "novelty": "增量贡献",
+    "iv": "自变量", "dv": "因变量", "covariates": "协变量",
+    "population": "总体与抽样", "exclusion": "纳入/排除标准",
+    "design_type": "设计类型", "randomization": "随机化/抵消平衡",
+    "hypotheses": "假设", "effect_expectation": "预期效应量", "power": "功效/样本量",
+    "analysis_plan": "分析计划", "ethics": "伦理与开放科学", "prereg": "预注册",
+    "data_sharing": "数据共享",
+}
+
+
+def ensure_dirs(project_dir: str | Path = ".") -> list[str]:
+    """创建标准项目目录(幂等)。返回本次新建的目录列表。"""
+    root = Path(project_dir)
+    created = []
+    for d in PROJECT_DIRS:
+        p = root / d
+        if not p.exists():
+            p.mkdir(parents=True, exist_ok=True)
+            created.append(d)
+    return created
+
+
+def _read_clarify(project_dir: str | Path) -> dict:
+    """读并解析澄清卡;无卡/无已澄清内容 → 空 dict。"""
+    from psyclaw.psych.clarify import CARD_NAME
+    from psyclaw.psych.preregister import parse_clarification
+    card = Path(project_dir) / "notes" / CARD_NAME
+    if not card.exists():
+        return {}
+    return parse_clarification(card.read_text(encoding="utf-8", errors="replace"))
+
+
+def generate_overview(project_dir: str | Path = ".") -> Path | None:
+    """据澄清卡生成 notes/project_overview.md(按澄清卡的 A–F 分类组织)。
+
+    无澄清卡或无已澄清内容 → 返回 None(由调用方提示先跑 clarify)。
+    """
+    from psyclaw.psych.clarify import SLOTS
+    answers = _read_clarify(project_dir)
+    if not answers:
+        return None
+
+    lines = ["# 研究项目概览", "",
+             "> 据澄清卡(notes/clarification.md)自动生成;澄清更新后重跑 `psyclaw setup` 可刷新。",
+             ""]
+    seen_cat = None
+    for sid, cat, _q, _why, _ex in SLOTS:
+        if sid not in answers:
+            continue
+        if cat != seen_cat:
+            lines += ["", f"## {cat}", ""]
+            seen_cat = cat
+        label = _LABELS.get(sid, sid)
+        lines.append(f"- **{label}**：{answers[sid]}")
+
+    n_total = len(SLOTS)
+    lines += ["", f"---", f"*已澄清 {len(answers)}/{n_total} 槽位*"]
+    out = Path(project_dir) / "notes" / "project_overview.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
+def init_project_memory(project_dir: str | Path = ".") -> Path:
+    """写项目记忆 notes/project_memory.md(据澄清卡播种;无卡则写骨架)。
+
+    幂等但**不覆盖**已有记忆(避免抹掉用户手写的决策日志):已存在则原样返回。
+    """
+    out = Path(project_dir) / "notes" / "project_memory.md"
+    if out.exists():
+        return out
+
+    a = _read_clarify(project_dir)
+    goal = a.get("research_question", "（待澄清:运行 psyclaw clarify）")
+
+    def _seed(sid: str) -> str:
+        return a.get(sid, "（待澄清）")
+
+    lines = [
+        f"# 项目记忆 — {goal.splitlines()[0][:60]}",
+        "",
+        "> 每次会话先读本文件接续上下文。据澄清卡播种,随研究推进**手动更新**。",
+        "",
+        "## 研究目标",
+        goal,
+        "",
+        "## 关键方法学决策(据澄清卡)",
+        f"- 设计类型：{_seed('design_type')}",
+        f"- 分析计划：{_seed('analysis_plan')}",
+        f"- 功效/样本量：{_seed('power')}",
+        f"- 预注册：{_seed('prereg')}",
+        "",
+        "## 决策日志",
+        "（在此记录研究过程中的重要决策与理由）",
+        "",
+        "## 未决问题",
+        "（在此记录待解决的问题）",
+        "",
+        "## 方法学偏好",
+        "（沉淀本项目的方法学惯例,供跨会话复用）",
+        "",
+    ]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines), encoding="utf-8")
+    return out
+
+
+def scaffold_project(project_dir: str | Path = ".") -> dict:
+    """跑①②③三件确定性脚手架。返回 {created_dirs, overview, memory}。"""
+    return {
+        "created_dirs": ensure_dirs(project_dir),
+        "overview": generate_overview(project_dir),
+        "memory": init_project_memory(project_dir),
+    }
