@@ -2002,7 +2002,7 @@ def build_parser() -> argparse.ArgumentParser:
     ppartial = sub.add_parser(
         "partial-corr",
         help=(
-            "偏相关分析 / 半偏相关 / 偏相关矩阵（stdlib only）："
+            "偏相关分析 / 半偏相关 / 偏相关矩阵："
             "控制协变量后的 r / t / p / 95%% CI（Fisher z）/ APA-7 报告"
         ),
     )
@@ -2027,7 +2027,7 @@ def build_parser() -> argparse.ArgumentParser:
     pirr = sub.add_parser(
         "irr",
         help=(
-            "评分者间信度（stdlib only）：Cohen's κ（含线性/二次加权）/ "
+            "评分者间信度：Cohen's κ（含线性/二次加权）/ "
             "Fleiss' κ（多评分者）/ Krippendorff's α（任意层级+缺失）/ "
             "ICC 六模型（Shrout & Fleiss 1979）/ APA-7 报告"
         ),
@@ -2055,7 +2055,7 @@ def build_parser() -> argparse.ArgumentParser:
     proc = sub.add_parser(
         "roc",
         help=(
-            "ROC 曲线 / AUC 诊断准确性分析（stdlib only）：量表截断值验证 / "
+            "ROC 曲线 / AUC 诊断准确性分析：量表截断值验证 / "
             "AUC + Hanley-McNeil 95%% CI / Youden's J 最优截断 / 敏感度·特异度·PPV·NPV·LR / APA-7 报告"
         ),
     )
@@ -2075,7 +2075,7 @@ def build_parser() -> argparse.ArgumentParser:
     pcmpc = sub.add_parser(
         "compare-corr",
         help=(
-            "相关系数差异检验（stdlib only）：两个 r 是否显著不同 / "
+            "相关系数差异检验：两个 r 是否显著不同 / "
             "独立样本 Fisher z / 重叠 Williams t / 非重叠 Steiger Z / Zou 2007 差异 CI / APA-7 报告"
         ),
     )
@@ -2107,7 +2107,7 @@ def build_parser() -> argparse.ArgumentParser:
     pcfa = sub.add_parser(
         "cfa",
         help=(
-            "验证性因子分析（CFA，ULS 估计，stdlib only）："
+            "验证性因子分析（CFA，ULS 估计）："
             "载荷矩阵 / CFI / TLI / RMSEA / SRMR / APA-7 报告"
         ),
     )
