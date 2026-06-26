@@ -238,7 +238,7 @@ def render_osf(prereg: dict) -> str:
     exp_md = _render_hyp_list(
         prereg["exploratory"], "_（无探索性假设/研究问题）_")
     power_block = prereg.get("power_md") or _slot(
-        a, "power", "功效分析：检验/α/功效/效应量/所得N（可跑 psyclaw power 生成）")
+        a, "power", "功效分析：检验/α/功效/效应量/所得N（用 G*Power 或统计库计算后填入）")
     eff_just = _slot(a, "effect_expectation", "预期效应量及其文献依据（注意发表偏倚高估）")
 
     return f"""# 预注册（OSF Preregistration）
@@ -386,13 +386,11 @@ OSF_NAME = "preregistration_osf.md"
 ASPREDICTED_NAME = "preregistration_aspredicted.md"
 
 
-def run_preregister(project_dir: str | Path = ".", fmt: str = "both",
-                    test: str | None = None,
-                    power_opts: dict | None = None) -> int:
-    """读澄清卡 → 生成预注册文稿(可选嵌入 D-1 功效计算)。
+def run_preregister(project_dir: str | Path = ".", fmt: str = "both") -> int:
+    """读澄清卡 → 生成预注册文稿。
 
-    fmt: osf | aspredicted | both(默认)。test 给定时用 ``power.compute`` 算样本量。
-    返回 0;澄清卡缺失返回 1(fail-closed)。
+    fmt: osf | aspredicted | both(默认)。样本量依据取自澄清卡 power 槽位文本
+    (功效/统计计算已外移到成熟库/MCP)。返回 0;澄清卡缺失返回 1(fail-closed)。
     """
     project = Path(project_dir)
     card = project / "notes" / CARD_NAME
@@ -402,17 +400,7 @@ def run_preregister(project_dir: str | Path = ".", fmt: str = "both",
         return 1
 
     answers = parse_clarification(card.read_text(encoding="utf-8", errors="replace"))
-
-    power_res = None
-    if test:
-        try:
-            from psyclaw.psych.power import compute
-            power_res = compute(test, **(power_opts or {}))
-        except Exception as exc:  # noqa: BLE001  # 功效计算失败不阻断预注册生成
-            print(f"  ⚠ 功效计算失败（{exc}），改用澄清卡 power 槽位文本。")
-            power_res = None
-
-    prereg = build_prereg(answers, power_res=power_res)
+    prereg = build_prereg(answers)
 
     notes = project / "notes"
     notes.mkdir(parents=True, exist_ok=True)
@@ -430,8 +418,6 @@ def run_preregister(project_dir: str | Path = ".", fmt: str = "both",
     body = [f"槽位已解析：{len(answers)}/{len(_VALID_SIDS)}",
             f"假设：确证 {len(prereg['confirmatory'])} · "
             f"探索 {len(prereg['exploratory'])}"]
-    if power_res and "error" not in power_res:
-        body.append(f"样本量依据：已嵌入 {power_res.get('analysis', '')}（D-1 功效分析）")
     print(ui.panel("Preregister — 预注册模板", "\n".join(body)))
     for p in written:
         print(f"    {p}")
@@ -445,48 +431,13 @@ def run_preregister(project_dir: str | Path = ".", fmt: str = "both",
 
 
 def preregister_cli(argv: list[str]) -> int:
-    """薄入口:preregister [--osf|--aspredicted] [--test <t> 及功效参数]。"""
+    """薄入口:preregister [--osf|--aspredicted|--both]。"""
     fmt = "both"
-    test = None
-    opts: dict = {}
-    float_flags = {"--d": "d", "--r": "r", "--f": "f", "--f2": "f2",
-                   "--a": "a", "--b": "b", "--cp": "cp", "--alpha": "alpha",
-                   "--rmsea0": "rmsea0", "--rmsea1": "rmsea1"}
-    int_flags = {"--k": "k", "--u": "u", "-n": "n", "--n": "n",
-                 "--tails": "tails", "--df": "df", "--sims": "sims"}
-    i = 0
-    while i < len(argv):
-        a = argv[i]
+    for a in argv:
         if a == "--osf":
             fmt = "osf"
         elif a == "--aspredicted":
             fmt = "aspredicted"
         elif a == "--both":
             fmt = "both"
-        elif a == "--test":
-            i += 1
-            test = argv[i] if i < len(argv) else None
-        elif a == "--power-target":   # 目标功效(反解 N)
-            i += 1
-            try:
-                opts["power"] = float(argv[i])
-            except (IndexError, ValueError):
-                pass
-        elif a == "--kind":
-            i += 1
-            if i < len(argv):
-                opts["kind"] = argv[i]
-        elif a in float_flags:
-            i += 1
-            try:
-                opts[float_flags[a]] = float(argv[i])
-            except (IndexError, ValueError):
-                pass
-        elif a in int_flags:
-            i += 1
-            try:
-                opts[int_flags[a]] = int(argv[i])
-            except (IndexError, ValueError):
-                pass
-        i += 1
-    return run_preregister(fmt=fmt, test=test, power_opts=opts or None)
+    return run_preregister(fmt=fmt)

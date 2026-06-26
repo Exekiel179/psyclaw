@@ -1,22 +1,23 @@
 """研究全流水线编排(一句话编排 / End-to-End Research Pipeline)。
 
-把已打通的四象限串成**一条命令**(`psyclaw research <topic>` / REPL `/research`):
+把研究编排串成**一条命令**(`psyclaw research <topic>` / REPL `/research`):
 
-  澄清门禁 → ① 文献 → ② 设计 → ③ 统计(ARS-Stat) → ④ 写作(APA-JARS)
-          → ⑤ 评审(peer-review panel) → ⑥ 门禁汇总(programmatic gates + 编辑决定)
+  澄清门禁 → ① 文献 → ② 设计 → ③ 写作(APA-JARS)
+          → ④ 评审(peer-review panel) → ⑤ 总验收(澄清 + 评审 → 判决)
+
+统计已外移到成熟库/MCP——本编排不内置统计计算,只做研究流程编排。
 
 与 run_loop(HITL planner→executor→critic 主干)的分工:
-  - `research-loop`(run_loop):通用 HITL 回路,planner 拆任务、critic 修复环。
-  - `research`(run_pipeline,本模块):显式按心理学研究四象限组织,产出一篇
-    结构完整的稿,并在末尾跑**程序化门禁 + 同行评审**,给出机器可读的总验收
-    (notes/pipeline_summary.json)。
+  - `research --freeform`(run_loop):通用 HITL 回路,planner 拆任务、critic 修复环。
+  - `research`(run_pipeline,本模块):按研究流程组织,产出一篇结构完整的稿,
+    末尾跑同行评审,给出机器可读的总验收(notes/pipeline_summary.json)。
 
 复用既有积木,不重造轮子:
-  loop._gen / _log / _ask_yn / _auto_analyze · review.summarize / run_review ·
-  clarify.check_card · gates.checker.check_artifact / format_report
+  loop._gen / _log / _ask_yn · review.summarize / run_review · clarify.check_card
 
 机器可判定控制点(纯函数,可单测,fail-closed):
   pipeline_verdict(clarify_resolved, stat_gate, review_summary) -> 总验收 dict
+  (stat_gate 现恒为 None——统计外移后无内置统计门禁)
 """
 
 from __future__ import annotations
@@ -25,8 +26,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-# 四象限阶段标识(顺序即执行顺序)。
-PHASES = ["literature", "design", "stat", "writing", "review", "gates"]
+# 研究编排阶段标识(顺序即执行顺序)。
+PHASES = ["literature", "design", "writing", "review", "gates"]
 
 
 # ---------------------------------------------------------------------------
@@ -119,11 +120,6 @@ def _design_task(goal: str) -> str:
 # 编排(依赖 provider / IO)
 # ---------------------------------------------------------------------------
 
-def _latest_stat_sidecar(project: Path) -> Path | None:
-    js = sorted((project / "outputs").glob("result_*.json"))
-    return js[-1] if js else None
-
-
 def _literature_stage(provider, goal: str, clar: str, project: Path) -> str:
     """① 文献:优先据 `/lit` 缓存的真实检索命中合成**有据综述**;无缓存则回落占位。
 
@@ -172,7 +168,7 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
            评审未达 ACCEPT/MINOR 不视为运行失败(交人工,符合 HITL 纪律)。
     """
     from psyclaw import config as cfg, ui
-    from psyclaw.loop import _auto_analyze, _gen, _log, _read
+    from psyclaw.loop import _gen, _log, _read
     from psyclaw.providers import get_provider
     from psyclaw.psych.clarify import check_card
     from psyclaw.review import run_review, summarize
@@ -191,7 +187,7 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
         set_goal(topic, project)
 
     print(ui.panel(
-        "Research Pipeline — 一句话编排(文献→设计→统计→写作→评审→门禁)",
+        "Research Pipeline — 一句话编排(文献→设计→写作→评审→总验收)",
         f"目标:{goal.splitlines()[0][:80]}"))
 
     # —— 门禁 0:澄清(硬规则,不澄清完不开工)——
@@ -228,25 +224,13 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     _log(project, "pipeline ② 设计 → notes/design.md")
     print(ui.panel("notes/design.md", design[:700] + ("…" if len(design) > 700 else "")))
 
-    # —— ③ 统计(ARS-Stat:仅当澄清卡能明确定位 dv/group)——
-    print("\n" + ui.accent("③ 统计(ARS-Stat)"))
-    stat_out = _auto_analyze(project, clar)
-    if stat_out:
-        artifacts["stat"] = "outputs/result_*.{md,json}"
-        print(ui.ok("  ✓ ARS-Stat 已对真实数据跑分析,结果落 outputs/"))
-        _log(project, "pipeline ③ ARS-Stat 真分析 → outputs/")
-    else:
-        stat_out = "(无可定位的数据列,empirical 分析待数据;理论/综述型研究跳过)"
-        print(ui.dim("  跳过自动分析:无数据或澄清卡未明确对应数据列(不猜列名)。"))
-
-    # —— ④ 写作(APA-JARS)——
+    # —— ③ 写作(APA-JARS;统计已外移到成熟库/MCP,本编排不内置统计)——
     from psyclaw.output.writing_backend import BACKEND_ARS, detect_backend, write_paper
 
     writing_backend = detect_backend(project_dir)
     backend_label = "ARS插件" if writing_backend == BACKEND_ARS else "内置"
-    print("\n" + ui.accent(f"④ 写作(APA-JARS 结构稿 · {backend_label}写作后端)"))
-    write_ctx = (f"# 背景综述\n{lit}\n\n# 研究设计\n{design}\n\n"
-                 f"# 统计结果(只引用 outputs/ 已存在的)\n{stat_out}")
+    print("\n" + ui.accent(f"③ 写作(APA-JARS 结构稿 · {backend_label}写作后端)"))
+    write_ctx = f"# 背景综述\n{lit}\n\n# 研究设计\n{design}"
     report, write_meta = write_paper(goal, write_ctx, provider, project,
                                      backend=writing_backend)
     report_path = project / "outputs" / "report.md"
@@ -266,8 +250,8 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     _log(project, f"pipeline ④ 写作({backend_label}) → outputs/report.md")
     print(ui.panel("outputs/report.md", report[:700] + ("…" if len(report) > 700 else "")))
 
-    # —— ⑤ 评审(peer-review panel;revise=True 闭合写作→评审→修复)——
-    print("\n" + ui.accent("⑤ 评审(EIC + R1/R2/R3 + Devil's Advocate)"))
+    # —— ④ 评审(peer-review panel;revise=True 闭合写作→评审→修复)——
+    print("\n" + ui.accent("④ 评审(EIC + R1/R2/R3 + Devil's Advocate)"))
     run_review(draft=str(report_path), project_dir=project_dir,
                auto=auto, revise=revise, rounds=rounds)
     review_summary: dict | None = None
@@ -283,20 +267,10 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     final_draft = ("notes/revised_draft.md" if revise and revised.exists()
                    else "outputs/report.md")
 
-    # —— ⑥ 门禁汇总(程序化统计门禁 + 编辑决定 → 机器可读总验收)——
-    print("\n" + ui.accent("⑥ 门禁汇总"))
-    stat_gate: dict | None = None
-    sidecar = _latest_stat_sidecar(project)
-    if sidecar is not None:
-        from psyclaw.gates.checker import check_artifact, format_report
-        stat_gate = check_artifact(str(sidecar), "stat")
-        print(ui.dim(f"  统计门禁对象:{sidecar.name}"))
-        print("  " + format_report(stat_gate).replace("\n", "\n  "))
-    else:
-        print(ui.dim("  无统计产出,统计门禁不适用(n/a)。"))
-
+    # —— ⑤ 总验收(澄清 + 评审 → 机器可读判决;统计已外移到成熟库/MCP)——
+    print("\n" + ui.accent("⑤ 总验收"))
     verdict = pipeline_verdict(card["resolved"] == card["total"],
-                               stat_gate, review_summary)
+                               None, review_summary)
     verdict["final_draft"] = final_draft
     _write_summary(project, goal, verdict, artifacts)
     _log(project, f"pipeline ⑥ 总验收:{'PASS' if verdict['overall_passed'] else 'BLOCK'} "

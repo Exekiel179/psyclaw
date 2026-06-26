@@ -17,7 +17,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from psyclaw.psych import preregister  # noqa: E402
 from psyclaw.psych.clarify import write_card  # noqa: E402
-from psyclaw.psych.power import compute  # noqa: E402
 from psyclaw.psych.preregister import (  # noqa: E402
     build_prereg, parse_clarification, power_justification_md,
     preregister_cli, render_aspredicted, render_osf, run_preregister,
@@ -143,22 +142,6 @@ def test_build_prereg_warns_on_missing_and_untagged():
 # 样本量依据(复用 D-1)
 # ---------------------------------------------------------------------------
 
-def test_power_justification_solves_n():
-    res = compute("ttest", d=0.5, power=0.80)   # 反解 N
-    md = power_justification_md(res)
-    assert "所需样本量" in md
-    assert "Cohen's d = 0.5" in md
-    # 发表偏倚告警必须保留。
-    assert any("发表偏倚" in line for line in md.splitlines())
-
-
-def test_power_justification_given_n():
-    res = compute("ttest", d=0.5, n=64)         # 给 N 求功效
-    md = power_justification_md(res)
-    assert "计划样本量" in md
-    assert "功效 =" in md
-
-
 def test_power_justification_none():
     assert power_justification_md(None) is None
     assert power_justification_md({"error": "x"}) is None
@@ -195,13 +178,6 @@ def test_render_aspredicted_eight_questions():
     assert "题名" in md
 
 
-def test_render_osf_embeds_power_calc():
-    res = compute("ttest", d=0.5, power=0.80)
-    prereg = build_prereg(ANSWERS, power_res=res)
-    md = render_osf(prereg)
-    assert "所需样本量" in md                   # D-1 功效结果嵌入抽样计划
-
-
 # ---------------------------------------------------------------------------
 # 端到端编排(IO)
 # ---------------------------------------------------------------------------
@@ -223,25 +199,6 @@ def test_run_preregister_osf_only(tmp_path):
     write_card(ANSWERS, tmp_path)
     run_preregister(project_dir=tmp_path, fmt="osf")
     assert (tmp_path / "notes" / "preregistration_osf.md").exists()
-    assert not (tmp_path / "notes" / "preregistration_aspredicted.md").exists()
-
-
-def test_run_preregister_embeds_power(tmp_path):
-    write_card(ANSWERS, tmp_path)
-    run_preregister(project_dir=tmp_path, fmt="osf", test="ttest",
-                    power_opts={"d": 0.5, "power": 0.80})
-    md = (tmp_path / "notes" / "preregistration_osf.md").read_text(encoding="utf-8")
-    assert "所需样本量" in md
-
-
-def test_preregister_cli_parses_flags(tmp_path, monkeypatch):
-    write_card(ANSWERS, tmp_path)
-    monkeypatch.chdir(tmp_path)
-    rc = preregister_cli(["--osf", "--test", "ttest", "--d", "0.5",
-                          "--power-target", "0.8"])
-    assert rc == 0
-    md = (tmp_path / "notes" / "preregistration_osf.md").read_text(encoding="utf-8")
-    assert "所需样本量" in md
     assert not (tmp_path / "notes" / "preregistration_aspredicted.md").exists()
 
 

@@ -5,27 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "psyclaw"
 version = "0.1.0"
-description = "心理学研究全流程 Agent CLI — 文献调研 · 实验设计 · 统计分析 · 论文写作，规范门禁内置"
+description = "心理学研究编排 Agent CLI — 文献调研 · 实验设计 · 论文写作 · 同行评审，规范门禁内置；统计交给成熟库/MCP"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "PsyClaw" }]
 
-# 核心依赖（硬依赖，配置时安装）：成熟统计库栈——pingouin/scipy 为主干，
-# statsmodels(回归族/GLM)、lifelines(生存)、factor_analyzer(EFA)、semopy(CFA/SEM)。
-# 各分析模块直接调用这些库，不再手写或降级到 stdlib 统计实现。
-dependencies = [
-    "pingouin>=0.5",
-    "pandas>=2.0",
-    "numpy>=1.22",
-    "scipy>=1.8",
-    "statsmodels>=0.14",
-    "lifelines>=0.27",
-    "factor_analyzer>=0.4",
-    "semopy>=2.3",
-]
+# 核心 = 纯 stdlib + 轻量可选依赖。统计计算已整体外移到成熟库/MCP——
+# psyclaw 自身不再 import 任何统计库;需在本机跑统计的用户按需装 [stats] extra 或走 MCP。
+dependencies = []
 
 [project.optional-dependencies]
+stats = [  # 可选:在本机直接跑统计时安装的成熟库栈(psyclaw 不强制依赖)
+    "pingouin>=0.5", "pandas>=2.0", "numpy>=1.22", "scipy>=1.8",
+    "statsmodels>=0.14", "lifelines>=0.27", "factor_analyzer>=0.4", "semopy>=2.3",
+]
 viz = ["seaborn", "matplotlib"]
 full = ["pyyaml", "rich", "prompt_toolkit", "mcp"]
 embed = ["model2vec"]  # 本地语义嵌入(纯 numpy 静态模型);未装时召回用内置哈希向量兜底
