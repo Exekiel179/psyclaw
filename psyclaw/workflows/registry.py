@@ -33,6 +33,12 @@ from psyclaw.workflows.steps_analysis import (
     step_inspect_data,
     step_write_analysis,
 )
+from psyclaw.workflows.steps_qual import (
+    step_load_transcripts,
+    step_qual_design,
+    step_thematic_analysis,
+    step_write_qual,
+)
 
 # 文献综述 / 系统综述
 LIT_REVIEW = {
@@ -85,10 +91,29 @@ ANALYSIS = {
     ],
 }
 
+# 质性研究(从转录稿起;LLM 辅助编码/主题分析,研究者复核)
+QUALITATIVE = {
+    "id": "qualitative",
+    "name": "质性研究",
+    "research_type": "质性研究 (主题分析/扎根理论;LLM 辅助编码,研究者复核)",
+    "command": "qualitative",
+    "steps": [
+        Step("clarify", "澄清门禁", run=lambda ctx: {},
+             gate=gate_clarify_complete),
+        Step("load_transcripts", "载入转录稿", run=step_load_transcripts),
+        Step("design", "质性研究设计", run=step_qual_design),
+        Step("thematic_analysis", "主题分析(LLM 辅助,研究者复核)",
+             run=step_thematic_analysis),
+        Step("write", "写质性报告(COREQ)", run=step_write_qual),
+        Step("review", "同行评审", run=step_review, optional=True),
+    ],
+}
+
 WORKFLOWS: dict[str, dict] = {
     LIT_REVIEW["id"]: LIT_REVIEW,
     META["id"]: META,
     ANALYSIS["id"]: ANALYSIS,
+    QUALITATIVE["id"]: QUALITATIVE,
 }
 
 # 顶层命令名 → workflow id(L0 路由:每类研究一条显式命令)

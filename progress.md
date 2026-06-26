@@ -24,8 +24,18 @@
 
 ## What's Next
 
-1. feat-012 Workflow 层余下:qualitative(质性,编码/主题分析)流程;各分析步从"生成脚本"升级为可选直连 MCP 统计后端
+1. 后续增强:各分析步从"生成脚本"升级为可选直连 MCP 统计后端;质性编码升级为专用 skill
 2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
+3. feat-013 会话持久化 session store(SQLite+FTS5)
+
+## 本轮(5):qualitative 质性研究流程 — 四条研究流程齐
+
+- `qualitative <转录稿>`:clarify门禁→载入转录稿→质性设计→主题分析(LLM 辅助)→写 COREQ 报告→评审
+- 质性是解释性分析(非统计):L3 实现 = LLM 辅助开放编码+主题分析,**研究者须复核**(HITL);
+  产物明确标注"LLM 辅助,逐条复核引文与主题归属"
+- 新子功能 `load_transcripts`(单文件/目录,过滤非 .txt/.md,fail-closed);生成式 `step_qual_design`/`step_thematic_analysis`/`step_write_qual`
+- 验证:`tests/test_workflows.py` 35 例;全量 **949 passed**
+- **四条研究流程齐(feat-012 done)**:review-lit / meta / analysis / qualitative,每类一条顶层命令
 
 ## 本轮(4):analysis 实证分析流程(第三条流程,统计外移到 pingouin/scipy)
 

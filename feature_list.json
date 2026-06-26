@@ -92,10 +92,10 @@
     {
       "id": "feat-012",
       "name": "Workflow 层:按研究类型路由的可组合流程引擎",
-      "description": "四层架构(路由→流程→子功能→skill/MCP)+ 两横切(harness/memory)。声明式 workflow 定义 + 引擎(gate/HITL/机器可读总验收);首条流程文献综述(review-lit:clarify→检索→PRISMA筛选→合成→评审);子功能可单用/可拼装。见 docs/ARCHITECTURE.md。",
+      "description": "四层架构(路由→流程→子功能→skill/MCP)+ 两横切(harness/memory)。声明式 workflow 定义 + 引擎(gate/HITL/机器可读总验收);四条研究流程按类型路由,每类一条顶层命令;子功能可单用/可拼装。见 docs/ARCHITECTURE.md。",
       "dependencies": ["feat-002"],
-      "status": "in-progress",
-      "evidence": "psyclaw/workflows/{engine,steps,steps_meta,steps_analysis,registry}.py;三条流程 review-lit(文献综述)+ meta(元分析)+ analysis(实证分析);子功能 screen_papers/validate_effects/generate_meta_script/profile_data/recommend_analysis/generate_analysis_script;meta+analysis 统计外移=生成委托 statsmodels/pingouin 的可复现脚本(均经 C:\\Python314 实跑 exit 0);tests/test_workflows.py 28 例;全量 942 passed。剩 qualitative 流程 + 分析步从生成脚本升级为可选直连 MCP"
+      "status": "done",
+      "evidence": "psyclaw/workflows/{engine,steps,steps_meta,steps_analysis,steps_qual,registry}.py;四条流程齐:review-lit(文献综述)/meta(元分析)/analysis(实证)/qualitative(质性);子功能 screen_papers/validate_effects+generate_meta_script/profile_data+recommend_analysis+generate_analysis_script/load_transcripts;统计外移=meta/analysis 生成委托 statsmodels/pingouin 的可复现脚本(均经 C:\\Python314 实跑 exit 0);质性=LLM 辅助编码研究者复核;tests/test_workflows.py 35 例;全量 949 passed。后续增强:分析步可选直连 MCP、质性编码升级专用 skill"
     },
     {
       "id": "feat-013",

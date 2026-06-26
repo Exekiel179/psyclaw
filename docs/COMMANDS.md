@@ -51,10 +51,11 @@
 | `review-lit <主题>` | 文献综述流程:澄清→检索→筛选(PRISMA)→合成综述→评审 |
 | `meta <effects.csv>` | 元分析流程:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审 |
 | `analysis <data.csv>` | 实证分析流程:画像数据→设计→推荐分析+生成可复现脚本(委托 pingouin/scipy)→写→评审 |
+| `qualitative <转录稿>` | 质性研究流程:载入转录稿→设计→主题分析(LLM 辅助,研究者复核)→写 COREQ 报告→评审 |
 | `research [topic]` | 不分类型的通用编排:文献→设计→写作→评审→总验收;`--freeform` 走通用 HITL 回路 |
 
-> 见 `docs/ARCHITECTURE.md`。每条流程 = 声明式步骤链;子功能可单用/可拼装;
-> empirical(实证)/ qualitative(质性)流程规划中。
+> 见 `docs/ARCHITECTURE.md`。每条流程 = 声明式步骤链;子功能可单用/可拼装。四条研究流程齐:
+> review-lit / meta / analysis / qualitative。
 
 ### 工作流 / 编排
 | 命令 | 作用 |
