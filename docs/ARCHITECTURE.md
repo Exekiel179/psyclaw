@@ -22,7 +22,7 @@ L3  实现 Skill + MCP    每个 Step 是薄壳,真正干活委托既有命令 /
 |---|---|---|
 | `review-lit <主题>` | 文献综述 / 系统综述 | ✅ 已实现 |
 | `meta <effects.csv>` | 元分析(统计委托外部 statsmodels 脚本) | ✅ 已实现 |
-| `empirical <主题>` | 实证研究(含实验设计;分析交外部统计/MCP) | 规划中 |
+| `analysis <data.csv>` | 实证分析(画像→设计→推荐分析+脚本;委托外部 pingouin/scipy) | ✅ 已实现 |
 | `qualitative <主题>` | 质性研究 | 规划中 |
 
 `research <主题>` 是不分类型的通用编排(沿用旧 pipeline);`--freeform` 走通用 HITL 回路。
@@ -85,9 +85,11 @@ Step 之下是真正的实现层:
 
 ## 现状
 
-- ✅ 引擎 + 注册表 + 两条流程:**文献综述**(`review-lit`)、**元分析**(`meta`);
-  子功能 `screen_papers`(PRISMA 初筛)、`validate_effects` + `generate_meta_script`(元分析脚本)。
-- 元分析体现"统计外移":`meta` 不在仓内算,而是生成委托 statsmodels 的可复现脚本
-  (`outputs/meta_analysis.py`,随机效应 DL + I²/τ²/Q + Egger),用户在 [stats] 环境跑/交 MCP。
-- `tests/test_workflows.py` 20 例;生成脚本经 C:\Python314 实跑产出合并效应/异质性/Egger,exit 0。
-- 下一步:empirical(生成式实验设计 + 分析步对接 MCP)、qualitative(编码/主题分析)。
+- ✅ 引擎 + 注册表 + 三条流程:**文献综述**(`review-lit`)、**元分析**(`meta`)、**实证分析**(`analysis`)。
+- "统计外移"两处样板:`meta` 生成委托 statsmodels 的脚本(随机效应 DL + I²/τ²/Q + Egger);
+  `analysis` 据数据画像**推荐分析**(t/ANOVA/相关/回归/描述)并生成委托 pingouin/scipy 的脚本——
+  仓内**不算任何统计**,脚本在 [stats] 环境跑/交 MCP。
+- 子功能(独立纯函数,可单用):`screen_papers`、`validate_effects`/`generate_meta_script`、
+  `profile_data`/`recommend_analysis`/`generate_analysis_script`。
+- `tests/test_workflows.py` 28 例;meta 与 analysis 生成脚本均经 C:\Python314 实跑 exit 0。
+- 下一步:`qualitative`(编码/主题分析);各分析步从"生成脚本"升级为"可选直连 MCP 统计后端"。

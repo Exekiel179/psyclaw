@@ -250,3 +250,71 @@ def test_registry_meta_present():
     assert wf is not None and wf["command"] == "meta"
     assert [s.id for s in wf["steps"]] == [
         "clarify", "load_effects", "meta_script", "write", "review"]
+
+
+# --- 实证分析子功能:profile_data / recommend_analysis / generate_analysis_script
+
+from psyclaw.workflows.steps_analysis import (  # noqa: E402
+    generate_analysis_script, profile_data, recommend_analysis,
+)
+
+
+def test_profile_data_kinds(tmp_path):
+    p = _eff_csv(tmp_path, "data.csv",
+                 [{"grp": "A", "score": "50", "age": "20"},
+                  {"grp": "B", "score": "55", "age": "22"}],
+                 ["grp", "score", "age"])
+    prof = profile_data(p)
+    assert prof["n"] == 2
+    assert set(prof["numeric"]) == {"score", "age"}
+    assert prof["categorical"] == ["grp"]
+
+
+def test_recommend_ttest():
+    prof = {"numeric": ["score"], "columns": [
+        {"name": "grp", "kind": "categorical", "n_levels": 2},
+        {"name": "score", "kind": "numeric"}]}
+    rec = recommend_analysis(prof)
+    assert rec["analysis"] == "ttest" and rec["group"] == "grp" and rec["dv"] == "score"
+
+
+def test_recommend_anova():
+    prof = {"numeric": ["y"], "columns": [
+        {"name": "cond", "kind": "categorical", "n_levels": 3},
+        {"name": "y", "kind": "numeric"}]}
+    assert recommend_analysis(prof)["analysis"] == "anova"
+
+
+def test_recommend_correlation_and_regression():
+    prof2 = {"numeric": ["x", "y"], "columns": [
+        {"name": "x", "kind": "numeric"}, {"name": "y", "kind": "numeric"}]}
+    assert recommend_analysis(prof2)["analysis"] == "correlation"
+    prof3 = {"numeric": ["a", "b", "c"], "columns": [
+        {"name": c, "kind": "numeric"} for c in "abc"]}
+    assert recommend_analysis(prof3)["analysis"] == "regression"
+
+
+def test_recommend_descriptives_fallback():
+    prof = {"numeric": ["only"], "columns": [{"name": "only", "kind": "numeric"}]}
+    assert recommend_analysis(prof)["analysis"] == "descriptives"
+
+
+def test_generate_analysis_script_delegates_to_pingouin():
+    rec = {"analysis": "ttest", "group": "grp", "dv": "score", "rationale": "x"}
+    script = generate_analysis_script("d.csv", rec)
+    assert "import pingouin as pg" in script
+    assert "pg.ttest(" in script
+    assert "cohen_d" in script           # 效应量随报
+    assert "d.csv" in script
+
+
+def test_profile_data_missing_file_raises():
+    with pytest.raises(ValueError, match="不存在"):
+        profile_data("nope.csv")
+
+
+def test_registry_analysis_present():
+    wf = get_workflow("analysis")
+    assert wf is not None and wf["command"] == "analysis"
+    assert [s.id for s in wf["steps"]] == [
+        "clarify", "inspect_data", "design", "analysis", "write", "review"]

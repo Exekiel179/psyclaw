@@ -27,6 +27,12 @@ from psyclaw.workflows.steps_meta import (
     step_meta_script,
     step_write_meta,
 )
+from psyclaw.workflows.steps_analysis import (
+    step_analysis,
+    step_design,
+    step_inspect_data,
+    step_write_analysis,
+)
 
 # 文献综述 / 系统综述
 LIT_REVIEW = {
@@ -61,9 +67,28 @@ META = {
     ],
 }
 
+# 实证分析(从数据表起;统计计算外移到 pingouin/scipy 脚本)
+ANALYSIS = {
+    "id": "analysis",
+    "name": "实证分析",
+    "research_type": "实证研究 / 数据分析 (统计委托外部 pingouin/scipy)",
+    "command": "analysis",
+    "steps": [
+        Step("clarify", "澄清门禁", run=lambda ctx: {},
+             gate=gate_clarify_complete),
+        Step("inspect_data", "画像数据", run=step_inspect_data),
+        Step("design", "研究/分析设计", run=step_design),
+        Step("analysis", "推荐分析 + 生成可复现脚本(委托 pingouin/scipy)",
+             run=step_analysis),
+        Step("write", "写实证稿", run=step_write_analysis),
+        Step("review", "同行评审", run=step_review, optional=True),
+    ],
+}
+
 WORKFLOWS: dict[str, dict] = {
     LIT_REVIEW["id"]: LIT_REVIEW,
     META["id"]: META,
+    ANALYSIS["id"]: ANALYSIS,
 }
 
 # 顶层命令名 → workflow id(L0 路由:每类研究一条显式命令)
