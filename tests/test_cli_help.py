@@ -91,13 +91,16 @@ def test_no_bare_percent_in_subparser_help():
     assert not offenders, f"subparser help 含未转义 %：{offenders}"
 
 
-def test_advanced_commands_hidden_but_callable():
-    """进阶命令(serve/figures)已从顶层 --help 隐藏，但仍可分发（渐进式披露）。"""
+def test_all_top_level_commands_exposed_in_help():
+    """`--help` 暴露全部顶层命令(不再隐藏);CORE_COMMANDS 仅用于 ★ 标注。"""
     p = build_parser()
-    names = [name for name, _ in _iter_subparsers(p)]
-    # choices 仍含它们（可分发），只是不在顶层帮助列表里
-    assert "serve" in names
-    assert "figures" in names
+    shown, callable_all = set(), set()
+    for action in p._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            shown = {pa.dest for pa in action._choices_actions}
+            callable_all = set(action.choices.keys())
+    assert shown == callable_all          # 顶层帮助列出的 == 可调用的(全部暴露)
+    assert {"serve", "figures", "loop", "guide"} <= shown
 
 
 # --- 编排命令:loop(通用)+ <type>-loop(研究流程)+ research(固定全流程)----------
@@ -122,23 +125,12 @@ def test_typed_loop_commands_registered():
     assert {"review-lit", "meta", "analysis", "qualitative"}.isdisjoint(names)
 
 
-def test_progressive_disclosure_core_only_in_help():
-    """默认 --help 仅展示常用命令；进阶命令隐藏但仍在 choices 可调用。"""
-    from psyclaw.cli import CORE_COMMANDS
+def test_guide_command_registered():
+    """`guide` 首次使用上手介绍命令已注册并可分发。"""
     p = build_parser()
-    shown, callable_all = set(), set()
-    for action in p._actions:
-        if isinstance(action, argparse._SubParsersAction):
-            shown = {pa.dest for pa in action._choices_actions}
-            callable_all = set(action.choices.keys())
-    # 顶层帮助只列常用
-    assert shown <= CORE_COMMANDS
-    assert "research" in shown
-    assert "figures" not in shown        # 进阶命令不在帮助列表
-    # 但隐藏命令仍可解析分发
-    assert "figures" in callable_all
-    args = p.parse_args(["figures"])
-    assert args.func.__name__ == "cmd_figures"
+    names = {name for name, _ in _iter_subparsers(p)}
+    assert "guide" in names
+    assert p.parse_args(["guide"]).func.__name__ == "cmd_guide"
 
 
 def test_commands_catalog_registered_and_covers_all():

@@ -28,6 +28,14 @@
 2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
 3. feat-013 会话持久化 session store(SQLite+FTS5)
 
+## 本轮(7):暴露全部顶层命令 + 新增 `guide` 首次上手介绍
+
+- 去掉渐进式披露的隐藏:`psyclaw --help` 现暴露**全部 39 个顶层命令**(不再藏一半);
+  `CORE_COMMANDS` 仅保留作 `guide`/`commands` 的 ★ 常用标注。
+- 新增 `psyclaw guide`:首次使用上手介绍——是什么(研究编排 harness,统计外移)+
+  心智模型(每类研究一条 loop)+ 60 秒上手 + 常用单功能;`--help` epilog 指向 guide。
+- tests/test_cli_help.py 改测(全部暴露 + guide 注册);全量 950 passed。
+
 ## 本轮(6):命令命名重构 — `loop` 通用编排器 + `<type>-loop`
 
 - 命名约定:每个流程都是一个 "loop"。`loop [主题]` = 通用流程编排回路(类 Claude Code 的
