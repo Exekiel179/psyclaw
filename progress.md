@@ -24,8 +24,20 @@
 
 ## What's Next
 
-1. feat-012 会话持久化 session store(SQLite+FTS5)
+1. feat-012 Workflow 层余下三条流程:empirical(实证)/ meta(元分析)/ qualitative(质性),分析步对接 MCP
 2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
+
+## 本轮(2):Workflow 层 — 按研究类型路由的可组合流程引擎
+
+愿景:不同研究需求走不同流程(文献综述/实证/元分析/质性…),上层分类简单,
+每个子功能可单用/可拆/可拼成 loop;harness 约束 + skill/MCP 实现 + memory 横切。
+
+- 架构:四层(L0 路由→L1 流程→L2 子功能→L3 skill/MCP)+ 两横切(harness/memory),见 `docs/ARCHITECTURE.md`
+- 引擎 `psyclaw/workflows/engine.py`:声明式 Step 列表 + gate(fail-closed)+ HITL + 机器可读总验收
+- 首条流程 **文献综述**(`review-lit <主题>`):clarify→检索→PRISMA筛选→合成综述→评审;复用 litsearch/synthesize/review
+- 新子功能 `screen_papers`(PRISMA 相关性初筛,独立纯函数,可单用;跨语言诚实降级)
+- L0 路由形态:**每类研究一条顶层命令**(review-lit 已落地,empirical/meta/qualitative 待续)
+- 验证:`tests/test_workflows.py` 12 例;全量 **926 passed**
 
 ## 本轮(2026-06-26):统计层整体外移
 

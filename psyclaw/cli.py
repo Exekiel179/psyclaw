@@ -450,6 +450,18 @@ def cmd_research(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_review_lit(args: argparse.Namespace) -> int:
+    # L0 路由:文献综述顶层命令 → 跑 lit-review workflow(引擎按声明式步骤跑)。
+    from psyclaw.workflows import get_workflow, run_workflow
+    try:
+        return run_workflow(get_workflow("lit-review"),
+                            topic=getattr(args, "topic", None),
+                            project_dir=".", auto=getattr(args, "auto", False))
+    except KeyboardInterrupt:
+        print("\n流程已中断。已落盘的产物保留在 notes/ outputs/。")
+        return 0
+
+
 def cmd_review(args: argparse.Namespace) -> int:
     from psyclaw.review import run_review
     try:
@@ -470,7 +482,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 其余进阶/内部命令照常可调用,完整分类清单见 `psyclaw commands`(★ 标常用)。
 # 调常用集只需改这一个集合——隐藏≠删除,不破坏任何既有命令契约。
 CORE_COMMANDS = {
-    "research", "review", "clarify", "lit", "export",
+    "research", "review-lit", "review", "clarify", "lit", "export",
     "score", "scale", "jars", "preregister", "declare-test",
     "plan", "goal", "tasks", "memory",
     "gates", "config", "setup", "doctor", "repl", "commands",
@@ -484,7 +496,8 @@ COMMAND_CATEGORIES = [
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics"]),
     ("量表 / 数据准备", ["score"]),
     ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars"]),
-    ("工作流 / 编排", ["goal", "plan", "tasks", "research", "review"]),
+    ("研究流程(按类型路由)", ["review-lit", "research"]),
+    ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("记忆 / 消息 / IO", ["memory", "serve", "notify", "lit", "auth", "export", "figures"]),
 ]
 
@@ -662,17 +675,24 @@ def build_parser() -> argparse.ArgumentParser:
     ptk.add_argument("args", nargs="*", help="子命令与参数,留空 list")
     ptk.set_defaults(func=cmd_tasks)
 
-    # research → 一句话端到端流水线(文献→设计→统计→写作→评审→门禁)
+    # research → 一句话研究编排(文献→设计→写作→评审→总验收;统计交外部库/MCP)
     prs = sub.add_parser("research",
-                         help="一句话端到端流水线:文献→设计→统计→写作→评审→门禁")
+                         help="一句话研究编排:文献→设计→写作→评审→总验收")
     prs.add_argument("topic", nargs="?", default=None, help="研究主题(可空,读 notes/goal.md)")
     prs.add_argument("--revise", "-r", action="store_true",
                      help="评审阶段闭合写作→评审→修复(把 BLOCKING/MAJOR 回灌修订)")
     prs.add_argument("--rounds", type=int, default=3, help="评审修订最大轮次(默认 3)")
     prs.add_argument("--freeform", "-f", action="store_true",
-                     help="改走通用 HITL 回路(planner→执行→critic→修复),不按固定四象限")
+                     help="改走通用 HITL 回路(planner→执行→critic→修复),不按固定流程")
     prs.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
     prs.set_defaults(func=cmd_research)
+
+    # review-lit → 文献综述 workflow(L0 路由:每类研究一条顶层命令)
+    prl = sub.add_parser("review-lit",
+                         help="文献综述流程:澄清→检索→筛选(PRISMA)→合成综述→评审")
+    prl.add_argument("topic", nargs="?", default=None, help="综述主题(可空,读 notes/goal.md)")
+    prl.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
+    prl.set_defaults(func=cmd_review_lit)
 
     prv = sub.add_parser("review", help="审稿模拟(EIC+3审稿人+Devil's Advocate,产可解析意见)")
     prv.add_argument("draft", nargs="?", default=None,

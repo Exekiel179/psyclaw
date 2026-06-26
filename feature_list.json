@@ -91,6 +91,14 @@
     },
     {
       "id": "feat-012",
+      "name": "Workflow 层:按研究类型路由的可组合流程引擎",
+      "description": "四层架构(路由→流程→子功能→skill/MCP)+ 两横切(harness/memory)。声明式 workflow 定义 + 引擎(gate/HITL/机器可读总验收);首条流程文献综述(review-lit:clarify→检索→PRISMA筛选→合成→评审);子功能可单用/可拼装。见 docs/ARCHITECTURE.md。",
+      "dependencies": ["feat-002"],
+      "status": "in-progress",
+      "evidence": "psyclaw/workflows/{engine,steps,registry}.py + cli review-lit;新子功能 screen_papers(PRISMA 初筛);tests/test_workflows.py 12 例;全量 926 passed。剩 empirical/meta/qualitative 三条流程 + 分析步对接 MCP"
+    },
+    {
+      "id": "feat-013",
       "name": "会话持久化 session store (SQLite+FTS5)",
       "description": "Hermes s03:可全文检索的跨会话对话持久化,替代当前纯内存 compact_history",
       "dependencies": ["feat-010"],
