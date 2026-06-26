@@ -527,11 +527,10 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 解析器
 # --------------------------------------------------------------------------
 
-# 渐进式披露(progressive disclosure):默认 `--help` 只展示「常用」命令,降低上手门槛;
-# 其余进阶/内部命令照常可调用,完整分类清单见 `psyclaw commands`(★ 标常用)。
-# 调常用集只需改这一个集合——隐藏≠删除,不破坏任何既有命令契约。
+# 常用命令集——`--help` 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅供 `guide`/`commands`
+# 标注 ★ 常用,帮助新用户聚焦上手路径。改这个集合只影响 ★ 标注,不影响命令可见性/可用性。
 CORE_COMMANDS = {
-    "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop", "research",
+    "guide", "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop", "research",
     "review", "clarify", "lit", "export",
     "score", "scale", "jars", "preregister", "declare-test",
     "plan", "goal", "tasks", "memory",
@@ -541,7 +540,7 @@ CORE_COMMANDS = {
 # 职能分类(每个命令恰好出现一次;`psyclaw commands` 按此展示)。统计方法已外移到
 # 成熟库/MCP——本 CLI 只保留研究编排 + 知识参考 + 文献/写作 harness。
 COMMAND_CATEGORIES = [
-    ("环境 / 系统", ["repl", "version", "doctor", "config", "setup",
+    ("环境 / 系统", ["guide", "repl", "version", "doctor", "config", "setup",
                   "skills", "mcp", "gates", "commands"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics"]),
     ("量表 / 数据准备", ["score"]),
@@ -553,13 +552,46 @@ COMMAND_CATEGORIES = [
 ]
 
 
+def cmd_guide(args: argparse.Namespace) -> int:
+    """首次使用上手介绍:是什么 + 心智模型(每类研究一条 loop)+ 60 秒上手。"""
+    from psyclaw import __version__, ui
+    print(ui.title(f"PsyClaw v{__version__} — 心理学研究编排 harness"))
+    print(ui.dim("把研究全流程编排起来(澄清→文献→设计→写作→评审→门禁);"
+                 "统计计算交给外部库/MCP,本体不内置统计。\n"))
+
+    print(ui.accent("心智模型:每类研究走一条 loop"))
+    rows = [
+        ("loop [主题]", "通用编排回路(planner→执行→critic→修复),任意任务"),
+        ("lit-loop <主题>", "文献综述:澄清→检索→PRISMA筛选→合成综述→评审"),
+        ("meta-loop <effects.csv>", "元分析:校验效应量→生成可复现脚本(statsmodels)→写→评审"),
+        ("analysis-loop <data.csv>", "实证分析:画像→设计→推荐分析+脚本(pingouin)→写→评审"),
+        ("qual-loop <转录稿>", "质性研究:转录稿→设计→主题分析(LLM辅助)→COREQ→评审"),
+    ]
+    for cmd, desc in rows:
+        print(f"  {ui.ok(cmd):<34} {ui.dim(desc)}")
+    print()
+
+    print(ui.accent("60 秒上手"))
+    print("  1. " + ui.ok("psyclaw clarify") + ui.dim("            先澄清研究问题(17 槽位,不澄清完不开工)"))
+    print("  2. " + ui.ok('psyclaw lit-loop "你的主题"') + ui.dim("  选对应你研究类型的 loop 起跑"))
+    print("  3. " + ui.dim("跟随步间提示;产物落 notes/ 与 outputs/;统计脚本在 [stats] 环境或 MCP 跑"))
+    print()
+
+    print(ui.accent("常用单功能(也可单独直接用)"))
+    print(ui.dim("  clarify 澄清 · lit 文献检索 · scale 量表库 · score 计分 · preregister 预注册"))
+    print(ui.dim("  export 出 APA7/期刊稿 · review 审稿模拟 · gates 学术门禁 · memory 三层记忆"))
+    print()
+    print(ui.dim("全部命令分类:psyclaw commands   ·   配置:psyclaw config   ·   自检:psyclaw doctor"))
+    return 0
+
+
 def cmd_commands(args: argparse.Namespace) -> int:
-    """按职能分类打印全部命令(★=常用)。配合默认 `--help` 仅示常用做渐进式披露。"""
+    """按职能分类打印全部命令(★=常用)。"""
     from psyclaw import ui
     p = build_parser()
     helps = getattr(p, "_psyclaw_help", {})
     print(ui.title("PsyClaw 命令清单") +
-          ui.dim("（★ = 常用，默认 `--help` 只显示这些；其余命令照常可用）\n"))
+          ui.dim("（★ = 上手常用;全部命令均可直接用）\n"))
     for title, names in COMMAND_CATEGORIES:
         print(ui.accent(title))
         for n in names:
@@ -569,7 +601,7 @@ def cmd_commands(args: argparse.Namespace) -> int:
                 h = h[:41] + "…"
             print(f"  {mark} {n:<13} {ui.dim(h)}")
         print()
-    print(ui.dim("任意命令加 -h 看详细参数，如 `psyclaw ttest -h`。"))
+    print(ui.dim("第一次用?运行 `psyclaw guide`。任意命令加 -h 看参数,如 `psyclaw lit-loop -h`。"))
     return 0
 
 
@@ -577,7 +609,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="psyclaw",
         description="心理学研究全流程 Agent CLI（文献·设计·统计·写作，规范门禁内置）",
-        epilog="上方为常用命令；完整分类清单运行  psyclaw commands （任意命令加 -h 看参数）。",
+        epilog="第一次用?运行  psyclaw guide （上手介绍）。分类清单  psyclaw commands ；任意命令加 -h 看参数。",
     )
     p.add_argument("-v", "--version", action="store_true", help="打印版本")
     p.add_argument("--approval", choices=["suggest", "auto"], default="suggest",
@@ -814,19 +846,18 @@ def build_parser() -> argparse.ArgumentParser:
     plit.set_defaults(func=cmd_lit)
 
     sub.add_parser(
-        "commands", help="按职能分类列出全部命令（★=常用，进阶命令在此查）"
+        "guide", help="首次使用上手介绍(是什么 + 每类研究一条 loop + 60 秒上手)"
+    ).set_defaults(func=cmd_guide)
+    sub.add_parser(
+        "commands", help="按职能分类列出全部命令（★=常用）"
     ).set_defaults(func=cmd_commands)
 
-    # 渐进式披露:快照各命令短 help(供 `commands` 用),再从顶层 --help 的列表里
-    # 摘除非常用命令——只动 _choices_actions(帮助展示),choices(分发)原样保留,
-    # 故被隐藏的命令仍能正常 `psyclaw <cmd>` 调用,不破坏任何契约。
+    # 快照各命令短 help(供 `commands`/`guide` 的分类展示与 ★ 标注用)。
+    # 顶层 --help 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅用于在 guide/commands 里标 ★ 常用。
     for action in p._actions:
         if isinstance(action, argparse._SubParsersAction):
-            helps = {pa.dest: (pa.help or "") for pa in action._choices_actions}
-            action._choices_actions = [
-                pa for pa in action._choices_actions if pa.dest in CORE_COMMANDS
-            ]
-            p._psyclaw_help = helps
+            p._psyclaw_help = {pa.dest: (pa.help or "")
+                               for pa in action._choices_actions}
 
     return p
 

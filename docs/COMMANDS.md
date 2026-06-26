@@ -3,9 +3,8 @@
 > 入口 `python -m psyclaw <命令>`。命令注册真源是 `psyclaw/cli.py`。
 > PsyClaw 现为**纯研究编排 harness**——统计计算已外移到成熟库/MCP,本 CLI 不含统计命令。
 
-> **渐进式披露**:默认 `psyclaw --help` 只显示常用命令(降低上手门槛);
-> 其余命令照常可调用,完整分类清单运行 **`psyclaw commands`**(★ 标常用)。
-> 常用集定义在 `cli.py` 的 `CORE_COMMANDS`。
+> 第一次用?运行 **`psyclaw guide`**(上手介绍 + 心智模型 + 60 秒上手)。
+> `psyclaw --help` 暴露**全部**顶层命令;**`psyclaw commands`** 按职能分类列出(★ 标上手常用)。
 
 ---
 
