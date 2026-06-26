@@ -1,15 +1,13 @@
 """Workflow 注册表 — 研究类型 → 声明式流程定义。
 
-每个 workflow 是纯数据(id/name/research_type/steps),steps 是 Step 列表。
+每个 workflow 是纯数据(id/name/research_type/command/steps),steps 是 Step 列表。
 高级用户可在此自由拼装/拆解步骤,或新建研究类型流程——这是"可组合"的落点。
 
-当前已实现:
-  lit-review   文献综述/系统综述(clarify→检索→筛选→综述→评审)
-
-规划中(待逐条灌通,验证引擎后批量加):
-  empirical    实证研究(含实验设计;分析交外部统计/MCP)
-  meta         元分析
-  qualitative  质性研究
+四条研究流程(顶层命令 <type>-loop;通用编排回路是 `loop`):
+  lit-review   → lit-loop       文献综述/系统综述
+  meta         → meta-loop      元分析(统计委托 statsmodels 脚本)
+  analysis     → analysis-loop  实证分析(统计委托 pingouin/scipy 脚本)
+  qualitative  → qual-loop      质性研究(LLM 辅助编码,研究者复核)
 """
 
 from __future__ import annotations
@@ -45,7 +43,7 @@ LIT_REVIEW = {
     "id": "lit-review",
     "name": "文献综述",
     "research_type": "文献综述 / 系统综述",
-    "command": "review-lit",
+    "command": "lit-loop",
     "steps": [
         Step("clarify", "澄清门禁", run=lambda ctx: {},
              gate=gate_clarify_complete),
@@ -61,7 +59,7 @@ META = {
     "id": "meta",
     "name": "元分析",
     "research_type": "元分析 (meta-analysis)",
-    "command": "meta",
+    "command": "meta-loop",
     "steps": [
         Step("clarify", "澄清门禁", run=lambda ctx: {},
              gate=gate_clarify_complete),
@@ -78,7 +76,7 @@ ANALYSIS = {
     "id": "analysis",
     "name": "实证分析",
     "research_type": "实证研究 / 数据分析 (统计委托外部 pingouin/scipy)",
-    "command": "analysis",
+    "command": "analysis-loop",
     "steps": [
         Step("clarify", "澄清门禁", run=lambda ctx: {},
              gate=gate_clarify_complete),
@@ -96,7 +94,7 @@ QUALITATIVE = {
     "id": "qualitative",
     "name": "质性研究",
     "research_type": "质性研究 (主题分析/扎根理论;LLM 辅助编码,研究者复核)",
-    "command": "qualitative",
+    "command": "qual-loop",
     "steps": [
         Step("clarify", "澄清门禁", run=lambda ctx: {},
              gate=gate_clarify_complete),

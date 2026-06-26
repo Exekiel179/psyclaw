@@ -28,6 +28,15 @@
 2. 文档去债收尾:DESIGN.md / TODO.md / README.md 仍大量描述已删的统计命令,待重写
 3. feat-013 会话持久化 session store(SQLite+FTS5)
 
+## 本轮(6):命令命名重构 — `loop` 通用编排器 + `<type>-loop`
+
+- 命名约定:每个流程都是一个 "loop"。`loop [主题]` = 通用流程编排回路(类 Claude Code 的
+  agentic loop = run_loop:planner→执行→critic→修复),不绑研究类型。
+- 四条研究流程改名:review-lit→**lit-loop**、meta→**meta-loop**、analysis→**analysis-loop**、
+  qualitative→**qual-loop**(走 workflow 引擎;registry command 字段 + CLI 注册同步)。
+- `research` 保留(不分类型固定全流程)。CORE_COMMANDS/COMMAND_CATEGORIES 同步;
+  tests/docs(ARCHITECTURE/COMMANDS)同步。全量 **949 passed**。
+
 ## 本轮(5):qualitative 质性研究流程 — 四条研究流程齐
 
 - `qualitative <转录稿>`:clarify门禁→载入转录稿→质性设计→主题分析(LLM 辅助)→写 COREQ 报告→评审

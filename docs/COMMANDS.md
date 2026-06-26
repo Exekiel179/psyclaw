@@ -45,17 +45,18 @@
 | `preregister` | OSF/AsPredicted 双格式预注册模板(据澄清卡抽取;样本量依据填澄清卡 power 槽位) |
 | `jars <draft>` | APA 2018 JARS 检查清单(quant/qual/mixed) |
 
-### 研究流程(按研究类型路由)
+### 研究流程 / 编排回路
 | 命令 | 作用 |
 |---|---|
-| `review-lit <主题>` | 文献综述流程:澄清→检索→筛选(PRISMA)→合成综述→评审 |
-| `meta <effects.csv>` | 元分析流程:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审 |
-| `analysis <data.csv>` | 实证分析流程:画像数据→设计→推荐分析+生成可复现脚本(委托 pingouin/scipy)→写→评审 |
-| `qualitative <转录稿>` | 质性研究流程:载入转录稿→设计→主题分析(LLM 辅助,研究者复核)→写 COREQ 报告→评审 |
-| `research [topic]` | 不分类型的通用编排:文献→设计→写作→评审→总验收;`--freeform` 走通用 HITL 回路 |
+| `loop [主题]` | 通用流程编排回路(类 Claude Code 的 agentic loop:planner→执行→critic→修复),不绑研究类型 |
+| `lit-loop <主题>` | 文献综述:澄清→检索→筛选(PRISMA)→合成综述→评审 |
+| `meta-loop <effects.csv>` | 元分析:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审 |
+| `analysis-loop <data.csv>` | 实证分析:画像数据→设计→推荐分析+生成可复现脚本(委托 pingouin/scipy)→写→评审 |
+| `qual-loop <转录稿>` | 质性研究:载入转录稿→设计→主题分析(LLM 辅助,研究者复核)→写 COREQ 报告→评审 |
+| `research [topic]` | 不分类型的固定全流程:文献→设计→写作→评审→总验收 |
 
-> 见 `docs/ARCHITECTURE.md`。每条流程 = 声明式步骤链;子功能可单用/可拼装。四条研究流程齐:
-> review-lit / meta / analysis / qualitative。
+> 见 `docs/ARCHITECTURE.md`。命名约定:**每个流程都是一个 "loop"**——`loop` 是通用编排器,
+> `<type>-loop` 是预置的具体研究流程;子功能可单用/可拼装。
 
 ### 工作流 / 编排
 | 命令 | 作用 |
