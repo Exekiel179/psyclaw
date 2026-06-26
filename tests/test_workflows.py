@@ -318,3 +318,55 @@ def test_registry_analysis_present():
     assert wf is not None and wf["command"] == "analysis"
     assert [s.id for s in wf["steps"]] == [
         "clarify", "inspect_data", "design", "analysis", "write", "review"]
+
+
+# --- 质性子功能:load_transcripts -------------------------------------------
+
+from psyclaw.workflows.steps_qual import load_transcripts  # noqa: E402
+
+
+def test_load_transcripts_dir_filters_non_text(tmp_path):
+    (tmp_path / "p1.txt").write_text("访谈一:正念让我更平静。", encoding="utf-8")
+    (tmp_path / "p2.md").write_text("访谈二:压力大时会失眠。", encoding="utf-8")
+    (tmp_path / "skip.csv").write_text("a,b", encoding="utf-8")
+    data = load_transcripts(str(tmp_path))
+    assert data["n"] == 2
+    assert {t["name"] for t in data["transcripts"]} == {"p1.txt", "p2.md"}
+
+
+def test_load_transcripts_single_file(tmp_path):
+    f = tmp_path / "one.txt"
+    f.write_text("一段访谈文本", encoding="utf-8")
+    data = load_transcripts(str(f))
+    assert data["n"] == 1 and data["transcripts"][0]["name"] == "one.txt"
+
+
+def test_load_transcripts_missing_raises():
+    with pytest.raises(ValueError, match="不存在"):
+        load_transcripts("nope/x.txt")
+
+
+def test_load_transcripts_wrong_type_raises(tmp_path):
+    f = tmp_path / "data.csv"
+    f.write_text("a,b", encoding="utf-8")
+    with pytest.raises(ValueError, match="txt/.md"):
+        load_transcripts(str(f))
+
+
+def test_load_transcripts_empty_dir_raises(tmp_path):
+    (tmp_path / "empty.txt").write_text("   ", encoding="utf-8")
+    with pytest.raises(ValueError, match="非空转录稿"):
+        load_transcripts(str(tmp_path))
+
+
+def test_registry_qualitative_present():
+    wf = get_workflow("qualitative")
+    assert wf is not None and wf["command"] == "qualitative"
+    assert [s.id for s in wf["steps"]] == [
+        "clarify", "load_transcripts", "design", "thematic_analysis",
+        "write", "review"]
+
+
+def test_all_four_research_workflows_registered():
+    for wid in ("lit-review", "meta", "analysis", "qualitative"):
+        assert get_workflow(wid) is not None
