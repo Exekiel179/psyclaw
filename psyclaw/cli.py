@@ -159,9 +159,49 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 
 def cmd_skills(args: argparse.Namespace) -> int:
-    print("已注册 Skills：")
-    for s in list_skills():
-        print(f"  - {s['name']:<18} [{s['category']}]  {s['description']}")
+    from psyclaw import ui
+    for_type = getattr(args, "for_type", None)
+    if for_type:
+        from psyclaw.skills.recommend import VALID_TYPES, normalize_type, recommend_skills
+        rt = normalize_type(for_type)
+        if rt is None:
+            print(ui.err(f"未知研究类型:{for_type}(可选:{', '.join(VALID_TYPES)})"))
+            return 1
+        recs = recommend_skills(rt)
+        print(ui.title(f"{rt} 相关外部技能包推荐"))
+        if not recs:
+            print(ui.dim("  未发现相关外部技能包。装 AcademicForge/AJS 到 .claude/skills 后再试。"))
+            return 0
+        for s in recs:
+            print(f"  - {s['name']:<26} {ui.dim('· '.join(s['matched']))}")
+            if s.get("description"):
+                print(ui.dim(f"      {s['description'][:64]}  [{s['source']}]"))
+        return 0
+    skills = list_skills()
+    bundled = [s for s in skills if s.get("source") == "bundled"]
+    external = [s for s in skills if s.get("source") != "bundled"]
+    print(ui.title(f"已注册 Skills（{len(skills)}）"))
+    for s in bundled:
+        print(f"  - {s['name']:<20} [{s['category']}]  {s['description'][:56]}")
+    if external:
+        from collections import defaultdict
+        by_root: dict[str, list] = defaultdict(list)
+        for s in external:
+            by_root[s["source"]].append(s)
+        print(ui.accent(f"\n外部技能包（{len(external)} 个 · AcademicForge/AJS 等）"))
+        for root, items in by_root.items():
+            print(ui.dim(f"  {root}（{len(items)}）"))
+            for s in items[:12]:
+                print(f"    - {s['name']:<28} {ui.dim(s['description'][:44])}")
+            if len(items) > 12:
+                print(ui.dim(f"    …… 另 {len(items) - 12} 个"))
+    else:
+        from psyclaw.skills.loader import external_skill_roots
+        roots = external_skill_roots(".")
+        print(ui.dim("\n未发现外部技能包。装 AcademicForge/AJS 到 .claude/skills 后自动出现:"))
+        print(ui.dim("  git clone …/AcademicForge && cd AcademicForge && bash install.sh"))
+        print(ui.dim(f"  已扫描根:{', '.join(str(r) for r in roots) or '(无)'}"
+                     "  ·  或设 PSYCLAW_SKILLS_PATH 指向自定义目录"))
     return 0
 
 
@@ -327,6 +367,12 @@ def cmd_method(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_journal(args: argparse.Namespace) -> int:
+    from psyclaw.psych.journals import print_journal
+    print_journal(getattr(args, "journal_id", None))
+    return 0
+
+
 def cmd_design(args: argparse.Namespace) -> int:
     from psyclaw.psych.knowledge import print_design
     print_design(args.design_id)
@@ -380,6 +426,66 @@ def cmd_jars(args: argparse.Namespace) -> int:
     if args.no_sidecar:
         argv += ["--no-sidecar"]
     return jars_cli(argv)
+
+
+def cmd_cite_check(args: argparse.Namespace) -> int:
+    """引用保真核查:稿件文内引用是否都溯源到检索命中(反杜撰参考文献)。"""
+    from psyclaw import ui
+    from psyclaw.psych.citations import run_citation_audit
+    a = run_citation_audit(args.manuscript, project_dir=getattr(args, "project", "."),
+                           journal=getattr(args, "journal", None))
+    print(ui.title("引用保真核查") + ui.dim(f"  {args.manuscript}"))
+    print(ui.dim(f"  允许键来源:{a.get('corpus_source') or '(无检索语料)'}"))
+    print(f"  {a['method']}")
+    if a.get("journal"):
+        mark = ui.ok("一致") if a.get("citation_style_ok") else ui.warn("不一致")
+        print(ui.dim(f"  期刊:{a['journal']} · 期望 {a.get('citation_format_expected')} "
+                     f"/ 实测 {a.get('citation_format_detected')} — ") + mark)
+    elif a.get("journal_note"):
+        print(ui.warn(f"  {a['journal_note']}"))
+    if a["orphan_n"]:
+        print(ui.err(f"  ✗ 孤儿引用 {a['orphan_n']} 条(疑似杜撰):"))
+        for o in a["orphan"]:
+            print(ui.warn(f"     · {o['raw']}"))
+        print(ui.dim("  详见 notes/citation_audit.md;删除或补检索后复核。"))
+        return 1
+    if a["manual_review"]:
+        print(ui.warn("  ⚠ 未能自动核验(见上),需人工核;详见 notes/citation_audit.md"))
+        return 0
+    print(ui.ok(f"  ✓ 全部 {a['cited_n']} 条文内引用均可溯源到检索命中"))
+    return 0
+
+
+def cmd_provenance(args: argparse.Namespace) -> int:
+    """复现溯源:给生成的脚本/图打包 代码+环境+说明+决策轨迹 → <产物>.provenance.json。"""
+    from psyclaw import ui
+    from psyclaw.provenance import write_provenance
+    prov = write_provenance(
+        args.artifact, description=getattr(args, "desc", "") or "",
+        project_dir=getattr(args, "project", "."),
+        data_path=getattr(args, "data", None),
+        data_fingerprint=getattr(args, "fingerprint", None),
+        journal=getattr(args, "journal", None))
+    env = prov["environment"]
+    print(ui.title("复现溯源") + ui.dim(f"  {args.artifact}"))
+    print(f"  代码 sha256:{(prov['artifact_sha256'] or '(读不到产物)')[:16]}…"
+          if prov["artifact_sha256"] else "  代码:(读不到产物)")
+    print(f"  环境:Python {env['python']} · {env['platform']}")
+    print(ui.dim(f"  说明:{prov['description'] or '(无)'}"))
+    print(ui.dim(f"  决策轨迹:{', '.join(prov['history']) or '(无)'}"))
+    if prov.get("journal"):
+        req = "要求(须带数据指纹)" if prov.get("data_availability_required") else "非强制"
+        print(ui.dim(f"  期刊:{prov['journal']} · 数据可得性 {req}"))
+    print(ui.dim(f"  → {prov['_sidecar']}"))
+    if prov["provenance_complete"]:
+        print(ui.ok("  ✓ 溯源完整(代码+环境+说明"
+                    + ("+数据指纹)" if prov.get("data_availability_required") else ")")))
+        return 0
+    if prov.get("data_availability_required") and not prov.get("data_availability_ok"):
+        print(ui.warn("  ⚠ 该期刊要求数据可得性,但缺数据指纹 —— 加 --data <数据文件>"))
+    else:
+        print(ui.warn("  ⚠ 溯源不完整(缺代码/环境/说明)"))
+    return 1
 
 
 def cmd_memory(args: argparse.Namespace) -> int:
@@ -508,6 +614,19 @@ def cmd_loop(args: argparse.Namespace) -> int:
         return 0
 
 
+def cmd_autoloop(args: argparse.Namespace) -> int:
+    # 自主科研回路(Ralph 式自循环):自动发现待办→派发给 <type>-loop→独立验收→记状态→决定下一步。
+    # 驱动既有 workflow,不重复实现领域逻辑;控制流确定性,LLM 只在被派发的流程内部。
+    from psyclaw.autoloop import run_autoloop
+    try:
+        return run_autoloop(project_dir=".",
+                            max_iters=getattr(args, "max_iters", 6),
+                            auto=getattr(args, "auto", False))
+    except KeyboardInterrupt:
+        print("\n自主回路已中断。状态已保存,下次 psyclaw auto-loop 从此处续。")
+        return 0
+
+
 def cmd_review_lit(args: argparse.Namespace) -> int:
     # L0 路由:lit-loop → 跑 lit-review workflow(引擎按声明式步骤跑)。
     from psyclaw.workflows import get_workflow, run_workflow
@@ -584,9 +703,9 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 常用命令集——`--help` 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅供 `guide`/`commands`
 # 标注 ★ 常用,帮助新用户聚焦上手路径。改这个集合只影响 ★ 标注,不影响命令可见性/可用性。
 CORE_COMMANDS = {
-    "guide", "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop", "research",
-    "review", "clarify", "lit", "export",
-    "score", "scale", "jars", "preregister", "declare-test",
+    "guide", "auto-loop", "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop",
+    "research", "review", "clarify", "lit", "export",
+    "score", "scale", "jars", "cite-check", "preregister", "declare-test",
     "plan", "goal", "tasks", "memory",
     "gates", "config", "setup", "doctor", "repl", "commands",
 }
@@ -596,13 +715,15 @@ CORE_COMMANDS = {
 COMMAND_CATEGORIES = [
     ("环境 / 系统", ["guide", "repl", "version", "doctor", "config", "setup",
                   "skills", "mcp", "gates", "commands"]),
-    ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics"]),
+    ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
+                    "journal"]),
     ("量表 / 数据准备", ["score"]),
-    ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars"]),
-    ("研究流程 / 编排回路", ["loop", "lit-loop", "meta-loop", "analysis-loop",
-                        "qual-loop", "research"]),
+    ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars", "cite-check"]),
+    ("研究流程 / 编排回路", ["auto-loop", "loop", "lit-loop", "meta-loop",
+                        "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
-    ("记忆 / 消息 / IO", ["memory", "serve", "notify", "lit", "auth", "export", "figures"]),
+    ("记忆 / 消息 / IO", ["memory", "serve", "notify", "lit", "auth", "export", "figures",
+                       "provenance"]),
 ]
 
 
@@ -615,6 +736,7 @@ def cmd_guide(args: argparse.Namespace) -> int:
 
     print(ui.accent("心智模型:每类研究走一条 loop"))
     rows = [
+        ("auto-loop", "自主科研回路:自动发现待办→派发对应流程→独立验收→记状态→定下一步"),
         ("loop [主题]", "通用编排回路(planner→执行→critic→修复),任意任务"),
         ("lit-loop <主题>", "文献综述:澄清→检索→PRISMA筛选→合成综述→评审"),
         ("meta-loop <effects.csv>", "元分析:校验效应量→生成可复现脚本(statsmodels)→写→评审"),
@@ -687,7 +809,11 @@ def build_parser() -> argparse.ArgumentParser:
     pst.add_argument("--non-interactive", action="store_true")
     pst.set_defaults(func=cmd_setup)
 
-    sub.add_parser("skills", help="列出已注册 skills").set_defaults(func=cmd_skills)
+    pks = sub.add_parser("skills",
+                         help="列出 skills(内置+发现 .claude/skills;--for 按研究类型推荐)")
+    pks.add_argument("--for", dest="for_type", default=None,
+                     help="按研究类型推荐外部技能包:lit-review|meta|analysis|qualitative(亦接受 *-loop 别名)")
+    pks.set_defaults(func=cmd_skills)
     pmcp = sub.add_parser("mcp", help="MCP 目录 / 以 stdio 服务器身份运行内置 MCP")
     pmcp.add_argument("--serve", dest="name",
                       choices=["mne", "spss", "mplus", "stata"], default=None,
@@ -745,6 +871,11 @@ def build_parser() -> argparse.ArgumentParser:
     pd.add_argument("design_id", nargs="?", default=None, help="设计 id,留空列出全部")
     pd.set_defaults(func=cmd_design)
 
+    pj = sub.add_parser("journal",
+                        help="期刊画像(心理学报/心理科学/Psych Science/JPSP/Psych Bulletin…引用风格/报告标准/退稿红线)")
+    pj.add_argument("journal_id", nargs="?", default=None, help="期刊 id,留空列出全部")
+    pj.set_defaults(func=cmd_journal)
+
     ppr = sub.add_parser("preregister",
                          help="预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取)")
     ppr.add_argument("--osf", action="store_true", help="只出 OSF 格式")
@@ -789,6 +920,27 @@ def build_parser() -> argparse.ArgumentParser:
                        help="不写 notes/jars_check.json sidecar")
     pjars.set_defaults(func=cmd_jars)
 
+    pcc = sub.add_parser(
+        "cite-check",
+        help="引用保真核查:文内引用是否都溯源到检索命中(反杜撰参考文献)")
+    pcc.add_argument("manuscript", help="稿件 Markdown(如 notes/lit_review.md)")
+    pcc.add_argument("--project", default=".", help="项目目录(默认当前)")
+    pcc.add_argument("--journal", default=None,
+                     help="按期刊定制引用风格核对 + 退稿红线(psyclaw journal 看目录)")
+    pcc.set_defaults(func=cmd_cite_check)
+
+    ppv = sub.add_parser(
+        "provenance",
+        help="复现溯源:给生成脚本/图打包 代码+环境+说明+决策轨迹(<产物>.provenance.json)")
+    ppv.add_argument("artifact", help="产物路径(如 outputs/analysis.py)")
+    ppv.add_argument("--desc", default="", help="自然语言说明(留空则从脚本 docstring 派生)")
+    ppv.add_argument("--data", default=None, help="数据文件路径(记指纹;data/raw 只记路径不哈希)")
+    ppv.add_argument("--fingerprint", default=None, help="直接提供已算好的数据指纹")
+    ppv.add_argument("--project", default=".", help="项目目录(默认当前)")
+    ppv.add_argument("--journal", default=None,
+                     help="按期刊定制:要求数据可得性的期刊须带数据指纹(psyclaw journal 看目录)")
+    ppv.set_defaults(func=cmd_provenance)
+
     pme = sub.add_parser("memory", help="三层记忆(画像/决策惯性/教训卡)")
     pme.add_argument("args", nargs="*", help="list | set <键> <值> | lesson <触发> <教训> | confirm <序号>")
     pme.set_defaults(func=cmd_memory)
@@ -832,6 +984,16 @@ def build_parser() -> argparse.ArgumentParser:
     plp.add_argument("topic", nargs="?", default=None, help="任务/研究主题(可空,读 notes/goal.md)")
     plp.add_argument("--auto", action="store_true", help="跳过人工确认(CI 用,慎用)")
     plp.set_defaults(func=cmd_loop)
+
+    # auto-loop → 自主科研回路(Ralph 式自循环):自动发现→派发 <type>-loop→独立验收→记状态→决定下一步
+    pal = sub.add_parser(
+        "auto-loop",
+        help="自主科研回路:自动发现待办→派发对应流程→独立验收→记状态→决定下一步(Ralph 式)")
+    pal.add_argument("--max-iters", dest="max_iters", type=int, default=6,
+                     help="迭代上限(默认 6;一个研究项目通常 ≤4 个阶段)")
+    pal.add_argument("--auto", action="store_true",
+                     help="全程无人值守(默认在每个任务派发前征求确认)")
+    pal.set_defaults(func=cmd_autoloop)
 
     # <type>-loop → 按研究类型预置的具体流程(走 workflow 引擎)
     # lit-loop → 文献综述

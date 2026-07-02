@@ -2,14 +2,128 @@
 
 ## Current State
 
-**Last Updated:** 2026-06-26
+**Last Updated:** 2026-07-03
 **重大转向:** PsyClaw 从「全流程统计 CLI」重定位为「纯研究编排 harness」——
 统计计算整体外移到成熟库/MCP,本仓删除全部手写统计实现。
 
 > 状态真源:`feature_list.json`(机器可读)。本文件是人读的「接续上下文」快照。
 
+## 本轮(13):skill 路由推荐 + 期刊画像层 ——feat-018 / feat-019 done
+
+用户点了两项:①按研究类型给 AcademicForge 相关 skill 做推荐路由;②AJS 式期刊画像层,让 cite-check 引用风格、
+provenance 数据可得性按期刊定制。均已落地。
+
+**feat-018 skill 路由推荐**:`psyclaw/skills/recommend.py`——据研究类型(lit-review/meta/analysis/qualitative,
+接受 `*-loop` 别名)用中英双语具体关键词打分,从发现到的第三方技能包挑最相关的。`psyclaw skills --for <type>`。
+纯确定性、可单测;仍不执行 skill(执行属宿主 Agent)。end-to-end:`skills --for meta-loop` 命中 forge-meta。
+
+**feat-019 期刊画像层**(AJS 思路):`psyclaw/psych/journals.json` 固化 5 本期刊(心理学报/心理科学/
+Psych Science/JPSP/Psych Bulletin)的引用风格/摘要字数/版块/报告标准/数据可得性/退稿红线;`psyclaw journal [id]`
+只读浏览(对齐 method/design)。**让前两处通用改进按期刊定制**:
+- cite-check `--journal`:`detect_citation_format` 粗判 author-year/numeric,与期刊期望核对(**软提示**,
+  孤儿引用仍是唯一硬判据)+ 退稿红线自查清单。end-to-end:`--journal psych-science` 检出 numeric≠author-year。
+- provenance `--journal`:期刊 `data_availability=required`(如 Psych Science/JPSP/Psych Bulletin)时,
+  溯源完整额外要求带数据指纹;无 → 不完整,补 `--data` → 完整。
+- 验证:`tests/test_skill_recommend.py` 6 + `tests/test_journals.py` 13;全量 **1047 passed**。
+
+**Claude Science 两处思路 + AJS 期刊定制 + AcademicForge 接入 至此闭环**。后续可选:把 skill 推荐挂进
+auto-loop 感知阶段;把 AcademicForge 包成 MCP connector;期刊画像扩到更多刊 / 加字数与版块的稿件核对。
+
+## 本轮(12):外部技能包发现 —— 接上 AcademicForge / AJS ——feat-017 done
+
+`psyclaw/skills/loader.py` 本就「agentskills.io 兼容」但只扫内置 `psyclaw/skills/`。本轮让它同时发现
+**标准安装根**下的第三方 Agent Skill——`.claude/skills`、`.opencode/skills`(项目级 + 用户级)+
+环境变量 `PSYCLAW_SKILLS_PATH`。**AcademicForge**(`HughYau/AcademicForge`,curate 了 Claude Science
+生态 ~140 科研 + 82 AI skills、78+ 数据库)、**AJS** 等 `bash install.sh` 落到这些根后,`psyclaw skills`
+免安装即列出、供研究编排参考。
+
+- `external_skill_roots(project_dir)` 收集存在的标准根;`list_skills(project_dir, include_external=True)`
+  平铺 `<skill>/SKILL.md` 与一层学科嵌套 `<domain>/<skill>/SKILL.md` 都扫,按 name 去重(内置优先),
+  每条标 `source`/`path`。`cmd_skills` 按来源分组呈现,空时给 AcademicForge 安装指引。
+- **边界(诚实)**:PsyClaw 只**发现 + 呈现 + 路由指引**这些 Agent Skill(给宿主 Agent 读的 markdown);
+  真正执行发生在 Claude Code 等宿主读取 SKILL.md 时,不由本体 Python 跑——写清在 loader docstring。
+- 验证:`tests/test_skills_loader.py` 7 例;全量 **1028 passed**;CLI end-to-end:PSYCLAW_SKILLS_PATH 指向
+  模拟 AcademicForge 安装 → `psyclaw skills` 分组列出 forge-genomics / forge-sci-writing。
+
+## 本轮(11):复现溯源 `provenance`(代码+环境+说明+决策轨迹)——feat-016 done
+
+Claude Science 两处思路的第二处落地。`analysis`/`meta` 把统计外移成可复现脚本,但脚本本身
+**不记录产出它的环境与决策轨迹**——几个月后想复跑常缺 Python/库版本、数据指纹、当初为何这么分析。
+
+- 新增 `psyclaw/provenance.py`(纯 stdlib,不 import/不跑任何统计库):`capture_environment`
+  (Python+平台+统计库版本,经 `importlib.metadata` 读 dist 元数据,不触发计算)、`build_provenance`
+  (四要素:确切代码+sha256 / 环境 / 自然语言说明(缺省从 docstring 派生)/ 决策轨迹指针)、
+  `write_provenance`(落 `<产物>.provenance.json` + `.provenance.md`)。
+- **data 边界**:数据指纹只对 data/clean+根按需**单向**哈希(不入库内容);受保护的 `data/raw`
+  一律只记路径不哈希;也可由调用方直接传入已算好的指纹。
+- 门禁:`gates/checker.py` 注册 `provenance_complete` + `KIND_TRIGGERS['provenance']`;
+  `rules.yaml` 新增 `REPRO.provenance`(trigger `provenance_check`,block)——完整=代码+环境+说明齐
+  (决策轨迹尽力采集、不作硬判据,故 block 安全:三要素对生成脚本恒可得)。
+- CLI:`psyclaw provenance <产物> [--desc --data --fingerprint]`;catalog 归「记忆/消息/IO」。
+- 验证:`tests/test_provenance.py` 11 例;全量 **1021 passed**;`gates` 自检 `REPRO.provenance [block] 校验:自动`;
+  CLI end-to-end:outputs/analysis.py → 采集 sha256+Python 3.14.2+平台+docstring 说明+notes/plan.md 轨迹
+  + data/clean/scores.csv 指纹 → 溯源完整 rc=0。
+- **两处改进(通用版)至此齐活**。下一步(用户选定顺序):叠加 AJS 式**期刊画像层**
+  (`brycewang-stanford/Awesome-Journal-Skills` 思路),让 cite-check 的引用风格判据、provenance 的
+  data-availability 要求都按期刊(心理学报/心理科学/Psych Science/JPSP/Psych Bulletin…)定制。
+
+## 本轮(10):引用保真核查 `cite-check`(反杜撰参考文献)——feat-015 done
+
+调研 Anthropic **Claude Science**(2026-06-30 发布,workflow 而非新模型:协调 agent + 专家 sub-agent
++ 独立 reviewer 核查每条引用/计算 + 可复现 provenance)后,决定把其中两处思路引进 PsyClaw。
+本轮先落**引用保真**(通用版;期刊画像层按用户选择留待后续叠加,参考 GitHub
+`brycewang-stanford/Awesome-Journal-Skills` 的期刊定制思路)。
+
+- 关键洞察:`synthesize_review` 早已**指示** LLM「只准引用真实检索命中的键」,却**从无任何环节核验它照做**——
+  这正是 AI 写作最常见的学术不端漏洞。本轮补上这道独立验收(实现与验收分离:允许键由真实检索确定、稿件由 LLM 生成)。
+- 新增 `psyclaw/psych/citations.py`(纯函数,可单测):`extract_intext_citations`(叙述式+夹注式,
+  连接词只认 `&`/`and`——刻意不认逗号以免把句内转折词误并入作者段)、`audit_citations`
+  (比对粒度=(首位作者姓氏,4 位年份))、`load_allowed`(读 evidence_map.json 回落 lit_search.json)、
+  `run_citation_audit`(落 `notes/citation_audit.json` sidecar + 人读报告;核验前截除参考文献区,其本身即语料)。
+- 门禁:`gates/checker.py` 注册 `no_fabricated_citations` + `KIND_TRIGGERS['citation']`;
+  `rules.yaml` 新增 `WRITE.citations`(trigger `citation_check`,block)——只对**检出的**孤儿引用 fail-closed,
+  无语料/无引用时置 `manual_review` 显式转人工核(不过度拦)。填上了此前 `WRITE.apa7` 里 `apa7_citations`「需人工核」的空缺。
+- CLI:`psyclaw cite-check <稿件.md>`(检出孤儿 rc=1);catalog 归「研究前规划/预注册」,`names==catalogued` 校验通过。
+- 验证:`tests/test_citations.py` 19 例;全量 **1010 passed**;`gates` 自检 `WRITE.citations [block] 校验:自动`;
+  CLI end-to-end:允许键 Smith et al.(2020) + 稿件含 Ghost et al.(2099) → 检出孤儿 1 条、rc=1。
+- 测试中修正 2 处真实缺陷:叙述式逗号连接词误并转折词;无语料时误把全部引用当孤儿。
+- **待续**:改进①**provenance bundle**(给生成脚本/图打包 代码+环境+说明+决策历史,强化复现门禁)下一轮做;
+  之后再叠加 AJS 式**期刊画像层**让两处改进按期刊定制。
+
+## 本轮(9):自主科研回路 `auto-loop`(Ralph 式自循环)——feat-014 done
+
+用户要的「自循环系统」:自动发现需求→分发任务→检查成果→记状态→决定下一步。落在
+`<type>-loop` 之上的**自驱动元回路**,一个命令贯通分层心智(Prompt/Context/Harness/Loop):
+
+- 新增 `psyclaw/autoloop.py`(控制流全确定性纯函数,LLM 只在被派发流程内部):
+  ① **感知** `discover_backlog` —— 每轮从仓库状态重新推导待办(模型会忘,仓库不会):
+     有目标→lit-loop、效应量表→meta-loop、数据表→analysis-loop、转录稿→qual-loop;
+     `classify_csv` 只读表头分效应量/数据表;已完成/标志产物已在 → 幂等剔除收敛。
+  ② **派发** `_dispatch` —— 路由到对应 workflow(实现 sub-agent);任务级批准后跑到底。
+  ③ **独立验收** `verify_result` —— 只读落盘 `workflow_summary.json`+标志产物,**与执行解耦**
+     (一个干、一个验:不信返回码,只信仓库里真实存在的东西)。
+  ④ **记状态** `notes/autoloop_state.json`(外部记忆;压缩/重启可续)。
+  ⑤ **决定** `decide` —— stop:backlog 空 / 门禁 blocker(写 decision_request)/ 迭代上限;
+     验收不过→标记跳过+写 `notes/blocked.md` **换下一个任务**,不在坑里空转重试。
+- fail-closed:澄清未完=硬 blocker;只读 data/clean+根目录,**不碰受保护的 data/raw**。
+- CLI `auto-loop`(--max-iters / --auto);进 CORE_COMMANDS/COMMAND_CATEGORIES/guide。
+- 验证:`tests/test_autoloop.py` 33 例;全量 **991 passed**;离线 mock end-to-end 实跑:
+  scores.csv → 发现 analysis-loop → 派发 → 独立验收通过 → 记状态 → 次轮收敛停止,exit 0。
+- **代码评审两轮收敛**(4 视角并行发现 + 对修复的对抗复审):修复 5 处真实问题——
+  ① `classify_csv` 收紧研究标签/方差列名集(`id,d,v` 不再误判成效应量表 → 避免数据表漏掉
+     analysis-loop);② `_dispatch` 不把派生标签固化成 goal.md(否则下一轮误触发 lit-loop,
+     已 end-to-end 验证 goal-restore);③ `_clarify_card` 异常 fail-closed(硬门禁宁拦不放);
+     ④ 派发/验收异常不炸整个回路(记跳过、换下一个任务);⑤ `max_iters` 优先于 blocker,
+     撞上限不误写 decision_request。对抗复审确认 5 处修复均正确、无回归。
+
 ## What's Done
 
+- [x] feat-019 **期刊画像层**(AJS 思路):`journals.json` 5 刊 + `journal` 命令;cite-check/provenance `--journal` 定制
+- [x] feat-018 **skill 路由推荐**:按研究类型推荐外部技能包;`psyclaw/skills/recommend.py` + `skills --for`
+- [x] feat-017 **外部技能包发现**(接上 AcademicForge/AJS):skills 加载器扫 .claude/skills 等标准根;`psyclaw/skills/loader.py`
+- [x] feat-016 **复现溯源 provenance**:给生成脚本/图打包 代码+环境+说明+决策轨迹;`psyclaw/provenance.py` + `REPRO.provenance` 门禁
+- [x] feat-015 **引用保真核查 cite-check**(反杜撰):文内引用逐条溯源到检索命中;`psyclaw/psych/citations.py` + `WRITE.citations` 门禁
+- [x] feat-014 **自主科研回路 auto-loop**(Ralph 式):感知→派发→独立验收→记状态→决定;`psyclaw/autoloop.py`
 - [x] feat-001 **统计层整体外移**:git rm 42 个统计模块 + 41 个测试;cli/loop/pipeline/repl/scales/preregister 去统计纠缠;psyclaw/ 零统计库依赖
 - [x] feat-002 研究编排流水线 research(澄清→文献→设计→写作→评审→总验收;--freeform 走通用回路)
 - [x] feat-003 审稿模拟 review panel
