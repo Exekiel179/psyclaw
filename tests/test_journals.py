@@ -26,6 +26,13 @@ def test_get_journal_by_id_alias_name():
     assert J.get_journal("nope") is None
 
 
+def test_get_journal_exact_alias_beats_substring():
+    # "Psychological Science" 是 psych-science 的精确别名,不能被 xinlikexue 名称
+    # "…Journal of Psychological Science" 的子串命中抢走。
+    assert J.get_journal("Psychological Science")["id"] == "psych-science"
+    assert J.get_journal("心理科学")["id"] == "xinlikexue"
+
+
 def test_requires_data_availability():
     assert J.requires_data_availability(J.get_journal("psych-science")) is True
     assert J.requires_data_availability(J.get_journal("xinlixuebao")) is False

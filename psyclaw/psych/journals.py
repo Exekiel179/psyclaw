@@ -25,17 +25,23 @@ def load_journals() -> list[dict]:
 
 
 def get_journal(jid: str | None) -> dict | None:
-    """按 id / 别名 / 名称子串匹配期刊画像(大小写不敏感)。找不到返回 None。"""
+    """按 id / 别名 / 名称匹配期刊画像(大小写不敏感)。找不到返回 None。
+
+    **先在全部期刊里找精确匹配(id/名称/别名),再退回子串匹配**——否则某刊仅凭子串命中
+    会抢先于另一刊的精确别名(如 "Psychological Science" 本应命中 psych-science,
+    却因是 xinlikexue 名称 "…Journal of Psychological Science" 的子串而被它抢走)。
+    """
     if not jid:
         return None
     key = jid.strip().lower()
     journals = load_journals()
-    for j in journals:
-        if j["id"].lower() == key:
-            return j
-    for j in journals:
+    for j in journals:                       # 1) 精确:id / 名称 / 别名
         names = [j["id"], j.get("name", "")] + list(j.get("aliases", []))
-        if any(key == n.lower() for n in names) or any(key in n.lower() for n in names):
+        if any(key == n.lower() for n in names):
+            return j
+    for j in journals:                       # 2) 退回:子串
+        names = [j["id"], j.get("name", "")] + list(j.get("aliases", []))
+        if any(key in n.lower() for n in names):
             return j
     return None
 

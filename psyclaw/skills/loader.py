@@ -54,7 +54,8 @@ def external_skill_roots(project_dir: str = ".") -> list[Path]:
 
 def _read_skill(skill_md: Path, source: str) -> dict:
     try:
-        meta = _parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+        # errors="replace":第三方技能包可能含非法 UTF-8,不能让一个坏文件炸掉整份 skills 列表。
+        meta = _parse_frontmatter(skill_md.read_text(encoding="utf-8", errors="replace"))
     except OSError:
         meta = {}
     return {
