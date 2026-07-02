@@ -61,6 +61,20 @@ def test_dedup_bundled_wins(tmp_path, monkeypatch):
     assert len(got) == 1 and got[0]["source"] == "bundled"
 
 
+def test_bad_utf8_skill_does_not_crash(tmp_path, monkeypatch):
+    # 第三方技能包含非法 UTF-8 时,不能炸掉整份 skills 列表(psyclaw skills / --for / setup)。
+    root = tmp_path / "ext"
+    good = root / "good"
+    good.mkdir(parents=True)
+    (good / "SKILL.md").write_text("---\nname: good-skill\n---\n正文\n", encoding="utf-8")
+    bad = root / "bad"
+    bad.mkdir()
+    (bad / "SKILL.md").write_bytes(b"---\nname: bad\xff\xfe skill\n---\n")
+    monkeypatch.setenv("PSYCLAW_SKILLS_PATH", str(root))
+    names = {s["name"] for s in loader.list_skills(project_dir=str(tmp_path))}  # 不抛异常
+    assert "good-skill" in names
+
+
 def test_external_roots_only_existing(tmp_path):
     (tmp_path / ".claude" / "skills").mkdir(parents=True)
     roots = loader.external_skill_roots(str(tmp_path))

@@ -35,8 +35,10 @@ _NAME = r"(?:[一-鿿·]+|[A-Z][A-Za-zÀ-ɏ.'’\-]*)"
 _NARRATIVE = re.compile(
     rf"({_NAME}(?:\s*(?:&|and)\s*{_NAME})*(?:\s+et\s+al\.?)?)\s*[(（]\s*({_YR})\s*[)）]"
 )
-# 参考文献 / 证据图谱区起始标记:该区本身就是允许键语料,不应作为「文内引用」再核验。
-_REF_MARKS = ("## 证据图谱", "参考文献", "\n## references", "\n# references", "\nreferences\n")
+# 参考文献 / 证据图谱区**标题行**:该区本身就是允许键语料,不应作为「文内引用」再核验。
+# 锚定到行首(可带 # 标题前缀)+ 词边界——避免正文里「参考文献管理软件」这类散提被误当分界而截断正文。
+_REF_LINE = re.compile(
+    r"^\s{0,3}#{0,6}\s*(证据图谱|参考文献|references|reference list|works cited)\b", re.I)
 # 括号(可能是夹注式引用,也可能是普通插注);内部按 ; 分条再判
 _PAREN = re.compile(r"[(（]([^()（）]*?)[)）]")
 # 夹注式单条:  Authors, YEAR   (末尾锚定年份,作者里须含至少一个 name token)
@@ -44,15 +46,21 @@ _PAREN_ITEM = re.compile(rf"^\s*(.*?),\s*({_YR})\s*$")
 _NAME_RE = re.compile(_NAME)
 # 从「Authors (YEAR)」形态的键里拆出作者段与年份(供解析允许键)。
 _KEY_RE = re.compile(rf"^(.*?)[(（]\s*({_YR})\s*[)）]\s*$")
+# 引用前的信号词/引导语(e.g., / i.e., / cf. / see / 例如 / 参见 …):须先剥离,否则
+# "(e.g., Smith, 2020)" 里 "e.g.," 的逗号会被当作作者分隔,首位姓氏误成 "e.g"。
+_SIGNAL_PREFIX = re.compile(
+    r"^\s*(?:e\.?\s*g\.?|i\.?\s*e\.?|cf\.?|see|viz\.?|参见|例如|如)[,，.]?\s+", re.I)
 
 
 def _first_surname(chunk: str) -> str:
     """从作者段取**首位作者姓氏**,小写归一。
 
     与 ``synthesize._surname`` 消费的是同一批已生成好的键,故只需一致地约简两侧:
-    切到第一个 ``& / , / and / et al`` 之前,再取末个空白 token(姓在末尾或整串即姓)。
+    先剥离信号词引导语(e.g./see/参见…),再切到第一个 ``& / , / and / et al`` 之前,
+    取末个空白 token(姓在末尾或整串即姓)。
     """
-    head = re.split(r"\s*(?:&|,|、|\band\b|et\s+al)\.?", (chunk or "").strip(), maxsplit=1)[0]
+    chunk = _SIGNAL_PREFIX.sub("", (chunk or "").strip())
+    head = re.split(r"\s*(?:&|,|、|\band\b|et\s+al)\.?", chunk, maxsplit=1)[0]
     head = head.strip(" .，,")
     toks = head.split()
     tok = toks[-1] if toks else head
@@ -192,14 +200,17 @@ def detect_citation_format(text: str) -> str:
 
 
 def _body_only(text: str) -> str:
-    """截去参考文献 / 证据图谱区(其本身即允许键语料),只留正文供文内引用核验。"""
-    low = (text or "").lower()
-    cut = len(text)
-    for mark in _REF_MARKS:
-        i = low.find(mark.lower())
-        if i != -1:
-            cut = min(cut, i)
-    return text[:cut]
+    """截去参考文献 / 证据图谱区(其本身即允许键语料),只留正文供文内引用核验。
+
+    只在**标题行**处截断(行首 + 词边界),不因正文里散提「参考文献」而误切——否则夹在
+    散提之后的真实(甚至杜撰的)文内引用会被丢弃,漏检杜撰。
+    """
+    out: list[str] = []
+    for line in (text or "").splitlines(keepends=True):
+        if _REF_LINE.match(line):
+            break
+        out.append(line)
+    return "".join(out)
 
 
 def _render_report(audit: dict) -> str:

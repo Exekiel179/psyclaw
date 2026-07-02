@@ -75,6 +75,17 @@ def test_audit_all_grounded():
     assert a["manual_review"] is False
 
 
+def test_audit_signal_prefix_parenthetical_grounded():
+    # APA 常见的 (e.g., Smith, 2020) / (see Smith, 2020):信号词逗号不得把姓氏误成 "e.g"。
+    allowed = ["Smith (2020)"]
+    for txt in ["研究支持该点 (e.g., Smith, 2020)。",
+                "另见 (see Smith, 2020)。",
+                "如 (cf. Smith, 2020) 所述。"]:
+        a = C.audit_citations(txt, allowed)
+        assert a["orphan_n"] == 0, txt
+        assert a["grounded_n"] == 1, txt
+
+
 def test_audit_detects_orphan_fabrication():
     allowed = ["Smith et al. (2020)"]
     text = "Smith et al. (2020) found X. However, Ghost et al. (2099) claimed W."
@@ -164,6 +175,23 @@ def test_run_citation_audit_ignores_reference_list_section(tmp_path):
     # 正文只有 Smith (2020) 一条且已溯源;参考文献里的 Roe/Doe 不应冒出孤儿
     assert a["orphan_n"] == 0
     assert a["no_fabricated_citations"] is True
+
+
+def test_run_citation_audit_prose_refword_does_not_truncate(tmp_path):
+    """正文里散提「参考文献」(如 参考文献管理软件)不得截断正文,后面的杜撰引用仍须被抓到。"""
+    notes = tmp_path / "notes"
+    notes.mkdir()
+    (notes / "evidence_map.json").write_text(json.dumps(
+        {"references": [{"key": "Smith (2020)"}]}), encoding="utf-8")
+    draft = notes / "lit_review.md"
+    draft.write_text(
+        "## 方法\n\n我们用参考文献管理软件整理文献。随后 Ghost (2099) 支持了假设。\n\n"
+        "## 参考文献\n\n1. Smith (2020). 某标题.\n",
+        encoding="utf-8")
+    a = C.run_citation_audit(str(draft), project_dir=str(tmp_path))
+    # 正文里的 Ghost(2099) 仍应被抓成孤儿;参考文献区(标题行后)不参与
+    assert a["orphan_n"] == 1
+    assert a["orphan"][0]["surname"] == "ghost"
 
 
 def test_run_citation_audit_clean_passes(tmp_path):
