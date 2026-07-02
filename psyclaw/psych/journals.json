@@ -1,0 +1,113 @@
+{
+  "_comment": "期刊画像层(AJS 思路的心理学落地)。每本期刊固化其引用风格/摘要与字数/版块/报告标准/数据可得性/退稿红线,供 cite-check 的引用风格与 provenance 的数据可得性按期刊定制。纯知识数据,不含统计。",
+  "journals": [
+    {
+      "id": "xinlixuebao",
+      "name": "心理学报 (Acta Psychologica Sinica)",
+      "aliases": ["心理学报", "acta psychologica sinica", "aps"],
+      "discipline": "psychology",
+      "language": "zh",
+      "citation_style": "APA(中文著录,作者-年)",
+      "citation_format": "author-year",
+      "abstract": {"type": "unstructured", "limit_words": 350},
+      "word_limit": null,
+      "sections": ["引言", "方法", "结果", "讨论"],
+      "reporting_standards": ["effect_size_ci", "assumptions", "exploratory_confirmatory"],
+      "data_availability": "encouraged",
+      "preregistration": "encouraged",
+      "red_lines": [
+        "缺中国被试/情境的外推限制讨论",
+        "相关当因果、缺识别假设限定",
+        "未报效应量与 95% CI",
+        "探索性发现当确证性结论"
+      ]
+    },
+    {
+      "id": "xinlikexue",
+      "name": "心理科学 (Journal of Psychological Science)",
+      "aliases": ["心理科学", "journal of psychological science"],
+      "discipline": "psychology",
+      "language": "zh",
+      "citation_style": "APA(中文著录,作者-年)",
+      "citation_format": "author-year",
+      "abstract": {"type": "unstructured", "limit_words": 250},
+      "word_limit": null,
+      "sections": ["引言", "方法", "结果", "讨论"],
+      "reporting_standards": ["effect_size_ci", "assumptions"],
+      "data_availability": "encouraged",
+      "preregistration": "optional",
+      "red_lines": [
+        "样本量论证不足(功效/依据缺)",
+        "未报效应量",
+        "过度概化"
+      ]
+    },
+    {
+      "id": "psych-science",
+      "name": "Psychological Science (APS)",
+      "aliases": ["psychological science", "psych science", "psci"],
+      "discipline": "psychology",
+      "language": "en",
+      "citation_style": "APA 7 (author-year)",
+      "citation_format": "author-year",
+      "abstract": {"type": "unstructured", "limit_words": 150},
+      "word_limit": 2000,
+      "sections": ["Introduction", "Method", "Results", "Discussion"],
+      "reporting_standards": ["effect_size_ci", "assumptions", "exploratory_confirmatory",
+                              "open_practices"],
+      "data_availability": "required",
+      "preregistration": "encouraged",
+      "red_lines": [
+        "缺开放实践 / 数据可得性声明(Open Data/Materials badge)",
+        "效应量或 CI 缺失",
+        "样本量论证弱、检验力不足",
+        "结论超出数据(过度声称)"
+      ]
+    },
+    {
+      "id": "jpsp",
+      "name": "Journal of Personality and Social Psychology (APA)",
+      "aliases": ["jpsp", "journal of personality and social psychology"],
+      "discipline": "psychology",
+      "language": "en",
+      "citation_style": "APA 7 (author-year)",
+      "citation_format": "author-year",
+      "abstract": {"type": "unstructured", "limit_words": 250},
+      "word_limit": null,
+      "sections": ["Introduction", "Method", "Results", "General Discussion"],
+      "reporting_standards": ["effect_size_ci", "assumptions", "exploratory_confirmatory",
+                              "multi_study_consistency"],
+      "data_availability": "required",
+      "preregistration": "encouraged",
+      "red_lines": [
+        "多研究间证据不一致 / 缺内部一致性",
+        "效应量 + CI 缺失",
+        "未区分探索性与确证性、无预注册",
+        "缺理论贡献定位"
+      ]
+    },
+    {
+      "id": "psych-bulletin",
+      "name": "Psychological Bulletin (APA · 综述/元分析)",
+      "aliases": ["psychological bulletin", "psych bulletin", "pbul"],
+      "discipline": "psychology",
+      "language": "en",
+      "citation_style": "APA 7 (author-year)",
+      "citation_format": "author-year",
+      "abstract": {"type": "unstructured", "limit_words": 250},
+      "word_limit": null,
+      "sections": ["Introduction", "Method (search & coding)", "Results (meta-analysis)",
+                   "Discussion"],
+      "reporting_standards": ["prisma", "meta_heterogeneity", "publication_bias",
+                              "effect_size_ci"],
+      "data_availability": "required",
+      "preregistration": "encouraged",
+      "red_lines": [
+        "异质性未报 I² / τ² / Q",
+        "检索不透明、未依 PRISMA 报告筛选流程",
+        "未评估发表偏倚",
+        "分析数据 / 编码表 / 代码不可得(复现受阻)"
+      ]
+    }
+  ]
+}

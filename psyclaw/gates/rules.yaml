@@ -85,6 +85,18 @@ gates:
     action: block
     fix: 运行 psyclaw jars <draft.md> 检查 JARS 缺项;两项阻断须补后方可投稿
 
+  - id: WRITE.citations
+    trigger: citation_check
+    requires: [no_fabricated_citations]
+    action: block
+    fix: 稿件文内引用须能溯源到检索命中(notes/evidence_map.json）。孤儿引用=疑似杜撰，删除或先 psyclaw lit 补检索；跑 psyclaw cite-check <稿件.md> 复核
+
+  - id: REPRO.provenance
+    trigger: provenance_check
+    requires: [provenance_complete]
+    action: block
+    fix: 生成的脚本/图须带复现溯源(确切代码+环境+自然语言说明)；跑 psyclaw provenance <产物> 生成 <产物>.provenance.json
+
   - id: MEASURE.ethics
     trigger: scale_score_used
     requires: [ethics_reviewed]

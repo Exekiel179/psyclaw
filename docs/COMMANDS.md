@@ -8,7 +8,7 @@
 
 ---
 
-## 命令总览(33 条)
+## 命令总览(37 条)
 
 ### 环境 / 系统
 | 命令 | 作用 |
@@ -17,7 +17,7 @@
 | `version` / `doctor` | 版本 / 环境自检(配置·MCP·Gates) |
 | `config` | 配置向导(API key/模型/环境变量) |
 | `setup` | 项目脚手架+能力选装:建目录 + 据 clarify 生成概览/项目记忆 + 装能力依赖(`--online`)+ 列 MCP/skill |
-| `skills` / `mcp` | 列出 skills / 运行内置 MCP(mne·spss·mplus·stata) |
+| `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH` 下 AcademicForge/AJS 等技能包;`--for <研究类型>` 按类型推荐)/ 运行内置 MCP(mne·spss·mplus·stata) |
 | `gates` | 学术规范门禁自检 |
 | `commands` | 按职能分类列出全部命令 |
 
@@ -31,6 +31,7 @@
 | `design [id]` | 实验设计目录(被试间/内/混合/纵向/ESM…) |
 | `cite [id]` | 方法学背书库:每个设计决策的文献支撑 |
 | `ethics <id>` | 量表伦理审查提示(IRB / 危机转介 / 敏感条目) |
+| `journal [id]` | 期刊画像(心理学报/心理科学/Psych Science/JPSP/Psych Bulletin…引用风格/报告标准/退稿红线;供 cite-check/provenance `--journal` 取判据) |
 
 ### 量表 / 数据准备
 | 命令 | 作用 |
@@ -44,10 +45,12 @@
 | `declare-test --dv --test` | 预注册单个计划分析;研究者自由度门禁 |
 | `preregister` | OSF/AsPredicted 双格式预注册模板(据澄清卡抽取;样本量依据填澄清卡 power 槽位) |
 | `jars <draft>` | APA 2018 JARS 检查清单(quant/qual/mixed) |
+| `cite-check <稿件.md>` | 引用保真核查:文内引用逐条溯源到检索命中,孤儿引用=疑似杜撰(反杜撰);`--journal` 附引用风格核对 + 退稿红线 |
 
 ### 研究流程 / 编排回路
 | 命令 | 作用 |
 |---|---|
+| `auto-loop` | 自主科研回路(Ralph 式自循环):每轮自动发现待办→派发对应 `<type>-loop`→**独立验收**(只读落盘产物)→记 `notes/autoloop_state.json`→决定下一步(`--max-iters` / `--auto`) |
 | `loop [主题]` | 通用流程编排回路(类 Claude Code 的 agentic loop:planner→执行→critic→修复),不绑研究类型 |
 | `lit-loop <主题>` | 文献综述:澄清→检索→筛选(PRISMA)→合成综述→评审 |
 | `meta-loop <effects.csv>` | 元分析:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审 |
@@ -76,6 +79,7 @@
 | `auth` | 机构权限(EZProxy/LibKey)配置与认证状态自检 |
 | `export <file>` | 格式化输出(APA7 / 心理学报 / 心理科学) |
 | `figures` | 图表主题层 + FIG.honest 诚实性核查 + Okabe-Ito 调色板 |
+| `provenance <产物>` | 复现溯源:给生成脚本/图打包 代码+环境+说明+决策轨迹(`<产物>.provenance.json`);`--journal` 按数据可得性要求收紧 |
 
 ---
 

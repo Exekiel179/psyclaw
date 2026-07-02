@@ -104,6 +104,55 @@
       "dependencies": ["feat-010"],
       "status": "not-started",
       "evidence": ""
+    },
+    {
+      "id": "feat-014",
+      "name": "自主科研回路 auto-loop (Ralph 式自循环)",
+      "description": "在 <type>-loop 之上的自驱动元回路:每轮① 感知发现(discover_backlog 从仓库状态重新推导待办)→② 派发(路由到对应 workflow,实现 sub-agent)→③ 独立验收(verify_result 只读落盘 workflow_summary.json+标志产物,与执行解耦)→④ 记状态(notes/autoloop_state.json 外部记忆)→⑤ 决定(stop:backlog 空/门禁 blocker/迭代上限)。控制流全确定性纯函数,LLM 只在被派发流程内部;澄清未完=硬 blocker 写 decision_request,流程验收不过=标记跳过写 blocked.md 换下一个任务,不空转重试;只读 data/clean+根目录(不碰受保护的 data/raw,分类 CSV 只读表头)。",
+      "dependencies": ["feat-012"],
+      "status": "done",
+      "evidence": "psyclaw/autoloop.py(discover_backlog/classify_csv/select_next/verify_result/decide/state/run_autoloop)+ cli.py auto-loop 命令;tests/test_autoloop.py 33 例;全量 C:\\Python314 pytest 991 passed;离线 mock end-to-end 实跑:数据表 scores.csv → 自动发现 analysis-loop → 派发(profile→推荐 ttest→生成 pingouin 脚本→写→评审)→ 独立验收通过(workflow=analysis + outputs/analysis.py 落盘)→ 记 autoloop_state.json(完成 1)→ 次轮 backlog 空收敛停止,exit 0。经两轮多视角代码评审(4 视角发现 + 对修复的对抗复审)修复 5 处:classify_csv 收紧列名集(id,d,v 不再误判效应量表→避免数据漏 analysis)、_dispatch 不固化派生 goal(否则误触发 lit-loop,已 end-to-end 验证)、_clarify_card 异常 fail-closed、派发异常不炸回路(记跳过续跑)、max_iters 优先于 blocker 不误写 decision_request"
+    },
+    {
+      "id": "feat-015",
+      "name": "引用保真核查 cite-check(反杜撰参考文献)",
+      "description": "独立验收稿件里每一条文内引用是否都能溯源到检索命中的允许键(notes/evidence_map.json 的 references[].key,回落 lit_search.json);比不上的 = 孤儿引用(疑似杜撰)。补上 synthesize_review『只准引用真实键』指令之后一直缺失的**核验环节**——实现与验收分离,对齐 Claude Science『独立 reviewer 核查每条引用』。纯文本比对:不算统计、不碰 data/raw、只读稿件与 notes/ 检索产物;比对粒度=(首位作者姓氏,4 位年份)。落 notes/citation_audit.json sidecar,WRITE.citations 门禁(trigger citation_check)据 no_fabricated_citations 对**检出的**孤儿引用 block;无语料/无引用时置 manual_review 显式转人工核(不过度拦)。参考 GitHub 项目 Awesome-Journal-Skills(brycewang-stanford,Stanford REAP × CoPaper.AI)的期刊定制思路——本轮先做通用版,期刊画像层后续再叠加。",
+      "dependencies": ["feat-007", "feat-009"],
+      "status": "done",
+      "evidence": "psyclaw/psych/citations.py(extract_intext_citations/audit_citations/load_allowed/run_citation_audit 纯函数,可单测)+ gates/checker.py 注册 no_fabricated_citations + KIND_TRIGGERS['citation']={citation_check} + rules.yaml WRITE.citations 门禁 + cli.py cite-check 命令(catalog 归入『研究前规划/预注册』,names==catalogued 校验通过);tests/test_citations.py 19 例;全量 C:\\Python314 pytest 1010 passed;gates 自检显示 WRITE.citations [block] 校验:自动;CLI end-to-end:evidence_map 允许键 Smith et al.(2020) + 稿件含 Ghost et al.(2099) → cite-check 检出孤儿 1 条、rc=1。测试期间修正 2 处真实缺陷:叙述式连接词去掉逗号(否则『However, Ghost et al.(2099)』把转折词误并入作者段→误判姓氏)、无检索语料时不产孤儿(纯 manual_review 不过度拦);另在核验前截除参考文献/证据图谱区(其本身即允许键语料,否则末位作者会冒出假孤儿)。"
+    },
+    {
+      "id": "feat-016",
+      "name": "复现溯源 provenance(代码+环境+说明+决策轨迹)",
+      "description": "给 analysis/meta 生成的可复现脚本(outputs/analysis.py / meta_analysis.py)与图打包 Claude Science 式**溯源包**:① 确切代码(code+sha256)② 运行环境(Python+平台+统计库版本)③ 自然语言说明(缺省从脚本 docstring 派生)④ 决策轨迹(plan/design/澄清卡/workflow_summary 指针)——补上『脚本能复跑但不记录产它的环境与决策』的空缺,强化 REPRO 复现门禁。纯元数据采集:不 import 也不运行任何统计库(版本经 importlib.metadata 读 dist 元数据),数据指纹只对 data/clean+根按需单向哈希、受保护的 data/raw 只记路径不哈希(亦可由调用方直接传入指纹)。参考 Claude Science『每个结果可复现、可溯源到代码/环境/消息历史』;本轮为通用版,后续可由期刊画像的 data_availability 驱动是否强制 replication-package。",
+      "dependencies": ["feat-009", "feat-012"],
+      "status": "done",
+      "evidence": "psyclaw/provenance.py(capture_environment/build_provenance/write_provenance 纯 stdlib:hashlib+importlib.metadata+platform+sys)+ gates/checker.py 注册 provenance_complete + KIND_TRIGGERS['provenance']={provenance_check} + rules.yaml REPRO.provenance 门禁 + cli.py provenance 命令(catalog 归入『记忆/消息/IO』,names==catalogued 通过);tests/test_provenance.py 11 例(含 data/raw 绝不哈希、data/clean 单向哈希、调用方指纹优先、docstring 派生说明、决策轨迹指针、门禁 block/pass);全量 C:\\Python314 pytest 1021 passed;gates 自检 REPRO.provenance [block] 校验:自动;CLI end-to-end:outputs/analysis.py → 采集 sha256+Python 3.14.2+平台+说明+notes/plan.md 轨迹 + data/clean/scores.csv 指纹 → 溯源完整 rc=0。"
+    },
+    {
+      "id": "feat-017",
+      "name": "外部技能包发现(接上 AcademicForge / AJS)",
+      "description": "让 skills 加载器除内置 psyclaw/skills 外,还发现标准安装根下的第三方 Agent Skill 技能包:.claude/skills 与 .opencode/skills(项目级 + 用户级)+ 环境变量 PSYCLAW_SKILLS_PATH。AcademicForge(HughYau/AcademicForge,curate 了 Claude Science 生态的 ~140 科研 + 82 AI-research skills、78+ 数据库,Minecraft mod-loader 式一站装)、AJS 等 `bash install.sh` 后即被 `psyclaw skills` 列出、供研究编排参考。统一解析标准 SKILL.md frontmatter(agentskills.io 兼容),按 name 去重内置优先,平铺 <skill>/SKILL.md 与一层学科嵌套 <domain>/<skill>/SKILL.md 两种布局都吃。边界诚实:PsyClaw 只**发现+呈现+路由指引**这些 Agent Skill(给宿主 Agent 读的 markdown 指令),真正执行发生在 Claude Code 等宿主读取 SKILL.md 时,不由本体 Python 跑。",
+      "dependencies": ["feat-010"],
+      "status": "done",
+      "evidence": "psyclaw/skills/loader.py(external_skill_roots + list_skills(project_dir, include_external) + 每条标 source/path)+ cli.py cmd_skills 按来源分组呈现(内置 / 外部按根分组,每根截断 12 条;空时给 AcademicForge install 指引与已扫描根);tests/test_skills_loader.py 7 例(项目级 .claude/skills 发现、PSYCLAW_SKILLS_PATH env、一层学科嵌套、include_external=False 跳过、同名去重内置优先、external_skill_roots 只留存在根);全量 C:\\Python314 pytest 1028 passed;CLI end-to-end:PSYCLAW_SKILLS_PATH 指向模拟 AcademicForge 安装(.claude/skills/{genomics,scientific-writing}/SKILL.md)→ `psyclaw skills` 在对应根下分组列出 forge-genomics / forge-sci-writing。"
+    },
+    {
+      "id": "feat-018",
+      "name": "按研究类型推荐外部技能包(skill 路由)",
+      "description": "在 feat-017『发现』之上补『路由指引』:据研究类型(lit-review/meta/analysis/qualitative)用中英双语关键词打分,从发现到的第三方技能包(AcademicForge/AJS)里挑出最相关的推荐,供研究者在对应 loop 里挑用。`psyclaw skills --for <type>`(亦接受 *-loop 别名)。纯确定性打分(关键词命中计数)、可单测;关键词特意选具体词(meta-analysis/thematic/计量…)避免 metadata 类误命中;仍不执行任何 skill(执行属宿主 Agent)。",
+      "dependencies": ["feat-017"],
+      "status": "done",
+      "evidence": "psyclaw/skills/recommend.py(normalize_type/score_skill/recommend_skills + RESEARCH_TYPE_KEYWORDS 四类中英双语关键词 + _TYPE_ALIASES)+ cli.py skills --for(未知类型报错列可选、external_only 只推第三方);tests/test_skill_recommend.py 6 例(别名归一、命中计数、类型匹配区分 meta/qual、未知类型空、external_only 排内置、top_k);全量 C:\\Python314 pytest 1047 passed;CLI end-to-end:模拟 AcademicForge 装 forge-meta/forge-qual → `skills --for meta-loop` 命中 forge-meta(matched meta-analysis/forest plot/heterogeneity/random-effects),不误推 forge-qual。",
+      "notes": "后续可把推荐挂进 auto-loop 感知阶段(为发现的 <type>-loop 顺带列相关技能包)。"
+    },
+    {
+      "id": "feat-019",
+      "name": "期刊画像层 + cite-check/provenance 期刊定制(AJS 思路)",
+      "description": "AJS(brycewang-stanford/Awesome-Journal-Skills)核心主张『一套泛泛的学术写作助手学不会期刊间差异』的心理学落地:journals.json 固化 5 本期刊(心理学报/心理科学/Psychological Science/JPSP/Psychological Bulletin)的引用风格/摘要与字数/版块/报告标准/数据可得性/预注册/退稿红线;`psyclaw journal [id]` 只读浏览(对齐 method/design 知识目录)。并让此前两处通用改进按期刊定制:cite-check `--journal`(引用风格核对为**软提示** + 退稿红线自查清单;孤儿引用仍是唯一硬判据)、provenance `--journal`(要求数据可得性的期刊 data_availability=required 须带数据指纹才算 provenance_complete)。纯知识数据,不含统计。",
+      "dependencies": ["feat-015", "feat-016"],
+      "status": "done",
+      "evidence": "psyclaw/psych/journals.json(5 期刊画像)+ journals.py(load_journals/get_journal 别名+名称子串匹配/list_journal_ids/requires_data_availability/expected_citation_format/print_journal)+ citations.py detect_citation_format(纯函数:author-year|numeric|mixed|none)+ run_citation_audit(journal=) 附风格软提示与红线 + provenance.py build_provenance(journal=) 据 required 收紧完整性 + cli.py journal 命令(catalog 归『知识目录(只读)』,names==catalogued 通过)+ cite-check/provenance --journal;tests/test_journals.py 13 例;全量 C:\\Python314 pytest 1047 passed;CLI end-to-end:`journal jpsp` 显示画像;`cite-check --journal psych-science` 检出 numeric≠期望 author-year(不一致);`provenance --journal psych-science` 无数据指纹→不完整、补 --data→完整。"
     }
   ]
 }

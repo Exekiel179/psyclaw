@@ -52,6 +52,8 @@ KIND_TRIGGERS = {
     "invariance": {"latent_mean_comparison"},   # M-3 测量不变性
     "meta": {"meta_analysis"},                  # P3-1 元分析
     "equivalence": {"equivalence_test"},        # P4-1 等价检验
+    "citation": {"citation_check"},             # W-2 引用保真(反杜撰参考文献)
+    "provenance": {"provenance_check"},         # R-2 复现溯源(代码+环境+说明+轨迹)
 }
 
 
@@ -182,6 +184,12 @@ REQUIREMENT_CHECKS = {
     "meta_effect_ci_reported": lambda d, base: d.get("meta_effect_ci_reported") is True,
     # P4-1 等价检验门控 — sidecar 由 psyclaw tost 生成
     "equivalence_tested": lambda d, base: d.get("equivalence_tested") is True,
+    # W-2 引用保真门控 — sidecar 由 psyclaw cite-check 生成(notes/citation_audit.json)
+    # 只对**检出的**孤儿引用 fail-closed;无语料/无引用时 audit 另置 manual_review 供人工核。
+    "no_fabricated_citations": lambda d, base: d.get("no_fabricated_citations") is True,
+    # R-2 复现溯源门控 — sidecar 由 psyclaw provenance 生成(<产物>.provenance.json)
+    # 完整=确切代码 + 环境 + 自然语言说明三要素齐(决策轨迹尽力采集,不作硬判据)。
+    "provenance_complete": lambda d, base: d.get("provenance_complete") is True,
     # FIG.honest 门控 — figure sidecar (by psyclaw figures --check)
     "axis_from_zero_or_flagged": lambda d, base: (
         d.get("axis_from_zero", True) is not False
