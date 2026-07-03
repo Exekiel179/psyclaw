@@ -991,7 +991,19 @@ def cmd_commands(args: argparse.Namespace) -> int:
                 h = h[:41] + "…"
             print(f"  {mark} {n:<13} {ui.dim(h)}")
         print()
+    try:                                  # 用户别名(v0.2:项目/全局 aliases.yaml)
+        from psyclaw.aliases import load_aliases
+        aliases = load_aliases(".")
+        if aliases:
+            print(ui.accent("你的别名(aliases.yaml)"))
+            for k, v in aliases.items():
+                print(f"    {k:<13} {ui.dim('→ ' + v)}")
+            print()
+    except Exception:  # noqa: BLE001
+        pass
     print(ui.dim("第一次用?运行 `psyclaw guide`。任意命令加 -h 看参数,如 `psyclaw lit-loop -h`。"))
+    print(ui.dim("自定义别名:~/.psyclaw/aliases.yaml 或 <项目>/.psyclaw/aliases.yaml,"
+                 "一行一条 `名字: 命令 参数`。"))
     return 0
 
 
@@ -1364,19 +1376,38 @@ def build_parser() -> argparse.ArgumentParser:
         "commands", help="按职能分类列出全部命令（★=常用）"
     ).set_defaults(func=cmd_commands)
 
-    # 快照各命令短 help(供 `commands`/`guide` 的分类展示与 ★ 标注用)。
-    # 顶层 --help 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅用于在 guide/commands 里标 ★ 常用。
+    # 快照各命令短 help(供 `commands`/`guide` 的分类展示与 ★ 标注用),
+    # 然后把顶层 --help 收敛到 CORE_COMMANDS(v0.2「命令简单化」:机制可以复杂,
+    # 帮助必须简单)。**全部命令仍可调用**,完整分类看 `psyclaw commands`。
     for action in p._actions:
         if isinstance(action, argparse._SubParsersAction):
             p._psyclaw_help = {pa.dest: (pa.help or "")
                                for pa in action._choices_actions}
+            n_all = len(action.choices)
+            action._choices_actions = [
+                ca for ca in action._choices_actions if ca.dest in CORE_COMMANDS]
+            p.epilog = (f"--help 只列 {len(action._choices_actions)} 条常用命令;"
+                        f"全部 {n_all} 条(均可直接用)见 `psyclaw commands`。"
+                        "第一次用?`psyclaw guide`;手把手教程 docs/TUTORIAL.md。")
 
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    parser = build_parser()
+    # 用户自定义别名(v0.2):~/.psyclaw/aliases.yaml + <项目>/.psyclaw/aliases.yaml。
+    # 内置命令优先,别名不得劫持;别名系统任何异常都不阻塞 CLI。
+    try:
+        from psyclaw.aliases import expand_alias, load_aliases
+        parser_probe = build_parser()
+        builtin: set[str] = set()
+        for action in parser_probe._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                builtin = set(action.choices.keys())
+        argv = expand_alias(argv, load_aliases("."), builtin=builtin)
+        parser = parser_probe
+    except Exception:  # noqa: BLE001
+        parser = build_parser()
     args = parser.parse_args(argv)
 
     if getattr(args, "version", False):

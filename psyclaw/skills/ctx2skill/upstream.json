@@ -1,0 +1,8 @@
+{
+  "name": "ctx2skill",
+  "repo": "https://github.com/S1s-Z/Ctx2Skill.git",
+  "ref": "main",
+  "upstream_dir": "upstream",
+  "preserve_structure": true,
+  "paper": "https://arxiv.org/html/2604.27660v3"
+}
