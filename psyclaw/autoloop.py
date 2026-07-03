@@ -385,7 +385,23 @@ def _write_blocked(project: Path, item: dict, verdict: dict) -> None:
         f.write(entry)
 
 
-def _print_sense(backlog: list[dict], state: dict) -> None:
+def skill_hints(action: str, project_dir: str = ".",
+                skills: list | None = None, top_k: int = 3) -> list[str]:
+    """给某待办 action 匹配相关**外部技能包**名(AcademicForge/AJS 等已装的)。
+
+    纯指路:auto-loop 派发的是仓内 workflow,这些 Agent Skill 是给宿主 Agent 读的 markdown,
+    本函数只把「装了哪些相关技能包」呈现给人,不改派发/验收。无相关/未装 → 返回 []。
+    """
+    try:
+        from psyclaw.skills.recommend import recommend_skills
+        recs = recommend_skills(action, skills=skills, project_dir=project_dir,
+                                top_k=top_k)
+    except Exception:  # noqa: BLE001  # 推荐失败不影响感知主流程
+        return []
+    return [r["name"] for r in recs]
+
+
+def _print_sense(backlog: list[dict], state: dict, project_dir: str = ".") -> None:
     from psyclaw import ui
     done = state.get("completed_actions", [])
     skip = state.get("skipped", [])
@@ -394,9 +410,21 @@ def _print_sense(backlog: list[dict], state: dict) -> None:
         print(ui.dim(f"  ① 感知:无待办({line})"))
         return
     print(ui.accent(f"  ① 感知 — 发现 {len(backlog)} 项待办({line})"))
+    # 一次性取外部技能池,避免每个待办各扫一遍 .claude/skills。
+    pool: list = []
+    try:
+        from psyclaw.skills.loader import list_skills
+        pool = list_skills(project_dir)
+    except Exception:  # noqa: BLE001
+        pool = []
     for c in backlog:
         mark = ui.warn("⚠ blocker") if c.get("blocker") else ui.dim(f"P{c['priority']}")
         print(f"     {mark}  {c['title']} — {c['reason']}")
+        if not c.get("blocker"):
+            hints = skill_hints(c["action"], project_dir, skills=pool)
+            if hints:
+                print(ui.dim(f"        ↳ 相关技能包:{' · '.join(hints)}"
+                             "(psyclaw skills --for 看详情)"))
 
 
 def run_autoloop(project_dir: str = ".", max_iters: int = 6,
@@ -425,7 +453,7 @@ def run_autoloop(project_dir: str = ".", max_iters: int = 6,
         done_actions = frozenset(state["completed_actions"]) | frozenset(state["skipped"])
         backlog = discover_backlog(project_dir, done_actions)
         print()
-        _print_sense(backlog, state)
+        _print_sense(backlog, state, project_dir)
 
         decision, reason = decide(state, backlog, max_iters)
         if decision == "stop":

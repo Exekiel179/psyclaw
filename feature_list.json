@@ -153,6 +153,14 @@
       "dependencies": ["feat-015", "feat-016"],
       "status": "done",
       "evidence": "psyclaw/psych/journals.json(5 期刊画像)+ journals.py(load_journals/get_journal 别名+名称子串匹配/list_journal_ids/requires_data_availability/expected_citation_format/print_journal)+ citations.py detect_citation_format(纯函数:author-year|numeric|mixed|none)+ run_citation_audit(journal=) 附风格软提示与红线 + provenance.py build_provenance(journal=) 据 required 收紧完整性 + cli.py journal 命令(catalog 归『知识目录(只读)』,names==catalogued 通过)+ cite-check/provenance --journal;tests/test_journals.py 13 例;全量 C:\\Python314 pytest 1047 passed;CLI end-to-end:`journal jpsp` 显示画像;`cite-check --journal psych-science` 检出 numeric≠期望 author-year(不一致);`provenance --journal psych-science` 无数据指纹→不完整、补 --data→完整。"
+    },
+    {
+      "id": "feat-020",
+      "name": "auto-loop 感知阶段挂 skill 推荐",
+      "description": "把 feat-018 的按研究类型技能推荐接进 feat-014 auto-loop 的 ① 感知阶段:每轮发现待办(lit-loop/meta-loop/analysis-loop/qual-loop)时,自动在该待办下列出装在 .claude/skills 里、与该研究类型相关的外部技能包(AcademicForge/AJS),把『发现工作』与『发现工具』接上,免去手动跑 skills --for。纯指路、纯加在感知输出上:auto-loop 派发的仍是仓内 workflow,推荐的 Agent Skill 是给宿主 Agent 读的 markdown,psyclaw 不执行它们——不改派发/验收逻辑,零风险增量。技能池每轮一次性 list_skills 预取(避免每个待办各扫一遍磁盘),blocker 待办不推荐,推荐/发现失败 fail-safe 不阻塞主流程。",
+      "dependencies": ["feat-014", "feat-018"],
+      "status": "done",
+      "evidence": "psyclaw/autoloop.py:新增 skill_hints(action, project_dir, skills, top_k) 薄封装 recommend_skills(external_only,失败返回 [])+ _print_sense(增 project_dir 参数,一次性预取 list_skills 池,每个非 blocker 待办打印『↳ 相关技能包:…』)+ run_autoloop 传 project_dir;tests/test_autoloop.py +3 例(action 类型匹配、无匹配/空池空、bundled-only 不推)共 36 例;全量 C:\\Python314 pytest 1065 passed;离线 end-to-end:seed .claude/skills 装 forge-meta/forge-analysis + 数据表 scores.csv → 感知阶段在 analysis-loop 待办下列出 forge-analysis 等相关技能包。"
     }
   ]
 }
