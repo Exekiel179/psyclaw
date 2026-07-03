@@ -169,6 +169,23 @@
       "dependencies": ["feat-010"],
       "status": "done",
       "evidence": "psyclaw/pdf_extract.py(extract_pdf_text/_via_lib/_via_stdlib/_read_literal 平衡括号扫描/_decode_literal(转义+八进制)/_decode_hex/_bytes_to_str(UTF-16BE BOM/latin-1)/_looks_like_text 质量门)+ psyclaw/context.py smart_excerpt 增 .pdf → _pdf_excerpt 分支(ok→<pdf>正文,失败→诚实 note);tests/test_pdf_extract.py 8 例(未压缩/FlateDecode/非PDF拒/无文本诚实提示/质量门/截断/smart_excerpt 路由不泄二进制/失败给提示);修复关键缺陷:字面量正则不支持嵌套括号(如 (p < .05))→ 改手写深度扫描;全量 C:\\Python314 pytest 1073 passed;本机 pypdf+pdfplumber 均可用(用户实跑将走高质量抽取)。"
+    },
+    {
+      "id": "feat-022",
+      "name": "来源路由树 search(按任务类型路由检索,主通道+兜底)",
+      "description": "据任务类型把检索路由到最合适的来源+模式:factual→学术库+精确、conceptual→学术库+语义(默认)、trend→学术库+时间序列(按年份窗口)、local→本地会话全文检索。决策树只选**主通道**但永远带一个**兜底通道**(主通道零命中即走兜底),规避『单一模式误路由把结果打空』。复用既有能力:academic=litsearch(OpenAlex/EuropePMC/arXiv)、local=会话 FTS(feat-013)、trend=litsearch 按年份窗口。控制流纯确定性(classify_task/route 可单测),execute_route 薄分发。来源集可扩展(加 web/MCP 源只需登记+加一条分发),core 不引入网络新依赖。psyclaw search <query> [--type factual|conceptual|trend|local]。",
+      "dependencies": ["feat-007", "feat-013"],
+      "status": "done",
+      "evidence": "psyclaw/search_router.py(classify_task 中英双语关键词/route 主通道+兜底计划/execute_route 主空则兜底/_run_channel 分发 litsearch|ContextArchive.search/_temporal_search 年份窗口)+ cli.py search 命令(catalog 新增『检索/知识图谱』类,lit 一并归入,names==catalogued 通过);tests/test_search_router.py 10 例(四类归类+默认/route 主兜底不同/未知类型回落/trend=temporal/local=exact/execute 主命中不兜底/主空走兜底);全量 C:\\Python314 pytest 1093 passed;'焦虑研究近年趋势' → trend/temporal(+semantic 兜底)。",
+      "notes": "web/MCP 源为后续扩展点(core 不内置通用网页检索)。"
+    },
+    {
+      "id": "feat-023",
+      "name": "带引用的轻量知识图谱 kg(边由构造即带引用)",
+      "description": "SQLite nodes/edges 知识图谱(stdlib,无 Neo4j),把研究里的构念/论文/人物/机构/技术串起来帮 Agent 理解全貌。核心纪律=**边必带来源**:add_edge 拒绝无 source_ref 的边(反幻觉关系);verify 复用 feat-015 cite-check 的 _canon_key 规范化,核对每条 citation 边的来源是否真在检索语料(notes/evidence_map.json 允许键),溯源不到=孤儿=疑似杜撰关系。主题范围非全局:seed_from_evidence_map 从既有 evidence_map(构念×支持文献)直接种出天然带引用的图。基础实体消歧(归一名+类型去重);ego 子图 BFS + mermaid 渲染(边标来源)。存 .psyclaw/kg/graph.db。psyclaw kg seed|show <实体>|verify|stats。",
+      "dependencies": ["feat-007", "feat-015"],
+      "status": "done",
+      "evidence": "psyclaw/kg.py(KnowledgeGraph:_db(nodes UNIQUE(norm,type)/edges UNIQUE(src,dst,rel,src_ref))/add_node 去重/add_edge 拒无来源/neighbors 出入边/subgraph BFS/seed_from_evidence_map/verify 复用 citations._canon_key+load_allowed/stats 自证 uncited=0 不变量)+ render_mermaid;cli.py kg 命令(catalog『检索/知识图谱』,names==catalogued 通过);tests/test_kg.py 10 例(节点去重/边必带来源/建点+stats/邻居出入/子图深度/种图/缺 evidence_map/verify 溯源+孤儿检出/非citation边跳过/mermaid);全量 C:\\Python314 pytest 1093 passed;CLI end-to-end:evidence_map 种 2 带引用边 → kg show 出 mermaid 子图(边标引用)→ kg verify 0 孤儿,加杜撰边 Ghost(2099) → verify 抓成孤儿。"
     }
   ]
 }
