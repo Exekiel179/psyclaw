@@ -332,3 +332,31 @@ def test_state_roundtrip_and_record(tmp_path):
 
 def test_state_path_under_notes(tmp_path):
     assert autoloop.state_path(str(tmp_path)).name == "autoloop_state.json"
+
+
+# --- feat-020:感知阶段挂 skill 推荐 ----------------------------------------
+
+def _ext_skill(name, desc):
+    return {"name": name, "description": desc, "category": "domain", "source": "/ext"}
+
+
+def test_skill_hints_matches_action_type():
+    pool = [
+        _ext_skill("forge-meta", "random-effects meta-analysis, forest plot, heterogeneity"),
+        _ext_skill("forge-qual", "thematic analysis of interview transcripts (COREQ)"),
+    ]
+    assert autoloop.skill_hints("meta-loop", skills=pool) == ["forge-meta"]
+    assert autoloop.skill_hints("qual-loop", skills=pool) == ["forge-qual"]
+
+
+def test_skill_hints_empty_when_no_match_or_no_skills():
+    assert autoloop.skill_hints("analysis-loop", skills=[]) == []
+    pool = [_ext_skill("unrelated", "make slides and posters")]
+    assert autoloop.skill_hints("meta-loop", skills=pool) == []
+
+
+def test_skill_hints_ignores_bundled_only():
+    # 内置包不作为「外部技能推荐」(external_only)。
+    pool = [{"name": "ars", "description": "meta-analysis toolkit",
+             "category": "domain", "source": "bundled"}]
+    assert autoloop.skill_hints("meta-loop", skills=pool) == []
