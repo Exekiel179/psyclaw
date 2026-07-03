@@ -109,6 +109,12 @@ def build_tools(project_dir: str = ".") -> dict:
         return render_tree(scan_tree(str(p)))
     _t("list_dir", "看目录结构(有界树;data/raw 只报数不列名)", "path?:str", _list_dir)
 
+    # 插件工具(用户项目/全局插件注册;内置同名优先,加载失败不拖垮工具集)
+    try:
+        from psyclaw.plugins import load_plugins, merge_plugin_tools
+        merge_plugin_tools(tools, load_plugins(project_dir))
+    except Exception:  # noqa: BLE001
+        pass
     return tools
 
 

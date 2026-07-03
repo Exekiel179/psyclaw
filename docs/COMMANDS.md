@@ -8,7 +8,7 @@
 
 ---
 
-## 命令总览(44 条)
+## 命令总览(45 条)
 
 > 默认路径:`psyclaw status`(看态势)→ `psyclaw auto-loop`(一键推进;门禁拦你可 `--skip-gates`
 > 显式跳过,留痕 + 产出标探索性)→ `psyclaw check 稿件.md`(投稿前一键质检)。
@@ -20,7 +20,8 @@
 | `version` / `doctor` | 版本 / 环境自检(配置·MCP·Gates) |
 | `config` | 配置向导(API key/模型/环境变量) |
 | `setup` | 项目脚手架+能力选装:建目录 + 据 clarify 生成概览/项目记忆 + 装能力依赖(`--online`)+ 列 MCP/skill |
-| `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH` 下 AcademicForge/AJS 等技能包;`--for <研究类型>` 按类型推荐)/ 运行内置 MCP(mne·spss·mplus·stata) |
+| `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH`;`--for <研究类型>` 按类型推荐)/ MCP 目录(内置 registry + 用户 `.psyclaw/mcp.yaml` 项目/全局)——**均标注 内置/用户·项目/用户·全局** |
+| `plugins` | 列出插件(用户 项目 `.psyclaw/plugins/` / 全局 `~/.psyclaw/plugins/`;`register(api)` 注册 agent 工具 / REPL 命令 / system 片段) |
 | `gates` | 学术规范门禁自检 |
 | `commands` | 按职能分类列出全部命令 |
 | `status` | **一屏项目态势**:目标/澄清/回路/等人决策(直接打印内容)/最近产物/下一步建议 |

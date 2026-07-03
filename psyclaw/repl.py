@@ -36,6 +36,8 @@ COMMANDS = {
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
     "/audit": "逐轮审计开关(on/off;每轮多一次 LLM 调用)",
     "/agent": "agent 模式开关(模型自主多步调用工具:search/read_file/save_file/kg_query/recall)",
+    "/safemode": "文件读取权限:safe=一切读取须 @ 引用;open(默认)=模型可请求自动读取",
+    "/plugins": "已加载插件(用户 项目/全局;可注册工具/命令/system 片段)",
     "/clarify": "研究澄清(grill-me 式,不澄清完不开工)",
     "/preregister": "预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取)",
     "/scale": "量表库(DASS/PHQ-9/GAD-7/TIPI…)",
@@ -75,6 +77,60 @@ _SAVE_SYSTEM = (
 
 _SAVE_RE = re.compile(
     r"```save[ :]+(?:path=)?(?P<path>[^\n`]+)\r?\n(?P<body>.*?)```", re.S)
+
+# 「键盘选择」:模型给选项时输出 choices 块,REPL 弹选择器并自动回传(psyclaw/choices.py)。
+_CHOICES_SYSTEM = (
+    "\n# 让用户选择(键盘选择器)\n需要用户在若干选项里选择时,除正文说明外,附一个块:\n"
+    "```choices\n{\"question\": \"问题\", \"multi\": true, \"options\": [\"选项A\", \"选项B\"]}\n"
+    "```\nPsyClaw 会弹出键盘选择器并把用户的选择自动回传给你;不要只写复选清单等用户打字。")
+
+# 「自动读文件」(开放模式,默认):模型输出 read 块,REPL 自动读取注入,不必让用户 @ 引用。
+_READ_OPEN_SYSTEM = (
+    "\n# 读取本地文件(当前:开放模式)\n需要看本地文件内容时,**不要说你无法读取**,"
+    "也不要让用户粘贴或 @ 引用。直接输出块(每行一个路径):\n"
+    "```read\n<文件路径>\n```\nPsyClaw 会自动读取并把内容(数据 CSV 给结构+少量样例行;"
+    "PDF 抽正文;受保护的 data/raw 会被拒绝)回传给你。")
+_READ_SAFE_SYSTEM = (
+    "\n# 读取本地文件(当前:安全模式)\n所有文件读取都需要用户用 @<路径> 显式引用;"
+    "需要文件内容时,请求用户提供 @ 引用,不要自行读取。")
+
+_READ_RE = re.compile(r"```read\s*\r?\n(?P<body>.*?)```", re.S)
+_MAX_AUTO_READS = 4      # 每轮最多自动读的文件数
+_MAX_AUTO_DEPTH = 3      # 连续自动跟进(读取/选择回传)的深度上限,防打转
+
+
+def parse_read_requests(reply: str) -> list[str]:
+    """从模型回复解析 ```read 块 → 路径列表(去重保序)。纯函数,可单测。"""
+    paths: list[str] = []
+    for m in _READ_RE.finditer(reply or ""):
+        for line in m.group("body").splitlines():
+            p = line.strip().strip("\"'` ")
+            if p and p not in paths:
+                paths.append(p)
+    return paths
+
+
+def gather_read_results(paths: list[str], limit: int = _MAX_AUTO_READS) -> tuple[str, list[str]]:
+    """读取模型请求的文件 → (回传消息, 终端提示行)。data/raw 拒读;缺失/超限如实说明。"""
+    from psyclaw.context import smart_excerpt
+    parts: list[str] = []
+    notes: list[str] = []
+    for raw in paths[:limit]:
+        p = Path(raw).expanduser()
+        if _save_is_protected(p):
+            parts.append(f"[拒绝读取 {p}:受保护的 data/raw,原始数据不入对话]")
+            notes.append(f"  ✗ 拒读(data/raw 受保护):{p.name}")
+            continue
+        if not p.is_file():
+            parts.append(f"[文件不存在:{p}]")
+            notes.append(f"  · 未找到:{p}")
+            continue
+        excerpt = smart_excerpt(p)
+        parts.append(excerpt)
+        notes.append(f"  ✓ 已自动读取 {p.name}({len(excerpt)} 字符注入)")
+    if len(paths) > limit:
+        parts.append(f"[本轮最多自动读 {limit} 个文件,其余 {len(paths) - limit} 个请下一轮再请求]")
+    return ("# 自动读取结果\n\n" + "\n\n".join(parts)) if parts else "", notes
 
 
 def parse_save_blocks(reply: str) -> list[dict]:
@@ -144,6 +200,10 @@ class ReplSession:
         self.plan_mode = False      # 规划模式:只规划不执行,产出自动抽任务
         self.audit_mode = False     # 逐轮审计(auditor agent,每轮多一次调用)
         self.agent_mode = False     # agent 模式:模型自主多步调用工具(纯工具层循环)
+        # 文件读取权限:open(默认,模型 ```read 块自动读)| safe(一切读取须用户 @ 引用)
+        self.file_access = str(self.conf.get("file_access", "open")).lower()
+        self.session_name: str | None = None   # /rename 后的会话名(提示符可见)
+        self._auto_depth = 0        # 自动跟进(读取/选择回传)深度,防打转
         from datetime import datetime
         self.session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         from psyclaw.recall import ContextArchive
@@ -151,6 +211,11 @@ class ReplSession:
         self.resume_id = resume_id           # 启动时续接的会话(feat-013)
         self.chars_in = 0
         self.chars_out = 0
+        try:                                 # 插件(用户项目/全局;坏插件不拖垮 REPL)
+            from psyclaw.plugins import load_plugins
+            self.plugins = load_plugins(".")
+        except Exception:  # noqa: BLE001
+            self.plugins = None
 
     # -- 会话续接(feat-013)-------------------------------------------------
     def _resume_session(self, sid: str) -> bool:
@@ -163,6 +228,12 @@ class ReplSession:
             print(ui.warn(f"  未找到会话 {sid},开新会话。"))
             return False
         self.session_id = sid
+        try:                                  # 会话名带回提示符
+            self.session_name = next(
+                (s["name"] for s in self.archive.list_sessions(200)
+                 if s["id"] == sid and s["name"] != sid), None)
+        except Exception:  # noqa: BLE001
+            self.session_name = None
         for t in turns:
             self.messages.append({"role": "user", "content": t["user_text"]})
             self.messages.append({"role": "assistant", "content": t["reply_text"]})
@@ -221,6 +292,12 @@ class ReplSession:
         if self.plan_mode:
             from psyclaw.tasks import PLAN_MODE_SYSTEM
             system += "\n\n" + PLAN_MODE_SYSTEM
+        # 键盘选择器约定 + 文件读取权限(随 /safemode 动态切换)
+        system += "\n" + _CHOICES_SYSTEM
+        system += "\n" + (_READ_SAFE_SYSTEM if self.file_access == "safe"
+                          else _READ_OPEN_SYSTEM)
+        if self.plugins and self.plugins.systems:
+            system += "\n\n" + "\n\n".join(self.plugins.systems)
         # 历史上下文召回:关键词定位 + 相关度门控(不达标不注入)
         try:
             from psyclaw.recall import render_recall
@@ -268,6 +345,43 @@ class ReplSession:
             from psyclaw.audit import render_verdict, run_audit
             result = run_audit(self.provider, text, reply)
             print(render_verdict(result))
+        # 自动跟进:模型请求读文件(开放模式自动读)/ 给出选项(弹键盘选择器)→ 回传续聊
+        follow = self._auto_followup(reply)
+        if follow:
+            self._auto_depth += 1
+            try:
+                self.ask(follow)
+            finally:
+                self._auto_depth -= 1
+
+    def _auto_followup(self, reply: str) -> str | None:
+        """读取请求 / 选项选择 → 需要自动回传给模型的消息(无则 None)。"""
+        reads = parse_read_requests(reply)
+        if reads:
+            if self.file_access == "safe":
+                print(ui.warn(f"  [安全模式] 模型请求读取 {len(reads)} 个文件已被拒;"
+                              "用 @<路径> 显式引用,或 /safemode off 放开。"))
+            elif self._auto_depth >= _MAX_AUTO_DEPTH:
+                print(ui.dim("  (自动读取跟进已达深度上限,请手动继续)"))
+            else:
+                msg, notes = gather_read_results(reads)
+                for n in notes:
+                    print(ui.dim(n) if n.startswith("  ·") else n)
+                if msg:
+                    return msg
+        try:
+            from psyclaw.choices import (format_selection_message, parse_choices,
+                                         pick_interactive)
+            choice = parse_choices(reply)
+        except Exception:  # noqa: BLE001
+            choice = None
+        if choice and self._auto_depth < _MAX_AUTO_DEPTH:
+            chosen = pick_interactive(choice)
+            if chosen:
+                print(ui.ok("  → 已选:" + "、".join(c[:40] for c in chosen)))
+                return format_selection_message(chosen, choice["question"])
+            print(ui.dim("  (未选择;可直接输入你的回复)"))
+        return None
 
     def _run_agent(self, system: str) -> str | None:
         """agent 模式:跑纯工具层循环(模型自主多步调工具)。返回最终答案;provider 错误返回 None。"""
@@ -467,6 +581,19 @@ class ReplSession:
             print(f"  [逐轮审计 {'开' if self.audit_mode else '关'}]"
                   + (" 每轮回答后 auditor 评分,SCORE<80 草拟教训卡;"
                      "注意每轮多一次 LLM 调用。" if self.audit_mode else ""))
+        elif cmd == "/safemode":
+            low = arg.lower()
+            if low in ("on", "safe"):
+                self.file_access = "safe"
+            elif low in ("off", "open"):
+                self.file_access = "open"
+            else:
+                self.file_access = "open" if self.file_access == "safe" else "safe"
+            if self.file_access == "safe":
+                print(ui.warn("  [安全模式 开] 一切文件读取须用 @<路径> 显式引用。"))
+            else:
+                print(ui.ok("  [开放模式] 模型可请求读取本地文件(```read 块自动读;"
+                            "data/raw 恒受保护)。"))
         elif cmd == "/agent":
             low = arg.lower()
             self.agent_mode = (low == "on") if low in ("on", "off") \
@@ -513,9 +640,32 @@ class ReplSession:
             self._cmd_rename(arg)
         elif cmd == "/search":
             self._cmd_search(arg)
+        elif cmd == "/plugins":
+            self._cmd_plugins()
+        elif self.plugins and cmd in self.plugins.commands:
+            try:                                  # 插件命令:异常不拖垮 REPL
+                self.plugins.commands[cmd]["handler"](arg)
+            except Exception as exc:  # noqa: BLE001
+                print(ui.err(f"  [插件命令 {cmd} 出错] {exc}"))
         else:
             print(f"  未知命令 {cmd},输入 /help 查看可用命令")
         return True
+
+    def _cmd_plugins(self) -> None:
+        from psyclaw.plugins import SCOPE_LABEL
+        if not self.plugins or not (self.plugins.loaded or self.plugins.errors):
+            print(ui.dim("  未加载插件。放 <项目>/.psyclaw/plugins/*.py 或 "
+                         "~/.psyclaw/plugins/*.py(含 register(api))即生效。"))
+            return
+        print(ui.accent(f"  插件({len(self.plugins.loaded)}):"))
+        for p in self.plugins.loaded:
+            print(f"    - {p['name']:<20} [{SCOPE_LABEL.get(p['scope'], p['scope'])}]")
+        if self.plugins.commands:
+            print(ui.dim("    命令:" + " ".join(self.plugins.commands)))
+        if self.plugins.tools:
+            print(ui.dim("    工具:" + " ".join(self.plugins.tools) + "(agent 模式可用)"))
+        for e in self.plugins.errors:
+            print(ui.warn(f"    ⚠ {e}"))
 
     # -- 会话管理 slash 命令(feat-013)------------------------------------
     def _cmd_sessions(self) -> None:
@@ -544,7 +694,8 @@ class ReplSession:
             print("  用法:/rename <新名称>(重命名当前会话)")
             return
         self.archive.rename_session(self.session_id, name)
-        print(ui.ok(f"  ✓ 当前会话已命名:{name}"))
+        self.session_name = name          # 提示符立即可见(用户实测:改了名要看得出来)
+        print(ui.ok(f"  ✓ 当前会话已命名:{name}(已显示在提示符)"))
 
     def _cmd_search(self, arg: str) -> None:
         q = arg.strip()
@@ -567,11 +718,18 @@ class ReplSession:
         print("  " + ui.accent("⚙ provider ") + self.provider.describe())
         print("  " + ui.dim("输入 / 弹出命令联想(↑↓选择 Tab补全) · /exit 退出 · @<文件> 引用") + "\n")
         while True:
-            prompt = PROMPT if not self.plan_mode else (
-                ui.paint("psyclaw", "brcyan", "bold")
-                + ui.warn(" plan") + ui.dim(" ❯ "))
+            base = ui.paint("psyclaw", "brcyan", "bold")
+            if self.session_name:
+                base += ui.dim(f"·{self.session_name[:12]}")
+            modes = ("" if not self.plan_mode else ui.warn(" plan")) \
+                + ("" if not self.agent_mode else ui.accent(" agent")) \
+                + ("" if self.file_access != "safe" else ui.warn(" safe"))
+            prompt = base + modes + ui.dim(" ❯ ")
+            cmds = dict(COMMANDS)
+            if self.plugins:
+                cmds.update({k: v["desc"] for k, v in self.plugins.commands.items()})
             try:
-                line = read_line(prompt, COMMANDS).strip()
+                line = read_line(prompt, cmds).strip()
             except (EOFError, KeyboardInterrupt):
                 print()
                 break
@@ -595,6 +753,7 @@ HELP_TEXT = """\
   /recall [q] 历史上下文召回(全量存库+关键词索引,相关度≥80%才注入)
   /audit      逐轮审计开关(auditor 评分;on/off/log)
   /agent      agent 模式(模型自主多步调工具:search/read_file/save_file/kg_query/recall)
+  /safemode   文件读取权限(safe=一切读取须 @ 引用;默认 open=模型可请求自动读取)
   /model [m]  查看/切换模型      /provider [p]  查看/切换 provider
   /skills     列出 skills        /mcp           MCP 目录与启用状态
   /gates      门禁自检           /cost          本会话成本粗估

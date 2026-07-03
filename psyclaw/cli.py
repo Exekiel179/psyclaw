@@ -40,6 +40,28 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plugins(args: argparse.Namespace) -> int:
+    """列出已加载插件(用户 项目/全局)与其注册的工具/命令。"""
+    from psyclaw import ui
+    from psyclaw.plugins import SCOPE_LABEL, load_plugins, plugin_dirs
+    reg = load_plugins(".")
+    if not (reg.loaded or reg.errors):
+        print(ui.dim("未加载插件。放 <项目>/.psyclaw/plugins/*.py 或 ~/.psyclaw/plugins/*.py"
+                     "(含 register(api):add_tool/add_command/add_system)即生效。"))
+        return 0
+    print(ui.title(f"插件({len(reg.loaded)})"))
+    for p in reg.loaded:
+        print(f"  - {p['name']:<20} [{SCOPE_LABEL.get(p['scope'], p['scope'])}]")
+    if reg.commands:
+        print(ui.dim("  命令:" + " ".join(reg.commands) + "(REPL 内可用)"))
+    if reg.tools:
+        print(ui.dim("  工具:" + " ".join(reg.tools) + "(agent 模式/psyclaw agent 可用)"))
+    for e in reg.errors:
+        print(ui.warn(f"  ⚠ {e}"))
+    print(ui.dim("  目录:" + " · ".join(f"{d}[{s}]" for d, s in plugin_dirs("."))))
+    return 0
+
+
 def cmd_check(args: argparse.Namespace) -> int:
     """投稿前一键质检:JARS + 引用保真(+期刊风格)+ 复现溯源 + KG 溯源,一屏汇总。"""
     from psyclaw.checkup import print_check, run_check
@@ -327,6 +349,28 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 def cmd_skills(args: argparse.Namespace) -> int:
     from psyclaw import ui
+    sync_target = getattr(args, "sync", None)
+    if sync_target is not None:
+        from psyclaw.skills.sync import list_syncable_skills, sync_skills
+        name = None if sync_target == "all" else sync_target
+        if getattr(args, "dry_run", False):
+            items = sync_skills(name=name, dry_run=True)
+        else:
+            items = sync_skills(name=name)
+        if not items:
+            known = ", ".join(s.name for s in list_syncable_skills()) or "(无)"
+            print(ui.err(f"没有可同步的内置 skill:{sync_target}。可同步:{known}"))
+            return 1
+        print(ui.title("同步内置 Skills"))
+        ok = True
+        for item in items:
+            ok = ok and bool(item["ok"])
+            marker = "✓" if item["ok"] else "✗"
+            print(f"  {marker} {item['name']:<14} {item['action']:<6} {item['target']}")
+            if item.get("note"):
+                print(ui.dim(f"      {item['note'][:180]}"))
+        return 0 if ok else 1
+
     for_type = getattr(args, "for_type", None)
     if for_type:
         from psyclaw.skills.recommend import VALID_TYPES, normalize_type, recommend_skills
@@ -356,8 +400,10 @@ def cmd_skills(args: argparse.Namespace) -> int:
         for s in external:
             by_root[s["source"]].append(s)
         print(ui.accent(f"\n外部技能包（{len(external)} 个 · AcademicForge/AJS 等）"))
+        _scope_label = {"project": "用户·项目", "global": "用户·全局", "custom": "用户·自定义"}
         for root, items in by_root.items():
-            print(ui.dim(f"  {root}（{len(items)}）"))
+            scope = _scope_label.get(items[0].get("scope", ""), "用户")
+            print(ui.dim(f"  [{scope}] {root}（{len(items)}）"))
             for s in items[:12]:
                 print(f"    - {s['name']:<28} {ui.dim(s['description'][:44])}")
             if len(items) > 12:
@@ -386,10 +432,13 @@ def cmd_mcp(args: argparse.Namespace) -> int:
             print("可 serve:mne | spss | mplus | stata")
             return 1
         return srv.run()
-    print("MCP 服务器目录（registry.yaml）：")
+    print("MCP 服务器目录（内置 registry.yaml + 用户 .psyclaw/mcp.yaml 项目/全局）：")
+    _scope_label = {"builtin": "内置", "project": "用户·项目", "global": "用户·全局"}
     for m in list_mcp_catalog():
         opt_tag = " [可选]" if is_optional(m) else ""
-        print(f"  - {m['name']:<14} [{m['category']:<16}] 启用条件: {m.get('enable_when', '—')}{opt_tag}")
+        scope = _scope_label.get(m.get("scope", "builtin"), m.get("scope", ""))
+        print(f"  - {m['name']:<14} [{scope:<5}·{m['category']:<14}] "
+              f"启用条件: {m.get('enable_when', '—')}{opt_tag}")
     print("\n内置 MCP 可独立 serve 给任意 MCP 客户端(Claude Desktop 等):")
     print("  psyclaw mcp --serve mne    # EEG/MEG/ERP")
     print("  psyclaw mcp --serve spss   # SPSS 语法生成 + 批处理")
@@ -886,7 +935,7 @@ CORE_COMMANDS = {
 # 成熟库/MCP——本 CLI 只保留研究编排 + 知识参考 + 文献/写作 harness。
 COMMAND_CATEGORIES = [
     ("环境 / 系统", ["guide", "status", "repl", "version", "doctor", "config", "setup",
-                  "skills", "mcp", "gates", "commands"]),
+                  "skills", "mcp", "plugins", "gates", "commands"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score"]),
@@ -963,6 +1012,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="一屏项目态势:目标/澄清/回路/等人决策(直接打印)/最近产物/下一步建议",
     ).set_defaults(func=cmd_status)
 
+    sub.add_parser(
+        "plugins",
+        help="列出插件(用户 项目/全局;register(api) 注册工具/命令/system 片段)",
+    ).set_defaults(func=cmd_plugins)
+
     pck = sub.add_parser(
         "check",
         help="投稿前一键质检:JARS+引用保真(+期刊风格)+复现溯源+KG溯源,一屏汇总")
@@ -1036,6 +1090,10 @@ def build_parser() -> argparse.ArgumentParser:
                          help="列出 skills(内置+发现 .claude/skills;--for 按研究类型推荐)")
     pks.add_argument("--for", dest="for_type", default=None,
                      help="按研究类型推荐外部技能包:lit-review|meta|analysis|qualitative(亦接受 *-loop 别名)")
+    pks.add_argument("--sync", nargs="?", const="all", default=None,
+                     help="同步带 upstream.json 的内置 skill。可指定名称,如 ctx2skill/opid")
+    pks.add_argument("--dry-run", action="store_true",
+                     help="配合 --sync 只显示将执行的同步动作")
     pks.set_defaults(func=cmd_skills)
     pmcp = sub.add_parser("mcp", help="MCP 目录 / 以 stdio 服务器身份运行内置 MCP")
     pmcp.add_argument("--serve", dest="name",
