@@ -971,6 +971,7 @@ def cmd_guide(args: argparse.Namespace) -> int:
     print(ui.dim("  正式开工前          → clarify 澄清(17 槽位)· setup 铺项目 · preregister 预注册"))
     print()
     print(ui.dim("全部命令:psyclaw commands   ·   配置 LLM:psyclaw config   ·   自检:psyclaw doctor"))
+    print(ui.accent("手把手教程") + ui.dim("(从零到第一篇过门禁的稿子):docs/TUTORIAL.md"))
     return 0
 
 

@@ -3,7 +3,7 @@
 > 入口 `python -m psyclaw <命令>`。命令注册真源是 `psyclaw/cli.py`。
 > PsyClaw 现为**纯研究编排 harness**——统计计算已外移到成熟库/MCP,本 CLI 不含统计命令。
 
-> 第一次用?运行 **`psyclaw guide`**(上手介绍 + 心智模型 + 60 秒上手)。
+> 第一次用?运行 **`psyclaw guide`**(决策树上手),手把手教程见 **`docs/TUTORIAL.md`**。
 > `psyclaw --help` 暴露**全部**顶层命令;**`psyclaw commands`** 按职能分类列出(★ 标上手常用)。
 
 ---
@@ -25,6 +25,9 @@
 | `gates` | 学术规范门禁自检 |
 | `commands` | 按职能分类列出全部命令 |
 | `status` | **一屏项目态势**:目标/澄清/回路/等人决策(直接打印内容)/最近产物/下一步建议 |
+
+`skills --sync [name]` 可同步带 `upstream.json` 的内置 skill,例如 `ctx2skill` / `opid`;
+上游仓库保持在各自 skill 的 `upstream/` 目录,不打散到 PsyClaw 主代码。
 
 ### 只读知识目录(查阅,无计算)
 | 命令 | 查什么 |
