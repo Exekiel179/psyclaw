@@ -33,6 +33,29 @@ def cmd_repl(args: argparse.Namespace) -> int:
     return run_repl()
 
 
+def cmd_agent(args: argparse.Namespace) -> int:
+    """agent 一次性任务:模型自主多步调用工具(纯工具层循环,provider 无关保底)。"""
+    from psyclaw import ui
+    from psyclaw.providers import get_provider
+    from psyclaw.repl import _build_system_prompt
+    from psyclaw.toolloop import run_tool_loop
+    conf = cfg.load_config()
+    provider = get_provider(conf)
+    task = " ".join(args.task)
+    auto = getattr(args, "auto", False)
+    approve = (lambda c: True) if auto else None   # 非 auto:拒副作用工具(只读照跑)
+    print(ui.title("PsyClaw agent") + ui.dim(f"  {task}"))
+    if not auto:
+        print(ui.dim("  (副作用工具默认拒绝;--auto 自动批准。只读工具照常执行。)"))
+    res = run_tool_loop(provider, _build_system_prompt(),
+                        [{"role": "user", "content": task}], project_dir=".",
+                        max_iters=getattr(args, "max_iters", 6),
+                        approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
+    print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
+    print(res["final"])
+    return 0
+
+
 def cmd_resume(args: argparse.Namespace) -> int:
     """续接历史会话进入 REPL(不给 id 则续接最近一次)。"""
     from psyclaw import ui
@@ -845,7 +868,7 @@ COMMAND_CATEGORIES = [
                     "journal"]),
     ("量表 / 数据准备", ["score"]),
     ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars", "cite-check"]),
-    ("研究流程 / 编排回路", ["auto-loop", "loop", "lit-loop", "meta-loop",
+    ("研究流程 / 编排回路", ["agent", "auto-loop", "loop", "lit-loop", "meta-loop",
                         "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("检索 / 知识图谱", ["search", "kg", "lit"]),
@@ -921,6 +944,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
 
     sub.add_parser("repl", help="进入交互式 REPL（默认）").set_defaults(func=cmd_repl)
+
+    pag = sub.add_parser(
+        "agent",
+        help="agent 一次性任务:模型自主多步调用工具(纯工具层循环,provider 无关保底)")
+    pag.add_argument("task", nargs="+", help="任务描述")
+    pag.add_argument("--auto", action="store_true",
+                     help="自动批准副作用工具(默认拒绝;只读工具照跑)")
+    pag.add_argument("--max-iters", type=int, default=6, dest="max_iters",
+                     help="工具调用轮数上限(默认 6)")
+    pag.set_defaults(func=cmd_agent)
 
     pres = sub.add_parser("resume",
                           help="续接历史会话进入 REPL(不给 id 续接最近一次)")
