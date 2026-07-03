@@ -135,7 +135,8 @@ def _find_transcripts(project: Path) -> Path | None:
 # ---------------------------------------------------------------------------
 
 def discover_backlog(project_dir: str = ".",
-                     done_actions: frozenset = frozenset()) -> list[dict]:
+                     done_actions: frozenset = frozenset(),
+                     skip_clarify: bool = False) -> list[dict]:
     """从仓库状态重新推导待办研究流程,按优先级排序。
 
     返回 backlog(list[dict]),每项:{id, action, title, priority, reason, seed, blocker}。
@@ -183,7 +184,8 @@ def discover_backlog(project_dir: str = ".",
         return []
 
     # 澄清门禁:有事可做却没澄清完 → 全被 clarify blocker 拦着
-    if _clarify_incomplete(project):
+    # (skip_clarify=用户显式要求跳过 → 不出 blocker;跳过留痕在派发的 workflow 层做)
+    if not skip_clarify and _clarify_incomplete(project):
         card = _clarify_card(project)
         return [{
             "id": "clarify", "action": "clarify", "priority": 0, "seed": None,
@@ -336,7 +338,7 @@ def _derive_topic(item: dict) -> str | None:
     return None
 
 
-def _dispatch(item: dict, project_dir: str) -> int:
+def _dispatch(item: dict, project_dir: str, skip_gates: bool = False) -> int:
     """把任务派发给对应 workflow。被派发的流程内部恒 auto=True 跑到底
     (任务级批准在 auto-loop 层已做;澄清等硬门禁仍在 workflow 内生效,不被绕过)。
 
@@ -352,7 +354,7 @@ def _dispatch(item: dict, project_dir: str) -> int:
     goal_before = get_goal(project_dir)
     topic = goal_before or _derive_topic(item)
     rc = run_workflow(get_workflow(wf_id), topic=topic, project_dir=project_dir,
-                      auto=True, seed=item.get("seed"))
+                      auto=True, seed=item.get("seed"), skip_gates=skip_gates)
     if not goal_before:                       # 本无人工目标 → 清掉引擎落下的派生 goal.md
         gp = goal_path(project_dir)
         try:                                  # 仅清理:失败也不应影响本轮验收结论
@@ -428,11 +430,13 @@ def _print_sense(backlog: list[dict], state: dict, project_dir: str = ".") -> No
 
 
 def run_autoloop(project_dir: str = ".", max_iters: int = 6,
-                 auto: bool = False) -> int:
+                 auto: bool = False, skip_gates: bool = False) -> int:
     """跑自主科研回路。
 
     非 auto:每轮在**任务级**征求确认(派发哪条流程),确认后该流程跑到底;
     auto:全程无人值守。返回 0=正常收敛/到上限;1=被门禁硬停(需人工)。
+    skip_gates:用户显式要求跳过门禁(澄清 blocker 不再拦;派发的 workflow 跳过时留痕
+    notes/gate_skips.md,产出按探索性对待)。默认 False,fail-closed 行为不变。
     """
     from psyclaw import ui
     from psyclaw.loop import _ask_yn, _log
@@ -451,7 +455,7 @@ def run_autoloop(project_dir: str = ".", max_iters: int = 6,
     rc = 0
     while True:
         done_actions = frozenset(state["completed_actions"]) | frozenset(state["skipped"])
-        backlog = discover_backlog(project_dir, done_actions)
+        backlog = discover_backlog(project_dir, done_actions, skip_clarify=skip_gates)
         print()
         _print_sense(backlog, state, project_dir)
 
@@ -480,7 +484,7 @@ def run_autoloop(project_dir: str = ".", max_iters: int = 6,
         _log(project, f"auto-loop dispatch · {item['action']} · {item['title']}")
         # 派发/验收异常不应炸掉整个回路:记为失败、写 blocked、换下一个任务(不空转)。
         try:
-            _dispatch(item, project_dir)
+            _dispatch(item, project_dir, skip_gates=skip_gates)
             verdict = verify_result(project_dir, item["action"])
         except Exception as exc:  # noqa: BLE001
             verdict = {"passed": False, "workflow": None,

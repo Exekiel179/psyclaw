@@ -100,6 +100,15 @@ def build_tools(project_dir: str = ".") -> dict:
                          for h in hits) or "无历史命中"
     _t("recall", "检索历史对话(跨会话全文)", "query:str, limit?:int", _recall)
 
+    def _list_dir(a):
+        from psyclaw.project_sense import render_tree, scan_tree
+        target = str(a.get("path", "") or project_dir)
+        p = Path(target).expanduser()
+        if not p.is_dir():
+            return f"目录不存在:{p}"
+        return render_tree(scan_tree(str(p)))
+    _t("list_dir", "看目录结构(有界树;data/raw 只报数不列名)", "path?:str", _list_dir)
+
     return tools
 
 

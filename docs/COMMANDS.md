@@ -8,7 +8,10 @@
 
 ---
 
-## 命令总览(42 条)
+## 命令总览(44 条)
+
+> 默认路径:`psyclaw status`(看态势)→ `psyclaw auto-loop`(一键推进;门禁拦你可 `--skip-gates`
+> 显式跳过,留痕 + 产出标探索性)→ `psyclaw check 稿件.md`(投稿前一键质检)。
 
 ### 环境 / 系统
 | 命令 | 作用 |
@@ -20,6 +23,7 @@
 | `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH` 下 AcademicForge/AJS 等技能包;`--for <研究类型>` 按类型推荐)/ 运行内置 MCP(mne·spss·mplus·stata) |
 | `gates` | 学术规范门禁自检 |
 | `commands` | 按职能分类列出全部命令 |
+| `status` | **一屏项目态势**:目标/澄清/回路/等人决策(直接打印内容)/最近产物/下一步建议 |
 
 ### 只读知识目录(查阅,无计算)
 | 命令 | 查什么 |
@@ -45,13 +49,14 @@
 | `declare-test --dv --test` | 预注册单个计划分析;研究者自由度门禁 |
 | `preregister` | OSF/AsPredicted 双格式预注册模板(据澄清卡抽取;样本量依据填澄清卡 power 槽位) |
 | `jars <draft>` | APA 2018 JARS 检查清单(quant/qual/mixed) |
+| `check [稿件.md] [--journal]` | **投稿前一键质检**:JARS + 引用保真(+期刊风格)+ 复现溯源 + KG 溯源,一屏汇总 ✓/✗/⚠ |
 | `cite-check <稿件.md>` | 引用保真核查:文内引用逐条溯源到检索命中,孤儿引用=疑似杜撰(反杜撰);`--journal` 附引用风格核对 + 退稿红线 |
 
 ### 研究流程 / 编排回路
 | 命令 | 作用 |
 |---|---|
 | `agent <task> [--auto]` | 纯工具层循环:模型**自主多步调用工具**(search/read_file/save_file/kg_query/recall);文本约定协议、provider 无关保底;副作用工具需批准(REPL 内 `/agent` 开关) |
-| `auto-loop` | 自主科研回路(Ralph 式自循环):每轮自动发现待办→派发对应 `<type>-loop`→**独立验收**(只读落盘产物)→记 `notes/autoloop_state.json`→决定下一步(`--max-iters` / `--auto`) |
+| `auto-loop` | 自主科研回路(Ralph 式自循环):每轮自动发现待办→派发对应 `<type>-loop`→**独立验收**(只读落盘产物)→记 `notes/autoloop_state.json`→决定下一步(`--max-iters` / `--auto` / `--skip-gates` 用户显式跳过门禁,留痕+产出标探索性;各 `<type>-loop` 同) |
 | `loop [主题]` | 通用流程编排回路(类 Claude Code 的 agentic loop:planner→执行→critic→修复),不绑研究类型 |
 | `lit-loop <主题>` | 文献综述:澄清→检索→筛选(PRISMA)→合成综述→评审 |
 | `meta-loop <effects.csv>` | 元分析:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审 |

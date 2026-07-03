@@ -210,6 +210,14 @@ class ReplSession:
         knowledge = relevant_knowledge(text)
         if knowledge:
             system += "\n\n" + knowledge
+        # 本地项目感知:每轮注入有界目录结构(模型看得见文件夹;失败不阻塞)
+        try:
+            from psyclaw.project_sense import project_brief
+            brief = project_brief(".")
+            if brief:
+                system += "\n\n" + brief
+        except Exception:  # noqa: BLE001
+            pass
         if self.plan_mode:
             from psyclaw.tasks import PLAN_MODE_SYSTEM
             system += "\n\n" + PLAN_MODE_SYSTEM
