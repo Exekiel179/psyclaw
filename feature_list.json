@@ -221,6 +221,14 @@
       "evidence": "psyclaw/plugins.py(PluginApi/PluginRegistry/plugin_dirs 项目优先/load_plugins 逐插件隔离/merge_plugin_tools 内置优先)+ toolloop.build_tools 并入插件工具 + repl.py(__init__ 加载/系统片段注入/插件 slash 分发+补全/ /plugins)+ cli.py plugins 命令 + cmd_skills/cmd_mcp 标 scope + skills/loader.py _root_scope(is_relative_to)+ mcp/manager.py user_registries/_all_entries(catalog 45 条,names==catalogued 通过);tests/test_plugins_scope.py 8 例(注册三扩展点/坏插件隔离/缺 register/下划线跳过/内置不被劫持/build_tools 并入/skills scope/McP 用户注册表 scope+同名内置优先);全量 C:\\Python314 pytest 1154 passed;e2e:项目插件 lab.py → psyclaw plugins 列出[用户·项目]+工具+命令。"
     },
     {
+      "id": "feat-029",
+      "name": "v0.2 发布:命令简单化 + 用户别名 + 内置 skill 同步 + CHANGELOG",
+      "description": "用户定调 v0.2:『机制可以复杂,但命令要简单化;支持用户自定义;内置 skill 能同步更新』。① 命令简单化:--help 收敛到 CORE_COMMANDS(全部命令照常可调用,epilog 动态指路 psyclaw commands / guide / TUTORIAL);② 用户别名:~/.psyclaw/aliases.yaml(全局)+ <项目>/.psyclaw/aliases.yaml(项目覆盖全局),一行一条『qc: check --journal xinlixuebao』→ psyclaw qc 稿件.md,shlex 解析带引号参数,**内置命令优先不可劫持**,任何异常 fail-safe 不阻塞 CLI,psyclaw commands 底部列出你的别名;③ 内置 skill 同步:纳入另一会话实现的 skills --sync(upstream.json 清单 → <skill>/upstream/ 同步,ctx2skill/opid 适配层薄壳)及其测试;④ __version__ 0.1.0→0.2.0 + CHANGELOG.md(v0.1→v0.2 全量变更)。",
+      "dependencies": ["feat-026", "feat-028"],
+      "status": "done",
+      "evidence": "psyclaw/aliases.py(alias_files 全局在前项目覆盖/_parse errors=replace fail-safe/load_aliases/expand_alias 纯函数·内置优先·shlex·坏定义原样)+ cli.py main() 别名展开(异常不阻塞)+ build_parser 末尾 --help 收敛(快照 _psyclaw_help 后过滤 _choices_actions,epilog 动态报『只列 N 条/全部 M 条』)+ cmd_commands 列别名 + psyclaw/skills/sync.py+ctx2skill/opid(另一会话实现,本轮纳入提交)+ __init__ 0.2.0 + CHANGELOG.md;tests/test_aliases.py 6 例(展开+余参追加/内置不劫持/透传/引号+注释/坏文件/坏定义)+ test_cli_help 帮助收敛新契约(shown==CORE∩all、未列命令仍可调、epilog 指路);全量 C:\\Python314 pytest 1163 passed;e2e:--help 尾行『只列 31 条…全部 51 条』、psyclaw version=0.2.0、别名 qc 展开为 check --journal xinlixuebao 实跑。"
+    },
+    {
       "id": "feat-023",
       "name": "带引用的轻量知识图谱 kg(边由构造即带引用)",
       "description": "SQLite nodes/edges 知识图谱(stdlib,无 Neo4j),把研究里的构念/论文/人物/机构/技术串起来帮 Agent 理解全貌。核心纪律=**边必带来源**:add_edge 拒绝无 source_ref 的边(反幻觉关系);verify 复用 feat-015 cite-check 的 _canon_key 规范化,核对每条 citation 边的来源是否真在检索语料(notes/evidence_map.json 允许键),溯源不到=孤儿=疑似杜撰关系。主题范围非全局:seed_from_evidence_map 从既有 evidence_map(构念×支持文献)直接种出天然带引用的图。基础实体消歧(归一名+类型去重);ego 子图 BFS + mermaid 渲染(边标来源)。存 .psyclaw/kg/graph.db。psyclaw kg seed|show <实体>|verify|stats。",

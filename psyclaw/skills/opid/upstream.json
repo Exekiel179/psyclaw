@@ -1,0 +1,8 @@
+{
+  "name": "opid",
+  "repo": "https://github.com/jinyangwu/OPID.git",
+  "ref": "main",
+  "upstream_dir": "upstream",
+  "preserve_structure": true,
+  "paper": "https://arxiv.org/html/2606.26790v1"
+}

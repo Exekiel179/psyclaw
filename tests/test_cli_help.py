@@ -91,16 +91,22 @@ def test_no_bare_percent_in_subparser_help():
     assert not offenders, f"subparser help 含未转义 %：{offenders}"
 
 
-def test_all_top_level_commands_exposed_in_help():
-    """`--help` 暴露全部顶层命令(不再隐藏);CORE_COMMANDS 仅用于 ★ 标注。"""
+def test_help_compact_but_all_callable():
+    """v0.2 命令简单化:`--help` 只列 CORE_COMMANDS;**全部命令仍可调用**,
+    完整清单看 `psyclaw commands`(epilog 指路)。"""
+    from psyclaw.cli import CORE_COMMANDS
     p = build_parser()
     shown, callable_all = set(), set()
     for action in p._actions:
         if isinstance(action, argparse._SubParsersAction):
             shown = {pa.dest for pa in action._choices_actions}
             callable_all = set(action.choices.keys())
-    assert shown == callable_all          # 顶层帮助列出的 == 可调用的(全部暴露)
-    assert {"serve", "figures", "loop", "guide"} <= shown
+    assert shown == (CORE_COMMANDS & callable_all)   # 帮助只列常用
+    assert shown < callable_all                      # 但可调用的远多于列出的
+    # 未列入帮助的命令依然可用(抽查)
+    assert p.parse_args(["serve", "telegram"]).func.__name__ == "cmd_serve"
+    assert p.parse_args(["figures"]).func.__name__ == "cmd_figures"
+    assert "psyclaw commands" in (p.epilog or "")    # epilog 指路完整清单
 
 
 # --- 编排命令:loop(通用)+ <type>-loop(研究流程)+ research(固定全流程)----------
