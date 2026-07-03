@@ -1,8 +1,19 @@
-# PsyClaw — 心理学研究全流程 Agent CLI · 设计稿 v0.1
+# PsyClaw — 心理学研究全流程 Agent CLI · 设计稿 v0.1（历史）
 
-> **一句话定位**：把 AutoResearchClaw 的自主研究流水线，特化成一个**心理学研究专用、可复现优先、规范门禁内置**的交互式命令行智能体。
+> ⚠️ **重定位说明（2026-06，务必先读）**
+> 本文件是 **v0.1 历史设计稿**，记录的是**重定位前**的愿景（把统计计算当作核心内置能力）。
+> **现状已变**：PsyClaw 已从「全流程统计 CLI」重定位为「纯研究**编排** harness」——
+> **统计计算整体外移到成熟库/MCP，本仓不内置、不 import 任何统计库，也不重实现任何统计算法**。
+> 因此下文中一切「内置统计 / ARS-Stat 跑分析 / r-mcp·pystat 主路径内算 / `/stat` 自动跑检验」
+> 的描述**均已作废**——统计改为由 meta/analysis 流程**生成委托 scipy/pingouin/statsmodels 的
+> 可复现脚本**（交 `[stats]` 环境或 MCP 运行），或直接用 SPSS/MNE/Mplus/Stata 等 MCP 服务器。
+> 架构层次、HITL 回路、Gates、图表规范、项目布局等**非统计**设计仍大体有效。
+> **当前真源**：状态 = `feature_list.json`；人读快照 = `progress.md`；计划 = `TODO.md`；命令集 = `docs/COMMANDS.md`。
+
+> **一句话定位（原）**：把 AutoResearchClaw 的自主研究流水线，特化成一个**心理学研究专用、可复现优先、规范门禁内置**的交互式命令行智能体。
 >
 > Chat an idea → 文献调研 · 实验设计 · 统计分析 · 论文写作，全程受 `PSYCLAW.md` 学术规范约束。
+> （注：「统计分析」现指**编排 + 生成可复现脚本**，不在本仓内计算。）
 
 本文件是**设计稿**，不含实现逻辑。配套交付一个**可运行的最小骨架**（见 `README.md` 与 `psyclaw/`）。
 
@@ -123,7 +134,7 @@ REPL 内用 `/前缀`，shell 里用子命令。两套等价。
 | `/research <topic>` | 跑完整 ARS 流水线（文献→设计→统计→写作） | ARS skill 总编排 |
 | `/lit <query>` | 文献检索 + 筛选 + 知识抽取（PRISMA 流程） | 文献 MCP + lit 子技能 |
 | `/design` | 实验设计（被试间/内、功效分析、样本量、预注册草案） | design 子技能 |
-| `/stat @data.csv` | **ARS-Stat**：自动选检验→跑分析→APA7 结果→可复现脚本 | stat 子技能 + 统计 MCP |
+| `/stat @data.csv` | ~~**ARS-Stat**：自动选检验→跑分析→APA7 结果~~ **（已作废：不在仓内算）** → 现由 analysis/meta 流程**生成**委托 pingouin/statsmodels 的可复现脚本 | 外部 `[stats]`/MCP |
 | `/write <section>` | 按 APA JARS 写作（intro/method/results/discussion） | writing 子技能 |
 | `/preregister` | 生成 OSF/AsPredicted 预注册模板 | gates + design |
 | `/reproduce` | 从产出脚本一键复跑，核对结果一致性 | gates checker |
@@ -144,6 +155,11 @@ ARS (Academic Research Skill)
 ```
 
 ### 4.1 ARS-Stat 子技能（统计是心理学的命门）
+
+> ⚠️ **本节已作废（统计外移）**：PsyClaw **不在仓内跑分析**。下述「跑分析（pingouin/statsmodels/
+> lavaan/lme4）」的决策流仅存为历史设计;现状是 analysis/meta 流程**只生成**委托这些外部库的
+> **可复现脚本**（交 `[stats]` 环境或 MCP 运行、结果回填），本仓零统计库依赖。假设诊断/效应量+CI/
+> 复现脚本等**规范门禁仍在**（供写作产出与外部统计结果对照）。
 
 输入：数据集 + 研究假设。输出：APA7 结果段 + 图 + **可独立运行的复现脚本**（`.R` / `.py`）。
 
@@ -177,7 +193,7 @@ ARS (Academic Research Skill)
 | **spss-mcp** | 统计（可选） | 检测到本地 SPSS | 跑 .sav、生成语法、输出表 |
 | **mplus-mcp** | 统计（可选） | 检测到本地 Mplus | SEM / CFA / 潜变量 / 增长模型 |
 | **stata-mcp** | 统计（可选） | 检测到本地 Stata | 面板/计量、do 文件 |
-| **r-mcp / pystat** | 统计（主路径） | 内置 | lavaan/lme4/pingouin/statsmodels |
+| ~~**r-mcp / pystat**~~ | 统计 | **已作废：非内置** | 统计外移后无「内置统计主路径」;脚本交外部 `[stats]`/MCP 跑 |
 | **zotero-mcp** | 文献管理 | Zotero API key | 文库检索、引文、撤稿检查（scite） |
 | **lit-search-mcp** | 文献检索 | 可配多源 | PubMed / PsycINFO / Semantic Scholar / OpenAlex / arXiv |
 | **osf-mcp** | 开放科学（可选） | OSF token | 预注册、数据托管 |
