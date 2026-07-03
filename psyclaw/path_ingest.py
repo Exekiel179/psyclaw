@@ -3,7 +3,9 @@
 ① 自动识别消息中的本地路径（绝对/相对/~展开/带引号/Windows 反斜杠）
 ② 数据文件（csv/tsv/xlsx/sav）→ 仅注入结构元数据，原始数据永不进入 LLM 上下文
    （守住「原始数据不入对话」隐私铁律 + 大文件不灌上下文）
-③ 文本文件（md/txt/py 等）→ smart_excerpt 摘录入上下文
+③ 文本文件（md/txt/py 等）→ smart_excerpt 摘录入上下文；**PDF → 抽正文**
+   （smart_excerpt 走 pdf_extract：pypdf/pdfplumber 优先，纯 stdlib zlib 兜底，
+   扫描件/加密抽不到时给诚实提示，绝不注入二进制乱码）
 ④ 只读，不改写原始文件；路径不存在/无权限给清晰报错
 """
 
