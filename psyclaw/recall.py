@@ -77,6 +77,7 @@ class ContextArchive:
         self.db_path = self.dir / "index.db"
         self._conn: sqlite3.Connection | None = None
         self._embedder = embedder          # None → 首次使用时 get_embedder()
+        self._fts: bool | None = None      # FTS5 是否可用(建连时探测;不可用回落 LIKE)
 
     @property
     def embedder(self):
@@ -99,8 +100,37 @@ class ContextArchive:
                 "CREATE INDEX IF NOT EXISTS idx_kw ON keywords(kw);"
                 "CREATE TABLE IF NOT EXISTS embeddings("
                 " turn_id INTEGER, model TEXT, dim INTEGER, vec BLOB,"
-                " UNIQUE(turn_id, model));")
+                " UNIQUE(turn_id, model));"
+                # 会话元数据(feat-013):id 与 turns.session 对应,name 供 resume/rename。
+                "CREATE TABLE IF NOT EXISTS sessions("
+                " id TEXT PRIMARY KEY, name TEXT, created TEXT, updated TEXT);")
+            # 旧库里已有 turns 但无 sessions 行 → 从既有轮次回填会话元数据。
+            self._conn.execute(
+                "INSERT OR IGNORE INTO sessions(id, name, created, updated)"
+                " SELECT session, session, MIN(ts), MAX(ts) FROM turns"
+                " WHERE session IS NOT NULL GROUP BY session")
+            self._fts = self._init_fts(self._conn)
+            self._conn.commit()
         return self._conn
+
+    def _init_fts(self, conn: sqlite3.Connection) -> bool:
+        """探测并建 FTS5 全文索引;不可用(未编译 FTS5)则回落 LIKE。"""
+        try:
+            conn.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS turns_fts USING fts5("
+                " turn_id UNINDEXED, session UNINDEXED, body)")
+        except sqlite3.OperationalError:
+            return False
+        # 回填:回落期(或本次刚建索引)落库的历史轮次补进 FTS。
+        try:
+            conn.execute(
+                "INSERT INTO turns_fts(turn_id, session, body)"
+                " SELECT t.id, t.session, t.user_text || char(10) || t.reply_text"
+                " FROM turns t WHERE NOT EXISTS"
+                "  (SELECT 1 FROM turns_fts f WHERE f.turn_id = t.id)")
+        except sqlite3.OperationalError:
+            pass
+        return True
 
     def close(self) -> None:
         if self._conn is not None:
@@ -110,6 +140,7 @@ class ContextArchive:
     # -- 写入:全量储存 + 关键词索引 + 向量 -----------------------------------
     def record(self, session: str, user_text: str, reply_text: str) -> int:
         db = self._db()
+        self.ensure_session(session)
         cur = db.execute(
             "INSERT INTO turns(session, ts, user_text, reply_text) VALUES(?,?,?,?)",
             (session, _now(), user_text, reply_text))
@@ -121,8 +152,111 @@ class ContextArchive:
             self._store_vec(db, turn_id, user_text + "\n" + reply_text)
         except Exception:  # noqa: BLE001  # 向量失败不影响全量储存与关键词
             pass
+        if self._fts:
+            try:
+                db.execute(
+                    "INSERT INTO turns_fts(turn_id, session, body) VALUES(?,?,?)",
+                    (turn_id, session, user_text + "\n" + reply_text))
+            except sqlite3.OperationalError:  # FTS 写失败不影响全量储存
+                pass
+        db.execute("UPDATE sessions SET updated=? WHERE id=?", (_now(), session))
         db.commit()
         return turn_id
+
+    # -- 会话生命周期(feat-013:sessions 元数据 + FTS 全文检索,供 resume/rename) -----
+    def ensure_session(self, session_id: str, name: str | None = None) -> None:
+        """确保会话元数据行存在(幂等)。name 缺省用 session_id。"""
+        db = self._db()
+        db.execute(
+            "INSERT OR IGNORE INTO sessions(id, name, created, updated) VALUES(?,?,?,?)",
+            (session_id, name or session_id, _now(), _now()))
+        db.commit()
+
+    def rename_session(self, session_id: str, name: str) -> bool:
+        """给会话改名(不存在则先建)。返回是否有行受影响。"""
+        db = self._db()
+        self.ensure_session(session_id)
+        cur = db.execute("UPDATE sessions SET name=? WHERE id=?", (name, session_id))
+        db.commit()
+        return cur.rowcount > 0
+
+    def list_sessions(self, limit: int = 50) -> list[dict]:
+        """列出会话(按最近更新降序):{id, name, created, updated, n_turns}。"""
+        db = self._db()
+        rows = db.execute(
+            "SELECT s.id, s.name, s.created, s.updated,"
+            " (SELECT COUNT(*) FROM turns t WHERE t.session = s.id) AS n"
+            " FROM sessions s ORDER BY s.updated DESC LIMIT ?", (limit,)).fetchall()
+        return [{"id": r[0], "name": r[1], "created": r[2], "updated": r[3],
+                 "n_turns": r[4]} for r in rows]
+
+    def session_turns(self, session_id: str) -> list[dict]:
+        """取某会话的全部轮次(时间顺序),供 resume 重建对话历史。"""
+        db = self._db()
+        rows = db.execute(
+            "SELECT ts, user_text, reply_text FROM turns WHERE session=? ORDER BY id",
+            (session_id,)).fetchall()
+        return [{"ts": r[0], "user_text": r[1], "reply_text": r[2]} for r in rows]
+
+    def _fts_query(self, query: str) -> str:
+        """把用户查询清成安全的 FTS5 MATCH 串(逐 token 引号包裹,隐式 AND)。"""
+        toks = re.findall(r"[0-9A-Za-z一-鿿]+", query or "")
+        return " ".join(f'"{t}"' for t in toks[:16])
+
+    def _hydrate(self, db: sqlite3.Connection, rows: list) -> list[dict]:
+        out: list[dict] = []
+        for tid, sess in rows:
+            row = db.execute(
+                "SELECT ts, user_text, reply_text FROM turns WHERE id=?",
+                (tid,)).fetchone()
+            if row:
+                out.append({"id": tid, "session": sess, "ts": row[0],
+                            "user_text": row[1], "reply_text": row[2]})
+        return out
+
+    def search(self, query: str, limit: int = 10) -> list[dict]:
+        """跨会话全文检索。FTS5 可用走 MATCH(bm25 排序),否则回落 LIKE 子串。
+
+        返回 [{id, session, ts, user_text, reply_text}]。无查询词返回 []。
+        """
+        db = self._db()
+        q = (query or "").strip()
+        if not q:
+            return []
+        if self._fts:
+            match = self._fts_query(q)
+            if match:
+                try:
+                    rows = db.execute(
+                        "SELECT turn_id, session FROM turns_fts"
+                        " WHERE turns_fts MATCH ? ORDER BY rank LIMIT ?",
+                        (match, limit)).fetchall()
+                    return self._hydrate(db, rows)
+                except sqlite3.OperationalError:
+                    pass  # 回落 LIKE
+        like = f"%{q}%"
+        rows = db.execute(
+            "SELECT id, session FROM turns WHERE user_text LIKE ? OR reply_text LIKE ?"
+            " ORDER BY id DESC LIMIT ?", (like, like, limit)).fetchall()
+        return self._hydrate(db, rows)
+
+    def delete_session(self, session_id: str) -> int:
+        """删除某会话的全部轮次(含关键词/向量/FTS)与元数据。返回删除轮次数。"""
+        db = self._db()
+        tids = [r[0] for r in db.execute(
+            "SELECT id FROM turns WHERE session=?", (session_id,)).fetchall()]
+        for tid in tids:
+            db.execute("DELETE FROM keywords WHERE turn_id=?", (tid,))
+            db.execute("DELETE FROM embeddings WHERE turn_id=?", (tid,))
+            if self._fts:
+                try:
+                    db.execute("DELETE FROM turns_fts WHERE turn_id=?", (tid,))
+                except sqlite3.OperationalError:
+                    pass
+        db.execute("DELETE FROM turns WHERE session=?", (session_id,))
+        db.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+        db.commit()
+        return len(tids)
 
     def _store_vec(self, db: sqlite3.Connection, turn_id: int, text: str) -> None:
         emb = self.embedder

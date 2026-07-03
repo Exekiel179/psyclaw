@@ -33,6 +33,69 @@ def cmd_repl(args: argparse.Namespace) -> int:
     return run_repl()
 
 
+def cmd_resume(args: argparse.Namespace) -> int:
+    """续接历史会话进入 REPL(不给 id 则续接最近一次)。"""
+    from psyclaw import ui
+    from psyclaw.recall import ContextArchive
+    from psyclaw.repl import run_repl
+    sid = getattr(args, "session_id", None)
+    if not sid:
+        rows = ContextArchive(".").list_sessions()
+        if not rows:
+            print(ui.warn("无历史会话可续接;直接 `psyclaw` 进 REPL 开新会话。"))
+            return 1
+        sid = rows[0]["id"]
+        print(ui.dim(f"未指定会话,续接最近一次:{sid}"))
+    print(_banner())
+    return run_repl(resume_id=sid)
+
+
+def cmd_session(args: argparse.Namespace) -> int:
+    """会话管理(REPL 外):list | search <词> | rename <id> <名> | delete <id>。"""
+    from psyclaw import ui
+    from psyclaw.recall import ContextArchive
+    arch = ContextArchive(".")
+    action = getattr(args, "action", None) or "list"
+    rest = getattr(args, "rest", []) or []
+    if action == "list":
+        rows = arch.list_sessions()
+        if not rows:
+            print("(无历史会话)")
+            return 0
+        print(ui.title(f"历史会话({len(rows)})"))
+        for s in rows:
+            print(f"  {s['id']:<17} {s['n_turns']:>3} 轮  更新 {s['updated']}  {s['name']}")
+        print(ui.dim("psyclaw resume <id> 续接 · psyclaw session search <词> 全文检索"))
+        return 0
+    if action == "search":
+        q = " ".join(rest)
+        hits = arch.search(q, limit=15)
+        if not hits:
+            print(f"未检索到含「{q}」的历史轮次。")
+            return 0
+        print(ui.title(f"检索「{q}」— {len(hits)} 条"))
+        for h in hits:
+            snip = h["user_text"][:70].replace("\n", " ")
+            print(f"  [{h['session']}] {snip}")
+        return 0
+    if action == "rename":
+        if len(rest) < 2:
+            print(ui.err("用法:psyclaw session rename <id> <新名>"))
+            return 1
+        arch.rename_session(rest[0], " ".join(rest[1:]))
+        print(ui.ok(f"✓ 会话 {rest[0]} 已命名:{' '.join(rest[1:])}"))
+        return 0
+    if action == "delete":
+        if not rest:
+            print(ui.err("用法:psyclaw session delete <id>"))
+            return 1
+        n = arch.delete_session(rest[0])
+        print(ui.ok(f"✓ 已删除会话 {rest[0]}(移除 {n} 轮)"))
+        return 0
+    print(ui.err(f"未知子动作:{action}(list|search|rename|delete)"))
+    return 1
+
+
 def cmd_version(args: argparse.Namespace) -> int:
     print(f"psyclaw {__version__}")
     return 0
@@ -707,7 +770,7 @@ CORE_COMMANDS = {
     "research", "review", "clarify", "lit", "export",
     "score", "scale", "jars", "cite-check", "preregister", "declare-test",
     "plan", "goal", "tasks", "memory",
-    "gates", "config", "setup", "doctor", "repl", "commands",
+    "gates", "config", "setup", "doctor", "repl", "resume", "commands",
 }
 
 # 职能分类(每个命令恰好出现一次;`psyclaw commands` 按此展示)。统计方法已外移到
@@ -722,8 +785,8 @@ COMMAND_CATEGORIES = [
     ("研究流程 / 编排回路", ["auto-loop", "loop", "lit-loop", "meta-loop",
                         "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
-    ("记忆 / 消息 / IO", ["memory", "serve", "notify", "lit", "auth", "export", "figures",
-                       "provenance"]),
+    ("记忆 / 消息 / IO", ["memory", "session", "resume", "serve", "notify", "lit", "auth",
+                       "export", "figures", "provenance"]),
 ]
 
 
@@ -794,6 +857,22 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
 
     sub.add_parser("repl", help="进入交互式 REPL（默认）").set_defaults(func=cmd_repl)
+
+    pres = sub.add_parser("resume",
+                          help="续接历史会话进入 REPL(不给 id 续接最近一次)")
+    pres.add_argument("session_id", nargs="?", default=None,
+                      help="会话 id(psyclaw session 看列表)")
+    pres.set_defaults(func=cmd_resume)
+
+    psn = sub.add_parser(
+        "session",
+        help="会话管理:list|search|rename|delete(跨会话持久化,SQLite+FTS5 全文检索)")
+    psn.add_argument("action", nargs="?", default="list",
+                     choices=["list", "search", "rename", "delete"])
+    psn.add_argument("rest", nargs="*",
+                     help="search <词> | rename <id> <名> | delete <id>")
+    psn.set_defaults(func=cmd_session)
+
     sub.add_parser("version", help="打印版本").set_defaults(func=cmd_version)
     sub.add_parser("doctor", help="环境自检（配置/MCP/Gates）").set_defaults(func=cmd_doctor)
 

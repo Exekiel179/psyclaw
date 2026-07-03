@@ -99,11 +99,11 @@
     },
     {
       "id": "feat-013",
-      "name": "会话持久化 session store (SQLite+FTS5)",
-      "description": "Hermes s03:可全文检索的跨会话对话持久化,替代当前纯内存 compact_history",
+      "name": "会话持久化 session store (SQLite+FTS5) + resume/rename",
+      "description": "可全文检索的跨会话对话持久化,替代纯内存 compact_history 跨会话丢失。在既有 recall.ContextArchive(已按 session 分轮存 SQLite + 关键词/向量召回)之上补:① sessions 元数据表(id/name/created/updated,旧库从 turns 回填)② FTS5 全文索引(unicode61;未编译 FTS5 的环境回落 LIKE 子串;回落期落库的历史轮次在 FTS 可用时惰性回填)③ 会话生命周期 API(ensure/rename/list/session_turns/search/delete)。命令:REPL slash `/sessions /resume /rename /search`(resume 把历史轮次载回 messages、续写到同一会话);顶层 `psyclaw resume [id]`(进 REPL 续接,不给 id 续接最近一次)+ `psyclaw session list|search|rename|delete`。纯 stdlib(sqlite3),不碰统计/data-raw。",
       "dependencies": ["feat-010"],
-      "status": "not-started",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/recall.py 扩展 ContextArchive(sessions 表 + _init_fts FTS5 探测/回落/回填 + record 维护会话与 FTS + ensure_session/rename_session/list_sessions/session_turns/search(FTS5 MATCH bm25 排序,回落 LIKE)/delete_session);psyclaw/repl.py ReplSession(resume_id) + _resume_session 载回历史 + /sessions //resume //rename //search slash 命令 + COMMANDS/HELP_TEXT;psyclaw/cli.py cmd_resume/cmd_session + resume/session 顶层命令(catalog 归『记忆/消息/IO』,names==catalogued 通过)。tests/test_session_store.py 11 例(建会话/幂等/改名/计数/顺序/FTS 检索中英词/LIKE 回落/空查询/删除/FTS 回填/旧库 sessions 回填)。本机 sqlite 3.50.4 FTS5 可用。全量 C:\\Python314 pytest 1062 passed;CLI end-to-end:seed 两会话 → session list/search 焦虑(FTS5 命中)/rename 均正确。"
     },
     {
       "id": "feat-014",

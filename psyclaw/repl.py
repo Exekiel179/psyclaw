@@ -54,6 +54,10 @@ COMMANDS = {
     "/research-loop": "通用 HITL 回路(planner→executor→critic)",
     "/review": "审稿模拟(EIC+3审稿人+DA;--revise 回灌修复环)",
     "/lit": "文献检索(M2+)",
+    "/sessions": "列出历史会话(跨会话持久化)",
+    "/resume": "续接历史会话(/resume <id>)",
+    "/rename": "给当前会话改名(/rename <新名>)",
+    "/search": "全文检索历史对话(/search <词>)",
     "/exit": "退出",
 }
 
@@ -74,7 +78,7 @@ def _build_system_prompt() -> str:
 
 
 class ReplSession:
-    def __init__(self) -> None:
+    def __init__(self, resume_id: str | None = None) -> None:
         self.conf = cfg.load_config()
         self.provider = get_provider(self.conf)
         self.system = _build_system_prompt()
@@ -86,8 +90,28 @@ class ReplSession:
         self.session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         from psyclaw.recall import ContextArchive
         self.archive = ContextArchive(".")   # 全量上下文库(SQLite,懒建)
+        self.resume_id = resume_id           # 启动时续接的会话(feat-013)
         self.chars_in = 0
         self.chars_out = 0
+
+    # -- 会话续接(feat-013)-------------------------------------------------
+    def _resume_session(self, sid: str) -> bool:
+        """把某历史会话的轮次载回 messages,后续对话续写到同一会话。"""
+        try:
+            turns = self.archive.session_turns(sid)
+        except Exception:  # noqa: BLE001  # 库异常不阻塞 REPL
+            turns = []
+        if not turns:
+            print(ui.warn(f"  未找到会话 {sid},开新会话。"))
+            return False
+        self.session_id = sid
+        for t in turns:
+            self.messages.append({"role": "user", "content": t["user_text"]})
+            self.messages.append({"role": "assistant", "content": t["reply_text"]})
+        from psyclaw.context import compact_history
+        self.messages, self.memo = compact_history(self.messages, self.memo)
+        print(ui.ok(f"  ⟳ 续接会话 {sid}(载入 {len(turns)} 轮,新对话续写到此会话)"))
+        return True
 
     # -- 文件引用 ----------------------------------------------------------
     def _expand_files(self, text: str) -> str:
@@ -344,12 +368,65 @@ class ReplSession:
         elif cmd == "/lit":
             from psyclaw.psych.lit_cli import lit_cli_argv
             lit_cli_argv(arg.split() if arg else [])
+        elif cmd == "/sessions":
+            self._cmd_sessions()
+        elif cmd == "/resume":
+            self._cmd_resume(arg)
+        elif cmd == "/rename":
+            self._cmd_rename(arg)
+        elif cmd == "/search":
+            self._cmd_search(arg)
         else:
             print(f"  未知命令 {cmd},输入 /help 查看可用命令")
         return True
 
+    # -- 会话管理 slash 命令(feat-013)------------------------------------
+    def _cmd_sessions(self) -> None:
+        rows = self.archive.list_sessions()
+        if not rows:
+            print("  (无历史会话)")
+            return
+        print(ui.accent("  历史会话(最近在前):"))
+        for s in rows:
+            cur = ui.ok("  ← 当前") if s["id"] == self.session_id else ""
+            print(f"    {s['id']:<17} {s['n_turns']:>3} 轮  {s['name']}{cur}")
+        print(ui.dim("  /resume <id> 续接 · /rename <新名> 命名当前 · /search <词> 全文检索"))
+
+    def _cmd_resume(self, arg: str) -> None:
+        sid = arg.strip()
+        if not sid:
+            print("  用法:/resume <会话id>(/sessions 看列表)")
+            return
+        self.messages.clear()
+        self.memo = ""
+        self._resume_session(sid)
+
+    def _cmd_rename(self, arg: str) -> None:
+        name = arg.strip()
+        if not name:
+            print("  用法:/rename <新名称>(重命名当前会话)")
+            return
+        self.archive.rename_session(self.session_id, name)
+        print(ui.ok(f"  ✓ 当前会话已命名:{name}"))
+
+    def _cmd_search(self, arg: str) -> None:
+        q = arg.strip()
+        if not q:
+            print("  用法:/search <关键词>(跨会话全文检索)")
+            return
+        hits = self.archive.search(q, limit=8)
+        if not hits:
+            print(f"  未检索到含「{q}」的历史轮次。")
+            return
+        print(ui.accent(f"  检索到 {len(hits)} 条:"))
+        for h in hits:
+            snippet = h["user_text"][:60].replace("\n", " ")
+            print(f"    [{h['session']}] {snippet}")
+
     # -- 主循环 --------------------------------------------------------------
     def run(self) -> int:
+        if self.resume_id:
+            self._resume_session(self.resume_id)
         print("  " + ui.accent("⚙ provider ") + self.provider.describe())
         print("  " + ui.dim("输入 / 弹出命令联想(↑↓选择 Tab补全) · /exit 退出 · @<文件> 引用") + "\n")
         while True:
@@ -393,6 +470,8 @@ HELP_TEXT = """\
   /export f   APA7 输出(Word + Markdown,确定性模板)
   /review f   审稿模拟(EIC+3审稿人+DA;--revise 闭合写作→评审→修复)
   /memory     三层记忆(画像/决策惯性/教训卡)
+  /sessions   历史会话列表       /resume <id>   续接历史会话
+  /rename <名> 命名当前会话       /search <词>   跨会话全文检索
   /clear      清空上下文         /compact       压缩上下文
   /config     配置向导           /exit          退出
   /research [t]    一句话研究编排:文献→设计→写作→评审→总验收(--revise 闭环)
@@ -400,5 +479,5 @@ HELP_TEXT = """\
   /lit [q] [-s]    文献检索(合法 OA;-s 据真实命中一键合成结构化综述)"""
 
 
-def run_repl() -> int:
-    return ReplSession().run()
+def run_repl(resume_id: str | None = None) -> int:
+    return ReplSession(resume_id=resume_id).run()
