@@ -181,8 +181,10 @@ def render_memo(memo: str) -> str:
 # ---------------------------------------------------------------------------
 
 def smart_excerpt(path: Path) -> str:
-    """文件 → 上下文友好的摘录。CSV 给结构,文本给头尾。"""
+    """文件 → 上下文友好的摘录。CSV 给结构,PDF 抽正文,文本给头尾。"""
     suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return _pdf_excerpt(path)
     try:
         if suffix in (".csv", ".tsv"):
             return _csv_excerpt(path)
@@ -196,6 +198,16 @@ def smart_excerpt(path: Path) -> str:
     return (f"<file path={path} chars={len(text)} excerpt=head+tail>\n"
             f"{head}\n…(中部省略 {len(text) - FILE_EXCERPT_CHARS} 字符,"
             f"需全文请用工具直接读)…\n{tail}\n</file>")
+
+
+def _pdf_excerpt(path: Path) -> str:
+    """PDF → 抽取正文摘录;抽不到则给诚实提示(绝不注入二进制乱码)。"""
+    from psyclaw.pdf_extract import extract_pdf_text
+    res = extract_pdf_text(path)
+    if res["ok"]:
+        return (f"<pdf path={path} 抽取={res['method']}>\n"
+                f"{res['text']}\n</pdf>")
+    return (f"<pdf path={path} 抽取失败>\n{res['note']}\n</pdf>")
 
 
 def _csv_excerpt(path: Path) -> str:

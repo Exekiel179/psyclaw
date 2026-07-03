@@ -161,6 +161,14 @@
       "dependencies": ["feat-014", "feat-018"],
       "status": "done",
       "evidence": "psyclaw/autoloop.py:新增 skill_hints(action, project_dir, skills, top_k) 薄封装 recommend_skills(external_only,失败返回 [])+ _print_sense(增 project_dir 参数,一次性预取 list_skills 池,每个非 blocker 待办打印『↳ 相关技能包:…』)+ run_autoloop 传 project_dir;tests/test_autoloop.py +3 例(action 类型匹配、无匹配/空池空、bundled-only 不推)共 36 例;全量 C:\\Python314 pytest 1065 passed;离线 end-to-end:seed .claude/skills 装 forge-meta/forge-analysis + 数据表 scores.csv → 感知阶段在 analysis-loop 待办下列出 forge-analysis 等相关技能包。"
+    },
+    {
+      "id": "feat-021",
+      "name": "PDF 正文抽取(读本地论文 PDF)",
+      "description": "修复用户实测痛点:REPL 引用/自动检测到本地 .pdf 时,旧代码把 PDF 当文本 read_text → 塞给 LLM 的是二进制乱码(PDF 头尾 + zlib 压缩流),LLM 只能说读不了。新增 pdf_extract:三级 best-effort 抽取——① 可选库 pypdf/pdfplumber(装了效果最好,正确处理字体编码,非硬依赖)② 纯 stdlib 兜底(zlib 解 FlateDecode 流 + 手写扫描器抽文本操作符,平衡括号 + 转义)③ 质量门(抽出不像正文=扫描件/加密/CID 字体 → 诚实返回提示装 pypdf 或粘贴文本/OCR,绝不注入乱码)。经 smart_excerpt 的 .pdf 分支接入,@file 与自动路径检测两条路都覆盖。只读、不碰统计。",
+      "dependencies": ["feat-010"],
+      "status": "done",
+      "evidence": "psyclaw/pdf_extract.py(extract_pdf_text/_via_lib/_via_stdlib/_read_literal 平衡括号扫描/_decode_literal(转义+八进制)/_decode_hex/_bytes_to_str(UTF-16BE BOM/latin-1)/_looks_like_text 质量门)+ psyclaw/context.py smart_excerpt 增 .pdf → _pdf_excerpt 分支(ok→<pdf>正文,失败→诚实 note);tests/test_pdf_extract.py 8 例(未压缩/FlateDecode/非PDF拒/无文本诚实提示/质量门/截断/smart_excerpt 路由不泄二进制/失败给提示);修复关键缺陷:字面量正则不支持嵌套括号(如 (p < .05))→ 改手写深度扫描;全量 C:\\Python314 pytest 1073 passed;本机 pypdf+pdfplumber 均可用(用户实跑将走高质量抽取)。"
     }
   ]
 }
