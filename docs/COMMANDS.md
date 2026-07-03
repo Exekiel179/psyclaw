@@ -8,7 +8,7 @@
 
 ---
 
-## 命令总览(37 条)
+## 命令总览(39 条)
 
 ### 环境 / 系统
 | 命令 | 作用 |
@@ -73,6 +73,8 @@
 | 命令 | 作用 |
 |---|---|
 | `memory [...]` | 三层记忆(画像/决策惯性/教训卡) |
+| `session [list\|search\|rename\|delete]` | 会话持久化管理:跨会话对话存 SQLite,FTS5 全文检索(无 FTS5 回落 LIKE) |
+| `resume [id]` | 续接历史会话进入 REPL(不给 id 续接最近一次;REPL 内亦有 `/sessions //resume //rename //search`) |
 | `serve <channel>` | 对接消息端(telegram / wechat 双向 bot) |
 | `notify <msg>` | 推送通知(企业微信 webhook / Telegram) |
 | `lit [query]` | 文献检索 + 合法 OA 全文(PRISMA 计数;`-s` 一键合成综述) |
