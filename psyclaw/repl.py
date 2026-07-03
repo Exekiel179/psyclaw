@@ -4,11 +4,14 @@
 - 自然语言对话(流式输出,注入 PSYCLAW.md 学术规范作为 system 提示)
 - slash 命令:/help /model /skills /mcp /gates /scale /clear /compact /cost /config /exit
 - @<file> 文件引用:把数据/文稿拉进上下文
+- **天然保存文件**:直接说「存到 X」即可——模型用 ```save 块输出,ask() 自动落盘
+  (护栏:绝不写 data/raw、覆盖前确认;对齐 _capture_plan 的「解析回复→写盘」套路,provider 无关)
 - 会话历史与粗略成本统计
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -62,6 +65,58 @@ COMMANDS = {
 }
 
 
+# 「天然」保存文件:提示模型用约定块输出,REPL 每轮自动扫描并落盘(对齐 _capture_plan 套路)。
+_SAVE_SYSTEM = (
+    "\n# 保存文件(天然支持)\n用户要求把内容保存/导出到某个文件时,**不要说你无法创建文件**。"
+    "改为在回复里用下面的块输出,PsyClaw 会自动写盘(会确认覆盖、**绝不写受保护的 data/raw**):\n"
+    "```save path=<文件路径>\n<文件的完整内容>\n```\n"
+    "可给多个 save 块;块外照常写说明。用户没明确要求保存时,不要滥用此块。")
+
+_SAVE_RE = re.compile(
+    r"```save[ :]+(?:path=)?(?P<path>[^\n`]+)\r?\n(?P<body>.*?)```", re.S)
+
+
+def parse_save_blocks(reply: str) -> list[dict]:
+    """从模型回复解析 ```save path=… 块 → [{path, content}]。纯函数,可单测。"""
+    out: list[dict] = []
+    for m in _SAVE_RE.finditer(reply or ""):
+        path = m.group("path").strip().strip("\"'` ")
+        body = m.group("body")
+        if body.endswith("\r\n"):
+            body = body[:-2]
+        elif body.endswith("\n"):
+            body = body[:-1]
+        if path:
+            out.append({"path": path, "content": body})
+    return out
+
+
+def _save_is_protected(p: Path) -> bool:
+    """目标是否落在受保护的 data/raw 下(绝不写,守铁律)。"""
+    parts = [x.lower() for x in p.parts]
+    return "raw" in parts and "data" in parts
+
+
+def apply_save_block(blk: dict, confirm=None) -> dict:
+    """写一个 save 块。护栏:拒 data/raw;文件已存在需 confirm(path)→True 才覆盖。
+
+    返回 {status, path, ...}。status ∈ {saved, refused-raw, skipped-exists, error}。
+    confirm 缺省(None)视为**不覆盖**(fail-safe:非交互不静默 clobber)。
+    """
+    p = Path(blk["path"]).expanduser()
+    if _save_is_protected(p):
+        return {"status": "refused-raw", "path": str(p)}
+    if p.exists():
+        if not (confirm and confirm(p)):
+            return {"status": "skipped-exists", "path": str(p)}
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(blk["content"], encoding="utf-8")
+        return {"status": "saved", "path": str(p), "chars": len(blk["content"])}
+    except OSError as exc:
+        return {"status": "error", "path": str(p), "error": str(exc)}
+
+
 def _build_system_prompt() -> str:
     """瘦核心系统提示(长上下文优化:知识库改为按消息动态注入)。"""
     from psyclaw.context import lean_core
@@ -70,6 +125,7 @@ def _build_system_prompt() -> str:
         "\n# 强制澄清规则\n任何研究开工前必须完成澄清卡(17 槽位,/clarify)。"
         "用户提出研究想法时,你的第一动作是 grill-me 式逐项澄清(一次一个问题,"
         "带推荐答案),而不是直接给方案。设计决策必须给文献背书(/cite 查背书库)。")
+    parts.append(_SAVE_SYSTEM)
     from psyclaw.memory import memory_prompt
     mem = memory_prompt()
     if mem:
@@ -185,6 +241,7 @@ class ReplSession:
         self.chars_out += len(reply)
         if self.plan_mode:
             self._capture_plan(reply)
+        self._capture_saves(reply)   # 「天然」落盘:扫描 ```save 块并写文件(带护栏)
         # 全量储存本轮上下文(写入失败不阻塞对话)
         try:
             self.archive.record(self.session_id, text, reply)
@@ -195,6 +252,31 @@ class ReplSession:
             from psyclaw.audit import render_verdict, run_audit
             result = run_audit(self.provider, text, reply)
             print(render_verdict(result))
+
+    def _capture_saves(self, reply: str) -> None:
+        """扫描回复里的 ```save 块并写盘(护栏:拒 data/raw、覆盖前交互确认)。"""
+        blocks = parse_save_blocks(reply)
+        if not blocks:
+            return
+        from psyclaw.loop import _ask_yn
+
+        def _confirm(p: Path) -> bool:
+            try:
+                return _ask_yn(f"  文件已存在,覆盖 {p}?")
+            except Exception:  # noqa: BLE001  # 非 TTY/EOF → 不覆盖
+                return False
+
+        for blk in blocks:
+            r = apply_save_block(blk, confirm=_confirm)
+            st = r["status"]
+            if st == "saved":
+                print(ui.ok(f"  ✓ 已保存 {r['path']}({r['chars']} 字符)"))
+            elif st == "refused-raw":
+                print(ui.err(f"  ✗ 拒绝写入受保护的 data/raw:{r['path']}"))
+            elif st == "skipped-exists":
+                print(ui.dim(f"  已跳过(未覆盖):{r['path']}"))
+            else:
+                print(ui.err(f"  ✗ 写入失败 {r['path']}:{r.get('error')}"))
 
     def _capture_plan(self, reply: str) -> None:
         """规划模式产物落盘:存 notes/plan.md 并自动抽任务(auto-write task)。"""

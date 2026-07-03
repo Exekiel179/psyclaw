@@ -180,6 +180,14 @@
       "notes": "web/MCP 源为后续扩展点(core 不内置通用网页检索)。"
     },
     {
+      "id": "feat-024",
+      "name": "「天然」保存文件(REPL 无需命令即可落盘)",
+      "description": "解决用户实测:PsyClaw REPL 是纯对话循环,LLM 没有写文件的动作通道,只能punt『我无法创建文件』让用户复制粘贴。不引入 function-calling 架构(重、依赖 provider、安全升级),改用**提示约定 + 自动落盘**:系统提示告诉模型『要保存文件时用 ```save path=… 块输出内容』,ask() 每轮自动扫描回复里的 save 块并写盘——完全对齐既有 _capture_plan『解析模型回复→写 notes/plan.md』的套路,provider 无关(不需 function-calling API)。用户只需自然地说『存到 method.txt』。护栏守铁律:**绝不写受保护的 data/raw**、目标已存在**覆盖前交互确认**、非交互(非 TTY)不静默 clobber、写完回报路径与字符数。",
+      "dependencies": ["feat-010"],
+      "status": "done",
+      "evidence": "psyclaw/repl.py:parse_save_blocks(纯函数,正则解析 ```save path=… 块,支持 path=/裸路径/带引号/Windows 反斜杠路径/多块/剥尾换行)+ _save_is_protected(data/raw 守卫)+ apply_save_block(护栏写盘,status∈{saved,refused-raw,skipped-exists,error};confirm(path)→True 才覆盖,缺省不覆盖)+ _capture_saves(方法,覆盖走 loop._ask_yn,非 TTY fail-safe 不覆盖)+ _SAVE_SYSTEM 注入 _build_system_prompt + ask() 每轮调用;tests/test_repl_save.py 9 例(解析单/多/裸/引号/Windows 路径/无块 + data/raw 拒 + 新建 + 存在跳过 + 确认覆盖);全量 C:\\Python314 pytest 1102 passed;end-to-end:含 ```save 块的模型回复 → 自动写出 method.txt(研究1+权限管理内容)。"
+    },
+    {
       "id": "feat-023",
       "name": "带引用的轻量知识图谱 kg(边由构造即带引用)",
       "description": "SQLite nodes/edges 知识图谱(stdlib,无 Neo4j),把研究里的构念/论文/人物/机构/技术串起来帮 Agent 理解全貌。核心纪律=**边必带来源**:add_edge 拒绝无 source_ref 的边(反幻觉关系);verify 复用 feat-015 cite-check 的 _canon_key 规范化,核对每条 citation 边的来源是否真在检索语料(notes/evidence_map.json 允许键),溯源不到=孤儿=疑似杜撰关系。主题范围非全局:seed_from_evidence_map 从既有 evidence_map(构念×支持文献)直接种出天然带引用的图。基础实体消歧(归一名+类型去重);ego 子图 BFS + mermaid 渲染(边标来源)。存 .psyclaw/kg/graph.db。psyclaw kg seed|show <实体>|verify|stats。",
