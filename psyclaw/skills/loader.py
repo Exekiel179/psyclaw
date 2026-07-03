@@ -52,7 +52,7 @@ def external_skill_roots(project_dir: str = ".") -> list[Path]:
     return out
 
 
-def _read_skill(skill_md: Path, source: str) -> dict:
+def _read_skill(skill_md: Path, source: str, scope: str = "builtin") -> dict:
     try:
         # errors="replace":第三方技能包可能含非法 UTF-8,不能让一个坏文件炸掉整份 skills 列表。
         meta = _parse_frontmatter(skill_md.read_text(encoding="utf-8", errors="replace"))
@@ -63,8 +63,26 @@ def _read_skill(skill_md: Path, source: str) -> dict:
         "category": meta.get("category", "domain"),
         "description": meta.get("description", ""),
         "source": source,
+        "scope": scope,       # builtin | project | global | custom(PSYCLAW_SKILLS_PATH)
         "path": str(skill_md),
     }
+
+
+def _root_scope(root: Path, project_dir: str) -> str:
+    """外部技能根归类:项目下=project,家目录下=global,其余(env 自定义)=custom。
+
+    用 ``is_relative_to``(路径组件级)而非字符串前缀——否则 ``F:/proj-data`` 会被
+    误判成在 ``F:/proj`` 里。
+    """
+    try:
+        r = root.resolve()
+        if r.is_relative_to(Path(project_dir).resolve()):
+            return "project"
+        if r.is_relative_to(Path.home().resolve()):
+            return "global"
+    except OSError:
+        pass
+    return "custom"
 
 
 def list_skills(project_dir: str = ".", include_external: bool = True) -> list[dict]:
@@ -77,18 +95,19 @@ def list_skills(project_dir: str = ".", include_external: bool = True) -> list[d
     seen: set[str] = set()
 
     for skill_md in sorted(SKILLS_DIR.glob("*/SKILL.md")):
-        s = _read_skill(skill_md, "bundled")
+        s = _read_skill(skill_md, "bundled", scope="builtin")
         if s["name"] not in seen:
             seen.add(s["name"])
             out.append(s)
 
     if include_external:
         for root in external_skill_roots(project_dir):
+            scope = _root_scope(root, project_dir)
             found: list[Path] = []
             found += sorted(root.glob("*/SKILL.md"))
             found += sorted(root.glob("*/*/SKILL.md"))
             for skill_md in found:
-                s = _read_skill(skill_md, str(root))
+                s = _read_skill(skill_md, str(root), scope=scope)
                 if s["name"] not in seen:
                     seen.add(s["name"])
                     out.append(s)

@@ -62,6 +62,33 @@ def is_optional(entry: dict) -> bool:
     return entry.get("origin", "builtin") in OPTIONAL_ORIGINS
 
 
+def user_registries(project_dir: str = ".") -> list[tuple[Path, str]]:
+    """用户级 MCP 目录(同 registry.yaml 格式):项目 .psyclaw/mcp.yaml + 全局 ~/.psyclaw/mcp.yaml。"""
+    cands = [(Path(project_dir) / ".psyclaw" / "mcp.yaml", "project"),
+             (Path.home() / ".psyclaw" / "mcp.yaml", "global")]
+    return [(p, scope) for p, scope in cands if p.is_file()]
+
+
+def _all_entries(project_dir: str = ".") -> list:
+    """内置 registry + 用户目录合并(带 _scope;同名内置优先,用户重复项忽略)。"""
+    entries: list = []
+    seen: set[str] = set()
+    for s in _parse_registry(REGISTRY):
+        s["_scope"] = "builtin"
+        seen.add(s.get("name", "?"))
+        entries.append(s)
+    for path, scope in user_registries(project_dir):
+        for s in _parse_registry(path):
+            name = s.get("name", "?")
+            if name in seen:
+                continue          # 内置优先,用户不得覆盖同名内置定义
+            s["_scope"] = scope
+            s.setdefault("origin", "user")
+            seen.add(name)
+            entries.append(s)
+    return entries
+
+
 def _is_enabled(enable_when: str) -> bool:
     if enable_when == "always":
         return True
@@ -111,15 +138,16 @@ def health_check(entry: dict) -> dict:
     return {"ok": True, "detail": "就绪", "optional": optional}
 
 
-def list_mcp_catalog() -> list:
-    """读取目录并标注每个 MCP 当前是否满足启用条件（含 origin 归属字段）。"""
+def list_mcp_catalog(project_dir: str = ".") -> list:
+    """读取目录(内置 + 用户 项目/全局)并标注启用条件与 origin/scope 归属。"""
     out = []
-    for s in _parse_registry(REGISTRY):
+    for s in _all_entries(project_dir):
         ew = s.get("enable_when", "always")
         out.append({
             "name": s.get("name", "?"),
             "category": s.get("category", "?"),
             "origin": s.get("origin", "builtin"),
+            "scope": s.get("_scope", "builtin"),
             "enable_when": ew,
             "enabled": _is_enabled(ew),
             "provides": s.get("provides", ""),
@@ -129,10 +157,10 @@ def list_mcp_catalog() -> list:
     return out
 
 
-def list_mcp_catalog_with_health() -> list:
-    """读取目录并包含实时健康检查结果（含 origin 归属字段）。"""
+def list_mcp_catalog_with_health(project_dir: str = ".") -> list:
+    """读取目录(内置 + 用户)并包含实时健康检查结果(含 origin/scope 归属字段)。"""
     out = []
-    for s in _parse_registry(REGISTRY):
+    for s in _all_entries(project_dir):
         ew = s.get("enable_when", "always")
         enabled = _is_enabled(ew)
         h = health_check(s)
@@ -140,6 +168,7 @@ def list_mcp_catalog_with_health() -> list:
             "name": s.get("name", "?"),
             "category": s.get("category", "?"),
             "origin": s.get("origin", "builtin"),
+            "scope": s.get("_scope", "builtin"),
             "enable_when": ew,
             "enabled": enabled,
             "provides": s.get("provides", ""),

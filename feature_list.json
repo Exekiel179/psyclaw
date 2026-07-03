@@ -205,6 +205,22 @@
       "evidence": "psyclaw/status.py(collect_status 纯采集各块独立 fail-safe + print_status)+ psyclaw/project_sense.py(scan_tree 有界/render_tree 折叠计数/project_brief ≤1500字符)+ repl.py ask() 注入 brief + toolloop build_tools 加 list_dir + workflows/engine.py run_workflow(skip_gates)+_record_gate_skip 留痕+summary.gates_skipped/exploratory + autoloop discover_backlog(skip_clarify)/_dispatch/run_autoloop(skip_gates)+ cli.py status/check 命令 + 5 个 loop --skip-gates + guide 决策树 + session 帮助改写(names==catalogued 通过,命令 44 条);tests/test_status_sense.py 10 + test_gate_skip.py 4 + test_checkup.py 6;全量 C:\\Python314 pytest 1135 passed;end-to-end:status 直接亮出 clarify blocker 与建议、check 抓出 JARS 缺项+杜撰引用 Ghost(2099)、guide 出默认三条路径、data/raw 文件名未泄入目录树。"
     },
     {
+      "id": "feat-027",
+      "name": "REPL 交互升级:键盘选择器 + 文件读取权限(open/safe)+ 会话名可见",
+      "description": "三个用户实测痛点:① 模型列复选清单『• [ ] 研究1a…』但 REPL 不支持键盘选择 → psyclaw/choices.py:模型输出 ```choices JSON 块(system 约定)或自发复选清单(启发式,≥2 条)→ 弹键盘选择器(prompt_toolkit 对话框方向键+空格勾选 → 编号输入兜底 → 非 TTY 不弹),选完自动回传续聊;② 模型说『我无法读取CSV』要用户 @ 引用 → 文件读取权限模式:open(默认)=模型输出 ```read 块 REPL 自动读取注入(smart_excerpt:CSV 结构+样例行/PDF 抽正文;data/raw 恒拒;每轮≤4 文件;自动跟进深度≤3 防打转),safe(/safemode)=一切读取须 @ 显式引用;③ /rename 后看不出改了名 → 会话名进提示符(psyclaw·名字 ❯),plan/agent/safe 模式同显,resume 带回名字。",
+      "dependencies": ["feat-010", "feat-013", "feat-021"],
+      "status": "done",
+      "evidence": "psyclaw/choices.py(parse_choices 块+复选启发式/resolve_selection 编号·全部·原文·取消/format_selection_message/pick_interactive 三级降级)+ repl.py(_CHOICES_SYSTEM/_READ_OPEN_SYSTEM/_READ_SAFE_SYSTEM 动态注入 + parse_read_requests/gather_read_results 纯函数 + _auto_followup 读取→选择→自动回传(深度上限)+ /safemode + session_name 进提示符);tests/test_choices_reads.py 12 例(含用户实测的 • [ ] 格式、data/raw 拒读内容不泄、文件数上限);全量 C:\\Python314 pytest 1154 passed。"
+    },
+    {
+      "id": "feat-028",
+      "name": "插件系统 + skill/MCP/plugins 统一 内置/用户(项目/全局)scope",
+      "description": "① 插件系统(用户要求):放 <项目>/.psyclaw/plugins/*.py 或 ~/.psyclaw/plugins/*.py,暴露 register(api)——api.add_tool(进 agent 工具循环,side_effect 照走批准门)/add_command(进 REPL slash+补全联想)/add_system(追加 system 提示)。每个插件独立 fail-safe 加载(坏插件不拖垮宿主,错误可见);内置同名优先不被劫持。psyclaw plugins + REPL /plugins 列出。② 统一 scope(用户要求):skills(builtin/project/global/custom,按根目录 is_relative_to 归类——修了字符串前缀误判 F:/proj-data∈F:/proj 的真 bug)、MCP(内置 registry.yaml + 用户 .psyclaw/mcp.yaml 项目/全局合并,内置优先防劫持)、plugins(项目/全局),三处列表均标注 内置/用户·项目/用户·全局。",
+      "dependencies": ["feat-017", "feat-025"],
+      "status": "done",
+      "evidence": "psyclaw/plugins.py(PluginApi/PluginRegistry/plugin_dirs 项目优先/load_plugins 逐插件隔离/merge_plugin_tools 内置优先)+ toolloop.build_tools 并入插件工具 + repl.py(__init__ 加载/系统片段注入/插件 slash 分发+补全/ /plugins)+ cli.py plugins 命令 + cmd_skills/cmd_mcp 标 scope + skills/loader.py _root_scope(is_relative_to)+ mcp/manager.py user_registries/_all_entries(catalog 45 条,names==catalogued 通过);tests/test_plugins_scope.py 8 例(注册三扩展点/坏插件隔离/缺 register/下划线跳过/内置不被劫持/build_tools 并入/skills scope/McP 用户注册表 scope+同名内置优先);全量 C:\\Python314 pytest 1154 passed;e2e:项目插件 lab.py → psyclaw plugins 列出[用户·项目]+工具+命令。"
+    },
+    {
       "id": "feat-023",
       "name": "带引用的轻量知识图谱 kg(边由构造即带引用)",
       "description": "SQLite nodes/edges 知识图谱(stdlib,无 Neo4j),把研究里的构念/论文/人物/机构/技术串起来帮 Agent 理解全貌。核心纪律=**边必带来源**:add_edge 拒绝无 source_ref 的边(反幻觉关系);verify 复用 feat-015 cite-check 的 _canon_key 规范化,核对每条 citation 边的来源是否真在检索语料(notes/evidence_map.json 允许键),溯源不到=孤儿=疑似杜撰关系。主题范围非全局:seed_from_evidence_map 从既有 evidence_map(构念×支持文献)直接种出天然带引用的图。基础实体消歧(归一名+类型去重);ego 子图 BFS + mermaid 渲染(边标来源)。存 .psyclaw/kg/graph.db。psyclaw kg seed|show <实体>|verify|stats。",
