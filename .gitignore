@@ -27,3 +27,6 @@ key.md
 .vscode/
 .idea/
 .DS_Store
+
+# 内置 skill 的上游同步产物(skills --sync 克隆,含上游自己的测试,不入库)
+psyclaw/skills/*/upstream/

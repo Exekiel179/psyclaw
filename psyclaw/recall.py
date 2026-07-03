@@ -231,7 +231,11 @@ class ContextArchive:
                         "SELECT turn_id, session FROM turns_fts"
                         " WHERE turns_fts MATCH ? ORDER BY rank LIMIT ?",
                         (match, limit)).fetchall()
-                    return self._hydrate(db, rows)
+                    hits = self._hydrate(db, rows)
+                    if hits:
+                        return hits
+                    # FTS 零命中 → 继续走 LIKE(评审修复:unicode61 把连续中文当一个
+                    # token,「量表」这类子串在 FTS 永远不命中;不能让空结果压住兜底)
                 except sqlite3.OperationalError:
                     pass  # 回落 LIKE
         like = f"%{q}%"

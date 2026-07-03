@@ -29,3 +29,6 @@ psyclaw = "psyclaw.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["psyclaw*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

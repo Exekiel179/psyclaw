@@ -28,7 +28,6 @@ def _banner() -> str:
 # --------------------------------------------------------------------------
 
 def cmd_repl(args: argparse.Namespace) -> int:
-    print(_banner())
     from psyclaw.repl import run_repl
     return run_repl()
 
@@ -210,6 +209,9 @@ def cmd_kg(args: argparse.Namespace) -> int:
         v = kg.verify(".")
         print(ui.title("KG 关系溯源核验")
               + ui.dim(f"  语料:{v['corpus_source'] or '(无)'}"))
+        if v.get("manual_review"):
+            print(ui.warn(f"  ⚠ {v.get('note', '无检索语料,需人工核')}"))
+            return 0
         print(f"  citation 边 {v['citation_edges']} · 溯源命中 {v['grounded']}"
               f" · 孤儿 {len(v['orphans'])}")
         for o in v["orphans"]:
@@ -953,25 +955,25 @@ COMMAND_CATEGORIES = [
 def cmd_guide(args: argparse.Namespace) -> int:
     """首次使用上手:一条默认路径 + 决策树(不再把 8 个入口的选择题抛给用户)。"""
     from psyclaw import __version__, ui
-    print(ui.title(f"PsyClaw v{__version__} — 心理学研究编排 harness"))
-    print(ui.dim("把研究全流程编排起来(澄清→文献→设计→写作→评审→门禁);"
-                 "统计计算交给外部库/MCP,本体不内置统计。\n"))
-
-    print(ui.accent("默认路径(90% 场景只需这三条)"))
-    print("  1. " + ui.ok("psyclaw status") + ui.dim("      看项目态势:进度/被什么拦着/下一步建议"))
-    print("  2. " + ui.ok("psyclaw auto-loop") + ui.dim("   一键推进:自动发现该做什么→派发→独立验收"))
-    print(ui.dim("     (澄清等门禁拦你、你又想先试试 → 加 --skip-gates 显式跳过,产出标探索性)"))
-    print("  3. " + ui.ok("psyclaw check 稿件.md") + ui.dim(" 投稿前一键质检(JARS/引用保真/复现溯源)"))
-    print()
-
-    print(ui.accent("按需分支(auto-loop 会自己路由;想手动点名才用)"))
-    print(ui.dim("  只想搜/问点东西      → psyclaw search \"问题\"(自动路由学术库/本地)/ 或直接 psyclaw 进 REPL 聊"))
-    print(ui.dim("  明确要做某类研究     → lit-loop 综述 · analysis-loop 实证 · meta-loop 元分析 · qual-loop 质性"))
-    print(ui.dim("  要模型自主用工具     → psyclaw agent \"任务\"(REPL 内 /agent)"))
-    print(ui.dim("  正式开工前          → clarify 澄清(17 槽位)· setup 铺项目 · preregister 预注册"))
-    print()
-    print(ui.dim("全部命令:psyclaw commands   ·   配置 LLM:psyclaw config   ·   自检:psyclaw doctor"))
-    print(ui.accent("手把手教程") + ui.dim("(从零到第一篇过门禁的稿子):docs/TUTORIAL.md"))
+    print(ui.startup(__version__))
+    print(ui.panel("Default Path",
+                   "\n".join([
+                       ui.ok("1. psyclaw status") + ui.dim("      看项目态势:进度/阻塞/下一步"),
+                       ui.ok("2. psyclaw auto-loop") + ui.dim("   自动发现待办 -> 派发流程 -> 独立验收"),
+                       ui.ok("3. psyclaw check 稿件.md") + ui.dim(" 投稿前质检:JARS/引用/复现/溯源"),
+                   ]),
+                   color="brmagenta"))
+    print(ui.panel("Manual Routes",
+                   "\n".join([
+                       "search \"问题\"      " + ui.dim("学术库/本地会话自动路由"),
+                       "lit-loop <主题>     " + ui.dim("文献综述 / 系统综述"),
+                       "analysis-loop data  " + ui.dim("实证分析规划 + 外部统计脚本"),
+                       "meta-loop effects   " + ui.dim("元分析脚本 + 报告"),
+                       "qual-loop transcripts " + ui.dim("质性主题分析 + COREQ"),
+                   ]),
+                   color="brcyan"))
+    print(ui.dim("配置: psyclaw config   自检: psyclaw doctor   全部命令: psyclaw commands"))
+    print(ui.dim("教程: docs/TUTORIAL.md"))
     return 0
 
 
@@ -1010,7 +1012,7 @@ def cmd_commands(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="psyclaw",
-        description="心理学研究全流程 Agent CLI（文献·设计·统计·写作，规范门禁内置）",
+        description="心理学研究编排工作台（澄清·文献·设计·写作·评审·门禁）",
         epilog="第一次用?运行  psyclaw guide （上手介绍）。分类清单  psyclaw commands ；任意命令加 -h 看参数。",
     )
     p.add_argument("-v", "--version", action="store_true", help="打印版本")

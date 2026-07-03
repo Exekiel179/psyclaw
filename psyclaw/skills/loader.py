@@ -62,6 +62,7 @@ def _read_skill(skill_md: Path, source: str, scope: str = "builtin") -> dict:
         "name": meta.get("name", skill_md.parent.name),
         "category": meta.get("category", "domain"),
         "description": meta.get("description", ""),
+        "status": meta.get("status", "active"),
         "source": source,
         "scope": scope,       # builtin | project | global | custom(PSYCLAW_SKILLS_PATH)
         "path": str(skill_md),
@@ -85,7 +86,12 @@ def _root_scope(root: Path, project_dir: str) -> str:
     return "custom"
 
 
-def list_skills(project_dir: str = ".", include_external: bool = True) -> list[dict]:
+def _is_legacy_bundled(skill: dict) -> bool:
+    return str(skill.get("status", "")).strip().lower() in {"legacy", "hidden", "disabled"}
+
+
+def list_skills(project_dir: str = ".", include_external: bool = True,
+                include_legacy: bool = False) -> list[dict]:
     """列出技能包(内置 + 外部)。按 name 去重,内置优先。
 
     外部根下同时扫平铺 ``<skill>/SKILL.md`` 与一层分类嵌套 ``<domain>/<skill>/SKILL.md``
@@ -96,6 +102,8 @@ def list_skills(project_dir: str = ".", include_external: bool = True) -> list[d
 
     for skill_md in sorted(SKILLS_DIR.glob("*/SKILL.md")):
         s = _read_skill(skill_md, "bundled", scope="builtin")
+        if not include_legacy and _is_legacy_bundled(s):
+            continue
         if s["name"] not in seen:
             seen.add(s["name"])
             out.append(s)

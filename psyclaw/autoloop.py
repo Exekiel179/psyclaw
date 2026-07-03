@@ -103,7 +103,9 @@ def classify_csv(path: str) -> str:
     try:
         with open(path, encoding="utf-8-sig", newline="") as f:
             header = next(csv.reader(f), [])
-    except (OSError, StopIteration):
+    except (OSError, StopIteration, UnicodeDecodeError, csv.Error):
+        # UnicodeDecodeError:GBK 编码 CSV(zh-CN Excel 默认)不能炸掉整个 auto-loop
+        # (评审修复);读不懂表头一律当数据表,交给 analysis-loop 的画像步去报错。
         return "data"
     low = {h.lower().strip() for h in header}
     has = lambda cands: any(c in low for c in cands)  # noqa: E731 精确匹配
@@ -353,15 +355,19 @@ def _dispatch(item: dict, project_dir: str, skip_gates: bool = False) -> int:
         return 1
     goal_before = get_goal(project_dir)
     topic = goal_before or _derive_topic(item)
-    rc = run_workflow(get_workflow(wf_id), topic=topic, project_dir=project_dir,
-                      auto=True, seed=item.get("seed"), skip_gates=skip_gates)
-    if not goal_before:                       # 本无人工目标 → 清掉引擎落下的派生 goal.md
-        gp = goal_path(project_dir)
-        try:                                  # 仅清理:失败也不应影响本轮验收结论
-            if gp.exists():
-                gp.unlink()
-        except OSError:
-            pass
+    try:
+        rc = run_workflow(get_workflow(wf_id), topic=topic, project_dir=project_dir,
+                          auto=True, seed=item.get("seed"), skip_gates=skip_gates)
+    finally:
+        # 评审修复:清理放 finally——run_workflow 抛异常时派生 goal.md 若残留,
+        # 下一轮 discover 会据文件名派生串误触发 lit-loop(发现必须保持纯粹)。
+        if not goal_before:                   # 本无人工目标 → 清掉引擎落下的派生 goal.md
+            gp = goal_path(project_dir)
+            try:                              # 仅清理:失败也不应影响本轮验收结论
+                if gp.exists():
+                    gp.unlink()
+            except OSError:
+                pass
     return rc
 
 

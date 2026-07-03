@@ -180,11 +180,30 @@ def render_memo(memo: str) -> str:
 # 3. @file 智能摘录
 # ---------------------------------------------------------------------------
 
+def _binary_note(path: Path, head: bytes) -> str | None:
+    """二进制嗅探:PK(zip/xlsx 改名)、NUL 字节等 → 诚实说明,绝不把乱码注入上下文。"""
+    if head[:4] == b"PK\x03\x04":
+        return (f"<file path={path} 格式=zip/office>\n该文件是 ZIP 压缩格式"
+                "(很可能是 xlsx/docx 改了扩展名)。不能当文本读;"
+                "请先另存为真正的 CSV(UTF-8),或告知我用 shell 解压查看。\n</file>")
+    if b"\x00" in head:
+        return (f"<file path={path} 格式=二进制>\n检测到二进制内容,不注入乱码。"
+                "若是数据文件请转成 CSV/文本后再引用。\n</file>")
+    return None
+
+
 def smart_excerpt(path: Path) -> str:
-    """文件 → 上下文友好的摘录。CSV 给结构,PDF 抽正文,文本给头尾。"""
+    """文件 → 上下文友好的摘录。CSV 给结构,PDF 抽正文,文本给头尾;二进制诚实拒绝。"""
     suffix = path.suffix.lower()
     if suffix == ".pdf":
         return _pdf_excerpt(path)
+    try:
+        head = path.open("rb").read(512)
+    except OSError as exc:
+        return f"<file path={path} error={exc}/>"
+    note = _binary_note(path, head)    # 评审+实测修复:伪装成 .csv 的 zip 曾被读成乱码
+    if note:
+        return note
     try:
         if suffix in (".csv", ".tsv"):
             return _csv_excerpt(path)

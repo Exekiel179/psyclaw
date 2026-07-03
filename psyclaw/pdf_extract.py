@@ -212,11 +212,19 @@ def _clean(text: str) -> str:
 
 
 _TEXTY = set(".,;:!?()[]{}\"'-—–/%&@#*+=…、，。；:！？（）《》“”‘’【】")
+_WORDISH = re.compile(r"[A-Za-z]{3,}|[一-鿿]{2,}")
 
 
 def _looks_like_text(text: str) -> bool:
-    """判抽取结果是否像正文:太短或可读字符占比过低(乱码)→ False。"""
+    """判抽取结果是否像正文:太短 / 可读占比低 / 无词形结构(乱码)→ False。
+
+    评审修复:latin-1 解码的随机二进制约 66% 字节是"字母数字",旧 0.6 阈值会放行
+    纯乱码(非 Flate 流如 DCT 图像)。改为双门:占比 ≥0.75 **且** 至少 5 个词形
+    token(≥3 个连续拉丁字母 或 ≥2 个连续汉字)——真正文轻松通过,随机字节几乎不可能。
+    """
     if len(text) < 40:
         return False
     good = sum(1 for c in text if c.isalnum() or c.isspace() or c in _TEXTY)
-    return good / len(text) >= 0.6
+    if good / len(text) < 0.75:
+        return False
+    return len(_WORDISH.findall(text[:8000])) >= 5
