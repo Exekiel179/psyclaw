@@ -26,10 +26,12 @@ _CHECKBOX_RE = re.compile(r"^\s*(?:[-•*·]\s*)?\[\s?\]\s*(?P<opt>.+?)\s*$")
 MAX_OPTIONS = 20
 
 
-def parse_choices(reply: str) -> dict | None:
+def parse_choices(reply: str, heuristic: bool = True) -> dict | None:
     """从模型回复解析选项集 → {question, multi, options} 或 None。纯函数。
 
-    优先 ```choices JSON 块;无块则启发式识别 ``[ ]`` 复选清单(≥2 条才算,免误触发)。
+    优先 ```choices JSON 块;无块且 ``heuristic=True`` 时启发式识别 ``[ ]`` 复选清单
+    (≥2 条才算;**代码围栏内的行不算**——save 块/示例代码里的清单不是给用户选的)。
+    规划模式等场景可传 ``heuristic=False`` 只认显式块(- [ ] 任务清单不该弹选择器)。
     """
     m = _BLOCK_RE.search(reply or "")
     if m:
@@ -42,11 +44,19 @@ def parse_choices(reply: str) -> dict | None:
                         "options": opts[:MAX_OPTIONS]}
         except (json.JSONDecodeError, AttributeError, TypeError):
             pass  # 块坏了 → 走启发式
+    if not heuristic:
+        return None
 
     lines = (reply or "").splitlines()
     opts: list[str] = []
     first_idx = None
+    in_fence = False
     for i, ln in enumerate(lines):
+        if ln.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
         cm = _CHECKBOX_RE.match(ln)
         if cm:
             if first_idx is None:

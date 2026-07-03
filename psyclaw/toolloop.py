@@ -66,11 +66,15 @@ def build_tools(project_dir: str = ".") -> dict:
 
     def _read(a):
         from psyclaw.context import smart_excerpt
+        from psyclaw.repl import read_denied
         p = Path(str(a.get("path", ""))).expanduser()
+        denial = read_denied(p)          # 评审修复:此前缺 data/raw/密钥守卫(铁律)
+        if denial:
+            return f"拒绝读取 {p}:{denial}"
         if not p.exists() or not p.is_file():
             return f"文件不存在:{p}"
         return smart_excerpt(p)[:4000]
-    _t("read_file", "读本地文件(含 PDF 抽取;csv 只给结构;绝不读 data/raw 原始行)",
+    _t("read_file", "读本地文件(含 PDF 抽取;csv 只给结构;绝不读 data/raw 原始行/密钥)",
        "path:str", _read)
 
     def _save(a):

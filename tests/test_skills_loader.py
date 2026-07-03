@@ -16,8 +16,17 @@ def _write_skill(root, name, desc="desc", category="domain"):
 
 def test_bundled_skills_have_source():
     skills = loader.list_skills(include_external=False)
-    assert skills, "至少应有内置 ARS 骨架 skill"
+    assert skills, "至少应有内置 skill"
     assert all(s["source"] == "bundled" for s in skills)
+
+
+def test_legacy_bundled_skill_hidden_by_default():
+    visible = {s["name"] for s in loader.list_skills(include_external=False)}
+    assert "ars" not in visible
+
+    all_bundled = {s["name"] for s in loader.list_skills(
+        include_external=False, include_legacy=True)}
+    assert "ars" in all_bundled
 
 
 def test_discovers_project_claude_skills(tmp_path):

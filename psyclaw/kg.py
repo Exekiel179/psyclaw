@@ -188,6 +188,14 @@ class KnowledgeGraph:
             "SELECT e.id, e.relation, e.source_ref, e.source_kind,"
             " ns.name, nd.name FROM edges e"
             " JOIN nodes ns ON ns.id=e.src JOIN nodes nd ON nd.id=e.dst").fetchall()
+        n_citation = sum(1 for r in rows if r[3] == "citation")
+        if not allowed:
+            # 评审修复:无检索语料 = 「无从核验」,不是「全是杜撰」——与 citations 的
+            # manual_review 语义一致(fail-closed 只对**检出的**孤儿,不对不可判)。
+            return {"total_edges": len(rows), "citation_edges": n_citation,
+                    "corpus_source": None, "grounded": 0, "orphans": [],
+                    "no_orphan_relations": True, "manual_review": True,
+                    "note": "无检索语料(evidence_map/lit_search 缺失),关系溯源需人工核"}
         orphans: list[dict] = []
         checked = 0
         for eid, rel, ref, kind, sname, dname in rows:
@@ -195,21 +203,35 @@ class KnowledgeGraph:
                 continue
             checked += 1
             canon = _canon_key(ref)
-            if not allowed or canon is None or canon not in allowed:
+            if canon is None or canon not in allowed:
                 orphans.append({"edge": f"{sname} —{rel}→ {dname}", "source_ref": ref})
         return {"total_edges": len(rows), "citation_edges": checked,
                 "corpus_source": source, "grounded": checked - len(orphans),
-                "orphans": orphans, "no_orphan_relations": len(orphans) == 0}
+                "orphans": orphans, "no_orphan_relations": len(orphans) == 0,
+                "manual_review": False}
+
+
+def _mmd_label(s: str) -> str:
+    """mermaid 标签转义:双引号与竖线会破坏语法(评审修复,经真实渲染器验证)。"""
+    return (s or "").replace('"', "'").replace("|", "/")
 
 
 def render_mermaid(sub: dict) -> str:
-    """ego 子图 → mermaid flowchart(每条边标注来源引用)。"""
-    id2name = {n["id"]: n["name"] for n in sub.get("nodes", [])}
+    """ego 子图 → mermaid flowchart(每条边标注来源引用)。
+
+    评审修复:裸 `"名字"` 不是合法的 flowchart 节点——必须 `nK["标签"]` 形式,
+    否则所有产出图都渲染失败;关系/引用里的 `|` 也须转义(会截断边标签)。
+    """
+    ordered = sorted(sub.get("nodes", []), key=lambda n: n["id"])
+    mid = {n["id"]: f"n{i}" for i, n in enumerate(ordered)}
     lines = ["```mermaid", "graph LR"]
+    for n in ordered:
+        lines.append(f'  {mid[n["id"]]}["{_mmd_label(n["name"])[:60]}"]')
     for e in sub.get("edges", []):
-        s = id2name.get(e["src"], "?")
-        d = id2name.get(e["dst"], "?")
-        ref = (e.get("source_ref") or "").replace('"', "'")[:40]
-        lines.append(f'  "{s}" -->|{e["relation"]} · {ref}| "{d}"')
+        s = mid.get(e["src"], "n_")
+        d = mid.get(e["dst"], "n_")
+        rel = _mmd_label(e.get("relation", ""))
+        ref = _mmd_label(e.get("source_ref", ""))[:40]
+        lines.append(f"  {s} -->|{rel} · {ref}| {d}")
     lines.append("```")
     return "\n".join(lines)

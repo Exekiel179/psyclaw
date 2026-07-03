@@ -106,7 +106,10 @@ def run_check(draft: str | None = None, journal: str | None = None,
         try:
             from psyclaw.kg import KnowledgeGraph
             v = KnowledgeGraph(project_dir).verify(project_dir)
-            if v["citation_edges"] == 0:
+            if v.get("manual_review"):
+                items.append(_item("KG 关系溯源", "manual",
+                                   v.get("note", "无检索语料,需人工核")))
+            elif v["citation_edges"] == 0:
                 items.append(_item("KG 关系溯源", "manual", "无 citation 边可核"))
             elif v["no_orphan_relations"]:
                 items.append(_item("KG 关系溯源", "pass",

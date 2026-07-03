@@ -75,14 +75,135 @@ _SAVE_SYSTEM = (
     "```save path=<文件路径>\n<文件的完整内容>\n```\n"
     "可给多个 save 块;块外照常写说明。用户没明确要求保存时,不要滥用此块。")
 
-_SAVE_RE = re.compile(
-    r"```save[ :]+(?:path=)?(?P<path>[^\n`]+)\r?\n(?P<body>.*?)```", re.S)
+_SAVE_OPEN_RE = re.compile(r"^```save[ :]+(?:path=)?(?P<path>[^\n`]+)\s*$")
+_FENCE_RE = re.compile(r"^```")
 
 # 「键盘选择」:模型给选项时输出 choices 块,REPL 弹选择器并自动回传(psyclaw/choices.py)。
 _CHOICES_SYSTEM = (
     "\n# 让用户选择(键盘选择器)\n需要用户在若干选项里选择时,除正文说明外,附一个块:\n"
     "```choices\n{\"question\": \"问题\", \"multi\": true, \"options\": [\"选项A\", \"选项B\"]}\n"
     "```\nPsyClaw 会弹出键盘选择器并把用户的选择自动回传给你;不要只写复选清单等用户打字。")
+
+# 「直接跑命令」:模型输出 psyclaw/shell 块,REPL 执行并把输出自动回传(用户实测:
+# 命令块没人执行,回合看着像结束了——死胡同必须消灭)。psyclaw 子命令进程内跑;
+# shell 交系统终端跑。危险命令(rm -rf / git push --force / DROP TABLE…)须人工确认。
+_RUN_SYSTEM = (
+    "\n# 直接运行命令(会真的执行)\n要跑 PsyClaw 子命令或系统命令时,输出块(每行一条),"
+    "PsyClaw 会执行并把输出回传给你,你据此继续:\n"
+    "```psyclaw\nanalysis-loop data/clean/x.csv --auto\n```\n"
+    "```shell\npython outputs/analysis.py\n```\n"
+    "注意:**没有** describe/stat 等内置统计命令(统计已外移)——统计请生成脚本再用 shell 跑。"
+    "不要输出命令块之后就当作已完成;结果会回传,等结果再下结论。")
+_RUN_SAFE_NOTE = "(当前安全模式:命令块不会自动执行,会提示用户手动跑。)"
+
+_RUN_RE = re.compile(r"```(?P<kind>psyclaw|shell|bash|sh|cmd|powershell)\s*\r?\n"
+                     r"(?P<body>.*?)```", re.S)
+# 危险命令红线(CLAUDE.md):自动执行前必须人工确认;非 TTY 直接拒。
+_DANGEROUS_RE = re.compile(
+    r"rm\s+-rf|git\s+push\s+--force|git\s+reset\s+--hard|push\s+.*\b(master|main)\b"
+    r"|DROP\s+TABLE|del\s+/[fsq]|rd\s+/s|format\s+[a-z]:|mkfs|shutdown", re.I)
+_RUN_TIMEOUT = 180
+_MAX_RUN_CMDS = 6
+
+
+def parse_run_requests(reply: str) -> list[dict]:
+    """从回复解析 psyclaw/shell 命令块 → [{kind, cmd}](kind ∈ psyclaw|shell)。纯函数。"""
+    out: list[dict] = []
+    for m in _RUN_RE.finditer(reply or ""):
+        kind = "psyclaw" if m.group("kind") == "psyclaw" else "shell"
+        for line in m.group("body").splitlines():
+            cmd = line.strip()
+            if cmd and not cmd.startswith("#"):
+                out.append({"kind": kind, "cmd": cmd})
+    return out
+
+
+# 交互式子命令不在块里跑:stdout 被重定向时它们会隐形地等输入,看起来像卡死。
+_INTERACTIVE_CMDS = {"repl", "config", "setup", "clarify", "serve", "resume"}
+
+
+def _run_psyclaw_cmd(cmd: str) -> str:
+    """进程内跑 psyclaw 子命令(不需要子进程;argparse 报错也如实回传)。"""
+    import io as _io
+    import shlex
+    from contextlib import redirect_stderr, redirect_stdout
+    argv = shlex.split(cmd)
+    if argv and argv[0] == "psyclaw":
+        argv = argv[1:]
+    if argv and argv[0] in _INTERACTIVE_CMDS:
+        return (f"$ psyclaw {' '.join(argv)}\n[未执行:{argv[0]} 是交互式命令,"
+                "请用户自己在终端跑;非交互流程可用对应 --auto/--non-interactive 形式]")
+    buf = _io.StringIO()
+    try:
+        from psyclaw.cli import main as _main
+        with redirect_stdout(buf), redirect_stderr(buf):
+            rc = _main(argv)
+    except SystemExit as exc:                 # argparse 错误等
+        rc = int(exc.code or 0) if str(exc.code or 0).isdigit() else 2
+    except Exception as exc:  # noqa: BLE001
+        buf.write(f"\n[执行异常] {exc}")
+        rc = 1
+    return f"$ psyclaw {' '.join(argv)}\n(rc={rc})\n{buf.getvalue()}"
+
+
+def _run_shell_cmd(cmd: str) -> str:
+    """交系统 shell 跑一条命令,捕获输出(带超时)。"""
+    import subprocess
+    try:
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace",
+                             timeout=_RUN_TIMEOUT)
+        out = (res.stdout or "") + (("\n" + res.stderr) if res.stderr else "")
+        return f"$ {cmd}\n(rc={res.returncode})\n{out}"
+    except subprocess.TimeoutExpired:
+        return f"$ {cmd}\n[超时:>{_RUN_TIMEOUT}s,已终止]"
+    except OSError as exc:
+        return f"$ {cmd}\n[无法执行:{exc}]"
+
+
+def run_commands(reqs: list[dict], confirm=None,
+                 limit: int = _MAX_RUN_CMDS) -> tuple[str, list[str]]:
+    """执行命令块 → (回传消息, 终端提示行)。危险命令须 confirm(cmd)→True,否则拒。"""
+    parts: list[str] = []
+    notes: list[str] = []
+    for r in reqs[:limit]:
+        cmd = r["cmd"]
+        if _DANGEROUS_RE.search(cmd):
+            if not (confirm and confirm(cmd)):
+                parts.append(f"$ {cmd}\n[已拒绝:危险命令,未获人工确认]")
+                notes.append(f"  ✗ 拒执行(危险命令):{cmd[:50]}")
+                continue
+        notes.append(f"  ⚙ 执行:{cmd[:70]}")
+        out = _run_psyclaw_cmd(cmd) if r["kind"] == "psyclaw" else _run_shell_cmd(cmd)
+        parts.append(out[:6000])
+    if len(reqs) > limit:
+        parts.append(f"[本轮最多执行 {limit} 条命令,其余 {len(reqs) - limit} 条请下一轮]")
+    return ("# 命令执行结果\n\n" + "\n\n".join(parts)) if parts else "", notes
+
+
+def strip_save_blocks(reply: str) -> str:
+    """去掉 save 块(含其嵌套围栏内容)——save 的内容是要写盘的文件,里面的
+    read/命令/复选清单只是文件内容,绝不能被当成本轮要执行的请求。"""
+    out: list[str] = []
+    lines = (reply or "").splitlines()
+    i, n = 0, len(lines)
+    while i < n:
+        if _SAVE_OPEN_RE.match(lines[i]):
+            inner = False
+            i += 1
+            while i < n:
+                ln = lines[i]
+                if _FENCE_RE.match(ln):
+                    if ln.strip() == "```" and not inner:
+                        break
+                    inner = not inner
+                i += 1
+            i += 1
+            continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out)
+
 
 # 「自动读文件」(开放模式,默认):模型输出 read 块,REPL 自动读取注入,不必让用户 @ 引用。
 _READ_OPEN_SYSTEM = (
@@ -97,6 +218,40 @@ _READ_SAFE_SYSTEM = (
 _READ_RE = re.compile(r"```read\s*\r?\n(?P<body>.*?)```", re.S)
 _MAX_AUTO_READS = 4      # 每轮最多自动读的文件数
 _MAX_AUTO_DEPTH = 3      # 连续自动跟进(读取/选择回传)的深度上限,防打转
+
+
+def _hitl_confirm(prompt: str) -> bool:
+    """真 fail-closed 的人工确认:非 TTY / EOF / Ctrl+C 一律 False。
+
+    (评审修复:loop._ask_yn 捕获 EOFError 后返回 default=True——管道/脚本模式下
+    确认会**静默放行**,与「非 TTY 不批准/不覆盖」的承诺相反。此包装先查 isatty,
+    再把包括 KeyboardInterrupt 在内的一切异常都判为拒绝。)
+    """
+    import sys as _sys
+    if not (_sys.stdin.isatty() and _sys.stdout.isatty()):
+        return False
+    from psyclaw.loop import _ask_yn
+    try:
+        return _ask_yn(prompt)
+    except BaseException:  # noqa: BLE001  # KeyboardInterrupt 也算拒绝
+        return False
+
+
+# 敏感文件denylist:自动读取(read 块/agent read_file)绝不碰密钥类文件(铁律「不碰密钥」)。
+_SECRET_NAMES = {".env", ".netrc", "credentials", "credentials.json", "id_rsa",
+                 "id_ed25519", "id_ecdsa", "id_dsa"}
+_SECRET_SUFFIXES = {".pem", ".key", ".ppk", ".pfx", ".p12"}
+
+
+def read_denied(p: Path) -> str | None:
+    """自动读取守卫:返回拒绝原因;可读返回 None。data/raw + 密钥类文件恒拒。"""
+    if _save_is_protected(p):
+        return "受保护的 data/raw,原始数据不入对话"
+    name = p.name.lower()
+    if (name in _SECRET_NAMES or p.suffix.lower() in _SECRET_SUFFIXES
+            or "secret" in name or "credential" in name):
+        return "疑似密钥/凭据文件,不注入对话(铁律:不碰密钥)"
+    return None
 
 
 def parse_read_requests(reply: str) -> list[str]:
@@ -117,9 +272,10 @@ def gather_read_results(paths: list[str], limit: int = _MAX_AUTO_READS) -> tuple
     notes: list[str] = []
     for raw in paths[:limit]:
         p = Path(raw).expanduser()
-        if _save_is_protected(p):
-            parts.append(f"[拒绝读取 {p}:受保护的 data/raw,原始数据不入对话]")
-            notes.append(f"  ✗ 拒读(data/raw 受保护):{p.name}")
+        denial = read_denied(p)
+        if denial:
+            parts.append(f"[拒绝读取 {p}:{denial}]")
+            notes.append(f"  ✗ 拒读:{p.name}({denial[:18]}…)")
             continue
         if not p.is_file():
             parts.append(f"[文件不存在:{p}]")
@@ -134,17 +290,35 @@ def gather_read_results(paths: list[str], limit: int = _MAX_AUTO_READS) -> tuple
 
 
 def parse_save_blocks(reply: str) -> list[dict]:
-    """从模型回复解析 ```save path=… 块 → [{path, content}]。纯函数,可单测。"""
+    """从模型回复解析 ```save path=… 块 → [{path, content}]。纯函数,可单测。
+
+    逐行扫描并**计数内部代码围栏**:保存的内容常含 ```python 等嵌套块,若用非贪婪正则,
+    内容会在第一个 ``` 处被截断且仍报「已保存」——静默丢数据(评审修复)。规则:
+    行首 ``` 开头的行在 save 块内视为围栏开/合切换;只有**不在内部围栏里**的裸 ``` 行才收尾。
+    """
     out: list[dict] = []
-    for m in _SAVE_RE.finditer(reply or ""):
+    lines = (reply or "").splitlines()
+    i, n = 0, len(lines)
+    while i < n:
+        m = _SAVE_OPEN_RE.match(lines[i])
+        if not m:
+            i += 1
+            continue
         path = m.group("path").strip().strip("\"'` ")
-        body = m.group("body")
-        if body.endswith("\r\n"):
-            body = body[:-2]
-        elif body.endswith("\n"):
-            body = body[:-1]
+        body: list[str] = []
+        inner_fence = False
+        i += 1
+        while i < n:
+            ln = lines[i]
+            if _FENCE_RE.match(ln):
+                if ln.strip() == "```" and not inner_fence:
+                    break                       # 真正的收尾围栏
+                inner_fence = not inner_fence   # 嵌套围栏开/合
+            body.append(ln)
+            i += 1
         if path:
-            out.append({"path": path, "content": body})
+            out.append({"path": path, "content": "\n".join(body)})
+        i += 1
     return out
 
 
@@ -225,8 +399,11 @@ class ReplSession:
         except Exception:  # noqa: BLE001  # 库异常不阻塞 REPL
             turns = []
         if not turns:
-            print(ui.warn(f"  未找到会话 {sid},开新会话。"))
+            print(ui.warn(f"  未找到会话 {sid};当前对话保持不变。"))
             return False
+        # 验证通过才动当前状态(评审修复:先清空再验证会把在聊的对话/备忘毁掉)
+        self.messages.clear()
+        self.memo = ""
         self.session_id = sid
         try:                                  # 会话名带回提示符
             self.session_name = next(
@@ -260,17 +437,19 @@ class ReplSession:
         return " ".join(out_parts)
 
     # -- 对话 --------------------------------------------------------------
-    def ask(self, text: str) -> None:
+    def ask(self, text: str, internal: bool = False) -> None:
         from psyclaw.context import compact_history, relevant_knowledge, render_memo
-        # 路径自动检测：先于 @file 展开，把数据元数据/文本摘录注入上下文
-        from psyclaw.path_ingest import process_message
-        path_ctx, path_errors = process_message(text)
-        for err in path_errors:
-            print(err)
-        text = self._expand_files(text)
-        # 若有路径注入内容，拼在用户消息前（LLM 可据此解读数据结构）
-        if path_ctx:
-            text = path_ctx + "\n\n用户问题：" + text
+        if not internal:
+            # 路径自动检测:只对**用户输入**做——自动回传消息(读取结果/命令输出)里的
+            # 碎片会被误当路径,打出「未找到文件 乱码」噪音(用户实测修复)。
+            from psyclaw.path_ingest import process_message
+            path_ctx, path_errors = process_message(text)
+            for err in path_errors:
+                print(err)
+            text = self._expand_files(text)
+            # 若有路径注入内容,拼在用户消息前(LLM 可据此解读数据结构)
+            if path_ctx:
+                text = path_ctx + "\n\n用户问题：" + text
         self.messages.append({"role": "user", "content": text})
         self.messages, self.memo = compact_history(self.messages, self.memo)
         # 动态系统提示:瘦核心 + 决策备忘 + 按需知识
@@ -292,10 +471,12 @@ class ReplSession:
         if self.plan_mode:
             from psyclaw.tasks import PLAN_MODE_SYSTEM
             system += "\n\n" + PLAN_MODE_SYSTEM
-        # 键盘选择器约定 + 文件读取权限(随 /safemode 动态切换)
+        # 键盘选择器约定 + 文件读取权限(随 /safemode 动态切换)+ 直接跑命令
         system += "\n" + _CHOICES_SYSTEM
         system += "\n" + (_READ_SAFE_SYSTEM if self.file_access == "safe"
                           else _READ_OPEN_SYSTEM)
+        system += "\n" + _RUN_SYSTEM + ("" if self.file_access != "safe"
+                                        else "\n" + _RUN_SAFE_NOTE)
         if self.plugins and self.plugins.systems:
             system += "\n\n" + "\n\n".join(self.plugins.systems)
         # 历史上下文召回:关键词定位 + 相关度门控(不达标不注入)
@@ -322,6 +503,11 @@ class ReplSession:
                 for chunk in self.provider.chat(self.messages, system=system):
                     blk.write(chunk)
                     reply_parts.append(chunk)
+            except KeyboardInterrupt:          # Ctrl+C = 取消本轮,不炸 REPL(评审修复)
+                blk.write("\n[已中断本轮生成]")
+                blk.close()
+                self.messages.pop()
+                return
             except Exception as exc:  # noqa: BLE001
                 blk.write(f"\n[provider 错误] {exc}")
                 blk.close()
@@ -350,13 +536,35 @@ class ReplSession:
         if follow:
             self._auto_depth += 1
             try:
-                self.ask(follow)
+                self.ask(follow, internal=True)
             finally:
                 self._auto_depth -= 1
 
     def _auto_followup(self, reply: str) -> str | None:
-        """读取请求 / 选项选择 → 需要自动回传给模型的消息(无则 None)。"""
-        reads = parse_read_requests(reply)
+        """命令执行 / 读取请求 / 选项选择 → 需要自动回传给模型的消息(无则 None)。
+
+        统一在 **去掉 save 块之后** 的正文上解析——save 的内容是要写盘的文件,
+        里面的示例命令/read/复选清单绝不能被当成本轮要执行的请求。
+        """
+        body = strip_save_blocks(reply)
+
+        # ① 命令块(psyclaw/shell):执行并回传输出——命令块吐了没人跑=死胡同(用户实测)
+        runs = parse_run_requests(body)
+        if runs:
+            if self.file_access == "safe":
+                print(ui.warn(f"  [安全模式] 模型给出 {len(runs)} 条命令,未自动执行;"
+                              "请手动复制运行,或 /safemode off 放开。"))
+            elif self._auto_depth >= _MAX_AUTO_DEPTH:
+                print(ui.dim("  (自动跟进已达深度上限,请手动继续)"))
+            else:
+                msg, notes = run_commands(
+                    runs, confirm=lambda c: _hitl_confirm(f"  危险命令,确认执行 {c}?"))
+                for n in notes:
+                    print(ui.warn(n) if n.startswith("  ✗") else ui.dim(n))
+                if msg:
+                    return msg
+
+        reads = parse_read_requests(body)
         if reads:
             if self.file_access == "safe":
                 print(ui.warn(f"  [安全模式] 模型请求读取 {len(reads)} 个文件已被拒;"
@@ -372,7 +580,9 @@ class ReplSession:
         try:
             from psyclaw.choices import (format_selection_message, parse_choices,
                                          pick_interactive)
-            choice = parse_choices(reply)
+            # 规划模式的 ## TASKS 就是 - [ ] 清单——那是任务看板,不是给用户选的选项;
+            # 只认显式 choices 块,复选启发式关闭(评审修复:否则每条计划回复都弹选择器)。
+            choice = parse_choices(body, heuristic=not self.plan_mode)
         except Exception:  # noqa: BLE001
             choice = None
         if choice and self._auto_depth < _MAX_AUTO_DEPTH:
@@ -385,15 +595,13 @@ class ReplSession:
 
     def _run_agent(self, system: str) -> str | None:
         """agent 模式:跑纯工具层循环(模型自主多步调工具)。返回最终答案;provider 错误返回 None。"""
-        from psyclaw.loop import _ask_yn
-        from psyclaw.toolloop import run_tool_loop
+        from psyclaw.toolloop import _short, run_tool_loop
 
         def _approve(call: dict) -> bool:
-            try:
-                return _ask_yn(f"  批准副作用工具 {call['name']}"
-                               f"({call.get('args')})?")
-            except Exception:  # noqa: BLE001  # 非 TTY → 不批准(fail-closed)
-                return False
+            # 真 fail-closed(非 TTY/EOF/中断不批准)+ 参数截断(save_file 的 content
+            # 可能几十 KB,不能整个灌进确认提示)
+            return _hitl_confirm(f"  批准副作用工具 {call['name']}"
+                                 f"({_short(call.get('args') or {}, 120)})?")
 
         try:
             res = run_tool_loop(
@@ -416,13 +624,10 @@ class ReplSession:
         blocks = parse_save_blocks(reply)
         if not blocks:
             return
-        from psyclaw.loop import _ask_yn
 
         def _confirm(p: Path) -> bool:
-            try:
-                return _ask_yn(f"  文件已存在,覆盖 {p}?")
-            except Exception:  # noqa: BLE001  # 非 TTY/EOF → 不覆盖
-                return False
+            # 真 fail-closed:非 TTY/EOF/中断一律不覆盖(评审修复:_ask_yn EOF 返 True)
+            return _hitl_confirm(f"  文件已存在,覆盖 {p}?")
 
         for blk in blocks:
             r = apply_save_block(blk, confirm=_confirm)
@@ -684,9 +889,7 @@ class ReplSession:
         if not sid:
             print("  用法:/resume <会话id>(/sessions 看列表)")
             return
-        self.messages.clear()
-        self.memo = ""
-        self._resume_session(sid)
+        self._resume_session(sid)   # 内部先验证会话存在,再清空并载入(误输 id 不毁现场)
 
     def _cmd_rename(self, arg: str) -> None:
         name = arg.strip()
@@ -715,7 +918,12 @@ class ReplSession:
     def run(self) -> int:
         if self.resume_id:
             self._resume_session(self.resume_id)
-        print("  " + ui.accent("⚙ provider ") + self.provider.describe())
+        try:
+            from psyclaw.status import collect_status
+            status = collect_status(".")
+        except Exception:  # noqa: BLE001
+            status = None
+        print(ui.startup(__version__, status=status, provider=self.provider.describe()))
         print("  " + ui.dim("输入 / 弹出命令联想(↑↓选择 Tab补全) · /exit 退出 · @<文件> 引用") + "\n")
         while True:
             base = ui.paint("psyclaw", "brcyan", "bold")
@@ -735,11 +943,14 @@ class ReplSession:
                 break
             if not line:
                 continue
-            if line.startswith("/"):
-                if not self.handle_command(line):
-                    break
-            else:
-                self.ask(line)
+            try:
+                if line.startswith("/"):
+                    if not self.handle_command(line):
+                        break
+                else:
+                    self.ask(line)
+            except KeyboardInterrupt:      # 深处的 Ctrl+C 也只取消本轮(评审修复)
+                print(ui.dim("\n  (已中断本轮;继续对话或 /exit 退出)"))
         print(ui.dim("再见。研究顺利!"))
         return 0
 

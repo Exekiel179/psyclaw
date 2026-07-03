@@ -135,8 +135,10 @@ def _data_metadata(path: Path) -> str:
         f'<data_file path="{path}" rows≈{n_rows} cols={len(headers)}>',
         f"列: {col_info}",
         "[⚠ 原始数据行未进入对话，数据隐私受保护]",
-        f'[📊 全量分析: psyclaw describe "{path}" / '
-        f'psyclaw stat "{path}" --dv <列> [--group <列>]]',
+        # 注:统计命令已外移——不要再推荐已删除的 describe/stat(评审修复:旧提示
+        # 会诱导模型调用不存在的命令)。当前正确路径 = analysis-loop 生成可复现脚本。
+        f'[📊 全量分析: psyclaw analysis-loop "{path}"(生成可复现脚本,'
+        "在 [stats] 环境或 MCP 跑;本 CLI 不内置统计命令)]",
         "</data_file>",
     ]
     return "\n".join(lines)

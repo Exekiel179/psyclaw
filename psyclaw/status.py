@@ -58,8 +58,14 @@ def collect_status(project_dir: str = ".") -> dict:
     dr = notes / "decision_request.md"
     st["decision_request"] = _read(dr) if dr.exists() else ""
     bl = notes / "blocked.md"
-    blocked = _read(bl, 4000)
-    # 只留最后一条(## 开头的最后一段)
+    # 取文件**尾部**再截最后一条——blocked.md 是追加式,最新在末尾;
+    # 读头 4000 字符会在文件变大后永远显示最旧的一条(评审修复)。
+    blocked = ""
+    if bl.exists():
+        try:
+            blocked = bl.read_text(encoding="utf-8", errors="replace")[-4000:]
+        except OSError:
+            blocked = ""
     if blocked:
         parts = [p for p in blocked.split("\n## ") if p.strip()]
         st["last_blocked"] = ("## " + parts[-1].strip()) if parts else blocked.strip()

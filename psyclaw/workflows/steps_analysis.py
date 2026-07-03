@@ -182,6 +182,12 @@ def step_analysis(ctx) -> dict:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(script, encoding="utf-8")
     ctx.artifacts["analysis"] = "outputs/analysis.py"
+    try:                                   # 生成脚本随手打复现溯源包(否则 check 恒 ✗)
+        from psyclaw.provenance import write_provenance
+        write_provenance(str(out), project_dir=str(ctx.project),
+                         data_path=ctx.data.get("data_csv"))
+    except Exception:  # noqa: BLE001  # 溯源失败不阻断流程,check 会如实报缺
+        pass
     print(ui.dim(f"  推荐分析:{rec['analysis']} —— {rec['rationale']}"))
     print(ui.dim("  可复现分析脚本 → outputs/analysis.py"
                  "(在装了 [stats] 的环境跑:python outputs/analysis.py)"))

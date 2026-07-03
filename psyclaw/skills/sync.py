@@ -65,14 +65,20 @@ def list_syncable_skills(root: Path = SKILLS_DIR) -> list[SyncableSkill]:
 
 
 def _git(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", *args],
-        cwd=str(cwd) if cwd else None,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(cwd) if cwd else None,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except (FileNotFoundError, OSError) as exc:
+        # 评审修复:机器上没装 git 时不该裸 traceback——转成普通失败行(✗ + note)。
+        return subprocess.CompletedProcess(
+            ["git", *args], returncode=127, stdout="",
+            stderr=f"git 不可用({exc});请安装 git 后重试 skills --sync")
 
 
 def _sync_one(skill: SyncableSkill, dry_run: bool = False) -> dict:
@@ -88,7 +94,8 @@ def _sync_one(skill: SyncableSkill, dry_run: bool = False) -> dict:
 
     if not skill.target.exists():
         skill.target.parent.mkdir(parents=True, exist_ok=True)
-        res = _git(["clone", "--depth", "1", "--branch", skill.ref,
+        # `--` 分隔:防 manifest 里以 - 开头的 repo 值被解析成 git 选项(加固)
+        res = _git(["clone", "--depth", "1", "--branch", skill.ref, "--",
                     skill.repo, str(skill.target)])
         return {"name": skill.name, "ok": res.returncode == 0, "action": action,
                 "target": str(skill.target),

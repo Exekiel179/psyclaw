@@ -185,6 +185,12 @@ def step_meta_script(ctx) -> dict:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(script, encoding="utf-8")
     ctx.artifacts["meta_script"] = "outputs/meta_analysis.py"
+    try:                                   # 生成脚本随手打复现溯源包(否则 check 恒 ✗)
+        from psyclaw.provenance import write_provenance
+        write_provenance(str(out), project_dir=str(ctx.project),
+                         data_path=ctx.data.get("effects_csv"))
+    except Exception:  # noqa: BLE001
+        pass
     print(ui.dim("  可复现元分析脚本 → outputs/meta_analysis.py"
                  "(在装了 [stats] 的环境跑:python outputs/meta_analysis.py)"))
     return {"script": "outputs/meta_analysis.py"}
