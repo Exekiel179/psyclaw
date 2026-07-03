@@ -96,6 +96,69 @@ def cmd_session(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_search(args: argparse.Namespace) -> int:
+    """来源路由检索:据任务类型路由到学术库/本地(主通道 + 兜底)。"""
+    from psyclaw import ui
+    from psyclaw.search_router import VALID_TYPES, execute_route, route
+    t = getattr(args, "type", None)
+    if t and t not in VALID_TYPES:
+        print(ui.err(f"未知类型 {t}(可选:{', '.join(VALID_TYPES)})"))
+        return 1
+    plan = route(args.query, t)
+    print(ui.title("来源路由") + ui.dim(f"  {args.query}"))
+    print(f"  任务类型:{plan['task_type']} — {plan['rationale']}")
+    print(ui.dim(f"  主通道 {plan['primary']['source']}/{plan['primary']['mode']}"
+                 f" · 兜底 {plan['fallback']['source']}/{plan['fallback']['mode']}"))
+    res = execute_route(plan, args.query, project_dir=".",
+                        limit=getattr(args, "limit", 10))
+    used, tag = res["used"], (ui.warn("(兜底)") if res["used_fallback"] else "")
+    print(ui.accent(f"  经 {used['source']}/{used['mode']} {tag}命中 {len(res['results'])} 条"))
+    for r in res["results"][:12]:
+        print(f"    · {(r.get('title') or '')[:80]}")
+    return 0
+
+
+def cmd_kg(args: argparse.Namespace) -> int:
+    """带引用的知识图谱:seed(据 evidence_map 种图)| show <实体> | verify | stats。"""
+    from psyclaw import ui
+    from psyclaw.kg import KnowledgeGraph, render_mermaid
+    kg = KnowledgeGraph(".")
+    action = getattr(args, "action", "stats") or "stats"
+    rest = getattr(args, "rest", []) or []
+    if action == "seed":
+        r = kg.seed_from_evidence_map(".")
+        if r.get("error"):
+            print(ui.warn(f"  {r['error']}"))
+            return 1
+        print(ui.ok(f"✓ 种图完成:新增 {r['added']} 条带引用边"
+                    f"(节点 {r['nodes']} · 边 {r['edges']})"))
+        return 0
+    if action == "show":
+        if not rest:
+            print(ui.err("用法:psyclaw kg show <实体>"))
+            return 1
+        sub = kg.subgraph(" ".join(rest), depth=1)
+        if not sub["nodes"]:
+            print(f"  未找到实体「{' '.join(rest)}」(先 psyclaw kg seed)")
+            return 0
+        print(render_mermaid(sub))
+        return 0
+    if action == "verify":
+        v = kg.verify(".")
+        print(ui.title("KG 关系溯源核验")
+              + ui.dim(f"  语料:{v['corpus_source'] or '(无)'}"))
+        print(f"  citation 边 {v['citation_edges']} · 溯源命中 {v['grounded']}"
+              f" · 孤儿 {len(v['orphans'])}")
+        for o in v["orphans"]:
+            print(ui.warn(f"    ✗ {o['edge']}(来源 {o['source_ref']} 不在检索语料=疑似杜撰关系)"))
+        return 0 if v["no_orphan_relations"] else 1
+    s = kg.stats()
+    print(ui.title("知识图谱")
+          + f"  节点 {s['nodes']} · 边 {s['edges']} · 无来源边 {s['uncited']}")
+    print(ui.dim("  seed 据 evidence_map 种图 · show <实体> 看子图 · verify 溯源核验"))
+    return 0
+
+
 def cmd_version(args: argparse.Namespace) -> int:
     print(f"psyclaw {__version__}")
     return 0
@@ -785,7 +848,8 @@ COMMAND_CATEGORIES = [
     ("研究流程 / 编排回路", ["auto-loop", "loop", "lit-loop", "meta-loop",
                         "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
-    ("记忆 / 消息 / IO", ["memory", "session", "resume", "serve", "notify", "lit", "auth",
+    ("检索 / 知识图谱", ["search", "kg", "lit"]),
+    ("记忆 / 消息 / IO", ["memory", "session", "resume", "serve", "notify", "auth",
                        "export", "figures", "provenance"]),
 ]
 
@@ -872,6 +936,24 @@ def build_parser() -> argparse.ArgumentParser:
     psn.add_argument("rest", nargs="*",
                      help="search <词> | rename <id> <名> | delete <id>")
     psn.set_defaults(func=cmd_session)
+
+    psr = sub.add_parser(
+        "search",
+        help="来源路由检索:据任务类型(事实/概念/趋势/回忆)路由到学术库/本地(主通道+兜底)")
+    psr.add_argument("query", help="检索问题")
+    psr.add_argument("--type", default=None,
+                     choices=["factual", "conceptual", "trend", "local"],
+                     help="显式指定任务类型(默认据问题自动判)")
+    psr.add_argument("--limit", type=int, default=10, help="每通道命中上限")
+    psr.set_defaults(func=cmd_search)
+
+    pkg = sub.add_parser(
+        "kg",
+        help="带引用的知识图谱:seed(据 evidence_map 种图)|show <实体>|verify|stats")
+    pkg.add_argument("action", nargs="?", default="stats",
+                     choices=["seed", "show", "verify", "stats"])
+    pkg.add_argument("rest", nargs="*", help="show <实体>")
+    pkg.set_defaults(func=cmd_kg)
 
     sub.add_parser("version", help="打印版本").set_defaults(func=cmd_version)
     sub.add_parser("doctor", help="环境自检（配置/MCP/Gates）").set_defaults(func=cmd_doctor)

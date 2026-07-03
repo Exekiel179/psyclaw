@@ -8,7 +8,7 @@
 
 ---
 
-## 命令总览(39 条)
+## 命令总览(41 条)
 
 ### 环境 / 系统
 | 命令 | 作用 |
@@ -69,6 +69,13 @@
 | `tasks [...]` | 任务看板(list/add/start/done/block/sync/clear) |
 | `review [draft]` | 审稿模拟(EIC+3 审稿人+Devil's Advocate;`--revise` 闭环修复) |
 
+### 检索 / 知识图谱
+| 命令 | 作用 |
+|---|---|
+| `search <query> [--type]` | 来源路由检索:据任务类型(事实/概念/趋势/回忆)路由到学术库/本地会话(主通道+兜底) |
+| `kg [seed\|show <实体>\|verify\|stats]` | 带引用的知识图谱:据 evidence_map 种图;边必带来源,`verify` 复用 cite-check 核对关系溯源 |
+| `lit [query]` | 文献检索 + 合法 OA 全文(PRISMA 计数;`-s` 一键合成综述) |
+
 ### 记忆 / 消息 / IO
 | 命令 | 作用 |
 |---|---|
@@ -77,7 +84,6 @@
 | `resume [id]` | 续接历史会话进入 REPL(不给 id 续接最近一次;REPL 内亦有 `/sessions //resume //rename //search`) |
 | `serve <channel>` | 对接消息端(telegram / wechat 双向 bot) |
 | `notify <msg>` | 推送通知(企业微信 webhook / Telegram) |
-| `lit [query]` | 文献检索 + 合法 OA 全文(PRISMA 计数;`-s` 一键合成综述) |
 | `auth` | 机构权限(EZProxy/LibKey)配置与认证状态自检 |
 | `export <file>` | 格式化输出(APA7 / 心理学报 / 心理科学) |
 | `figures` | 图表主题层 + FIG.honest 诚实性核查 + Okabe-Ito 调色板 |
