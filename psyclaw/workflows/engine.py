@@ -66,11 +66,14 @@ def _ask_continue(ctx: WorkflowContext, step: Step) -> bool:
 
 def run_workflow(workflow: dict, topic: str | None = None,
                  project_dir: str = ".", auto: bool = False,
-                 seed: dict | None = None) -> int:
+                 seed: dict | None = None, skip_gates: bool = False) -> int:
     """按 workflow 定义跑研究流程。
 
     workflow: {"id", "name", "research_type", "steps": [Step, ...]}
     seed:     预填 ctx.data 的输入(如 {"effects_csv": "..."}),供需要数据文件的流程用。
+    skip_gates: **用户显式要求**时跳过前置门禁(默认 False,fail-closed 不变)。跳过要留痕:
+        每次跳过记 notes/gate_skips.md + 总验收带 gates_skipped 列表,产出按探索性对待
+        (区分探索/确证的学术诚信不靠拦,靠标注)。
     返回 0=跑通(总验收落 notes/workflow_summary.json);1=fail-closed 中断(门禁未过 / 无目标 / 步骤硬失败)。
     """
     from psyclaw import config as cfg, ui
@@ -109,18 +112,23 @@ def run_workflow(workflow: dict, topic: str | None = None,
     for i, step in enumerate(steps, 1):
         print("\n" + ui.accent(f"{i}/{len(steps)} {step.title}"))
 
-        # ① harness 前置门禁(fail-closed,除非 optional)
+        # ① harness 前置门禁(fail-closed,除非 optional / 用户显式要求跳过)
         if step.gate is not None:
             ok, reason = step.gate(ctx)
             if not ok:
-                if step.optional:
+                if skip_gates:
+                    print(ui.warn(f"  ⚠ 门禁未过但按你的要求跳过:{reason}"))
+                    print(ui.dim("    产出将按探索性对待;已记 notes/gate_skips.md。"))
+                    _record_gate_skip(ctx, workflow, step, reason)
+                elif step.optional:
                     print(ui.dim(f"  跳过(门禁未过,可选步骤):{reason}"))
                     results.append({"id": step.id, "status": "skipped", "reason": reason})
                     continue
-                print(ui.err(f"  ✗ 门禁拦截:{reason}"))
-                ctx.log(f"workflow {workflow['id']} blocked at {step.id}: {reason}")
-                stopped_at = step.id
-                break
+                else:
+                    print(ui.err(f"  ✗ 门禁拦截:{reason}"))
+                    ctx.log(f"workflow {workflow['id']} blocked at {step.id}: {reason}")
+                    stopped_at = step.id
+                    break
 
         # ② 跑 step(硬失败 fail-closed,除非 optional)
         try:
@@ -157,6 +165,24 @@ def run_workflow(workflow: dict, topic: str | None = None,
     return 0 if verdict["overall_passed"] else 1
 
 
+def _record_gate_skip(ctx: WorkflowContext, workflow: dict, step: Step,
+                      reason: str) -> None:
+    """用户要求跳过门禁的留痕:ctx 记入 gates_skipped(进总验收)+ 追加 notes/gate_skips.md。"""
+    ctx.data.setdefault("gates_skipped", []).append(
+        {"step": step.id, "reason": reason})
+    ctx.log(f"workflow {workflow['id']} gate SKIPPED by user at {step.id}: {reason}")
+    p = ctx.project / "notes" / "gate_skips.md"
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(f"\n## {datetime.now().isoformat(timespec='seconds')} — "
+                    f"{workflow['id']} · {step.id}\n"
+                    f"- 未过的门禁:{reason}\n"
+                    f"- 依据:用户显式要求(--skip-gates);相应产出按**探索性**对待。\n")
+    except OSError:
+        pass  # 留痕失败不阻断流程
+
+
 def workflow_verdict(workflow: dict, results: list[dict],
                      stopped_at: str | None) -> dict:
     """机器可读总验收(纯函数,可单测)。
@@ -191,6 +217,9 @@ def _write_summary(ctx: WorkflowContext, workflow: dict, verdict: dict) -> None:
         "artifacts": ctx.artifacts,
         "verdict": verdict,
     }
+    if ctx.data.get("gates_skipped"):
+        summary["gates_skipped"] = ctx.data["gates_skipped"]
+        summary["exploratory"] = True   # 跳过门禁的产出按探索性对待(标注,不隐瞒)
     out = ctx.project / "notes" / "workflow_summary.json"
     out.write_text(json.dumps(summary, ensure_ascii=False, indent=2,
                               default=str), encoding="utf-8")

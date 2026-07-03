@@ -33,6 +33,24 @@ def cmd_repl(args: argparse.Namespace) -> int:
     return run_repl()
 
 
+def cmd_status(args: argparse.Namespace) -> int:
+    """一屏聚合项目态势(目标/澄清/回路/待决策/产物/下一步)。"""
+    from psyclaw.status import collect_status, print_status
+    print_status(collect_status("."))
+    return 0
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    """投稿前一键质检:JARS + 引用保真(+期刊风格)+ 复现溯源 + KG 溯源,一屏汇总。"""
+    from psyclaw.checkup import print_check, run_check
+    res = run_check(draft=getattr(args, "draft", None),
+                    journal=getattr(args, "journal", None),
+                    project_dir=".",
+                    research_type=getattr(args, "research_type", "quant"))
+    print_check(res)
+    return 0 if res["passed"] else 1
+
+
 def cmd_agent(args: argparse.Namespace) -> int:
     """agent 一次性任务:模型自主多步调用工具(纯工具层循环,provider 无关保底)。"""
     from psyclaw import ui
@@ -770,7 +788,8 @@ def cmd_autoloop(args: argparse.Namespace) -> int:
     try:
         return run_autoloop(project_dir=".",
                             max_iters=getattr(args, "max_iters", 6),
-                            auto=getattr(args, "auto", False))
+                            auto=getattr(args, "auto", False),
+                            skip_gates=getattr(args, "skip_gates", False))
     except KeyboardInterrupt:
         print("\n自主回路已中断。状态已保存,下次 psyclaw auto-loop 从此处续。")
         return 0
@@ -782,7 +801,8 @@ def cmd_review_lit(args: argparse.Namespace) -> int:
     try:
         return run_workflow(get_workflow("lit-review"),
                             topic=getattr(args, "topic", None),
-                            project_dir=".", auto=getattr(args, "auto", False))
+                            project_dir=".", auto=getattr(args, "auto", False),
+                            skip_gates=getattr(args, "skip_gates", False))
     except KeyboardInterrupt:
         print("\n流程已中断。已落盘的产物保留在 notes/ outputs/。")
         return 0
@@ -797,7 +817,8 @@ def cmd_meta(args: argparse.Namespace) -> int:
     try:
         return run_workflow(get_workflow("meta"), topic=topic, project_dir=".",
                             auto=getattr(args, "auto", False),
-                            seed={"effects_csv": args.effects_csv})
+                            seed={"effects_csv": args.effects_csv},
+                            skip_gates=getattr(args, "skip_gates", False))
     except KeyboardInterrupt:
         print("\n流程已中断。已落盘的产物保留在 notes/ outputs/。")
         return 0
@@ -812,7 +833,8 @@ def cmd_analysis(args: argparse.Namespace) -> int:
     try:
         return run_workflow(get_workflow("analysis"), topic=topic, project_dir=".",
                             auto=getattr(args, "auto", False),
-                            seed={"data_csv": args.data_csv})
+                            seed={"data_csv": args.data_csv},
+                            skip_gates=getattr(args, "skip_gates", False))
     except KeyboardInterrupt:
         print("\n流程已中断。已落盘的产物保留在 notes/ outputs/。")
         return 0
@@ -827,7 +849,8 @@ def cmd_qualitative(args: argparse.Namespace) -> int:
     try:
         return run_workflow(get_workflow("qualitative"), topic=topic, project_dir=".",
                             auto=getattr(args, "auto", False),
-                            seed={"transcripts": args.transcripts})
+                            seed={"transcripts": args.transcripts},
+                            skip_gates=getattr(args, "skip_gates", False))
     except KeyboardInterrupt:
         print("\n流程已中断。已落盘的产物保留在 notes/ outputs/。")
         return 0
@@ -852,9 +875,9 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 常用命令集——`--help` 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅供 `guide`/`commands`
 # 标注 ★ 常用,帮助新用户聚焦上手路径。改这个集合只影响 ★ 标注,不影响命令可见性/可用性。
 CORE_COMMANDS = {
-    "guide", "auto-loop", "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop",
+    "guide", "status", "auto-loop", "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop",
     "research", "review", "clarify", "lit", "export",
-    "score", "scale", "jars", "cite-check", "preregister", "declare-test",
+    "score", "scale", "jars", "cite-check", "check", "preregister", "declare-test",
     "plan", "goal", "tasks", "memory",
     "gates", "config", "setup", "doctor", "repl", "resume", "commands",
 }
@@ -862,12 +885,13 @@ CORE_COMMANDS = {
 # 职能分类(每个命令恰好出现一次;`psyclaw commands` 按此展示)。统计方法已外移到
 # 成熟库/MCP——本 CLI 只保留研究编排 + 知识参考 + 文献/写作 harness。
 COMMAND_CATEGORIES = [
-    ("环境 / 系统", ["guide", "repl", "version", "doctor", "config", "setup",
+    ("环境 / 系统", ["guide", "status", "repl", "version", "doctor", "config", "setup",
                   "skills", "mcp", "gates", "commands"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score"]),
-    ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars", "cite-check"]),
+    ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars", "cite-check",
+                       "check"]),
     ("研究流程 / 编排回路", ["agent", "auto-loop", "loop", "lit-loop", "meta-loop",
                         "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
@@ -878,37 +902,26 @@ COMMAND_CATEGORIES = [
 
 
 def cmd_guide(args: argparse.Namespace) -> int:
-    """首次使用上手介绍:是什么 + 心智模型(每类研究一条 loop)+ 60 秒上手。"""
+    """首次使用上手:一条默认路径 + 决策树(不再把 8 个入口的选择题抛给用户)。"""
     from psyclaw import __version__, ui
     print(ui.title(f"PsyClaw v{__version__} — 心理学研究编排 harness"))
     print(ui.dim("把研究全流程编排起来(澄清→文献→设计→写作→评审→门禁);"
                  "统计计算交给外部库/MCP,本体不内置统计。\n"))
 
-    print(ui.accent("心智模型:每类研究走一条 loop"))
-    rows = [
-        ("auto-loop", "自主科研回路:自动发现待办→派发对应流程→独立验收→记状态→定下一步"),
-        ("loop [主题]", "通用编排回路(planner→执行→critic→修复),任意任务"),
-        ("lit-loop <主题>", "文献综述:澄清→检索→PRISMA筛选→合成综述→评审"),
-        ("meta-loop <effects.csv>", "元分析:校验效应量→生成可复现脚本(statsmodels)→写→评审"),
-        ("analysis-loop <data.csv>", "实证分析:画像→设计→推荐分析+脚本(pingouin)→写→评审"),
-        ("qual-loop <转录稿>", "质性研究:转录稿→设计→主题分析(LLM辅助)→COREQ→评审"),
-    ]
-    for cmd, desc in rows:
-        print(f"  {ui.ok(cmd):<34} {ui.dim(desc)}")
+    print(ui.accent("默认路径(90% 场景只需这三条)"))
+    print("  1. " + ui.ok("psyclaw status") + ui.dim("      看项目态势:进度/被什么拦着/下一步建议"))
+    print("  2. " + ui.ok("psyclaw auto-loop") + ui.dim("   一键推进:自动发现该做什么→派发→独立验收"))
+    print(ui.dim("     (澄清等门禁拦你、你又想先试试 → 加 --skip-gates 显式跳过,产出标探索性)"))
+    print("  3. " + ui.ok("psyclaw check 稿件.md") + ui.dim(" 投稿前一键质检(JARS/引用保真/复现溯源)"))
     print()
 
-    print(ui.accent("60 秒上手"))
-    print("  1. " + ui.ok("psyclaw clarify") + ui.dim("            先澄清研究问题(17 槽位,不澄清完不开工)"))
-    print("  2. " + ui.ok("psyclaw setup") + ui.dim("              铺目录 + 据澄清生成项目概览/记忆 + 装能力依赖/MCP"))
-    print("  3. " + ui.ok('psyclaw lit-loop "你的主题"') + ui.dim("  选对应你研究类型的 loop 起跑"))
-    print("  4. " + ui.dim("跟随步间提示;产物落 notes/ 与 outputs/;统计脚本在 [stats] 环境或 MCP 跑"))
+    print(ui.accent("按需分支(auto-loop 会自己路由;想手动点名才用)"))
+    print(ui.dim("  只想搜/问点东西      → psyclaw search \"问题\"(自动路由学术库/本地)/ 或直接 psyclaw 进 REPL 聊"))
+    print(ui.dim("  明确要做某类研究     → lit-loop 综述 · analysis-loop 实证 · meta-loop 元分析 · qual-loop 质性"))
+    print(ui.dim("  要模型自主用工具     → psyclaw agent \"任务\"(REPL 内 /agent)"))
+    print(ui.dim("  正式开工前          → clarify 澄清(17 槽位)· setup 铺项目 · preregister 预注册"))
     print()
-
-    print(ui.accent("常用单功能(也可单独直接用)"))
-    print(ui.dim("  clarify 澄清 · lit 文献检索 · scale 量表库 · score 计分 · preregister 预注册"))
-    print(ui.dim("  export 出 APA7/期刊稿 · review 审稿模拟 · gates 学术门禁 · memory 三层记忆"))
-    print()
-    print(ui.dim("全部命令分类:psyclaw commands   ·   配置:psyclaw config   ·   自检:psyclaw doctor"))
+    print(ui.dim("全部命令:psyclaw commands   ·   配置 LLM:psyclaw config   ·   自检:psyclaw doctor"))
     return 0
 
 
@@ -945,6 +958,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("repl", help="进入交互式 REPL（默认）").set_defaults(func=cmd_repl)
 
+    sub.add_parser(
+        "status",
+        help="一屏项目态势:目标/澄清/回路/等人决策(直接打印)/最近产物/下一步建议",
+    ).set_defaults(func=cmd_status)
+
+    pck = sub.add_parser(
+        "check",
+        help="投稿前一键质检:JARS+引用保真(+期刊风格)+复现溯源+KG溯源,一屏汇总")
+    pck.add_argument("draft", nargs="?", default=None,
+                     help="稿件 md(留空取 outputs/report.md)")
+    pck.add_argument("--journal", default=None,
+                     help="按期刊定制(引用风格核对;psyclaw journal 看目录)")
+    pck.add_argument("--type", dest="research_type", default="quant",
+                     choices=["quant", "qual", "mixed"], help="研究类型(JARS 用)")
+    pck.set_defaults(func=cmd_check)
+
     pag = sub.add_parser(
         "agent",
         help="agent 一次性任务:模型自主多步调用工具(纯工具层循环,provider 无关保底)")
@@ -963,7 +992,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     psn = sub.add_parser(
         "session",
-        help="会话管理:list|search|rename|delete(跨会话持久化,SQLite+FTS5 全文检索)")
+        help="会话管理:list|rename|delete(跨会话持久化;找内容用 psyclaw search 统一入口)")
     psn.add_argument("action", nargs="?", default="list",
                      choices=["list", "search", "rename", "delete"])
     psn.add_argument("rest", nargs="*",
@@ -1187,6 +1216,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="迭代上限(默认 6;一个研究项目通常 ≤4 个阶段)")
     pal.add_argument("--auto", action="store_true",
                      help="全程无人值守(默认在每个任务派发前征求确认)")
+    pal.add_argument("--skip-gates", dest="skip_gates", action="store_true",
+                     help="按你的要求跳过门禁(澄清等不再拦;留痕 notes/gate_skips.md,产出按探索性对待)")
     pal.set_defaults(func=cmd_autoloop)
 
     # <type>-loop → 按研究类型预置的具体流程(走 workflow 引擎)
@@ -1195,6 +1226,8 @@ def build_parser() -> argparse.ArgumentParser:
                          help="文献综述流程:澄清→检索→筛选(PRISMA)→合成综述→评审")
     prl.add_argument("topic", nargs="?", default=None, help="综述主题(可空,读 notes/goal.md)")
     prl.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
+    prl.add_argument("--skip-gates", dest="skip_gates", action="store_true",
+                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
     prl.set_defaults(func=cmd_review_lit)
 
     # meta-loop → 元分析(输入效应量表;统计由生成的脚本在外部 statsmodels 跑)
@@ -1203,6 +1236,8 @@ def build_parser() -> argparse.ArgumentParser:
     pma.add_argument("effects_csv", help="效应量 CSV(含 study / 效应量(d/g/r/yi) / variance|se|ci 列)")
     pma.add_argument("--topic", default=None, help="元分析主题(可空,默认据文件名)")
     pma.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
+    pma.add_argument("--skip-gates", dest="skip_gates", action="store_true",
+                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
     pma.set_defaults(func=cmd_meta)
 
     # analysis-loop → 实证分析(输入数据表;统计由生成的脚本在外部 pingouin/scipy 跑)
@@ -1211,6 +1246,8 @@ def build_parser() -> argparse.ArgumentParser:
     pan.add_argument("data_csv", help="数据 CSV(被试×变量;自动画像列类型并推荐分析)")
     pan.add_argument("--topic", default=None, help="研究主题(可空,默认据文件名)")
     pan.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
+    pan.add_argument("--skip-gates", dest="skip_gates", action="store_true",
+                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
     pan.set_defaults(func=cmd_analysis)
 
     # qual-loop → 质性研究(输入转录稿;LLM 辅助编码/主题分析,研究者复核)
@@ -1219,6 +1256,8 @@ def build_parser() -> argparse.ArgumentParser:
     pq.add_argument("transcripts", help="转录稿:单个 .txt/.md 文件,或包含它们的目录")
     pq.add_argument("--topic", default=None, help="研究主题(可空,默认据文件名)")
     pq.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
+    pq.add_argument("--skip-gates", dest="skip_gates", action="store_true",
+                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
     pq.set_defaults(func=cmd_qualitative)
 
     prv = sub.add_parser("review", help="审稿模拟(EIC+3审稿人+Devil's Advocate,产可解析意见)")

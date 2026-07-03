@@ -276,7 +276,8 @@ def _patch_engine_writes_goal(monkeypatch):
     import psyclaw.workflows as wf
     from psyclaw.tasks import goal_path
 
-    def fake_run(workflow, topic=None, project_dir=".", auto=False, seed=None):
+    def fake_run(workflow, topic=None, project_dir=".", auto=False, seed=None,
+                 skip_gates=False):
         if topic:
             gp = goal_path(project_dir)
             gp.parent.mkdir(parents=True, exist_ok=True)
