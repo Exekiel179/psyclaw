@@ -35,6 +35,7 @@ COMMANDS = {
     "/tasks": "任务看板(自动从计划抽取;start/done/add/sync)",
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
     "/audit": "逐轮审计开关(on/off;每轮多一次 LLM 调用)",
+    "/agent": "agent 模式开关(模型自主多步调用工具:search/read_file/save_file/kg_query/recall)",
     "/clarify": "研究澄清(grill-me 式,不澄清完不开工)",
     "/preregister": "预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取)",
     "/scale": "量表库(DASS/PHQ-9/GAD-7/TIPI…)",
@@ -142,6 +143,7 @@ class ReplSession:
         self.memo = ""              # 滚动压缩的决策备忘
         self.plan_mode = False      # 规划模式:只规划不执行,产出自动抽任务
         self.audit_mode = False     # 逐轮审计(auditor agent,每轮多一次调用)
+        self.agent_mode = False     # agent 模式:模型自主多步调用工具(纯工具层循环)
         from datetime import datetime
         self.session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         from psyclaw.recall import ContextArchive
@@ -223,20 +225,26 @@ class ReplSession:
             pass
         self.chars_in += len(text) + len(system)
         print()
-        blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
-        reply_parts: list[str] = []
-        try:
-            for chunk in self.provider.chat(self.messages, system=system):
-                blk.write(chunk)
-                reply_parts.append(chunk)
-        except Exception as exc:  # noqa: BLE001
-            blk.write(f"\n[provider 错误] {exc}")
+        if self.agent_mode:
+            reply = self._run_agent(system)
+            if reply is None:            # provider 错误 → 回退用户消息
+                self.messages.pop()
+                return
+        else:
+            blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
+            reply_parts: list[str] = []
+            try:
+                for chunk in self.provider.chat(self.messages, system=system):
+                    blk.write(chunk)
+                    reply_parts.append(chunk)
+            except Exception as exc:  # noqa: BLE001
+                blk.write(f"\n[provider 错误] {exc}")
+                blk.close()
+                self.messages.pop()
+                return
             blk.close()
-            self.messages.pop()
-            return
-        blk.close()
-        print()
-        reply = "".join(reply_parts)
+            print()
+            reply = "".join(reply_parts)
         self.messages.append({"role": "assistant", "content": reply})
         self.chars_out += len(reply)
         if self.plan_mode:
@@ -252,6 +260,34 @@ class ReplSession:
             from psyclaw.audit import render_verdict, run_audit
             result = run_audit(self.provider, text, reply)
             print(render_verdict(result))
+
+    def _run_agent(self, system: str) -> str | None:
+        """agent 模式:跑纯工具层循环(模型自主多步调工具)。返回最终答案;provider 错误返回 None。"""
+        from psyclaw.loop import _ask_yn
+        from psyclaw.toolloop import run_tool_loop
+
+        def _approve(call: dict) -> bool:
+            try:
+                return _ask_yn(f"  批准副作用工具 {call['name']}"
+                               f"({call.get('args')})?")
+            except Exception:  # noqa: BLE001  # 非 TTY → 不批准(fail-closed)
+                return False
+
+        try:
+            res = run_tool_loop(
+                self.provider, system, self.messages, project_dir=".",
+                approve=_approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
+        except Exception as exc:  # noqa: BLE001
+            print(ui.err(f"  [provider 错误] {exc}"))
+            return None
+        if res["trace"]:
+            print(ui.dim(f"  [agent:{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · "
+                         f"{res['stopped']}]"))
+        blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
+        blk.write(res["final"])
+        blk.close()
+        print()
+        return res["final"]
 
     def _capture_saves(self, reply: str) -> None:
         """扫描回复里的 ```save 块并写盘(护栏:拒 data/raw、覆盖前交互确认)。"""
@@ -423,6 +459,17 @@ class ReplSession:
             print(f"  [逐轮审计 {'开' if self.audit_mode else '关'}]"
                   + (" 每轮回答后 auditor 评分,SCORE<80 草拟教训卡;"
                      "注意每轮多一次 LLM 调用。" if self.audit_mode else ""))
+        elif cmd == "/agent":
+            low = arg.lower()
+            self.agent_mode = (low == "on") if low in ("on", "off") \
+                else not self.agent_mode
+            if self.agent_mode:
+                from psyclaw.toolloop import build_tools
+                names = ", ".join(build_tools(".").keys())
+                print(ui.ok("  [agent 模式 开] 模型可自主多步调用工具:") + ui.dim(names))
+                print(ui.dim("    副作用工具(save_file)每次执行前问你批准;/agent off 退出。"))
+            else:
+                print("  [agent 模式 关] 恢复普通对话。")
         elif cmd == "/clear":
             self.messages.clear()
             print("  [上下文已清空]")
@@ -539,6 +586,7 @@ HELP_TEXT = """\
   /tasks      任务看板(list|add|start|done|block|sync;计划自动抽取)
   /recall [q] 历史上下文召回(全量存库+关键词索引,相关度≥80%才注入)
   /audit      逐轮审计开关(auditor 评分;on/off/log)
+  /agent      agent 模式(模型自主多步调工具:search/read_file/save_file/kg_query/recall)
   /model [m]  查看/切换模型      /provider [p]  查看/切换 provider
   /skills     列出 skills        /mcp           MCP 目录与启用状态
   /gates      门禁自检           /cost          本会话成本粗估
