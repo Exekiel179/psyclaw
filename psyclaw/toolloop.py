@@ -60,6 +60,43 @@ def parse_tool_calls(reply: str) -> list[dict]:
     return calls
 
 
+# v0.3 安全加固(外审 MEDIUM):save_file 路径允许清单。凭据类文件与目录一律拒写。
+_CRED_DIR_PARTS = frozenset({".ssh", ".aws", ".gnupg", ".kube", ".docker"})
+_CRED_NAMES = frozenset({".netrc", ".env", ".npmrc", ".pypirc", "credentials",
+                         "id_rsa", "id_ed25519", "authorized_keys", "known_hosts"})
+_CRED_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
+
+
+def save_path_denied(raw_path: str, project_dir: str = ".") -> str | None:
+    """save_file 目标路径护栏:返回拒绝原因(带完整解析路径),None=放行。纯函数,可单测。
+
+    - 解析(resolve,消解 ../ 与途径软链)后必须落在项目根内——拒相对逃逸与项目外绝对路径;
+    - 目标已存在且是软链接 → 拒(不经软链写,防指向别处的覆盖);
+    - 凭据类文件名/后缀/目录段(.ssh/.aws/.env/*.pem/id_rsa…) → 拒(纵深防御,即使在根内);
+    - data/raw 铁律仍由 apply_save_block 内部把关,这里不重复。
+    """
+    from pathlib import Path
+    raw = (raw_path or "").strip()
+    if not raw:
+        return "拒绝写入:路径为空"
+    root = Path(project_dir).expanduser().resolve()
+    p = Path(raw).expanduser()
+    target = p if p.is_absolute() else root / p
+    try:
+        resolved = target.resolve()
+    except OSError as exc:  # 极端路径(过长/非法字符)
+        return f"拒绝写入:路径无法解析({exc})"
+    if not resolved.is_relative_to(root):
+        return f"拒绝写入:目标在项目根之外({resolved})"
+    if target.exists() and target.is_symlink():
+        return f"拒绝写入:目标是软链接({target} → {resolved})"
+    name = resolved.name.lower()
+    if (name in _CRED_NAMES or name.endswith(_CRED_SUFFIXES)
+            or _CRED_DIR_PARTS & {part.lower() for part in resolved.parts}):
+        return f"拒绝写入:凭据类路径({resolved})"
+    return None
+
+
 def build_tools(project_dir: str = ".") -> dict:
     """内置工具集:把既有能力(检索/读文件/存文件/KG/召回)暴露为可调用工具。"""
     from pathlib import Path
@@ -97,12 +134,16 @@ def build_tools(project_dir: str = ".") -> dict:
 
     def _save(a):
         from psyclaw.repl import apply_save_block
+        raw = str(a.get("path", ""))
+        denial = save_path_denied(raw, project_dir)   # v0.3:项目根允许清单+凭据护栏
+        if denial:
+            return denial
         r = apply_save_block(
-            {"path": str(a.get("path", "")), "content": str(a.get("content", ""))},
+            {"path": raw, "content": str(a.get("content", ""))},
             confirm=lambda p: True)   # 副作用批准已在循环层做,此处允许覆盖
         tail = f"({r.get('chars')} 字符)" if r.get("chars") is not None else ""
         return f"{r['status']} {r.get('path', '')} {tail}".strip()
-    _t("save_file", "保存文件到磁盘(绝不写 data/raw;覆盖需批准)",
+    _t("save_file", "保存文件到磁盘(仅项目根内;绝不写 data/raw/凭据路径;覆盖需批准)",
        "path:str, content:str", _save, side_effect=True)
 
     def _kg(a):
