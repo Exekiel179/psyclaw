@@ -423,6 +423,48 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.3.0→0.5.0(跳过未发版 0.4);CHANGELOG.md v0.5.0 段(编排纵深 feat-039/040、长会话 feat-041、含 v0.4 工件 feat-036/037/038);docs/COMMANDS.md(统计三条路补 agent 直连 MCP + PSYCLAW_MCP_TOOLS)、docs/ARCHITECTURE.md(L3 加 v0.5 agent 直连 MCP 段);TODO §2 + progress 本轮(25) + session-handoff 快照;验证:uv run --python 3.12 pytest → 1242 passed;psyclaw version → 0.5.0(uv tool editable)"
+    },
+    {
+      "id": "feat-043",
+      "name": "工具调用参数规范化与校验(v0.6:多轮工具调用不崩)",
+      "description": "parse_tool_calls 现在把 args 原样返回:模型输出 args 为 list/数字/双重编码 JSON 字符串(\"args\":\"{...}\")时,内置工具 a.get(...) 抛 AttributeError,且 _exec_tool 竟标 ok=True(掩盖崩溃)。修:parse 规范化 args——dict 保留;JSON 对象字符串→解析为 dict;其余非 dict→{name:None,error:'args 必须是 JSON 对象'} 引导模型改;name 须非空字符串(否则 error)。_exec_tool 工具异常改标 ok=False(如实报失败,模型能自纠)。纯函数可测。",
+      "dependencies": [
+        "feat-030"
+      ],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-044",
+      "name": "工具循环无进展检测(v0.6:多轮不空转/不卡死)",
+      "description": "当前只有 max_iters 与截断兜底;模型反复用**相同参数**调同一工具(常见混乱模式)会白耗到 max_iters,空回复也被当最终答案。加:① 空/纯空白回复(无 tool 块、非截断)→ 视为无进展,回灌一次追问而非当答案;② 连续相同 (name,args) 调用达阈值 → stopped=no_progress,附清晰说明停止(不静默、不空转到 24 轮)。有限纠偏后收敛。",
+      "dependencies": [
+        "feat-043"
+      ],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-045",
+      "name": "消息序列不变量守卫(v0.6:多轮不触发 provider 400)",
+      "description": "provider(Anthropic/OpenAI)对空 content 消息、非交替角色会 400。工具循环回灌/续写路径需保证:绝不向 convo 追加空 content 的 assistant/user 消息;最终答案为空时有限重试一次而非返回空 final;assistant→user 交替不被 nudge 打破。加不变量检查函数 + 循环内应用。",
+      "dependencies": [
+        "feat-044"
+      ],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-046",
+      "name": "v0.6 发布收尾 + 多轮集成测试",
+      "description": "新增贴近真实的多轮工具调用集成测试(混合:正常调用→畸形 args 自纠→重复调用检测→截断续写→最终答案),证明『多轮对话工具调用不出问题』;版本 0.5.0→0.6.0;CHANGELOG v0.6 段;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-043",
+        "feat-044",
+        "feat-045"
+      ],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }
