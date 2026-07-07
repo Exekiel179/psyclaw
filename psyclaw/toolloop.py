@@ -234,6 +234,47 @@ def _render_results(results: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+# --- 长会话上下文修剪(v0.3 feat-033) -------------------------------------------
+# 24 轮 × 每轮 ≤6000 字符/工具的回灌若原样保留,长任务会撑爆 provider 上下文、
+# 也更易触发 max_tokens 截断。滚动修剪:最近 _KEEP_RECENT_RESULTS 轮工具结果保留完整,
+# 更早的压缩为「工具名 + 输出首行」摘要——模型如需详情可重新调用工具(幂等只读工具居多)。
+
+_RESULT_HEAD = "# 工具结果"
+_COMPRESSED_HEAD = "# 工具结果(旧轮次已压缩;如需详情请重新调用对应工具)"
+_KEEP_RECENT_RESULTS = 3
+_COMPRESS_LINE_CHARS = 160
+
+
+def _compress_result_msg(content: str) -> str:
+    """把一条工具结果回灌压缩为:每个工具保留 `## 名字` + 输出首行(限长)。纯函数。"""
+    out = [_COMPRESSED_HEAD]
+    take_next = False
+    for ln in content.splitlines():
+        if ln.startswith("## "):
+            out.append(ln)
+            take_next = True
+        elif take_next and ln.strip():
+            out.append(ln[:_COMPRESS_LINE_CHARS]
+                       + ("…" if len(ln) > _COMPRESS_LINE_CHARS else ""))
+            take_next = False
+    return "\n".join(out)
+
+
+def trim_convo(convo: list, base_len: int) -> None:
+    """就地滚动修剪循环内追加的工具结果消息(最近 _KEEP_RECENT_RESULTS 条保完整)。
+
+    只动 base_len 之后、以 _RESULT_HEAD 开头的 user 消息——调用方传入的原始
+    messages(REPL 历史等)与 assistant 回复、续写提示一概不碰。幂等:已压缩的跳过。
+    """
+    idxs = [i for i in range(base_len, len(convo))
+            if convo[i].get("role") == "user"
+            and str(convo[i].get("content", "")).startswith(_RESULT_HEAD)
+            and not str(convo[i].get("content", "")).startswith(_COMPRESSED_HEAD)]
+    for i in idxs[:-_KEEP_RECENT_RESULTS] if len(idxs) > _KEEP_RECENT_RESULTS else []:
+        convo[i] = {"role": "user",
+                    "content": _compress_result_msg(convo[i]["content"])}
+
+
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
                   project_dir: str = ".", max_iters: int = 24,
                   approve=None, emit=None) -> dict:
@@ -248,6 +289,7 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
     tools = tools if tools is not None else build_tools(project_dir)
     full_system = system + "\n" + render_tool_catalog(tools)
     convo = [dict(m) for m in messages]
+    base_len = len(convo)   # 修剪只动此后循环追加的消息,不碰调用方原始历史
     trace: list[dict] = []
     trunc_streak = 0
     for it in range(1, max_iters + 1):
@@ -275,5 +317,6 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
         if cut:  # 有完整调用但尾部还挂着截断的残块 → 一并告知,避免模型以为已发出
             feedback += "\n\n(注意:你上一条输出末尾有一个被截断的 tool 块未被执行,如仍需要请重发完整块。)"
         convo.append({"role": "user", "content": feedback})
+        trim_convo(convo, base_len)   # feat-033:旧轮次工具结果滚动压缩,防上下文无界增长
     return {"final": f"(达到工具调用上限 {max_iters},未收敛;可提高上限或缩小任务)",
             "iters": max_iters, "stopped": "max_iters", "trace": trace}
