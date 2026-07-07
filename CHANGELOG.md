@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.0(2026-07-07)
+
+> 主题:**一键配置基础环境**。
+
+### 新增
+- **`psyclaw setup --env`**(feat-051):一条命令诊断并配好跑 psyclaw 所缺的基础环境——
+  检查 ① 配置文件是否已建 ② LLM provider 是否配了 API key(否则只能走 mock 占位)
+  ③ `stats` 组(pingouin/pandas/scipy:pystat 真算、跑生成的统计脚本)④ `full` 组
+  (prompt_toolkit/rich:REPL 实时联想)。每项给 ✓/✗ + 确切修法 + 能否自动装;
+  加 `--online` 则一键 pip 装可自动修的缺失组(stats/full),不能自动的(API key)列为待手动。
+  装失败如实报告、不阻断。
+
 ## v0.8.0(2026-07-07)
 
 > 主题:**闭环「统计外移到 MCP」**——agent 现在能直接调用统计后端。

@@ -20,6 +20,7 @@
 | `version` / `doctor` | 版本 / 环境自检(配置·MCP·Gates) |
 | `config` | 配置向导(API key/模型/环境变量) |
 | `setup` | 项目脚手架+能力选装:建目录 + 据 clarify 生成概览/项目记忆 + 装能力依赖(`--online`)+ 列 MCP/skill |
+| `setup --env` | **一键配置基础环境**(v0.9):诊断配置文件/LLM key/stats/full 组,每项给 ✓✗+修法;`--online` 自动 pip 装可修的缺失组 |
 | `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH`;`--for <研究类型>` 按类型推荐)/ MCP 目录(内置 registry + 用户 `.psyclaw/mcp.yaml` 项目/全局)——**均标注 内置/用户·项目/用户·全局** |
 | `plugins` | 列出插件(用户 项目 `.psyclaw/plugins/` / 全局 `~/.psyclaw/plugins/`;`register(api)` 注册 agent 工具 / REPL 命令 / system 片段) |
 | `gates` | 学术规范门禁自检 |
