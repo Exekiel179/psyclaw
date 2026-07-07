@@ -77,6 +77,11 @@ Step 之下是真正的实现层:
 把已启用+健康的 MCP 服务器工具惰性并入 agent 工具集(`mcp__<server>__<tool>`,fail-closed 批准)。
 至此 L3 的 MCP 不再只是"另起进程手动跑",agent 循环可在多步推理中直接调用——编排纵深落地。
 
+**v0.8:pystat 后端闭环。** `psyclaw/mcp/servers/pystat_server.py` 委托 pingouin/pandas 做
+常规统计(t 检验/相关/方差/回归/描述),库在则真跑(带效应量+CI)、不在则给可运行脚本。
+它随 registry 的 `command` 被 feat-040 自动浮出为 `mcp__pystat__*`——agent 可在推理中直接
+委托统计,不必让用户手动跑脚本。至此「统计外移到成熟库/MCP」从口号变成 agent 触手可及的工具。
+
 ## 两条横切
 
 - **Harness**:每个 Step 的 `gate` = 前置约束(如澄清未完成不开工、确证须先预注册);
