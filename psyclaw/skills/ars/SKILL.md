@@ -2,6 +2,7 @@
 name: ars
 description: Academic Research Skill — 端到端心理学研究总编排：文献调研→实验设计→统计分析→论文写作，全程受 PSYCLAW 规范门禁约束。当用户要做心理学研究、跑统计、写论文、做文献综述、设计实验时触发。
 category: domain
+status: legacy
 metadata:
   subskills: [literature, design, stat, writing]
   requires_mcp: [pystat, lit-search-mcp, zotero-mcp]

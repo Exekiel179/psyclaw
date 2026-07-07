@@ -19,11 +19,12 @@ if _ENABLED and os.name == "nt":
 
 RESET = "\033[0m"
 _CODES = {
-    "bold": "1", "dim": "2", "italic": "3",
+    "bold": "1", "dim": "2", "italic": "3", "reverse": "7",
     "red": "31", "green": "32", "yellow": "33", "blue": "34",
     "magenta": "35", "cyan": "36", "white": "37",
     "brred": "91", "brgreen": "92", "bryellow": "93",
     "brblue": "94", "brmagenta": "95", "brcyan": "96",
+    "bgblue": "44", "bgmagenta": "45", "bgcyan": "46",
 }
 
 
@@ -64,12 +65,8 @@ def rule(width: int = 56, char: str = "─") -> str:
 
 
 BANNER_ART = r"""
-   ____             ____ _
-  |  _ \ ___ _   _ / ___| | __ ___      __
-  | |_) / __| | | | |   | |/ _` \ \ /\ / /
-  |  __/\__ \ |_| | |___| | (_| |\ V  V /
-  |_|   |___/\__, |\____|_|\__,_| \_/\_/
-             |___/
+  PsyClaw
+  research orchestration workbench
 """
 
 
@@ -148,6 +145,107 @@ def panel(title: str, content: str, color: str = "brcyan") -> str:
     return "\n".join(lines)
 
 
+def _clip(text: str, width: int) -> str:
+    """Clip by terminal display width."""
+    if display_width(text) <= width:
+        return text
+    out, used = "", 0
+    for ch in text:
+        w = _char_width(ch)
+        if used + w > max(0, width - 1):
+            break
+        out += ch
+        used += w
+    return out + "…"
+
+
+def _pad(text: str, width: int) -> str:
+    return text + " " * max(0, width - display_width(text))
+
+
+def _button(label: str, hint: str, color: str) -> str:
+    return paint(f" {label} ", color, "bold", "reverse") + " " + dim(hint)
+
+
+def _agent_row(key: str, value: str, width: int) -> str:
+    body = paint("│", "brcyan") + " " + dim(f"{key:<8}") + value
+    return body + " " * max(0, width - display_width(body) - 1) + paint("│", "brcyan")
+
+
+def kv(label: str, value: str, width: int = 10) -> str:
+    """Compact aligned label/value row."""
+    return dim(f"{label:<{width}}") + value
+
+
+def _startup_status_lines(status: dict | None, provider: str | None = None) -> list[str]:
+    lines: list[str] = []
+    if provider:
+        lines.append(kv("Provider", _clip(provider, 48)))
+    if not status:
+        return lines
+
+    project = status.get("project", "")
+    if project:
+        lines.append(kv("Project", _clip(project, 54)))
+
+    goal = (status.get("goal") or "").strip()
+    goal_text = _clip(goal.splitlines()[0], 54) if goal else dim("not set · psyclaw goal <目标>")
+    lines.append(kv("Goal", goal_text))
+
+    c = status.get("clarify", {})
+    if c.get("exists"):
+        if c.get("unresolved", 0) == 0:
+            clarify = ok("ready")
+        else:
+            clarify = warn(f"{c.get('resolved', 0)}/{c.get('total', 0)} resolved")
+    else:
+        clarify = dim("not started · psyclaw clarify")
+    lines.append(kv("Clarify", clarify))
+
+    nxt = status.get("next")
+    if nxt:
+        tag = warn("blocked") if nxt.get("blocker") else accent("next")
+        lines.append(kv("Next", f"{tag} {nxt.get('title', '')}"))
+    else:
+        lines.append(kv("Next", dim("psyclaw guide · psyclaw status")))
+    return lines
+
+
+def startup(version: str, status: dict | None = None, provider: str | None = None) -> str:
+    """Startup workbench screen for CLI/REPL entry."""
+    w = max(68, min(term_width(), 92))
+    inner = w - 4
+    brand = paint(">_", "brgreen", "bold") + " " \
+        + paint("PsyClaw", "bold", "brcyan") + dim(f" v{version}")
+    mode = paint("research agent", "bold", "white") + dim("  psychology workflow harness")
+    status_lines = _startup_status_lines(status, provider)
+    title = "─ " + brand + " "
+
+    lines = [
+        paint("╭" + title, "brcyan") +
+        paint("─" * max(0, w - display_width(title) - 2) + "╮", "brcyan"),
+        _agent_row("mode", mode, w),
+    ]
+
+    if status_lines:
+        for raw in status_lines:
+            lines.append(_agent_row("", raw, w))
+    lines.append(paint("├" + "─" * max(0, w - 2) + "┤", "brcyan"))
+
+    launch = [
+        _button("/status", "state", "brcyan"),
+        _button("/auto-loop", "next", "brmagenta"),
+        _button("/clarify", "slots", "bryellow"),
+        _button("/commands", "map", "brgreen"),
+    ]
+    lines.append(_agent_row("try", "   ".join(launch[:2]), w))
+    lines.append(_agent_row("", "   ".join(launch[2:]), w))
+
+    lines.append(_agent_row("input", dim("/ for commands  @file for context  Ctrl+C to exit"), w))
+    lines.append(paint("╰" + "─" * max(0, w - 2) + "╯", "brcyan"))
+    return "\n".join(lines)
+
+
 class StreamBlock:
     """流式渲染块:LLM 回复边缓冲、关闭时整块 Markdown 渲染后输出。
 
@@ -196,10 +294,4 @@ class StreamBlock:
 
 
 def banner(version: str) -> str:
-    lines = [paint(BANNER_ART, "brcyan")]
-    lines.append("  " + title("PsyClaw") + dim(" · ")
-                 + paint(f"v{version}", "bryellow")
-                 + dim("  心理学研究全流程 Agent CLI"))
-    lines.append("  " + dim("文献调研 · 实验设计 · 统计分析 · 论文写作 — 规范门禁内置"))
-    lines.append("  " + rule())
-    return "\n".join(lines)
+    return startup(version)
