@@ -2,7 +2,23 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07(晚:v0.3→…→v0.8→**v0.9.0 发布**)
+**Last Updated:** 2026-07-07(晚:v0.3→…→v0.9→**v0.10.0 发布**)
+
+## 本轮(30):v0.10.0 发布 ——feat-053/054 done(数据→结果端到端闭环)
+
+用户『下个版本是 v0.10』。做 handoff 反复顺延的最高杠杆项——workflow 分析步接 pystat MCP:
+- feat-053:新增 psyclaw/workflows/pystat_bridge.py——rec_to_pystat_call 纯映射
+  recommend_analysis 的 {analysis,group/dv/iv/x/y}→pystat 工具+args(5 分支);run_via_pystat
+  经 MCPClient 真跑,client_factory 可注入、不可用/异常 fail-safe。step_analysis 生成脚本后
+  best-effort 经 pystat 跑,结果落 outputs/analysis_result.txt(装 [stats] 真数值、否则降级脚本),
+  失败不阻断(脚本兜底)。e2e:经真实 pystat MCP subprocess 连通(458 字降级脚本)。
+- feat-054:版本 0.9.0→0.10.0 + CHANGELOG v0.10 + ARCHITECTURE 闭环段。
+
+全量 **1306 passed**;`psyclaw version` → 0.10.0。54 个 feature 全 done。
+闭环三段:v0.5 agent 能调 MCP、v0.8 建 pystat 后端、v0.10 workflow 也接上。
+
+---
+
 
 ## 本轮(29):v0.9.0 发布 ——feat-051/052 done(setup --env 一键配置基础环境)
 

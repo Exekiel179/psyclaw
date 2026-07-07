@@ -82,6 +82,11 @@ Step 之下是真正的实现层:
 它随 registry 的 `command` 被 feat-040 自动浮出为 `mcp__pystat__*`——agent 可在推理中直接
 委托统计,不必让用户手动跑脚本。至此「统计外移到成熟库/MCP」从口号变成 agent 触手可及的工具。
 
+**v0.10:workflow 也接上,端到端闭环。** `workflows/pystat_bridge.py` 把 `recommend_analysis`
+的检验类型+角色列纯映射到 pystat 工具,`step_analysis` 生成脚本后 best-effort 经 pystat MCP
+直接跑,结果落 `outputs/analysis_result.txt`(fail-safe:不可用仍有脚本)。至此「数据→画像→
+推荐→出结果」在 workflow 层也贯通——agent 路径(v0.5)与 workflow 路径都能落到同一 pystat 后端。
+
 ## 两条横切
 
 - **Harness**:每个 Step 的 `gate` = 前置约束(如澄清未完成不开工、确证须先预注册);

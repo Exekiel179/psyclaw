@@ -539,8 +539,8 @@
       "dependencies": [
         "feat-053"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.9.0→0.10.0;CHANGELOG v0.10.0 段(analysis 分析步接 pystat MCP,数据→结果端到端闭环);docs/ARCHITECTURE.md L3 加 v0.10 闭环段;TODO §2 + progress 本轮(30) + session-handoff 快照(v0.11 候选=结果回填稿件);验证:uv run --python 3.12 pytest → 1306 passed;psyclaw version → 0.10.0"
     }
   ]
 }
