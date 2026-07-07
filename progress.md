@@ -2,11 +2,30 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-03
+**Last Updated:** 2026-07-07
 **重大转向:** PsyClaw 从「全流程统计 CLI」重定位为「纯研究编排 harness」——
 统计计算整体外移到成熟库/MCP,本仓删除全部手写统计实现。
 
 > 状态真源:`feature_list.json`(机器可读)。本文件是人读的「接续上下文」快照。
+
+## 本轮(23):toolloop 截断防护 ——feat-030 done(修「工具调用中途提前停止」)
+
+用户痛点:『对话不能长期维持,AI 在工具调用过程中提前停止』。根因诊断+修复:
+
+- **根因**:provider 输出被 max_tokens 截断 → ```tool 块未闭合 → parse_tool_calls
+  解析不出调用 → run_tool_loop 误判为最终答案 → **静默提前终止**。叠加:providers
+  完全忽略 stop_reason/finish_reason;anthropic max_tokens 硬编码 4096;agent 默认 6 轮上限。
+- **修复**:`toolloop.py` has_truncated_tool_block + _TRUNC_NUDGE 续写(连续 >2 次才停,
+  stopped=truncated 不静默;完整调用+尾部残块 → 执行并告知);`providers/base.py`
+  last_stop_reason;anthropic 捕获 message_delta.stop_reason,openai 系归一化 length→
+  max_tokens;PSYCLAW_MAX_TOKENS 可配(默认 8192);agent --max-iters 6→24。
+- **测试**:test_toolloop +6 例;另修 test_mcp_servers 2 例陈旧断言(3d9b183 改 detect:
+  门控后未同步)。全量 **1190 passed**(uv python 3.12;本机无 3.11+ 系统解释器,用 uv)。
+- **全流程冒烟(六环节)**:① status 环境感知 ✓ ② agent 工具循环 live 实跑
+  (2 轮 1 调用收敛)✓ ③ ContextArchive 记忆写入+召回 ✓ ④ auto-loop 感知→决策→收尾
+  (非 TTY fail-closed 不挂起)✓ ⑤ gates 门禁自检 ✓ ⑥ 技能发现 39 个+类型路由推荐 ✓。
+- 已知小坑:recommend_skills 的 normalize_type 不识别中文『元分析』(英文 meta 可);
+  本机(macOS)只有 python3.9,测试统一走 `uv run --python 3.12`。
 
 ## 本轮(22):v0.2 发布 ——feat-029 done
 
