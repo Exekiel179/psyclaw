@@ -178,6 +178,12 @@ def build_tools(project_dir: str = ".") -> dict:
         merge_plugin_tools(tools, load_plugins(project_dir))
     except Exception:  # noqa: BLE001
         pass
+    # MCP 工具(v0.5 feat-040:已启用+健康的 MCP 服务器工具,mcp__ 前缀,fail-closed)
+    try:
+        from psyclaw.mcp.agent_tools import merge_mcp_tools
+        merge_mcp_tools(tools, project_dir)
+    except Exception:  # noqa: BLE001
+        pass
     return tools
 
 
