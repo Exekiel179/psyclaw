@@ -243,6 +243,46 @@
       "dependencies": ["feat-014"],
       "status": "done",
       "evidence": "psyclaw/toolloop.py(has_truncated_tool_block/_MAX_TRUNC_STREAK/_TRUNC_NUDGE/run_tool_loop 截断分支)+ providers/base.py(last_stop_reason)+ anthropic_api.py + openai_compat.py + cli.py(agent --max-iters 24);tests/test_toolloop.py 新增 6 例(未闭合检测/截断不当答案继续/连续截断放弃 stopped=truncated/stop_reason=max_tokens 触发重试/完整调用+残块执行并告知/默认上限≥24);另修 tests/test_mcp_servers.py 2 例陈旧断言(3d9b183 改 mplus/stata 为 detect: 门控后测试未同步,改为 enabled iff shutil.which);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1190 passed(修前 1188 passed 2 failed,失败为上述陈旧断言,已确认与本改动无关后修正)。"
+    },
+    {
+      "id": "feat-031",
+      "name": "shell 执行 fail-closed 安全加固(v0.3,外审 HIGH)",
+      "description": "repl.py run_commands 现仅靠 _DANGEROUS_RE 正则拒绝清单把关 LLM 生成的 shell 命令(subprocess shell=True 自动执行)——拒绝清单不是安全边界。改为:shell 类命令每条都须 confirm(cmd)→True 才执行(fail-closed,非 TTY 不批),_DANGEROUS_RE 降级为确认提示里的 ⚠ 危险标签;psyclaw 进程内子命令保持自动(自家 argparse 编排,交互式命令已有 _INTERACTIVE_CMDS 守卫)。",
+      "dependencies": [],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-032",
+      "name": "save_file 路径允许清单(v0.3,外审 MEDIUM)",
+      "description": "toolloop build_tools 的 _save 现以 confirm=lambda p:True 调 apply_save_block,可写任意路径。改为:Path.resolve() 后必须 is_relative_to(项目根),拒软链接目标、拒凭据类路径(~/.ssh/~/.aws/~/.gnupg/.netrc/.env/*.pem),拒绝消息带完整解析路径;data/raw 铁律照旧在 apply_save_block 内生效。",
+      "dependencies": [],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-033",
+      "name": "长会话上下文修剪(v0.3,「对话长期维持」另一半)",
+      "description": "toolloop run_tool_loop 的 convo 无界增长(默认 24 轮 × 每轮 ≤6000 字符/工具回灌)会撑爆 provider 上下文或触发更频繁截断。循环内滚动修剪:保 system+最初任务+最近 N 轮完整,更早的工具结果消息压缩为一行摘要(工具名+结果首行);修剪对模型透明(摘要行说明可用 recall 找回)。附带审视 repl compact_history 现契约并补质量测试。",
+      "dependencies": ["feat-030"],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-034",
+      "name": "normalize_type 中文研究类型别名(v0.3 小修)",
+      "description": "skills/recommend.py normalize_type 不识别中文研究类型(『元分析』→None,英文 meta 可)——补中文别名映射(元分析/元/荟萃→meta 等,覆盖 RESEARCH_TYPE_KEYWORDS 全部类型),高频入口。",
+      "dependencies": [],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-035",
+      "name": "v0.3 发布收尾(版本对齐 + CHANGELOG)",
+      "description": "版本不一致:pyproject.toml=0.1.0、__version__=0.2.0(v0.2 发布轮漏改 pyproject)。统一升 0.3.0;CHANGELOG.md 增 v0.3 段(feat-030..034);全量回归绿后打收尾提交。",
+      "dependencies": ["feat-031", "feat-032", "feat-033", "feat-034"],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }
