@@ -2,7 +2,22 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07(晚:v0.3→…→v0.7→**v0.8.0 发布**)
+**Last Updated:** 2026-07-07(晚:v0.3→…→v0.8→**v0.9.0 发布**)
+
+## 本轮(29):v0.9.0 发布 ——feat-051/052 done(setup --env 一键配置基础环境)
+
+用户『v0.9 新增 setup,一键配置好所缺失的基础环境』。
+- feat-051:新增 psyclaw/env_setup.py——diagnose 检查 base 四项(配置文件/LLM provider key/
+  stats 组/full 组),每项 ✓✗+确切修法+能否自动装;bootstrap(apply) 一键 pip 装可自动修的
+  缺失组、装失败如实报;CLI setup 加 --env(--online 实装)。纯逻辑依赖注入,离线可测。
+  现有 setup 偏项目脚手架,本功能补「环境就绪」这一环。
+- feat-052:版本 0.8.0→0.9.0 + CHANGELOG v0.9 + COMMANDS setup --env 行。
+
+全量 **1293 passed**;`psyclaw version` → 0.9.0;live:setup --env 正确诊断本机
+(config✓ provider✓ stats✗ full✗ + 修法 + 可自动安装提示)。52 个 feature 全 done。
+
+---
+
 
 ## 本轮(28):v0.8.0 发布 ——feat-049/050 done(闭环「统计外移到 MCP」)
 
