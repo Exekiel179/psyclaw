@@ -519,8 +519,8 @@
       "dependencies": [
         "feat-051"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.8.0→0.9.0;CHANGELOG v0.9.0 段(setup --env 一键配置基础环境);docs/COMMANDS.md setup --env 行;TODO §2 + progress 本轮(29) + session-handoff 快照(v1.0 候选);验证:uv run --python 3.12 pytest → 1293 passed;psyclaw version → 0.9.0"
     }
   ]
 }
