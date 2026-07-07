@@ -495,3 +495,44 @@ def test_log_agent_run_truncates_heads(tmp_path):
     r = TL.read_agent_runs(str(tmp_path))[0]
     assert len(r["task"]) == TL._RUNS_MAX_HEAD
     assert len(r["final_head"]) == TL._RUNS_MAX_HEAD
+def test_sanitize_drops_empty_content():
+    msgs = [{"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "  "},
+            {"role": "user", "content": "again"}]
+    out = TL.sanitize_messages(msgs)
+    assert out == [{"role": "user", "content": "hi\n\nagain"}]
+def test_sanitize_merges_consecutive_same_role():
+    msgs = [{"role": "user", "content": "a"},
+            {"role": "user", "content": "b"},
+            {"role": "assistant", "content": "c"}]
+    out = TL.sanitize_messages(msgs)
+    assert out == [{"role": "user", "content": "a\n\nb"},
+                   {"role": "assistant", "content": "c"}]
+def test_sanitize_first_must_be_user():
+    msgs = [{"role": "assistant", "content": "x"},
+            {"role": "user", "content": "y"}]
+    out = TL.sanitize_messages(msgs)
+    assert out[0]["role"] == "user"
+def test_sanitize_drops_unknown_roles():
+    msgs = [{"role": "system", "content": "s"}, {"role": "user", "content": "u"}]
+    out = TL.sanitize_messages(msgs)
+    assert out == [{"role": "user", "content": "u"}]
+def test_sanitize_non_string_content_coerced_or_dropped():
+    msgs = [{"role": "user", "content": None}, {"role": "user", "content": "ok"}]
+    assert TL.sanitize_messages(msgs) == [{"role": "user", "content": "ok"}]
+def test_loop_sends_only_sanitized_messages_to_provider():
+    """回灌进行中,provider 每次收到的消息都合法:非空 content + 角色交替 + 首条 user。"""
+    seen = []
+    class SpyProvider(FakeProvider):
+        def chat(self, messages, system=""):
+            seen.append([dict(m) for m in messages])
+            return super().chat(messages, system)
+    prov = SpyProvider(['```tool\n{"name":"echo","args":{"x":1}}\n```', "答案"])
+    tools, _ = _tools()
+    TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    for msgs in seen:
+        assert msgs, "不应发空消息列表"
+        assert msgs[0]["role"] == "user"
+        assert all(str(m["content"]).strip() for m in msgs)   # 无空 content
+        roles = [m["role"] for m in msgs]
+        assert all(roles[i] != roles[i + 1] for i in range(len(roles) - 1))  # 交替
