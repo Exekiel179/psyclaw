@@ -20,6 +20,24 @@ import json
 import re
 
 _TOOL_RE = re.compile(r"```tool\s*\r?\n(?P<body>.*?)```", re.S)
+_OPEN_TOOL_RE = re.compile(r"```tool\s*\r?\n")
+
+# 连续截断续写上限:防 provider 反复截断导致死循环(计入 max_iters,额外再设短路)
+_MAX_TRUNC_STREAK = 2
+
+_TRUNC_NUDGE = ("你上一条输出在 ```tool 块中被截断,没有形成完整的工具调用。"
+                "请重新输出**完整**的 tool 块(可拆小任务、缩短 args);"
+                "若无需工具,直接给出最终答案。")
+
+
+def has_truncated_tool_block(reply: str) -> bool:
+    """检测未闭合的 ```tool 块——输出被 max_tokens 截断的典型特征。纯函数,可单测。
+
+    修复「工具调用中途提前停止」:截断的回复解析不出完整 tool 块,
+    若不检测会被误判成最终答案而静默终止任务。
+    """
+    text = reply or ""
+    return len(_OPEN_TOOL_RE.findall(text)) > len(_TOOL_RE.findall(text))
 
 
 def parse_tool_calls(reply: str) -> list[dict]:
@@ -176,24 +194,45 @@ def _render_results(results: list[dict]) -> str:
 
 
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
-                  project_dir: str = ".", max_iters: int = 6,
+                  project_dir: str = ".", max_iters: int = 24,
                   approve=None, emit=None) -> dict:
     """跑纯工具层循环。返回 {final, iters, stopped, trace}。
 
     每轮:provider.chat → 解析 tool 块;无块=最终答案;有块=执行(副作用需 approve)→ 回灌 → 续。
+
+    截断防护(修「工具调用中途提前停止」):输出含未闭合 ```tool 块、或 provider 报
+    stop_reason=max_tokens 且无完整调用时,**不**当最终答案——回灌续写提示让模型重发完整
+    tool 块;连续截断 > _MAX_TRUNC_STREAK 次才放弃(stopped="truncated",不静默)。
     """
     tools = tools if tools is not None else build_tools(project_dir)
     full_system = system + "\n" + render_tool_catalog(tools)
     convo = [dict(m) for m in messages]
     trace: list[dict] = []
+    trunc_streak = 0
     for it in range(1, max_iters + 1):
         reply = "".join(provider.chat(convo, system=full_system))
         calls = parse_tool_calls(reply)
-        if not calls:
+        cut = has_truncated_tool_block(reply) or (
+            not calls and getattr(provider, "last_stop_reason", "") == "max_tokens")
+        if not calls and not cut:
             return {"final": reply, "iters": it, "stopped": "answered", "trace": trace}
         convo.append({"role": "assistant", "content": reply})
+        if not calls:  # 截断且无一个完整调用 → 请求续写,不执行任何工具
+            trunc_streak += 1
+            if trunc_streak > _MAX_TRUNC_STREAK:
+                return {"final": reply + f"\n\n(输出连续 {trunc_streak} 次在 tool 块中被"
+                        "截断,已停止;可调高 PSYCLAW_MAX_TOKENS 或缩小任务)",
+                        "iters": it, "stopped": "truncated", "trace": trace}
+            if emit:
+                emit("输出被截断,请求模型重发完整 tool 块…")
+            convo.append({"role": "user", "content": _TRUNC_NUDGE})
+            continue
+        trunc_streak = 0
         results = [_exec_tool(c, tools, approve, emit) for c in calls]
         trace.extend(results)
-        convo.append({"role": "user", "content": _render_results(results)})
+        feedback = _render_results(results)
+        if cut:  # 有完整调用但尾部还挂着截断的残块 → 一并告知,避免模型以为已发出
+            feedback += "\n\n(注意:你上一条输出末尾有一个被截断的 tool 块未被执行,如仍需要请重发完整块。)"
+        convo.append({"role": "user", "content": feedback})
     return {"final": f"(达到工具调用上限 {max_iters},未收敛;可提高上限或缩小任务)",
             "iters": max_iters, "stopped": "max_iters", "trace": trace}

@@ -235,6 +235,14 @@
       "dependencies": ["feat-007", "feat-015"],
       "status": "done",
       "evidence": "psyclaw/kg.py(KnowledgeGraph:_db(nodes UNIQUE(norm,type)/edges UNIQUE(src,dst,rel,src_ref))/add_node 去重/add_edge 拒无来源/neighbors 出入边/subgraph BFS/seed_from_evidence_map/verify 复用 citations._canon_key+load_allowed/stats 自证 uncited=0 不变量)+ render_mermaid;cli.py kg 命令(catalog『检索/知识图谱』,names==catalogued 通过);tests/test_kg.py 10 例(节点去重/边必带来源/建点+stats/邻居出入/子图深度/种图/缺 evidence_map/verify 溯源+孤儿检出/非citation边跳过/mermaid);全量 C:\\Python314 pytest 1093 passed;CLI end-to-end:evidence_map 种 2 带引用边 → kg show 出 mermaid 子图(边标引用)→ kg verify 0 孤儿,加杜撰边 Ghost(2099) → verify 抓成孤儿。"
+    },
+    {
+      "id": "feat-030",
+      "name": "toolloop 截断防护——工具调用中途不再提前停止",
+      "description": "修复长任务提前停止的三个根因:(1) provider 输出被 max_tokens 截断时 ```tool 块未闭合,parse_tool_calls 解析不出调用,run_tool_loop 误判为最终答案而静默终止——新增 has_truncated_tool_block 检测未闭合块 + provider.last_stop_reason==max_tokens 检查,触发续写提示(_TRUNC_NUDGE)让模型重发完整块,连续截断 >_MAX_TRUNC_STREAK(2) 次才停(stopped=truncated,不静默);完整调用+尾部截断残块时执行完整的并在回灌里告知残块未执行。(2) anthropic_api/openai_compat 此前完全忽略 stop_reason/finish_reason——base.Provider 加 last_stop_reason 属性,anthropic 从 message_delta 捕获,openai 系捕获 finish_reason 并归一化(length→max_tokens);anthropic max_tokens 4096→PSYCLAW_MAX_TOKENS 环境变量可配(默认 8192)。(3) agent 命令 max_iters 默认 6→24(长研究任务多步调用;auto-loop 的 6 是研究阶段数语义,不动)。",
+      "dependencies": ["feat-014"],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(has_truncated_tool_block/_MAX_TRUNC_STREAK/_TRUNC_NUDGE/run_tool_loop 截断分支)+ providers/base.py(last_stop_reason)+ anthropic_api.py + openai_compat.py + cli.py(agent --max-iters 24);tests/test_toolloop.py 新增 6 例(未闭合检测/截断不当答案继续/连续截断放弃 stopped=truncated/stop_reason=max_tokens 触发重试/完整调用+残块执行并告知/默认上限≥24);另修 tests/test_mcp_servers.py 2 例陈旧断言(3d9b183 改 mplus/stata 为 detect: 门控后测试未同步,改为 enabled iff shutil.which);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1190 passed(修前 1188 passed 2 failed,失败为上述陈旧断言,已确认与本改动无关后修正)。"
     }
   ]
 }

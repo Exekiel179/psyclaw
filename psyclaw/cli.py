@@ -88,7 +88,7 @@ def cmd_agent(args: argparse.Namespace) -> int:
         print(ui.dim("  (副作用工具默认拒绝;--auto 自动批准。只读工具照常执行。)"))
     res = run_tool_loop(provider, _build_system_prompt(),
                         [{"role": "user", "content": task}], project_dir=".",
-                        max_iters=getattr(args, "max_iters", 6),
+                        max_iters=getattr(args, "max_iters", 24),
                         approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
     print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
     print(res["final"])
@@ -1049,8 +1049,8 @@ def build_parser() -> argparse.ArgumentParser:
     pag.add_argument("task", nargs="+", help="任务描述")
     pag.add_argument("--auto", action="store_true",
                      help="自动批准副作用工具(默认拒绝;只读工具照跑)")
-    pag.add_argument("--max-iters", type=int, default=6, dest="max_iters",
-                     help="工具调用轮数上限(默认 6)")
+    pag.add_argument("--max-iters", type=int, default=24, dest="max_iters",
+                     help="工具调用轮数上限(默认 24;长研究任务多步调用不够时再调高)")
     pag.set_defaults(func=cmd_agent)
 
     pres = sub.add_parser("resume",

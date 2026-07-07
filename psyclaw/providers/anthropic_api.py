@@ -22,9 +22,13 @@ class AnthropicProvider(Provider):
 
     def chat(self, messages: list, system: str = "") -> Iterator[str]:
         model = self.model if self.model != "default" else DEFAULT_MODEL
+        try:
+            max_tokens = int(os.environ.get("PSYCLAW_MAX_TOKENS", "8192"))
+        except ValueError:
+            max_tokens = 8192
         payload = {
             "model": model,
-            "max_tokens": 4096,
+            "max_tokens": max_tokens,
             "stream": True,
             "messages": messages,
         }
@@ -35,6 +39,7 @@ class AnthropicProvider(Provider):
             "anthropic-version": "2023-06-01",
         }
         url = f"{self.base_url}/v1/messages"
+        self.last_stop_reason = ""
         for data in self._post_sse(url, headers, payload):
             try:
                 ev = json.loads(data)
@@ -44,3 +49,8 @@ class AnthropicProvider(Provider):
                 delta = ev.get("delta", {})
                 if delta.get("type") == "text_delta":
                     yield delta.get("text", "")
+            elif ev.get("type") == "message_delta":
+                # 捕获停止原因:max_tokens=输出被截断(toolloop 据此续写而非误判答完)
+                reason = (ev.get("delta") or {}).get("stop_reason")
+                if reason:
+                    self.last_stop_reason = str(reason)
