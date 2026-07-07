@@ -175,8 +175,48 @@ def test_run_commands_dangerous_denied_without_confirm():
 
 
 def test_run_commands_executes_shell():
-    msg, _ = R.run_commands([{"kind": "shell", "cmd": "echo psyclaw-run-ok"}])
+    # v0.3 安全加固:shell 须显式确认(fail-closed);确认到位后照常执行
+    msg, _ = R.run_commands([{"kind": "shell", "cmd": "echo psyclaw-run-ok"}],
+                            confirm=lambda c: True)
     assert "psyclaw-run-ok" in msg and "(rc=0)" in msg
+
+
+# --- v0.3 安全加固(外审 HIGH):shell 每条 fail-closed,拒绝清单只是标签 -----------
+
+def test_run_commands_shell_denied_without_confirm():
+    """普通(非危险模式)shell 命令,无 confirm 也一律拒——拒绝清单不是安全边界。"""
+    msg, notes = R.run_commands([{"kind": "shell", "cmd": "echo innocent"}],
+                                confirm=None)
+    assert "已拒绝" in msg and "shell 命令" in msg
+    assert any("✗" in n for n in notes)
+    assert "(rc=" not in msg  # 未执行(拒绝消息只回显命令,不含执行结果)
+
+
+def test_run_commands_shell_denied_when_confirm_refuses():
+    msg, _ = R.run_commands([{"kind": "shell", "cmd": "echo nope"}],
+                            confirm=lambda c: False)
+    assert "已拒绝" in msg
+
+
+def test_run_commands_psyclaw_kind_auto_runs_without_confirm():
+    """psyclaw 进程内子命令保持自动(自家 argparse,无 shell)。"""
+    msg, notes = R.run_commands([{"kind": "psyclaw", "cmd": "version"}], confirm=None)
+    assert "(rc=0)" in msg and any("⚙" in n for n in notes)
+
+
+def test_run_commands_psyclaw_dangerous_still_needs_confirm():
+    """psyclaw 类命令若命中危险模式(如参数里藏 rm -rf)同样须确认(纵深防御)。"""
+    msg, _ = R.run_commands([{"kind": "psyclaw", "cmd": "clean rm -rf /tmp/x"}],
+                            confirm=None)
+    assert "已拒绝" in msg and "危险命令" in msg
+
+
+def test_run_commands_confirm_called_per_shell_command():
+    seen = []
+    R.run_commands([{"kind": "shell", "cmd": "echo a"},
+                    {"kind": "shell", "cmd": "echo b"}],
+                   confirm=lambda c: (seen.append(c), True)[1])
+    assert seen == ["echo a", "echo b"]
 
 
 def test_run_psyclaw_version_inprocess():
