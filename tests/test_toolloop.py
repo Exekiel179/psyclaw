@@ -116,6 +116,59 @@ def test_exec_tool_exception_marked_failure():
     assert r["ok"] is False and "异常" in r["output"]
 
 
+# --- 无进展检测(v0.6 feat-044) ------------------------------------------------
+
+def test_calls_signature_stable_and_order_insensitive():
+    a = [{"name": "s", "args": {"q": 1, "z": 2}}]
+    b = [{"name": "s", "args": {"z": 2, "q": 1}}]     # 键序不同 → 同签名
+    assert TL._calls_signature(a) == TL._calls_signature(b)
+    c = [{"name": "s", "args": {"q": 9}}]
+    assert TL._calls_signature(a) != TL._calls_signature(c)
+
+
+def test_empty_reply_nudged_then_answers():
+    prov = FakeProvider(["", "  ", "真正的答案"])       # 两次空 → 追问 → 答案
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "answered" and res["final"] == "真正的答案"
+    assert prov.chats == 3
+
+
+def test_empty_reply_streak_stops_no_progress():
+    prov = FakeProvider([""] * 10)
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "no_progress"
+    assert prov.chats == TL._MAX_NOPROGRESS + 1
+
+
+def test_repeated_identical_call_stops_no_progress():
+    prov = FakeProvider(['```tool\n{"name":"echo","args":{"x":1}}\n```'] * 10)
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "no_progress"
+    # 相同调用执行 _MAX_NOPROGRESS 次后,第 +1 次识别为卡住并停(不空转到 max_iters)
+    assert len(res["trace"]) == TL._MAX_NOPROGRESS
+    assert prov.chats == TL._MAX_NOPROGRESS + 1
+
+
+def test_varied_calls_do_not_trigger_no_progress():
+    prov = FakeProvider(['```tool\n{"name":"echo","args":{"x":1}}\n```',
+                         '```tool\n{"name":"echo","args":{"x":2}}\n```',
+                         '```tool\n{"name":"echo","args":{"x":3}}\n```',
+                         "答案"])
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "answered" and len(res["trace"]) == 3
+
+
+def test_non_empty_answer_still_returns_immediately():
+    prov = FakeProvider(["这就是最终答案"])
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "answered" and res["iters"] == 1
+
+
 # --- build_tools / catalog ----------------------------------------------------
 
 def test_build_tools_shape():
@@ -143,7 +196,9 @@ def test_loop_calls_tool_then_answers():
 
 
 def test_loop_max_iters():
-    prov = FakeProvider(['```tool\n{"name":"echo","args":{}}\n```'] * 10)
+    # 各轮参数不同(否则会先触发 feat-044 无进展检测);验证 max_iters 硬顶
+    prov = FakeProvider(['```tool\n{"name":"echo","args":{"x":%d}}\n```' % i
+                         for i in range(10)])
     tools, _ = _tools()
     res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}],
                            tools=tools, max_iters=3)

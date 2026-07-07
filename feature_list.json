@@ -441,8 +441,8 @@
       "dependencies": [
         "feat-043"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(_calls_signature 键序无关签名;run_tool_loop 加 empty_streak/repeat_streak/prev_sig:空/纯空白回复→追问 _EMPTY_NUDGE 而非当答案,连续 >_MAX_NOPROGRESS(2) 空→stopped=no_progress;连续相同 (name,args) 达 _MAX_NOPROGRESS→stopped=no_progress 收敛,不空转到 max_iters);tests/test_toolloop.py +6 例(签名键序无关/空回复追问后答/空连击停/重复调用停且执行恰 2 次/变参不误触/非空答案立即返回)+ 改 test_loop_max_iters 用变参(否则先中无进展检测);验证:uv run --python 3.12 pytest → 1256 passed"
     },
     {
       "id": "feat-045",
