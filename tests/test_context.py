@@ -154,6 +154,64 @@ class TestCompactHistory:
 
 
 # ---------------------------------------------------------------------------
+# compact_history LLM 蒸馏(v0.5 feat-041)
+# ---------------------------------------------------------------------------
+
+class _FakeProvider:
+    def __init__(self, reply="- 决策:用被试内设计\n- 待办:补功效分析", api_key="k"):
+        self._reply = reply
+        self.api_key = api_key
+        self.calls = 0
+
+    def chat(self, messages, system=""):
+        self.calls += 1
+        self._last_system = system
+        return iter([self._reply])
+
+
+class _BoomProvider:
+    api_key = "k"
+
+    def chat(self, messages, system=""):
+        raise RuntimeError("network down")
+
+
+class TestCompactHistoryLLMDistill:
+    def _big(self):
+        return _make_messages(20, chars_each=CHAR_BUDGET_HISTORY // 2)
+
+    def test_llm_distill_used_when_provider_has_key(self):
+        prov = _FakeProvider()
+        _, memo = compact_history(self._big(), "", provider=prov)
+        assert prov.calls == 1
+        assert "用被试内设计" in memo and "补功效分析" in memo
+        assert "压缩器" in prov._last_system   # 用了蒸馏 system 提示
+
+    def test_falls_back_to_rule_distill_on_provider_error(self):
+        prov = _BoomProvider()
+        _, memo = compact_history(self._big(), "", provider=prov)
+        assert len(memo) > 0                    # 回落规则蒸馏,不空、不抛
+        assert "用户" in memo or "助手" in memo  # 规则蒸馏带角色前缀
+
+    def test_no_key_provider_falls_back(self):
+        prov = _FakeProvider(api_key="")        # 如 mock
+        _, memo = compact_history(self._big(), "", provider=prov)
+        assert prov.calls == 0                  # 没调 LLM
+        assert len(memo) > 0
+
+    def test_provider_none_is_rule_distill(self):
+        _, memo_a = compact_history(self._big(), "", provider=None)
+        _, memo_b = compact_history(self._big(), "")   # 默认参数
+        assert memo_a == memo_b and len(memo_a) > 0
+
+    def test_below_budget_no_llm_call(self):
+        prov = _FakeProvider()
+        msgs = _make_messages(4, 100)
+        new_msgs, _ = compact_history(msgs, "", provider=prov)
+        assert prov.calls == 0 and new_msgs == msgs
+
+
+# ---------------------------------------------------------------------------
 # render_memo
 # ---------------------------------------------------------------------------
 

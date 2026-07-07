@@ -409,8 +409,8 @@
       "name": "compact_history LLM 蒸馏升级(v0.5:长会话质量)",
       "description": "context.compact_history 现在靠 _distill 规则截断早期轮次为备忘。升级:可选传 provider,用它把被丢弃轮次蒸馏成结构化决策摘要(比规则截断保真);provider 缺失/异常/无 key → fail-safe 回落现有规则蒸馏(zero-dep 契约不破)。纯函数可测(注入 fake provider)。",
       "dependencies": [],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/context.py(_llm_distill:provider 有 key 时用 _DISTILL_SYSTEM 把被丢弃轮次蒸馏成结构化决策备忘,provider=None/无 key(mock)/异常/空输出→返回 None 回落规则蒸馏 _distill;compact_history 加 provider 可选参,zero-dep 契约不破);repl.py ask 流程传 self.provider(无 key 自动回落);tests/test_context.py +5 例(有 key 用 LLM 且带蒸馏 system/provider 异常回落规则蒸馏不抛/无 key 不调 LLM/None 与默认一致/预算下不调 LLM);验证:uv run --python 3.12 pytest → 1242 passed"
     },
     {
       "id": "feat-042",
