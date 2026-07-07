@@ -461,7 +461,9 @@ class ReplSession:
             if path_ctx:
                 text = path_ctx + "\n\n用户问题：" + text
         self.messages.append({"role": "user", "content": text})
-        self.messages, self.memo = compact_history(self.messages, self.memo)
+        # feat-041:传 provider 做结构化 LLM 蒸馏(无 key/异常自动回落规则蒸馏)
+        self.messages, self.memo = compact_history(self.messages, self.memo,
+                                                   provider=self.provider)
         # 动态系统提示:瘦核心 + 决策备忘 + 按需知识
         system = self.system
         memo_part = render_memo(self.memo)
