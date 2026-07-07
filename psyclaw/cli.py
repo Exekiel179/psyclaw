@@ -77,7 +77,21 @@ def cmd_agent(args: argparse.Namespace) -> int:
     from psyclaw import ui
     from psyclaw.providers import get_provider
     from psyclaw.repl import _build_system_prompt
-    from psyclaw.toolloop import run_tool_loop
+    from psyclaw.toolloop import log_agent_run, read_agent_runs, run_tool_loop
+    if getattr(args, "history", None) is not None:   # feat-037:回看运行痕迹
+        runs = read_agent_runs(".", limit=args.history or 10)
+        if not runs:
+            print("(无 agent 运行记录;跑过 psyclaw agent 后这里会有痕迹)")
+            return 0
+        for r in runs:
+            print(f"{r.get('ts', '?')}  [{r.get('iters', '?')} 轮 · "
+                  f"{len(r.get('tools', []))} 工具 · {r.get('stopped', '?')}]  "
+                  f"{r.get('task', '')[:60]}")
+            print(ui.dim(f"    → {r.get('final_head', '')[:100]}"))
+        return 0
+    if not args.task:
+        print("用法:psyclaw agent <任务描述> 或 psyclaw agent --history [n]")
+        return 2
     conf = cfg.load_config()
     provider = get_provider(conf)
     task = " ".join(args.task)
@@ -92,6 +106,7 @@ def cmd_agent(args: argparse.Namespace) -> int:
                         approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
     print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
     print(res["final"])
+    log_agent_run(".", task, res)   # feat-037:落运行痕迹(失败静默)
     return 0
 
 
@@ -1046,11 +1061,13 @@ def build_parser() -> argparse.ArgumentParser:
     pag = sub.add_parser(
         "agent",
         help="agent 一次性任务:模型自主多步调用工具(纯工具层循环,provider 无关保底)")
-    pag.add_argument("task", nargs="+", help="任务描述")
+    pag.add_argument("task", nargs="*", help="任务描述(--history 时可省)")
     pag.add_argument("--auto", action="store_true",
                      help="自动批准副作用工具(默认拒绝;只读工具照跑)")
     pag.add_argument("--max-iters", type=int, default=24, dest="max_iters",
                      help="工具调用轮数上限(默认 24;长研究任务多步调用不够时再调高)")
+    pag.add_argument("--history", type=int, nargs="?", const=10, default=None,
+                     help="回看最近 n 次 agent 运行痕迹(默认 10),不执行任务")
     pag.set_defaults(func=cmd_agent)
 
     pres = sub.add_parser("resume",

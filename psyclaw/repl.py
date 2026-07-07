@@ -626,6 +626,10 @@ class ReplSession:
         if res["trace"]:
             print(ui.dim(f"  [agent:{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · "
                          f"{res['stopped']}]"))
+        from psyclaw.toolloop import log_agent_run
+        task_head = next((m["content"] for m in reversed(self.messages)
+                          if m.get("role") == "user"), "")
+        log_agent_run(".", task_head, res)   # feat-037:落运行痕迹(失败静默)
         blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
         blk.write(res["final"])
         blk.close()
