@@ -328,6 +328,32 @@ def cmd_setup(args: argparse.Namespace) -> int:
     from psyclaw.scaffold import scaffold_project
     ni = getattr(args, "non_interactive", False)
     online = getattr(args, "online", False)
+
+    # --env:一键配置缺失的基础环境(v0.9 feat-051),不做项目脚手架
+    if getattr(args, "env", False):
+        from psyclaw.env_setup import bootstrap, format_report
+        print(ui.title("PsyClaw setup --env — 一键配置基础环境"))
+        print(ui.rule())
+        res = bootstrap(".", apply=online)
+        for c in res["checks"]:
+            mark = ui.ok("✓") if c["ok"] else ui.err("✗")
+            print(f"  {mark} {c['label']:<16} " + ui.dim(c["detail"]))
+            if not c["ok"] and c["fix"]:
+                print("      " + ui.accent("→ " + c["fix"]))
+        if res["installed"]:
+            good = [g for g, v in res["installed"].items() if v is True]
+            bad = [g for g, v in res["installed"].items() if v is False]
+            if good:
+                print(ui.ok("  已自动安装: ") + ", ".join(good))
+            if bad:
+                print(ui.err("  安装失败(请手动): ") + ", ".join(bad))
+        elif res["planned"] and not online:
+            print(ui.dim(f"\n  可自动安装: {', '.join(res['planned'])}"
+                         " —— 加 --online 实际联网安装。"))
+        print("\n环境状态: " + (ui.ok("全部就绪 ✓") if res["all_ok"]
+                              else ui.warn("有缺失,见上方修法")))
+        return 0 if res["all_ok"] else 1
+
     print(ui.title("PsyClaw setup — 项目脚手架 + 能力选装"))
     print(ui.rule())
 
@@ -1112,6 +1138,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     pst = sub.add_parser("setup",
                          help="项目脚手架+能力选装:目录/据clarify生成概览/项目记忆/能力依赖/MCP·skill")
+    pst.add_argument("--env", action="store_true",
+                     help="一键配置缺失的基础环境(检查 provider/key + stats/full 组;--online 实装)")
     pst.add_argument("--groups", default=None, help="直接装指定组(逗号分隔:stats,viz,eeg,full)")
     pst.add_argument("--online", action="store_true",
                      help="联网自动安装缺失的能力依赖(否则交互询问/仅显示矩阵)")

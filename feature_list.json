@@ -503,6 +503,24 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.7.0→0.8.0;CHANGELOG v0.8.0 段(pystat MCP:agent 可直连统计后端,闭环统计外移);docs/ARCHITECTURE.md L3 加 v0.8 pystat 段、docs/COMMANDS.md 统计三条路 --serve 补 pystat 默认启用;TODO §2 + progress 本轮(28) + session-handoff 快照(v0.9 候选=workflow 分析步默认走 pystat);验证:uv run --python 3.12 pytest → 1282 passed;psyclaw version → 0.8.0"
+    },
+    {
+      "id": "feat-051",
+      "name": "setup 一键配置缺失的基础环境(v0.9)",
+      "description": "用户需求:一条命令把跑 psyclaw 所缺的基础环境配好。现有 setup 偏项目脚手架、能力装是 opt-in。新增 psyclaw/env_setup.py:diagnose() 检查 base 环境四项——① 配置文件是否已建(_source != defaults)② LLM provider 是否配了 key(否则 agent 落 mock)③ stats 组(pingouin/pandas/scipy:pystat 真算、跑生成脚本)④ full 组(prompt_toolkit/rich:REPL 增强);每项给 ✓/✗+确切修法+能否自动装。bootstrap(apply) 一键 pip 装可自动修的缺失组(stats/full),不能自动的(API key)列为待手动。CLI:setup 加 --env(诊断+报告,--online 实装缺失组)。纯逻辑依赖注入(detect/provider/installer 可 fake),不实际联网即可测。fail-safe:装失败不阻断,如实报。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/env_setup.py(diagnose 检查 base 四项:配置文件 _source!=defaults、provider 有 key 且非 mock、stats 组、full 组;每项 ok/detail/fix/auto;plan_installs 挑缺失且可自动装的组;bootstrap(apply) 调 installer 装缺失组后重诊断,装失败记 _error 不抛;format_report 渲染;依赖注入 detect_fn/config_fn/provider_fn/installer 可测);cli.py setup 加 --env(诊断+上色报告,--online 实装,all_ok→exit 0/1);tests/test_env_setup.py 11 例(全就绪/缺配置+key/缺组 auto/provider 异常/plan 只挑 auto/bootstrap 不 apply 只报/apply 装+重诊断/装失败如实报/manual 列非 auto/report 可读);live:psyclaw setup --env 正确报 config✓provider✓ stats✗ full✗ + 确切修法 + 可自动安装提示。验证:uv run --python 3.12 pytest → 1293 passed"
+    },
+    {
+      "id": "feat-052",
+      "name": "v0.9 发布收尾",
+      "description": "版本 0.8.0→0.9.0;CHANGELOG v0.9 段(setup --env 一键环境配置);docs/COMMANDS setup 行补 --env;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-051"
+      ],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }
