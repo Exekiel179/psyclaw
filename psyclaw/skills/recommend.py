@@ -11,12 +11,22 @@ from __future__ import annotations
 
 from psyclaw.skills.loader import list_skills
 
-# loop 命令名 / workflow id → 规范研究类型
+# loop 命令名 / workflow id / 中文名 → 规范研究类型
+# (v0.3 feat-034:补中文别名——REPL/CLI 高频入口,此前『元分析』→None 直接查不到)
 _TYPE_ALIASES = {
     "lit-loop": "lit-review", "review-lit": "lit-review", "lit": "lit-review",
     "meta-loop": "meta",
     "analysis-loop": "analysis",
     "qual-loop": "qualitative", "qual": "qualitative",
+    # 中文别名(normalize 已 strip+lower,中文不受 lower 影响,直接映射)
+    "文献综述": "lit-review", "文献回顾": "lit-review", "综述": "lit-review",
+    "系统综述": "lit-review", "文献": "lit-review",
+    "元分析": "meta", "荟萃分析": "meta", "荟萃": "meta", "meta分析": "meta",
+    "实证": "analysis", "实证分析": "analysis", "实证研究": "analysis",
+    "数据分析": "analysis", "统计分析": "analysis", "定量": "analysis",
+    "定量研究": "analysis", "量化研究": "analysis",
+    "质性": "qualitative", "质性研究": "qualitative", "定性": "qualitative",
+    "定性研究": "qualitative", "访谈研究": "qualitative", "主题分析": "qualitative",
 }
 
 RESEARCH_TYPE_KEYWORDS: dict[str, list[str]] = {
