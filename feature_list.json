@@ -501,8 +501,8 @@
       "dependencies": [
         "feat-049"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.7.0→0.8.0;CHANGELOG v0.8.0 段(pystat MCP:agent 可直连统计后端,闭环统计外移);docs/ARCHITECTURE.md L3 加 v0.8 pystat 段、docs/COMMANDS.md 统计三条路 --serve 补 pystat 默认启用;TODO §2 + progress 本轮(28) + session-handoff 快照(v0.9 候选=workflow 分析步默认走 pystat);验证:uv run --python 3.12 pytest → 1282 passed;psyclaw version → 0.8.0"
     }
   ]
 }

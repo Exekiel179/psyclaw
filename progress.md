@@ -2,7 +2,23 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07(晚:v0.3→v0.4→v0.5→v0.6→**v0.7.0 发布**)
+**Last Updated:** 2026-07-07(晚:v0.3→…→v0.7→**v0.8.0 发布**)
+
+## 本轮(28):v0.8.0 发布 ——feat-049/050 done(闭环「统计外移到 MCP」)
+
+用户『开始 v0.8』。做 handoff 记录的最高杠杆项——pystat MCP 服务器:
+- 根因:registry 早声明 pystat(always)却无 server 文件/command,feat-040 浮不出它。
+- feat-049:建 psyclaw/mcp/servers/pystat_server.py 照 mne_server 惯例(惰性 pingouin/pandas,
+  缺失→可运行脚本,在则真跑返回带效应量+CI 的 JSON;顶层零统计 import);6 工具
+  describe/ttest/correlation/anova/regression/guidance;registry 补 command → feat-040
+  自动浮出 6 个 mcp__pystat__*。**agent 现可直接把 t 检验/方差/回归委托 pystat**。
+- feat-050:版本 0.7.0→0.8.0 + CHANGELOG v0.8 + docs(COMMANDS/ARCHITECTURE)。
+
+全量 **1282 passed**;`psyclaw version` → 0.8.0。50 个 feature 全 done。
+下一步候选见 handoff(workflow 分析步默认走 pystat MCP / eval harness / 真机手测)。
+
+---
+
 
 ## 本轮(27):v0.7.0 发布 ——feat-047/048 done(修用户报告的 REPL 方向键 ^[[A)
 
