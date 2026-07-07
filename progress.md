@@ -2,11 +2,31 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07
+**Last Updated:** 2026-07-07(晚:v0.3.0 发布 + v0.4 三 feature)
 **重大转向:** PsyClaw 从「全流程统计 CLI」重定位为「纯研究编排 harness」——
 统计计算整体外移到成熟库/MCP,本仓删除全部手写统计实现。
 
 > 状态真源:`feature_list.json`(机器可读)。本文件是人读的「接续上下文」快照。
+
+## 本轮(24):v0.3.0 发布 + v0.4(provider 健壮性 + agent 可观测)——feat-031..038 done
+
+用户定调:『完成 v0.3 开发后写新计划,然后完成每一条』。两个版本周期一口气落地:
+
+**v0.3.0(已发布,版本号统一 0.3.0)**——主题:安全加固 + 长会话可靠性
+- feat-031 shell fail-closed(外审 HIGH):REPL 命令块 shell 每条须确认,拒绝清单降级为 ⚠ 标签;
+- feat-032 save_file 路径允许清单(外审 MEDIUM):项目根内+拒软链/凭据(save_path_denied);
+- feat-033 toolloop 上下文滚动修剪(旧轮次工具结果压缩为「工具名+首行」,近 3 轮保完整);
+- feat-034 normalize_type 补 22 个中文研究类型别名;feat-035 版本对齐+CHANGELOG v0.3 段。
+
+**v0.4(进行中,feat-036/037 done,feat-038 本条)**——主题:provider 健壮性 + agent 可观测
+- feat-036 _post_sse 网络重试(首字节前 429/5xx/网络异常指数退避 ≤3 次;HTTP 错误读 body
+  显性化;流开始后不重试防重复消费);
+- feat-037 agent 运行痕迹持久化(.psyclaw/agent_runs.jsonl + `psyclaw agent --history [n]`,
+  CLI/REPL 双入口自动落痕;live e2e 验证);
+- feat-038 docs 同步(COMMANDS agent 行 v0.3/v0.4 特性、TUTORIAL 加「shell 命令逐条确认」行)。
+
+全量 **1222 passed**(uv python 3.12)。本机开发环境:`uv tool install --editable .` 已把
+psyclaw 注册为命令(0.3.0);测试统一 `uv run --python 3.12 --with pytest python -m pytest -q`。
 
 ## 本轮(23):toolloop 截断防护 ——feat-030 done(修「工具调用中途提前停止」)
 

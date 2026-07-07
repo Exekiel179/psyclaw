@@ -4,54 +4,51 @@
 
 ## Current Objective
 
-- Goal: psyclaw 全流程跑通（环境感知/工具调用/记忆/反馈循环/自进化）；修「工具调用中途提前停止」
-- Current status: feat-030 done——截断防护落地，六环节全流程冒烟通过
-- Branch / commit: master @ 7f570a1
+- Goal: 完成 v0.3 开发 → 写新计划(v0.4)→ 逐条完成(用户 /goal)
+- Current status: **v0.3.0 已发布**(feat-031..035);v0.4 feat-036/037/038 全部 done
+- Branch / commit: master(v0.4 收尾提交为最新)
 
 ## Completed This Session
 
-- [x] feat-030 toolloop 截断防护（根因:截断的 ```tool 块被误判为最终答案 → 静默提前停止）
-- [x] providers 捕获 stop_reason/finish_reason（归一化 length→max_tokens）+ PSYCLAW_MAX_TOKENS 可配
-- [x] agent --max-iters 默认 6→24
-- [x] 修 test_mcp_servers 2 例陈旧断言（3d9b183 detect: 门控后未同步）
-- [x] 全流程六环节冒烟:status/agent live/记忆召回/auto-loop/gates/技能路由
+- [x] v0.3.0:shell fail-closed(HIGH)· save_file 允许清单(MEDIUM)· 上下文滚动修剪 ·
+      中文类型别名 · 版本统一 0.3.0 + CHANGELOG
+- [x] v0.4:feat-036 provider 网络重试/错误显性化 · feat-037 agent_runs.jsonl + --history ·
+      feat-038 docs 同步(COMMANDS/TUTORIAL)+ 本快照
 
 ## Verification Evidence
 
 | Check | Command | Result | Notes |
 |---|---|---|---|
-| 全量测试 | `uv run --python 3.12 --with pytest python -m pytest -q` | 1190 passed | 本机(macOS)无 3.11+ 系统解释器,走 uv |
-| agent 实跑 | `uv run --python 3.12 python -m psyclaw agent "看一下项目目录结构"` | 2 轮 1 调用 answered | 工具循环收敛 |
-| auto-loop | `python -m psyclaw auto-loop --max-iters 1 </dev/null` | 感知→停止,不挂起 | 非 TTY fail-closed |
-| 记忆 | ContextArchive record+search | 召回命中 1 | |
-| 门禁 | `python -m psyclaw gates` | 规则表输出正常 | |
+| 全量测试 | `uv run --python 3.12 --with pytest python -m pytest -q` | 1222 passed | 本机唯一可用测试通道 |
+| CLI 版本 | `psyclaw version` | 0.3.0 | uv tool editable 安装 |
+| agent 痕迹 | `psyclaw agent "列出项目根目录结构"` → `--history` | 落痕+回显正确 | live e2e |
+| 重试离线测 | test_providers TestPostSseRetry 6 例 | 绿 | 429 退避 [1.0,2.0] 等 |
 
 ## Files Changed
 
-- `psyclaw/toolloop.py`（截断检测+续写）· `psyclaw/providers/{base,anthropic_api,openai_compat}.py`
-- `psyclaw/cli.py`（agent max-iters 24）· `tests/test_toolloop.py`（+6）· `tests/test_mcp_servers.py`（修 2 陈旧）
-- `feature_list.json`（feat-030 + evidence）· `TODO.md` · `progress.md`
-- 未提交:`.claude/`（hooks/agents/skills 本地 Claude Code 配置,待用户定夺是否入库）
+- v0.3: `psyclaw/repl.py` `psyclaw/toolloop.py` `psyclaw/skills/recommend.py`
+  `pyproject.toml` `psyclaw/__init__.py` `CHANGELOG.md` + 对应测试
+- v0.4: `psyclaw/providers/base.py` `psyclaw/toolloop.py` `psyclaw/cli.py` `psyclaw/repl.py`
+  `docs/COMMANDS.md` `docs/TUTORIAL.md` + 对应测试
+- 未提交:`.claude/`(本地 Claude Code hooks/agents/skills 配置,待用户定夺是否入库)
 
 ## Decisions Made
 
-- auto-loop 的 max_iters=6 不动（语义=研究阶段数,非工具轮数）
-- 截断连续重试上限 _MAX_TRUNC_STREAK=2（防 provider 反复截断死循环）
-- 陈旧 mcp 测试改为断言 registry 真源语义（enabled iff shutil.which）而非删除
+- shell 逐条确认是**有意的行为变化**(安全>便利),文档已写清;psyclaw 进程内命令保持自动
+- _post_sse 流开始后不重试(防重复消费);仅首字节前退避重试
+- v0.4 不单独发版(0.4.0 号留给 scope 再积累;当前 0.3.0)
 
 ## Blockers / Risks
 
-- 本机沙箱 allowlist 期望 `python`,只有 `python3`(3.9);统一用 `uv run --python 3.12`
-- recommend_skills normalize_type 不识别中文研究类型（『元分析』→None;英文 meta 可）——候选小修
+- 本机只有 python3.9,一切测试/运行走 `uv run --python 3.12`(memory 已记)
+- MCP client 仍是骨架(manager 只做目录/健康检查),agent 循环尚未直连 MCP 工具——v0.5 候选
 
 ## Next Session Startup
 
-1. 读 `CLAUDE.md`（项目铁律 + Harness 契约）。
-2. 读 `feature_list.json` 与 `progress.md`。
-3. Review 本交接。
-4. `uv run --python 3.12 --with pytest python -m pytest -q` 确认 1190 绿后再动手。
+1. 读 `CLAUDE.md` → `feature_list.json` → `progress.md` → 本交接。
+2. `uv run --python 3.12 --with pytest python -m pytest -q` 确认 1222 绿再动手。
 
 ## Recommended Next Step
 
-- 长会话纵深:REPL 的 compact_history 在超长研究会话下的压缩质量验证（配合截断防护,
-  这是「对话长期维持」的另一半);或 normalize_type 补中文研究类型别名（小修,高频入口）。
+- v0.5 候选(未立项):① agent 循环接入已启用 MCP 服务器的工具(编排纵深,最高杠杆);
+  ② REPL 超长会话 compact_history 蒸馏质量的 LLM 辅助升级;③ eval harness(历史 handoff 提过)。
