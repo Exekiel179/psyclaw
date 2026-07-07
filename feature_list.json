@@ -401,8 +401,8 @@
       "dependencies": [
         "feat-039"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/mcp/agent_tools.py(merge_mcp_tools:只并 enabled+health.ok+有 command 的服务器,tools/list 短超时 10s,mcp__<server>__<tool> 前缀防撞,一律 side_effect=True fail-closed;客户端进程级缓存 _clients 按 command 复用+atexit 收尾;PSYCLAW_MCP_TOOLS=0 可关;任何异常不外抛);toolloop.build_tools 在插件合并后调 merge_mcp_tools(与插件加载同构);tests/test_mcp_agent_tools.py 7 例(前缀+side_effect+schema hint/真调 echo 服务器/跳过禁用+不健康+无 command/env 关闭/坏命令不炸/catalog 异常吞掉/客户端缓存复用);验证:uv run --python 3.12 pytest → 1237 passed;live e2e:build_tools('.') 实际浮出真实 mne-mcp 4 工具(mne_info/preprocess_plan/erp_components/stats_guidance),内置 6+MCP 4=10"
     },
     {
       "id": "feat-041",
