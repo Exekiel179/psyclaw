@@ -191,7 +191,21 @@ def step_analysis(ctx) -> dict:
     print(ui.dim(f"  推荐分析:{rec['analysis']} —— {rec['rationale']}"))
     print(ui.dim("  可复现分析脚本 → outputs/analysis.py"
                  "(在装了 [stats] 的环境跑:python outputs/analysis.py)"))
-    return {"analysis": rec["analysis"]}
+    # v0.10 feat-053:best-effort 经 pystat MCP 直接出结果(闭环);失败仍有脚本兜底
+    ran = False
+    try:
+        from psyclaw.workflows.pystat_bridge import run_via_pystat
+        result = run_via_pystat(rec, ctx.data["data_csv"])
+        if result:
+            res_path = ctx.project / "outputs" / "analysis_result.txt"
+            res_path.write_text(result, encoding="utf-8")
+            ctx.artifacts["analysis_result"] = "outputs/analysis_result.txt"
+            ctx.data["analysis_result"] = result
+            ran = True
+            print(ui.ok("  ✓ 已经 pystat MCP 运行 → outputs/analysis_result.txt"))
+    except Exception:  # noqa: BLE001 — pystat 直跑是增强,失败不阻断
+        pass
+    return {"analysis": rec["analysis"], "ran_via_pystat": ran}
 
 
 def step_write_analysis(ctx) -> dict:
