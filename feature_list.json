@@ -362,8 +362,8 @@
       "dependencies": [
         "feat-030"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/providers/base.py(_post_sse 重写:首字节前 429/5xx/529/URLError/timeout 指数退避重试 ≤3 次(_sleep 可注入),4xx 非 429 不重试;_http_error_detail 读 body 截 300 字拼 RuntimeError;流开始后异常向上传播不重试防重复消费);tests/test_providers.py +6 例(成功透传跳 [DONE]/429×2 后成功且退避 [1.0,2.0]/URLError+503 混合重试/400 不重试且 body 进消息/持续失败 3/3 报错/流中断不重试);验证:uv run --python 3.12 pytest → 1218 passed"
     },
     {
       "id": "feat-037",

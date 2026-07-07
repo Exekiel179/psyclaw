@@ -173,3 +173,67 @@ class TestGetProvider:
         # unknown 映射到 custom preset，key_env=OPENAI_API_KEY，无 key → mock
         p = get_provider({"provider": "unknownxyz"})
         assert isinstance(p, MockProvider)
+import io
+import urllib.error
+import urllib.request
+class _FakeResp:
+    """可迭代 + 上下文管理的假 SSE 响应。"""
+    def __init__(self, lines, explode_after=None):
+        self._lines = list(lines)
+        self._explode_after = explode_after
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        return False
+    def __iter__(self):
+        for i, ln in enumerate(self._lines):
+            if self._explode_after is not None and i >= self._explode_after:
+                raise OSError("connection reset mid-stream")
+            yield ln
+def _http_error(code, body=b'{"error":{"message":"boom"}}'):
+    return urllib.error.HTTPError("http://x", code, "err", {}, io.BytesIO(body))
+class TestPostSseRetry:
+    def _run(self, monkeypatch, outcomes, lines=(b'data: {"a":1}\n', b"data: [DONE]\n")):
+        """outcomes: 每次 urlopen 的行为(异常实例或 'ok')。返回 (yielded, sleeps, calls)。"""
+        calls = {"n": 0}
+        sleeps: list[float] = []
+        def fake_urlopen(req, timeout=0):
+            calls["n"] += 1
+            out = outcomes[calls["n"] - 1]
+            if out == "ok":
+                return _FakeResp(lines)
+            raise out
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        got = list(Provider._post_sse("http://x", {}, {"m": 1}, _sleep=sleeps.append))
+        return got, sleeps, calls["n"]
+    def test_success_passthrough_skips_done(self, monkeypatch):
+        got, sleeps, n = self._run(monkeypatch, ["ok"])
+        assert got == ['{"a":1}'] and sleeps == [] and n == 1
+    def test_retries_on_429_then_succeeds(self, monkeypatch):
+        got, sleeps, n = self._run(monkeypatch, [_http_error(429), _http_error(429), "ok"])
+        assert got == ['{"a":1}'] and n == 3
+        assert sleeps == [1.0, 2.0]          # 指数退避
+    def test_retries_on_503_and_urlerror(self, monkeypatch):
+        got, _, n = self._run(monkeypatch,
+                              [urllib.error.URLError("net down"), _http_error(503), "ok"])
+        assert got == ['{"a":1}'] and n == 3
+    def test_400_no_retry_and_body_in_message(self, monkeypatch):
+        with pytest.raises(RuntimeError) as ei:
+            self._run(monkeypatch, [_http_error(400)])
+        assert "不重试" in str(ei.value) and "boom" in str(ei.value)
+        assert "400" in str(ei.value)
+    def test_persistent_failure_raises_after_max_attempts(self, monkeypatch):
+        errs = [urllib.error.URLError("down")] * 5
+        with pytest.raises(RuntimeError) as ei:
+            self._run(monkeypatch, errs)
+        assert "3/3" in str(ei.value)
+    def test_mid_stream_failure_not_retried(self, monkeypatch):
+        calls = {"n": 0}
+        def fake_urlopen(req, timeout=0):
+            calls["n"] += 1
+            return _FakeResp([b'data: {"a":1}\n', b'data: {"b":2}\n'], explode_after=1)
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        gen = Provider._post_sse("http://x", {}, {}, _sleep=lambda s: None)
+        with pytest.raises(OSError):
+            list(gen)
+        assert calls["n"] == 1               # 流开始后不重试
