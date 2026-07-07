@@ -73,6 +73,10 @@ Step 之下是真正的实现层:
 统计(描述/回归/因子/生存/元分析…)**已整体外移到这层**,不在 PsyClaw 本体(见 `CLAUDE.md`)。
 实证/元分析流程的"分析"步会委托到 MCP 统计后端或外部库。
 
+**v0.5:agent 直连 MCP。** `psyclaw/mcp/client.py`(stdio JSON-RPC 客户端)+ `agent_tools.py`
+把已启用+健康的 MCP 服务器工具惰性并入 agent 工具集(`mcp__<server>__<tool>`,fail-closed 批准)。
+至此 L3 的 MCP 不再只是"另起进程手动跑",agent 循环可在多步推理中直接调用——编排纵深落地。
+
 ## 两条横切
 
 - **Harness**:每个 Step 的 `gate` = 前置约束(如澄清未完成不开工、确证须先预注册);

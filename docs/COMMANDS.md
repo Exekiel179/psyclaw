@@ -109,6 +109,8 @@
 1. **外部成熟库**:在装了 `psyclaw[stats]`(scipy/pingouin/statsmodels/lifelines/
    factor_analyzer/semopy)的解释器里直接写分析脚本。
 2. **MCP 服务器**:`psyclaw mcp --serve {mne,spss,mplus,stata}` 以 stdio MCP 跑专业统计后端。
+   v0.5 起 **agent 会直接调用**这些 MCP:`agent`/REPL 的工具集自动并入已启用+健康的 MCP
+   服务器工具(名字带 `mcp__<server>__` 前缀,属副作用工具需批准);`PSYCLAW_MCP_TOOLS=0` 可关。
 3. **REPL 自然语言**:在 `psyclaw repl` 里直接用自然语言提统计需求,ARS 规范已注入上下文。
 
 PsyClaw 负责把研究流程编排起来(澄清→文献→设计→写作→评审→门禁),

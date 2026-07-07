@@ -2,7 +2,28 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07(晚:v0.3.0 发布 + v0.4 三 feature)
+**Last Updated:** 2026-07-07(晚:v0.3.0 → v0.4 → **v0.5.0 发布**)
+
+## 本轮(25):v0.5.0 发布 ——feat-039..042 done(编排纵深:agent 真正会用 MCP)
+
+用户定调『继续开 v0.5』。主题=把「统计外移到 MCP」从目录/健康检查兑现成 agent **可调用**:
+
+- feat-039 MCP stdio 客户端 `psyclaw/mcp/client.py`(与 server_base 对偶:惰性起进程+
+  initialize 握手+后台读线程按 id 匹配+超时/EOF fail-safe;resolve_command 把 python 换
+  sys.executable 兜底本机);8 例真实 subprocess 往返测试。
+- feat-040 `psyclaw/mcp/agent_tools.py` merge_mcp_tools:build_tools 并入已启用+健康+有
+  command 的 MCP 工具(mcp__ 前缀、fail-closed、客户端进程级缓存+atexit、PSYCLAW_MCP_TOOLS=0
+  可关);**live e2e:build_tools 实际浮出真实 mne-mcp 4 工具**(内置 6+MCP 4=10)。
+- feat-041 compact_history 可选 LLM 蒸馏(有 key 结构化蒸馏,无 key/异常回落规则蒸馏,
+  不拿 mock 套话污染备忘)。
+- feat-042 版本 0.3.0→0.5.0(跳过未发版的 0.4)+ CHANGELOG v0.5 段(含 v0.4 工件 feat-036/037/038)
+  + docs(COMMANDS/ARCHITECTURE 记 agent 直连 MCP)。
+
+全量 **1242 passed**;`psyclaw version` → 0.5.0(uv tool editable 即时生效)。
+下一步候选见 session-handoff(REPL 长会话蒸馏实网验证 / eval harness / 各 workflow 分析步直连 MCP)。
+
+---
+
 **重大转向:** PsyClaw 从「全流程统计 CLI」重定位为「纯研究编排 harness」——
 统计计算整体外移到成熟库/MCP,本仓删除全部手写统计实现。
 

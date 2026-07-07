@@ -421,8 +421,8 @@
         "feat-040",
         "feat-041"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.3.0→0.5.0(跳过未发版 0.4);CHANGELOG.md v0.5.0 段(编排纵深 feat-039/040、长会话 feat-041、含 v0.4 工件 feat-036/037/038);docs/COMMANDS.md(统计三条路补 agent 直连 MCP + PSYCLAW_MCP_TOOLS)、docs/ARCHITECTURE.md(L3 加 v0.5 agent 直连 MCP 段);TODO §2 + progress 本轮(25) + session-handoff 快照;验证:uv run --python 3.12 pytest → 1242 passed;psyclaw version → 0.5.0(uv tool editable)"
     }
   ]
 }

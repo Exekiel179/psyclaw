@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.5.0(2026-07-07)
+
+> 主题:**编排纵深——agent 真正会用 MCP** + provider 健壮性 + agent 可观测。
+> (含此前未单独发版的 v0.4 工件:feat-036/037/038。)
+
+### 编排纵深:agent 接入 MCP(统计外移从"目录"兑现成"可调用")
+- **MCP stdio 客户端**(feat-039):`psyclaw/mcp/client.py`——JSON-RPC over stdio,
+  惰性起子进程 + initialize 握手 + 超时 fail-safe;进程异常/坏 JSON/服务器报错优雅降级不抛。
+- **agent 循环接入 MCP 工具**(feat-040):`agent`/REPL 的工具集自动并入**已启用+健康**的 MCP
+  服务器工具(`mcp__<server>__<tool>` 前缀、fail-closed 批准、客户端进程级复用、连接失败不拖垮)。
+  例:装了 MNE 的机器上 agent 可直接调 `mne_info`/`erp_components` 等做 EEG/ERP 分析。
+  `PSYCLAW_MCP_TOOLS=0` 可整体关闭。
+
+### 长会话可靠性
+- **compact_history LLM 蒸馏**(feat-041):超预算压缩时,有 key 的 provider 会把被移出上下文的
+  早期轮次蒸馏成**结构化决策备忘**(比规则截断保真);无 key/异常/离线 → fail-safe 回落规则蒸馏。
+
+### provider 健壮性 + agent 可观测(v0.4 工件)
+- **provider 网络重试**(feat-036):429/5xx/网络异常首字节前指数退避重试(≤3 次);HTTP 错误读
+  响应 body 显性化;流开始后不重试(防重复消费)。
+- **agent 运行痕迹**(feat-037):每次 agent 运行落 `.psyclaw/agent_runs.jsonl`,
+  `psyclaw agent --history [n]` 回看最近 n 次。
+
+### 其他
+- 版本号 0.3.0 →(跳过未发版的 0.4)→ **0.5.0**(pyproject + `__version__`)。
+- 全量测试 1242 passed。
+
 ## v0.3.0(2026-07-07)
 
 > 主题:**agent 执行面安全加固 + 长会话可靠性**(「对话长期维持、不中途停」)。
