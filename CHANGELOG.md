@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.3.0(2026-07-07)
+
+> 主题:**agent 执行面安全加固 + 长会话可靠性**(「对话长期维持、不中途停」)。
+
+### 长会话可靠性
+- **截断防护**(feat-030):provider 输出被 max_tokens 截断时,未闭合的 ```tool 块不再被
+  误判为最终答案——检测截断并请求模型重发完整块(连续超限才停,`stopped=truncated` 不静默);
+  providers 捕获 `stop_reason`/`finish_reason`(归一化);`PSYCLAW_MAX_TOKENS` 环境变量可配
+  (默认 8192);`agent --max-iters` 默认 6→24。
+- **上下文滚动修剪**(feat-033):toolloop 循环内旧轮次工具结果压缩为「工具名+输出首行」摘要
+  (最近 3 轮保完整),长任务不再撑爆上下文;调用方历史与 assistant 回复不碰。
+
+### 安全加固(外部安全审查 HIGH/MEDIUM 修复)
+- **shell 执行 fail-closed**(feat-031):REPL 命令块里的 shell 命令**每条**须人工确认才执行,
+  危险模式正则降级为确认提示里的 ⚠ 标签(拒绝清单不是安全边界);psyclaw 进程内子命令保持自动。
+- **save_file 路径允许清单**(feat-032):agent 的 save_file 工具只能写项目根内;拒 `../` 逃逸、
+  项目外绝对路径、软链接目标、凭据类路径(`.env`/`id_rsa`/`*.pem`/`.ssh`/`.aws` …)。
+
+### 其他
+- `normalize_type` 补 22 个中文研究类型别名(『元分析』『文献综述』『质性研究』…)——中文入口
+  的技能推荐路由不再落空(feat-034)。
+- 版本号统一:`pyproject.toml` 与 `__version__` 对齐 0.3.0(v0.2 发布轮 pyproject 漏改)。
+- 修 2 例陈旧 MCP 测试断言(mplus/stata 改 detect: 门控后未同步)。
+- 全量测试 1212 passed。
+
 ## v0.2.0(2026-07-03)
 
 > 主题:**机制可以复杂,命令要简单**。默认三条路:`status` → `auto-loop` → `check`。
