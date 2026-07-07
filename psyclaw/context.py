@@ -152,17 +152,47 @@ def _distill(msg: dict) -> str:
     return "\n".join(f"  [{role}] {ln[:160]}" for ln in keep)
 
 
-def compact_history(messages: list, memo: str) -> tuple:
+_DISTILL_SYSTEM = (
+    "你是会话压缩器。把下面被移出上下文的早期对话轮次,蒸馏成一段**结构化决策备忘**,"
+    "只保留后续仍需依据的既定事实:研究设计/变量/样本决策、已选方案与理由、约定的口径、"
+    "待办与未决问题。丢弃寒暄、过程性措辞、已被推翻的想法。用简洁的中文要点(每点一行,"
+    "≤160 字),不要编造未出现的内容。直接输出要点,不要开场白。")
+
+
+def _llm_distill(dropped: list, provider) -> str | None:
+    """用 provider 把被丢弃轮次蒸馏成结构化备忘;失败返回 None 让调用方回落规则蒸馏。"""
+    # 无 provider 或无 key(mock/离线)→ 回落规则蒸馏,别拿 mock 的套话污染备忘
+    if provider is None or not getattr(provider, "api_key", ""):
+        return None
+    convo = "\n\n".join(
+        f"[{'用户' if m['role'] == 'user' else '助手'}] {m['content'][:1500]}"
+        for m in dropped if m["content"].strip())
+    if not convo.strip():
+        return ""
+    try:
+        out = "".join(provider.chat([{"role": "user", "content": convo}],
+                                    system=_DISTILL_SYSTEM))
+    except Exception:  # noqa: BLE001  # provider 异常/无 key/网络 → fail-safe 回落
+        return None
+    out = (out or "").strip()
+    return out or None
+
+
+def compact_history(messages: list, memo: str, provider=None) -> tuple:
     """超预算时压缩。返回 (new_messages, new_memo)。
 
     memo 是累积的"决策备忘",作为首条 user 消息的前缀注入。
+    v0.5 feat-041:传 provider 时用它做**结构化 LLM 蒸馏**(比规则截断保真);
+    provider 缺失/异常/空输出 → fail-safe 回落到规则蒸馏(_distill),zero-dep 契约不破。
     """
     total = sum(len(m["content"]) for m in messages)
     if total <= CHAR_BUDGET_HISTORY or len(messages) <= KEEP_RECENT_TURNS:
         return messages, memo
     cut = len(messages) - KEEP_RECENT_TURNS
     dropped, kept = messages[:cut], messages[cut:]
-    new_notes = "\n".join(_distill(m) for m in dropped if m["content"].strip())
+    new_notes = _llm_distill(dropped, provider)
+    if new_notes is None:   # 回落规则蒸馏
+        new_notes = "\n".join(_distill(m) for m in dropped if m["content"].strip())
     memo = (memo + "\n" + new_notes).strip()
     # memo 本身限长:保最近 4000 字符
     if len(memo) > 4000:
