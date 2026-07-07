@@ -59,7 +59,7 @@
 ### 研究流程 / 编排回路
 | 命令 | 作用 |
 |---|---|
-| `agent <task> [--auto]` | 纯工具层循环:模型**自主多步调用工具**(search/read_file/save_file/kg_query/recall);文本约定协议、provider 无关保底;副作用工具需批准(REPL 内 `/agent` 开关) |
+| `agent <task> [--auto] [--max-iters 24] [--history [n]]` | 纯工具层循环:模型**自主多步调用工具**(search/read_file/save_file/kg_query/recall);文本约定协议、provider 无关保底;副作用工具需批准(REPL 内 `/agent` 开关)。v0.3+:截断防护(未闭合 tool 块自动续写,`PSYCLAW_MAX_TOKENS` 可配)+ 旧轮次结果滚动压缩;`save_file` 只能写项目根内(拒软链/凭据路径)。v0.4+:运行痕迹自动落 `.psyclaw/agent_runs.jsonl`,`--history [n]` 回看最近 n 次 |
 | `auto-loop` | 自主科研回路(Ralph 式自循环):每轮自动发现待办→派发对应 `<type>-loop`→**独立验收**(只读落盘产物)→记 `notes/autoloop_state.json`→决定下一步(`--max-iters` / `--auto` / `--skip-gates` 用户显式跳过门禁,留痕+产出标探索性;各 `<type>-loop` 同) |
 | `loop [主题]` | 通用流程编排回路(类 Claude Code 的 agentic loop:planner→执行→critic→修复),不绑研究类型 |
 | `lit-loop <主题>` | 文献综述:澄清→检索→筛选(PRISMA)→合成综述→评审 |
