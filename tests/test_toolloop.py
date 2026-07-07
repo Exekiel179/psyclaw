@@ -214,3 +214,67 @@ def test_loop_default_max_iters_raised():
     import inspect
     sig = inspect.signature(TL.run_tool_loop)
     assert sig.parameters["max_iters"].default >= 24
+
+
+# --- save_file 路径允许清单(v0.3 外审 MEDIUM) ----------------------------------
+
+def test_save_path_allows_inside_project(tmp_path):
+    assert TL.save_path_denied("notes/out.md", str(tmp_path)) is None
+    assert TL.save_path_denied(str(tmp_path / "sub" / "a.txt"), str(tmp_path)) is None
+
+
+def test_save_path_denies_relative_escape(tmp_path):
+    d = TL.save_path_denied("../outside.txt", str(tmp_path))
+    assert d and "项目根之外" in d
+
+
+def test_save_path_denies_absolute_outside(tmp_path):
+    d = TL.save_path_denied("/tmp/psyclaw_evil.txt", str(tmp_path))
+    assert d and "项目根之外" in d
+
+
+def test_save_path_denies_home_credentials(tmp_path):
+    d = TL.save_path_denied("~/.ssh/authorized_keys", str(tmp_path))
+    assert d  # 项目根之外(通常)或凭据类,任一理由拒即可
+
+
+def test_save_path_denies_credential_names_inside_root(tmp_path):
+    for bad in (".env", "id_rsa", "server.pem", "client.key"):
+        d = TL.save_path_denied(bad, str(tmp_path))
+        assert d and "凭据类" in d, bad
+
+
+def test_save_path_denies_credential_dir_inside_root(tmp_path):
+    d = TL.save_path_denied(".ssh/config", str(tmp_path))
+    assert d and "凭据类" in d
+
+
+def test_save_path_denies_symlink_target(tmp_path):
+    real = tmp_path / "real.txt"
+    real.write_text("x", encoding="utf-8")
+    link = tmp_path / "link.txt"
+    link.symlink_to(real)
+    d = TL.save_path_denied(str(link), str(tmp_path))
+    assert d and "软链接" in d
+
+
+def test_save_path_denies_symlink_dir_escape(tmp_path):
+    """途径软链目录逃逸:resolve 消解后落到根外 → 拒。"""
+    outside = tmp_path.parent / "psyclaw_outside_probe"
+    outside.mkdir(exist_ok=True)
+    ln = tmp_path / "esc"
+    ln.symlink_to(outside, target_is_directory=True)
+    d = TL.save_path_denied("esc/x.txt", str(tmp_path))
+    assert d and "项目根之外" in d
+
+
+def test_save_path_denies_empty():
+    assert TL.save_path_denied("", ".") is not None
+
+
+def test_save_tool_rejects_escape_without_writing(tmp_path):
+    """端到端:save_file 工具对逃逸路径直接拒,不落盘。"""
+    tools = TL.build_tools(str(tmp_path))
+    out = tools["save_file"]["run"]({"path": "../evil.md", "content": "x"})
+    assert "拒绝写入" in out
+    assert not (tmp_path.parent / "evil.md").exists()
