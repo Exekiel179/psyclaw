@@ -465,6 +465,24 @@
       ],
       "status": "done",
       "evidence": "tests/test_toolloop_multiturn.py 新增(ScriptedProvider 走真实多轮:正常调用→双重编码 JSON 字符串 args 自纠成功→list args 拦截失败→未知工具→max_tokens 截断续写→重发→答案;断言工具只在合法参数时执行[x=1,2,3]、畸形/未知如实标 ok=False、provider 每次只收合法序列;+连续失败不误判无进展仍能答案);版本 0.5.0→0.6.0(pyproject+__init__);CHANGELOG v0.6 段;TODO/progress/session-handoff 快照;验证:uv run --python 3.12 pytest → 1264 passed;psyclaw version → 0.6.0"
+    },
+    {
+      "id": "feat-047",
+      "name": "REPL 方向键/历史/光标(readline 后端)——修 ^[[A 泄漏(v0.7)",
+      "description": "用户报:psyclaw REPL 不支持方向键,按 ↑ 显示 ^[[A。根因:tool 装在 uv py3.12(无 prompt_toolkit),非 ptk TTY 落到自研 _read_line_interactive 逐键 raw reader——只把 ↑↓ 映射到 slash 联想、←→ 变 ESC,无命令历史/光标移动,且终端兼容性差会漏转义。修:非 ptk TTY 优先走 readline-backed 输入(stdlib readline 一挂即得方向键/↑↓历史/←→光标/Ctrl-A/E/K),slash 命令用 readline 补全器(整行补全、libedit/gnu 均绑 Tab),ANSI 提示用 \\001\\002 包裹让宽度计算正确;readline 不可用(Windows)再退 raw reader,再退裸 input。ptk premium 路径不变。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/ui_input.py(_readline_input:import readline 即得方向键/↑↓历史/←→光标/Ctrl-A-E-K,装整行 slash 补全器 set_completer+set_completer_delims('')、libedit 绑 'bind ^I rl_complete'/gnu 绑 'tab: complete'、结束 finally 复原;_rl_wrap_prompt 用 \\001\\002 包 ANSI SGR 让宽度计算正确;read_line 非 ptk TTY 改为优先 _readline_input,readline 缺失→raw reader→input);tests/test_repl_ptk.py 改 1 例(降级链新增 readline 层)+新增 6 例(非 ptk TTY 首选 readline/readline 缺失退 raw/KI 穿透/wrap ANSI/无 ANSI 不变/补全器候选+复原);根因:tool 装在 uv py3.12 无 prompt_toolkit,旧路径落自研 raw reader 不支持方向键。验证:uv run --python 3.12 pytest → 1270 passed;smoke:_readline_input 真 import readline 可用"
+    },
+    {
+      "id": "feat-048",
+      "name": "v0.7 发布收尾",
+      "description": "版本 0.6.0→0.7.0;CHANGELOG v0.7 段(REPL 方向键修复,用户可感知);TUTORIAL 补一句(方向键/历史可用,装 [full] 得实时补全);progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-047"
+      ],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }

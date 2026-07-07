@@ -188,6 +188,50 @@ def _clear_suggestions(prev_lines: int) -> None:
 _readline_ready: bool | None = None     # None=未尝试 True=已挂接 False=不可用
 
 
+# ---------------------------------------------------------------------------
+# readline 后端(v0.7 feat-047):非 ptk TTY 的主路径。
+# stdlib readline 一经 import 即给 input() 挂上方向键/↑↓历史/←→光标/Ctrl-A/E/K;
+# 再挂一个整行 slash 补全器(Tab 触发)。修「REPL 方向键漏出 ^[[A、无历史」。
+# ---------------------------------------------------------------------------
+
+def _rl_wrap_prompt(prompt: str) -> str:
+    """用 \\001..\\002 包裹 ANSI SGR 序列,让 readline 正确计算提示可见宽度。
+
+    否则彩色提示会让 readline 高估宽度,编辑时光标错位(gnu/libedit 都认这对标记)。
+    """
+    import re
+    return re.sub(r"(\033\[[0-9;]*m)", "\001\\1\002", prompt)
+
+
+def _readline_input(prompt: str, commands: dict) -> str:
+    """readline 支持的行输入:方向键/历史/光标全可用 + slash 命令 Tab 补全。
+
+    readline 缺失(Windows 等)或任何异常 → 抛出,由 read_line 降级到 raw reader / input()。
+    """
+    import readline
+
+    def _completer(text: str, state: int):
+        buf = readline.get_line_buffer()
+        if not buf.startswith("/") or " " in buf:
+            return None
+        matches = [c for c in commands if c.startswith(buf)]
+        return (matches[state] + " ") if state < len(matches) else None
+
+    prev_completer = readline.get_completer()
+    prev_delims = readline.get_completer_delims()
+    readline.set_completer(_completer)
+    readline.set_completer_delims("")          # 整行补全,不按词边界拆
+    if "libedit" in (readline.__doc__ or ""):  # macOS 默认 libedit,绑定语法不同
+        readline.parse_and_bind("bind ^I rl_complete")
+    else:
+        readline.parse_and_bind("tab: complete")
+    try:
+        return input(_rl_wrap_prompt(prompt)).strip()
+    finally:                                    # 复原,避免污染其他 input()(确认框等)
+        readline.set_completer(prev_completer)
+        readline.set_completer_delims(prev_delims)
+
+
 def _fallback_input(prompt: str) -> str:
     """裸 input() 兜底：先尝试 import readline 启用行内编辑/↑↓ 历史。
 
@@ -209,9 +253,11 @@ def _fallback_input(prompt: str) -> str:
 def read_line(prompt: str, commands: dict) -> str:
     """带 slash 联想的行输入。commands: {"/cmd": "描述"}。
 
-    优先 prompt_toolkit（若已安装且 TTY）→ 降级 stdlib 交互输入 → 降级 input()。
-    最末级 input() 兜底前会 import readline（见 `_fallback_input`），让方向键/
-    历史在终端兼容降级时仍可用。
+    路径优先级(v0.7 feat-047 起):
+      prompt_toolkit(若装了 [full] 且 TTY,实时联想下拉)
+      → **readline 后端**(非 ptk TTY 主路径:方向键/↑↓历史/←→光标/Ctrl-A-E-K + Tab 补全)
+      → 自研 raw reader(readline 缺失如 Windows,保留 slash 联想菜单)
+      → 裸 input()(非 TTY / 一切降级)。
     """
     if _PTK_AVAILABLE and sys.stdin.isatty() and sys.stdout.isatty():
         try:
@@ -222,6 +268,13 @@ def read_line(prompt: str, commands: dict) -> str:
             pass
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         return _fallback_input(prompt)
+    # 非 ptk TTY:优先 readline(修方向键/历史);readline 不可用再退 raw reader
+    try:
+        return _readline_input(prompt, commands)
+    except (KeyboardInterrupt, EOFError):
+        raise
+    except Exception:  # noqa: BLE001 — readline 缺失(Windows 等)/异常 → raw reader
+        pass
     try:
         return _read_line_interactive(prompt, commands)
     except (KeyboardInterrupt, EOFError):

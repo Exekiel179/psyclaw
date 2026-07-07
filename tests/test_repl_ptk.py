@@ -356,11 +356,13 @@ class TestFallbackReadline:
         assert called == ["np> "]
 
     def test_read_line_interactive_error_routes_through_fallback(self):
-        """交互路径抛非中断异常时降级 _fallback_input。"""
+        """readline 与 raw reader 都抛非中断异常时,最终降级 _fallback_input。"""
         self._reset()
         called = []
 
         with patch.object(uin, "_PTK_AVAILABLE", False), \
+             patch.object(uin, "_readline_input",
+                          side_effect=RuntimeError("no readline")), \
              patch.object(uin, "_read_line_interactive",
                           side_effect=RuntimeError("tty broken")), \
              patch.object(uin, "_fallback_input",
@@ -373,6 +375,83 @@ class TestFallbackReadline:
 
         assert result == "fb"
         assert called == ["ip> "]
+
+
+# ===========================================================================
+# UX(v0.7 feat-047)— readline 后端:非 ptk TTY 优先,修方向键/历史/^[[A
+# ===========================================================================
+
+class TestReadlineBackend:
+
+    def test_non_ptk_tty_prefers_readline_input(self):
+        """非 ptk TTY 首选 _readline_input(而非旧 raw reader)。"""
+        called = []
+        with patch.object(uin, "_PTK_AVAILABLE", False), \
+             patch.object(uin, "_readline_input",
+                          side_effect=lambda p, c: called.append(p) or "rl"), \
+             patch.object(uin, "_read_line_interactive",
+                          side_effect=AssertionError("raw reader 不应被调用")), \
+             patch("sys.stdin") as mock_stdin, \
+             patch("sys.stdout") as mock_stdout:
+            mock_stdin.isatty.return_value = True
+            mock_stdout.isatty.return_value = True
+            assert uin.read_line("p> ", _CMDS) == "rl"
+        assert called == ["p> "]
+
+    def test_readline_unavailable_falls_to_raw_reader(self):
+        """readline 缺失(Windows 等)→ 退回 raw reader。"""
+        with patch.object(uin, "_PTK_AVAILABLE", False), \
+             patch.object(uin, "_readline_input",
+                          side_effect=RuntimeError("no readline module")), \
+             patch.object(uin, "_read_line_interactive",
+                          side_effect=lambda p, c: "raw"), \
+             patch("sys.stdin") as mock_stdin, \
+             patch("sys.stdout") as mock_stdout:
+            mock_stdin.isatty.return_value = True
+            mock_stdout.isatty.return_value = True
+            assert uin.read_line("p> ", _CMDS) == "raw"
+
+    def test_readline_keyboardinterrupt_propagates(self):
+        with patch.object(uin, "_PTK_AVAILABLE", False), \
+             patch.object(uin, "_readline_input", side_effect=KeyboardInterrupt), \
+             patch("sys.stdin") as mock_stdin, \
+             patch("sys.stdout") as mock_stdout:
+            mock_stdin.isatty.return_value = True
+            mock_stdout.isatty.return_value = True
+            try:
+                uin.read_line("p> ", _CMDS)
+                assert False, "should raise"
+            except KeyboardInterrupt:
+                pass
+
+    def test_rl_wrap_prompt_wraps_ansi(self):
+        wrapped = uin._rl_wrap_prompt("\033[2mhi\033[0m x> ")
+        assert "\001\033[2m\002" in wrapped and "\001\033[0m\002" in wrapped
+        assert "hi" in wrapped
+
+    def test_rl_wrap_prompt_no_ansi_unchanged(self):
+        assert uin._rl_wrap_prompt("plain> ") == "plain> "
+
+    def test_readline_input_completes_slash_and_restores(self):
+        """_readline_input 装/卸补全器:整行 slash 补全,结束后复原。"""
+        fake_rl = MagicMock()
+        fake_rl.__doc__ = "GNU readline"
+        fake_rl.get_completer.return_value = "PREV"
+        fake_rl.get_completer_delims.return_value = " \t"
+        fake_rl.get_line_buffer.return_value = "/m"
+        set_calls = []
+        fake_rl.set_completer.side_effect = lambda fn: set_calls.append(fn)
+
+        with patch.dict("sys.modules", {"readline": fake_rl}), \
+             patch("builtins.input", return_value="  /memory  "):
+            out = uin._readline_input("p> ", _CMDS)
+
+        assert out == "/memory"
+        # 装了真 completer(callable),最后复原为原 completer "PREV"
+        real_completer = next(fn for fn in set_calls if callable(fn))
+        assert real_completer("", 0).startswith("/m")   # "/m" 前缀有候选
+        assert set_calls[-1] == "PREV"                  # 结束复原
+        fake_rl.set_completer_delims.assert_called_with(" \t")
 
 
 # ===========================================================================
