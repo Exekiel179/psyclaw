@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.10.0(2026-07-07)
+
+> 主题:**数据→结果端到端闭环**——analysis 流程直接经 pystat MCP 出结果。
+
+### 新增
+- **analysis 分析步接 pystat MCP**(feat-053):`psyclaw analysis <data.csv>` 的分析步此前
+  只生成 `outputs/analysis.py` 让用户手动跑;现在在生成脚本后**自动经 pystat MCP 直接运行**
+  推荐的分析,把结果写到 `outputs/analysis_result.txt`。`pystat_bridge` 把 `recommend_analysis`
+  的检验类型 + 角色列纯映射到 pystat 工具(t 检验/方差/回归/相关/描述),经 MCP 客户端执行:
+  装了 `[stats]` 则回带**效应量 + 95% CI** 的真结果,未装则回 pystat 的降级脚本——无论哪种都多
+  一个具体产物。全程 fail-safe:pystat 不可用/异常绝不阻断流程(生成的脚本仍在)。
+  至此「数据 → 画像 → 推荐分析 → pystat 出结果」端到端闭环:v0.5 让 agent 能调 MCP、v0.8 建了
+  pystat 后端、本版把 workflow 也接上。
+
 ## v0.9.0(2026-07-07)
 
 > 主题:**一键配置基础环境**。

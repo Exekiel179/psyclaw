@@ -4,50 +4,50 @@
 
 ## Current Objective
 
-- Goal: v0.9 新增 setup —— 一键配置好所缺失的基础环境(用户请求)
-- Current status: **v0.9.0 已发布**——feat-051/052 done;52 个 feature 全 done
-- Branch / commit: master(v0.9.0 release 提交为最新)
+- Goal: 下个版本是 v0.10(用户请求)
+- Current status: **v0.10.0 已发布**——feat-053/054 done;54 个 feature 全 done
+- Branch / commit: master(v0.10.0 release 提交为最新)
 
 ## Completed This Session
 
-- [x] feat-051 `setup --env` 一键环境配置(env_setup.py:diagnose + bootstrap)
-- [x] feat-052 版本 0.9.0 + CHANGELOG + COMMANDS
+- [x] feat-053 workflow 分析步接 pystat MCP(pystat_bridge + step_analysis)
+- [x] feat-054 版本 0.10.0 + CHANGELOG + ARCHITECTURE
 
 ## Verification Evidence
 
 | Check | Command | Result |
 |---|---|---|
-| 全量测试 | `uv run --python 3.12 --with pytest python -m pytest -q` | 1293 passed |
-| CLI 版本 | `psyclaw version` | 0.9.0 |
-| setup --env live | `psyclaw setup --env` | 正确诊断:config✓ provider✓ stats✗ full✗ + 修法 |
-| env_setup 单测 | test_env_setup 11 例 | 绿(依赖注入,离线) |
+| 全量测试 | `uv run --python 3.12 --with pytest python -m pytest -q` | 1306 passed |
+| CLI 版本 | `psyclaw version` | 0.10.0 |
+| e2e 闭环 | `run_via_pystat` 经真实 pystat MCP subprocess | 连通(降级脚本 458 字) |
+| bridge 单测 | test_pystat_bridge 13 例 | 绿(纯映射+注入客户端+step 端到端) |
 
-## Files Changed(v0.9)
+## Files Changed(v0.10)
 
-- 新增 `psyclaw/env_setup.py` `tests/test_env_setup.py`
-- 改 `psyclaw/cli.py`(setup --env 分支 + 参数)
-- `pyproject.toml` `psyclaw/__init__.py` `CHANGELOG.md` `docs/COMMANDS.md` + TODO/progress
+- 新增 `psyclaw/workflows/pystat_bridge.py` `tests/test_pystat_bridge.py`
+- 改 `psyclaw/workflows/steps_analysis.py`(step_analysis best-effort 跑 pystat)
+- `pyproject.toml` `psyclaw/__init__.py` `CHANGELOG.md` `docs/ARCHITECTURE.md` + TODO/progress
 - 未提交:`.claude/`(本地 Claude Code hooks/agents/skills,待用户定夺是否入库)
 
 ## Decisions Made
 
-- `setup --env` 作为 setup 的子模式(不动既有脚手架流程),env_setup.py 独立模块
-- base 环境 = 配置文件 + provider key + stats 组 + full 组;API key 不能自动装 → 列待手动
-- 依赖注入(detect/config/provider/installer)保证离线可测,不真联网/真 pip
+- pystat 直跑是 step_analysis 的**增强**,不改既有契约:脚本照写、失败不阻断(fail-safe)
+- rec_to_pystat_call 纯映射(5 分支),run_via_pystat 客户端注入——离线可测,不真联网
+- 结果落 outputs/analysis_result.txt(与 analysis.py 并存),step 返回 ran_via_pystat 标志
 
 ## Blockers / Risks
 
-- 本机 uv py3.12 无 pingouin/prompt_toolkit,`--online` 真安装路径未在本机实测
-  (installer 逻辑复用既有 bootstrap._pip_install,注入 fake 已测编排逻辑)
+- 本机无 pingouin,e2e 只验证到「经真实 pystat MCP 连通 + 降级脚本」;「真数值结果」
+  路径需装 [stats] 实测(pystat_server 真算逻辑照 pingouin API 写)
 - 本机只有 python3.9,测试/运行走 `uv run --python 3.12`(memory 已记)
 
 ## Next Session Startup
 
 1. 读 `CLAUDE.md` → `feature_list.json` → `progress.md` → 本交接。
-2. `uv run --python 3.12 --with pytest python -m pytest -q` 确认 1293 绿再动手。
+2. `uv run --python 3.12 --with pytest python -m pytest -q` 确认 1306 绿再动手。
 
 ## Recommended Next Step
 
-- v1.0 候选(未立项):① workflow 的 analysis/meta 分析步默认走 pystat MCP 出结果
-  (端到端闭环,历次提);② `setup --env --online` 真安装路径在装齐环境上实测;
-  ③ eval harness;④ `doctor` 与 `setup --env` 合流(doctor 只读诊断 → 一键跳 setup --env 修)。
+- v0.11 候选(未立项):① step_write_analysis 引用 outputs/analysis_result.txt 的真结果回填稿件
+  (把闭环延伸到写作:结果→论文数值);② meta workflow 同样接 pystat(元分析 effect pooling);
+  ③ 装 [stats] 对 pystat 真算路径做数值实测;④ eval harness;⑤ doctor↔setup --env 合流。
