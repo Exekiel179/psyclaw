@@ -521,6 +521,26 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.8.0→0.9.0;CHANGELOG v0.9.0 段(setup --env 一键配置基础环境);docs/COMMANDS.md setup --env 行;TODO §2 + progress 本轮(29) + session-handoff 快照(v1.0 候选);验证:uv run --python 3.12 pytest → 1293 passed;psyclaw version → 0.9.0"
+    },
+    {
+      "id": "feat-053",
+      "name": "workflow 分析步接 pystat MCP——端到端闭环(v0.10)",
+      "description": "v0.8 建了 pystat MCP、v0.5 让 agent 能调,但 analysis workflow 的 step_analysis 仍只生成 outputs/analysis.py 让用户手动跑。补最后一公里:新增 psyclaw/workflows/pystat_bridge.py:rec_to_pystat_call(纯映射 recommend_analysis 的 {analysis,group/dv/iv/x/y} → pystat 工具名+args:ttest/anova/regression/correlation/descriptives 五分支)+ run_via_pystat(经 MCPClient 跑 pystat,client_factory 可注入;不可用/异常 fail-safe 返回 None)。step_analysis 生成脚本后 best-effort 经 pystat 跑,有结果存 outputs/analysis_result.txt 并提示——pingouin 在则真数值、不在则 pystat 降级脚本,either way 多一个具体产物;失败绝不阻断流程(仍有脚本)。至此 数据→profile→推荐→pystat 出结果 端到端闭环。",
+      "dependencies": [
+        "feat-049"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/workflows/pystat_bridge.py(rec_to_pystat_call 纯映射 5 分支 ttest/anova[group→between]/regression[iv→predictors 逗号连]/correlation/descriptives+未知 None;run_via_pystat 经 MCPClient 跑 pystat,client_factory 可注入,不可映射不建客户端、无客户端/异常/空结果→None fail-safe;_default_pystat_client 查目录 enabled+健康+command);steps_analysis.step_analysis 生成脚本后 best-effort 经 pystat 跑,有结果存 outputs/analysis_result.txt+记 artifacts,失败不阻断(脚本兜底);tests/test_pystat_bridge.py 13 例(5 映射+未知/注入客户端调对工具/无客户端/不可映射不建/异常吞/空结果 None/step 端到端写结果+脚本照写/step pystat 不可用仍活);e2e:run_via_pystat 经真实 pystat MCP subprocess 连通(本机无 pingouin→降级脚本 458 字,装 [stats] 则真数值)。验证:uv run --python 3.12 pytest → 1306 passed。至此 数据→profile→推荐→pystat 出结果 端到端闭环。"
+    },
+    {
+      "id": "feat-054",
+      "name": "v0.10 发布收尾",
+      "description": "版本 0.9.0→0.10.0;CHANGELOG v0.10 段(workflow 分析步接 pystat,端到端闭环);docs/ARCHITECTURE 记闭环完成;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-053"
+      ],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }
