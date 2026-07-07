@@ -354,6 +354,37 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml version 0.1.0→0.3.0 + psyclaw/__init__.py __version__ 0.2.0→0.3.0(对齐);CHANGELOG.md v0.3.0 段(长会话可靠性 feat-030/033、安全加固 feat-031/032、其他 feat-034/版本统一/陈旧测试修复);TODO.md §2 全部标 ✅;验证:uv run --python 3.12 pytest → 1212 passed;psyclaw version → 0.3.0(uv tool editable 安装即时生效)"
+    },
+    {
+      "id": "feat-036",
+      "name": "provider 网络层健壮性(v0.4:重试+错误显性化)",
+      "description": "base._post_sse 现在 HTTP/网络错误只抛裸异常,调用方(REPL/_run_agent)只显示「provider 错误」,且无重试——网络瞬断/限流直接杀死整个 agent 长任务。改为:429/5xx/URLError/timeout 指数退避重试(≤3 次,仅在首字节产出前,流中断不重试防重复消费);HTTPError 读响应 body(截断)拼进异常消息(API 的 error JSON 通常在 body 里,裸 status 无法定位);4xx(非 429)不重试直接显性报错。stdlib only,time.sleep 可测试注入。",
+      "dependencies": [
+        "feat-030"
+      ],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-037",
+      "name": "agent 运行痕迹持久化(v0.4:agent_runs.jsonl + --history)",
+      "description": "run_tool_loop 的 trace/final 只活在当轮终端,跑完即失——崩溃/关窗后无法回看 agent 做了什么(可观测性缺口,也是复现溯源的输入)。新增 toolloop.log_agent_run(project_dir, task, res) 追加 .psyclaw/agent_runs.jsonl(ts/task 头/iters/stopped/工具调用名列表/final 头);cli cmd_agent 跑完自动记;psyclaw agent --history [n] 回看最近 n 次(默认 10);REPL _run_agent 同样落痕。",
+      "dependencies": [
+        "feat-030"
+      ],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-038",
+      "name": "v0.4 收尾:docs 同步 + harness 快照",
+      "description": "README/docs/COMMANDS.md 同步 v0.3+v0.4 用户可感知变化(shell 命令逐条确认是行为变化必须写清;save_file 只写项目根;PSYCLAW_MAX_TOKENS;agent --history);progress.md/session-handoff.md 快照;全量回归绿。",
+      "dependencies": [
+        "feat-036",
+        "feat-037"
+      ],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }
