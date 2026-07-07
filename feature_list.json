@@ -451,8 +451,8 @@
       "dependencies": [
         "feat-044"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(sanitize_messages 纯函数:丢非 user/assistant 角色与空 content、合并连续同角色、丢开头 assistant 保首条 user;run_tool_loop 每次 provider.chat 前套用);tests/test_toolloop.py +6 例(丢空 content、合并同角色、首条须 user、丢未知角色、None content、端到端断言 provider 每次只收合法序列:非空 content+角色交替+首条 user);验证:uv run --python 3.12 pytest → 1262 passed"
     },
     {
       "id": "feat-046",
