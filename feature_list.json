@@ -385,6 +385,44 @@
       ],
       "status": "done",
       "evidence": "docs/COMMANDS.md(agent 行补 --max-iters/--history 与 v0.3/v0.4 特性说明);docs/TUTORIAL.md(REPL 7 件事:新增『shell 命令块每条先确认』行,save 行补 agent 护栏);progress.md 本轮(24) v0.3.0+v0.4 快照;session-handoff.md(Evidence/Decisions/Next=v0.5 候选);验证:uv run --python 3.12 pytest → 1222 passed"
+    },
+    {
+      "id": "feat-039",
+      "name": "MCP stdio 客户端(v0.5:连接内置/用户 MCP 服务器)",
+      "description": "psyclaw/mcp/client.py:JSON-RPC 2.0 over stdio 客户端(与 server_base.py 对偶)。subprocess 起服务器(command 字符串 shlex 拆分,`python` 用 sys.executable 兜底本机无 python),换行分隔 JSON-RPC:initialize→notifications/initialized→tools/list→tools/call。每步超时 fail-safe(不挂死 agent),进程异常/坏 JSON 优雅降级返回错误串。上下文管理器 close 收尾杀进程。stdlib only(subprocess/json/shlex)。",
+      "dependencies": [],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-040",
+      "name": "agent 循环接入 MCP 工具(v0.5:编排纵深)",
+      "description": "toolloop.build_tools 合并已启用 MCP 服务器暴露的工具(list_mcp_catalog_with_health 里 enabled+健康的,惰性连接:工具被调时才起子进程)。MCP 工具名加前缀防撞内置(mcp__<server>__<tool>);标 side_effect=True 走 fail-closed 批准(外部执行,保守)。连接失败不拖垮工具集(与既有插件加载同构)。catalog 里对模型说明这些是外部 MCP 工具。",
+      "dependencies": [
+        "feat-039"
+      ],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-041",
+      "name": "compact_history LLM 蒸馏升级(v0.5:长会话质量)",
+      "description": "context.compact_history 现在靠 _distill 规则截断早期轮次为备忘。升级:可选传 provider,用它把被丢弃轮次蒸馏成结构化决策摘要(比规则截断保真);provider 缺失/异常/无 key → fail-safe 回落现有规则蒸馏(zero-dep 契约不破)。纯函数可测(注入 fake provider)。",
+      "dependencies": [],
+      "status": "planned",
+      "evidence": ""
+    },
+    {
+      "id": "feat-042",
+      "name": "v0.5.0 发布收尾",
+      "description": "版本 0.3.0→0.5.0(pyproject+__init__);CHANGELOG v0.5 段(MCP client/agent 接入/蒸馏升级);docs/COMMANDS+ARCHITECTURE 记 agent 可调 MCP 工具;progress/session-handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-039",
+        "feat-040",
+        "feat-041"
+      ],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }
