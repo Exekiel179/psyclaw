@@ -483,6 +483,26 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.6.0→0.7.0;CHANGELOG v0.7.0 段(REPL 方向键 readline 修复,用户可感知);docs/TUTORIAL.md『编辑/翻历史』行(方向键/Ctrl-A-E 可用+装 [full] 得实时联想);TODO §2 + progress 本轮(27) + session-handoff 快照(v0.8 候选=pystat MCP);验证:uv run --python 3.12 pytest → 1270 passed;psyclaw version → 0.7.0"
+    },
+    {
+      "id": "feat-049",
+      "name": "pystat MCP 服务器——闭环『统计外移到 MCP』(v0.8)",
+      "description": "registry 早声明 pystat(enable_when always)却无 server 文件、无 command,feat-040 因此浮不出它。建 psyclaw/mcp/servers/pystat_server.py 照 mne_server.py 惯例:惰性 import pingouin/pandas(缺失→返回可直接运行的脚本骨架,不假装算结果;在则真跑返回 JSON);工具 pystat_describe/pystat_ttest/pystat_correlation/pystat_anova/pystat_regression/pystat_guidance,每个脚本/结果都带效应量+95%CI(符合 gates STAT.effect_size)与前提/严谨性提示;纯 stdlib 骨架(顶层不 import 统计库)。registry 补 command=python -m psyclaw.mcp.servers.pystat_server → health find_spec ok → feat-040 自动浮出 mcp__pystat__* 到 agent 工具集,agent 可直接把 t 检验/方差/回归委托 pystat。",
+      "dependencies": [
+        "feat-040"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/mcp/servers/pystat_server.py(6 工具 describe/ttest/correlation/anova/regression/guidance,照 mne_server 惯例:惰性 _has_pingouin,缺失→可运行脚本骨架/在则真跑返回 JSON;每脚本带效应量+95%CI[bootci/cohen-d/CI95%/np2/标准化β+CI]与前提+严谨性提示;顶层零统计 import);registry.yaml pystat 补 command=python -m ...pystat_server + origin builtin;tests/test_pystat_server.py 12 例(6 工具降级脚本+CI 提示+guidance/MCP client 真 subprocess 往返 list+call/AST 校验顶层不 import pingouin/pandas/numpy/scipy/statsmodels);live 验证:list_mcp_catalog pystat command+enabled+health ok;build_tools('.') 浮出 6 个 mcp__pystat__* 到 agent 工具集——闭环『统计外移到 MCP』,agent 可直接委托 t 检验/方差/回归。验证:uv run --python 3.12 pytest → 1282 passed"
+    },
+    {
+      "id": "feat-050",
+      "name": "v0.8 发布收尾",
+      "description": "版本 0.7.0→0.8.0;CHANGELOG v0.8 段(pystat MCP:agent 可直连统计后端);docs/COMMANDS+ARCHITECTURE 记 pystat;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-049"
+      ],
+      "status": "planned",
+      "evidence": ""
     }
   ]
 }
