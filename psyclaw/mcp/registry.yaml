@@ -5,7 +5,9 @@ servers:
   # stats-core = 主路径内置；stats-optional = 商业软件检测到才启用
   - name: pystat
     category: stats-core
+    origin: builtin
     enable_when: always
+    command: python -m psyclaw.mcp.servers.pystat_server
     provides: [pingouin, statsmodels, descriptive, t_test, anova, regression, mediation]
 
   - name: r-mcp
