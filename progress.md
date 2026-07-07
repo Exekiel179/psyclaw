@@ -2,7 +2,24 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07(晚:v0.3 → v0.4 → v0.5 → **v0.6.0 发布**)
+**Last Updated:** 2026-07-07(晚:v0.3→v0.4→v0.5→v0.6→**v0.7.0 发布**)
+
+## 本轮(27):v0.7.0 发布 ——feat-047/048 done(修用户报告的 REPL 方向键 ^[[A)
+
+用户报『psyclaw 不支持方向键输入,会显示 [[A』。根因诊断+修复(优先于原计划的 pystat MCP):
+- 根因:tool 装在 uv py3.12(**无 prompt_toolkit**),非 ptk TTY 落到自研逐键 raw reader
+  (_read_line_interactive)——只把 ↑↓ 映射 slash 联想、←→ 变 ESC,无历史/光标。
+- feat-047:read_line 非 ptk TTY 改为**优先 stdlib readline 后端**(_readline_input)——
+  import readline 即得方向键/↑↓历史/←→光标/Ctrl-A-E-K;slash 命令 readline 整行补全器
+  (libedit/gnu 分别绑 Tab);ANSI 提示 \001\002 包裹保证光标宽度正确;readline 缺失→raw→input。
+- feat-048:版本 0.6.0→0.7.0 + CHANGELOG v0.7 + TUTORIAL『编辑/翻历史』行。
+
+全量 **1270 passed**;`psyclaw version` → 0.7.0。
+注:原 v0.7 计划(pystat MCP 直连)因 pystat 服务器缺失(registry 声明但无 server 文件/command)
+且用户插入方向键 bug,本轮改做方向键;pystat MCP 顺延为 v0.8 候选(见 handoff)。
+
+---
+
 
 ## 本轮(26):v0.6.0 发布 ——feat-043..046 done(多轮对话 + 工具调用稳)
 
