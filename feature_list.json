@@ -372,8 +372,8 @@
       "dependencies": [
         "feat-030"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(log_agent_run 追加 .psyclaw/agent_runs.jsonl:ts/task 头/iters/stopped/工具名列表/final 头,各头截 200 字,OSError 静默;read_agent_runs 新→旧读 limit 条,坏行跳过,缺文件 []);cli.py cmd_agent(--history [n] 回看默认 10、task 改 nargs=* 配合、跑完自动 log);repl.py _run_agent 同样落痕;.psyclaw/ 已在 .gitignore。tests/test_toolloop.py +4 例(写读新→旧/limit+缺文件/坏行跳过/头截断);验证:uv run --python 3.12 pytest → 1222 passed;live e2e:agent 实跑后 --history 回显 [2 轮 · 1 工具 · answered] 列出项目根目录结构"
     },
     {
       "id": "feat-038",

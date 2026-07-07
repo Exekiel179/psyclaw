@@ -275,6 +275,60 @@ def trim_convo(convo: list, base_len: int) -> None:
                     "content": _compress_result_msg(convo[i]["content"])}
 
 
+# --- agent 运行痕迹持久化(v0.4 feat-037) ---------------------------------------
+# trace/final 只活在当轮终端会跑完即失——落 .psyclaw/agent_runs.jsonl 供回看
+# (psyclaw agent --history),也是复现溯源的输入。单行 JSON 追加,坏行读取时跳过。
+
+_RUNS_FILE = "agent_runs.jsonl"
+_RUNS_MAX_HEAD = 200
+
+
+def log_agent_run(project_dir: str, task: str, res: dict) -> None:
+    """把一次 run_tool_loop 结果追加到 .psyclaw/agent_runs.jsonl。失败静默(不拖垮主流程)。"""
+    import json as _json
+    import time as _time
+    from pathlib import Path
+    try:
+        d = Path(project_dir) / ".psyclaw"
+        d.mkdir(parents=True, exist_ok=True)
+        rec = {
+            "ts": _time.strftime("%Y-%m-%d %H:%M:%S"),
+            "task": (task or "")[:_RUNS_MAX_HEAD],
+            "iters": res.get("iters"),
+            "stopped": res.get("stopped"),
+            "tools": [t.get("name") for t in res.get("trace", [])],
+            "final_head": str(res.get("final", ""))[:_RUNS_MAX_HEAD],
+        }
+        with open(d / _RUNS_FILE, "a", encoding="utf-8") as fh:
+            fh.write(_json.dumps(rec, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def read_agent_runs(project_dir: str, limit: int = 10) -> list[dict]:
+    """读最近 limit 条运行痕迹(新→旧)。坏行跳过;文件缺失返回 []。"""
+    import json as _json
+    from pathlib import Path
+    p = Path(project_dir) / ".psyclaw" / _RUNS_FILE
+    if not p.is_file():
+        return []
+    out: list[dict] = []
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    for ln in reversed(lines):
+        if len(out) >= limit:
+            break
+        try:
+            rec = _json.loads(ln)
+        except _json.JSONDecodeError:
+            continue
+        if isinstance(rec, dict):
+            out.append(rec)
+    return out
+
+
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
                   project_dir: str = ".", max_iters: int = 24,
                   approve=None, emit=None) -> dict:
