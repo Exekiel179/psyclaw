@@ -20,6 +20,9 @@ class Provider:
         self.model = model
         self.base_url = base_url.rstrip("/") if base_url else self.default_base_url()
         self.api_key = self.resolve_api_key()
+        # 最近一次 chat 的停止原因(归一化:"max_tokens"=被截断)。
+        # toolloop 据此区分「真答完」与「输出被砍」——后者若含未闭合 tool 块须续写而非停。
+        self.last_stop_reason: str = ""
 
     # 子类覆盖 ------------------------------------------------------------
     def default_base_url(self) -> str:

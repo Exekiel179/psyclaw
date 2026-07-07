@@ -331,15 +331,19 @@ class TestMcpCli:
         names = [m["name"] for m in catalog]
         assert "stata-mcp" in names
 
-    def test_mplus_is_builtin_always(self):
+    def test_mplus_enabled_iff_detected(self):
+        # R-3(3d9b183)后 mplus 为 detect: 门控的可选商业集成——enabled 跟随本机检测
+        import shutil
         from psyclaw.mcp.manager import list_mcp_catalog
         catalog = {m["name"]: m for m in list_mcp_catalog()}
-        assert catalog["mplus-mcp"]["enabled"] is True
+        assert catalog["mplus-mcp"]["enabled"] is (shutil.which("mplus") is not None)
 
-    def test_stata_is_builtin_always(self):
+    def test_stata_enabled_iff_detected(self):
+        # 同上:detect:stata 门控,无 Stata 的机器 enabled=False 是正确行为
+        import shutil
         from psyclaw.mcp.manager import list_mcp_catalog
         catalog = {m["name"]: m for m in list_mcp_catalog()}
-        assert catalog["stata-mcp"]["enabled"] is True
+        assert catalog["stata-mcp"]["enabled"] is (shutil.which("stata") is not None)
 
     def test_mcp_help_contains_mplus(self, capsys):
         from psyclaw.cli import cmd_mcp
