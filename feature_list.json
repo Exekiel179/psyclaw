@@ -321,8 +321,8 @@
       "name": "save_file 路径允许清单(v0.3,外审 MEDIUM)",
       "description": "toolloop build_tools 的 _save 现以 confirm=lambda p:True 调 apply_save_block,可写任意路径。改为:Path.resolve() 后必须 is_relative_to(项目根),拒软链接目标、拒凭据类路径(~/.ssh/~/.aws/~/.gnupg/.netrc/.env/*.pem),拒绝消息带完整解析路径;data/raw 铁律照旧在 apply_save_block 内生效。",
       "dependencies": [],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(save_path_denied 纯函数:resolve 后须 is_relative_to 项目根/拒已存在软链目标/拒凭据类名单 _CRED_NAMES+_CRED_SUFFIXES+_CRED_DIR_PARTS;_save 先过护栏再 apply_save_block,工具描述更新);tests/test_toolloop.py +10 例(根内放行/../逃逸/项目外绝对路径/~/.ssh/凭据名/凭据目录/软链目标/途径软链目录逃逸/空路径/端到端拒写不落盘);验证:uv run --python 3.12 pytest → 1205 passed"
     },
     {
       "id": "feat-033",
