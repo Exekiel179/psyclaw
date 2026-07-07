@@ -49,6 +49,7 @@ class OpenAICompatProvider(Provider):
         msgs = ([{"role": "system", "content": system}] if system else []) + messages
         payload = {"model": model, "stream": True, "messages": msgs}
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        self.last_stop_reason = ""
         for data in self._post_sse(self._endpoint(), headers, payload):
             try:
                 ev = json.loads(data)
@@ -58,3 +59,8 @@ class OpenAICompatProvider(Provider):
                 text = choice.get("delta", {}).get("content")
                 if text:
                     yield text
+                # 捕获停止原因并归一化(OpenAI 系 "length"=截断 → 统一记 "max_tokens")
+                reason = choice.get("finish_reason")
+                if reason:
+                    self.last_stop_reason = ("max_tokens" if reason == "length"
+                                             else str(reason))

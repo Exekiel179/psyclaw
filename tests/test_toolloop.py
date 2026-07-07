@@ -130,3 +130,87 @@ def test_emit_called_per_tool():
     TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}],
                      tools=tools, emit=events.append)
     assert events and "echo" in events[0]
+
+
+# --- 截断防护(修「工具调用中途提前停止」) --------------------------------------
+
+def test_has_truncated_tool_block():
+    assert TL.has_truncated_tool_block('```tool\n{"name":"echo"')            # 未闭合
+    assert not TL.has_truncated_tool_block('```tool\n{"name":"e"}\n```')     # 完整
+    assert not TL.has_truncated_tool_block("普通回复没有块")
+    assert not TL.has_truncated_tool_block("")
+    # 一个完整 + 一个截断 → 仍算截断
+    assert TL.has_truncated_tool_block(
+        '```tool\n{"name":"a","args":{}}\n```\n```tool\n{"name":"b"')
+
+
+def test_loop_truncated_block_not_treated_as_answer():
+    """截断的 tool 块不能被误判成最终答案——回灌续写提示后继续。"""
+    prov = FakeProvider(['先说明\n```tool\n{"name":"echo","args":{"x":',  # 被截断
+                         '```tool\n{"name":"echo","args":{"x":1}}\n```',   # 重发完整
+                         "最终答案"])
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "answered"
+    assert res["final"] == "最终答案"
+    assert res["trace"] and res["trace"][0]["output"] == "echoed 1"
+    assert prov.chats == 3  # 截断轮 + 重发轮 + 答案轮
+
+
+def test_loop_truncation_streak_gives_up():
+    """连续截断超上限 → stopped=truncated,不无限循环、不静默。"""
+    prov = FakeProvider(['```tool\n{"name":"echo"'] * 10)
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "truncated"
+    assert "截断" in res["final"]
+    assert prov.chats == TL._MAX_TRUNC_STREAK + 1  # 首次 + 重试上限
+
+
+def test_loop_stop_reason_max_tokens_triggers_retry():
+    """无 tool 块但 provider 报 max_tokens 截断 → 续写而非当答案。"""
+
+    class CutProvider(FakeProvider):
+        def __init__(self, replies, reasons):
+            super().__init__(replies)
+            self.reasons = list(reasons)
+            self.last_stop_reason = ""
+
+        def chat(self, messages, system=""):
+            self.last_stop_reason = self.reasons.pop(0) if self.reasons else ""
+            return super().chat(messages, system)
+
+    prov = CutProvider(["写到一半的普通文本被砍", "完整的最终答案"],
+                       ["max_tokens", "end_turn"])
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "answered"
+    assert res["final"] == "完整的最终答案"
+
+
+def test_loop_complete_call_plus_truncated_tail_executes_and_notes():
+    """完整调用 + 尾部截断残块:执行完整的,回灌里告知残块未执行。"""
+    convo_seen = []
+
+    class SpyProvider(FakeProvider):
+        def chat(self, messages, system=""):
+            convo_seen.append([dict(m) for m in messages])
+            return super().chat(messages, system)
+
+    prov = SpyProvider(['```tool\n{"name":"echo","args":{"x":2}}\n```\n'
+                        '```tool\n{"name":"echo"',            # 尾部残块
+                        "最终答案"])
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "answered"
+    assert res["trace"][0]["output"] == "echoed 2"
+    # 第二次 chat 的回灌消息应包含「截断残块未执行」提示
+    feedback = convo_seen[1][-1]["content"]
+    assert "截断" in feedback and "未被执行" in feedback
+
+
+def test_loop_default_max_iters_raised():
+    """默认迭代上限 ≥24:长研究任务不再 6 轮就停。"""
+    import inspect
+    sig = inspect.signature(TL.run_tool_loop)
+    assert sig.parameters["max_iters"].default >= 24
