@@ -391,8 +391,8 @@
       "name": "MCP stdio 客户端(v0.5:连接内置/用户 MCP 服务器)",
       "description": "psyclaw/mcp/client.py:JSON-RPC 2.0 over stdio 客户端(与 server_base.py 对偶)。subprocess 起服务器(command 字符串 shlex 拆分,`python` 用 sys.executable 兜底本机无 python),换行分隔 JSON-RPC:initialize→notifications/initialized→tools/list→tools/call。每步超时 fail-safe(不挂死 agent),进程异常/坏 JSON 优雅降级返回错误串。上下文管理器 close 收尾杀进程。stdlib only(subprocess/json/shlex)。",
       "dependencies": [],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/mcp/client.py(MCPClient:惰性 start 起子进程+initialize/notifications/initialized 握手,后台读线程+queue 按 id 匹配响应,_request 超时/EOF fail-safe 返回错误 dict;list_tools/call_tool 归一错误为可读串不抛;resolve_command 把 python/python3 换 sys.executable 兜底本机无 python;上下文管理器 close 幂等杀进程);tests/_mcp_echo_server.py 夹具(基于 server_base 的 echo/boom 服务器)+ tests/test_mcp_client.py 8 例(command 解析/list 往返/call 往返中文/服务器错误可读/未知工具/坏命令降级/超时不挂死/close 幂等);验证:uv run --python 3.12 pytest → 1230 passed(真实 subprocess 往返)"
     },
     {
       "id": "feat-040",
