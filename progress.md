@@ -2,7 +2,26 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07(晚:v0.3.0 → v0.4 → **v0.5.0 发布**)
+**Last Updated:** 2026-07-07(晚:v0.3 → v0.4 → v0.5 → **v0.6.0 发布**)
+
+## 本轮(26):v0.6.0 发布 ——feat-043..046 done(多轮对话 + 工具调用稳)
+
+用户重点『多轮对话,工具调用不要出现问题』。方法=审计工具循环、**实测复现**真实故障点后加固:
+
+- feat-043 参数规范化:实测模型把 args 写成 list/双重编码 JSON 字符串时内置工具 a.get 崩、
+  且 _exec_tool 误标 ok=True 掩盖崩溃。_normalize_args 收口(JSON 对象字符串解析/非对象报错
+  引导),name 须字符串,工具异常改标 ok=False。
+- feat-044 无进展检测:_calls_signature 识别连续相同 (name,args) 调用、空回复不再空转到
+  max_iters,有限纠偏后 stopped=no_progress 收敛。
+- feat-045 消息序列不变量:sanitize_messages(去空 content/合并连续同角色/首条须 user)每次
+  调 provider 前套用,防多轮回灌拼出非法序列触发 400。
+- feat-046 多轮集成测试 test_toolloop_multiturn.py(正常→畸形 args 自纠→截断续写→未知工具→
+  重发→答案,断言工具不崩+失败如实上报+provider 只收合法序列)+ 版本 0.6.0 + CHANGELOG。
+
+全量 **1264 passed**;`psyclaw version` → 0.6.0。工具循环测试从 v0.5 的 ~38 例增至 60 例。
+
+---
+
 
 ## 本轮(25):v0.5.0 发布 ——feat-039..042 done(编排纵深:agent 真正会用 MCP)
 

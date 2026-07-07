@@ -463,8 +463,8 @@
         "feat-044",
         "feat-045"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "tests/test_toolloop_multiturn.py 新增(ScriptedProvider 走真实多轮:正常调用→双重编码 JSON 字符串 args 自纠成功→list args 拦截失败→未知工具→max_tokens 截断续写→重发→答案;断言工具只在合法参数时执行[x=1,2,3]、畸形/未知如实标 ok=False、provider 每次只收合法序列;+连续失败不误判无进展仍能答案);版本 0.5.0→0.6.0(pyproject+__init__);CHANGELOG v0.6 段;TODO/progress/session-handoff 快照;验证:uv run --python 3.12 pytest → 1264 passed;psyclaw version → 0.6.0"
     }
   ]
 }
