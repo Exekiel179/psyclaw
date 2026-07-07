@@ -361,3 +361,31 @@ def test_loop_trims_old_results_end_to_end():
     last = spy_heads[-1]
     assert len(last) == 6
     assert sum(1 for h in last if h.startswith(TL._COMPRESSED_HEAD)) == 3
+def _fake_res(final="答案", stopped="answered", iters=2, tools=("echo", "search")):
+    return {"final": final, "iters": iters, "stopped": stopped,
+            "trace": [{"name": t, "ok": True, "output": "x"} for t in tools]}
+def test_log_and_read_agent_runs(tmp_path):
+    TL.log_agent_run(str(tmp_path), "第一个任务", _fake_res())
+    TL.log_agent_run(str(tmp_path), "第二个任务", _fake_res(stopped="max_iters"))
+    runs = TL.read_agent_runs(str(tmp_path))
+    assert len(runs) == 2
+    assert runs[0]["task"] == "第二个任务"          # 新→旧
+    assert runs[0]["stopped"] == "max_iters"
+    assert runs[1]["tools"] == ["echo", "search"]
+    assert runs[1]["ts"]                            # 有时间戳
+def test_read_agent_runs_limit_and_missing(tmp_path):
+    assert TL.read_agent_runs(str(tmp_path)) == []   # 文件缺失 → []
+    for i in range(5):
+        TL.log_agent_run(str(tmp_path), f"t{i}", _fake_res())
+    assert len(TL.read_agent_runs(str(tmp_path), limit=3)) == 3
+def test_read_agent_runs_skips_bad_lines(tmp_path):
+    TL.log_agent_run(str(tmp_path), "good", _fake_res())
+    p = tmp_path / ".psyclaw" / "agent_runs.jsonl"
+    p.write_text(p.read_text(encoding="utf-8") + "{broken json\n", encoding="utf-8")
+    runs = TL.read_agent_runs(str(tmp_path))
+    assert len(runs) == 1 and runs[0]["task"] == "good"
+def test_log_agent_run_truncates_heads(tmp_path):
+    TL.log_agent_run(str(tmp_path), "长" * 500, _fake_res(final="答" * 500))
+    r = TL.read_agent_runs(str(tmp_path))[0]
+    assert len(r["task"]) == TL._RUNS_MAX_HEAD
+    assert len(r["final_head"]) == TL._RUNS_MAX_HEAD
