@@ -40,10 +40,38 @@ def has_truncated_tool_block(reply: str) -> bool:
     return len(_OPEN_TOOL_RE.findall(text)) > len(_TOOL_RE.findall(text))
 
 
+def _normalize_args(raw) -> tuple[dict, str | None]:
+    """把模型给的 args 规范成 dict。返回 (args, error)。
+
+    v0.6 feat-043:模型常把 args 写成双重编码的 JSON 字符串("args":"{...}"),或误写成
+    list/数字。此前原样传给工具 → a.get(...) 崩(且被误标成功)。这里统一收口:
+    - None/缺省 → {};dict → 原样;
+    - 字符串:尝试 JSON 解析,得 dict 才用,否则报错引导;
+    - 其余(list/数字/bool)→ 报错,让模型重发 JSON 对象。
+    """
+    if raw is None:
+        return {}, None
+    if isinstance(raw, dict):
+        return raw, None
+    if isinstance(raw, str):
+        s = raw.strip()
+        if not s:
+            return {}, None
+        try:
+            parsed = json.loads(s)
+        except json.JSONDecodeError:
+            return {}, "args 必须是 JSON 对象(如 {\"query\": \"...\"}),收到无法解析的字符串"
+        if isinstance(parsed, dict):
+            return parsed, None
+        return {}, "args 必须是 JSON 对象,不能是数组/标量"
+    return {}, "args 必须是 JSON 对象(键值对),不能是数组/标量"
+
+
 def parse_tool_calls(reply: str) -> list[dict]:
     """从模型回复解析 ```tool JSON 块 → [{name, args}]。纯函数,可单测。
 
-    非法 JSON / 缺 name 的块 → {name:None, error:...},由执行层回报给模型纠正。
+    非法 JSON / 缺 name / args 非对象的块 → {name:None|name, error:...},
+    由执行层回报给模型纠正(而非静默崩在工具里)。
     """
     calls: list[dict] = []
     for m in _TOOL_RE.finditer(reply or ""):
@@ -53,10 +81,18 @@ def parse_tool_calls(reply: str) -> list[dict]:
         except json.JSONDecodeError:
             calls.append({"name": None, "args": {}, "error": "工具调用不是合法 JSON"})
             continue
-        if isinstance(obj, dict) and obj.get("name"):
-            calls.append({"name": obj["name"], "args": obj.get("args") or {}})
-        else:
+        if not isinstance(obj, dict) or not obj.get("name"):
             calls.append({"name": None, "args": {}, "error": "工具调用缺 name 字段"})
+            continue
+        name = obj["name"]
+        if not isinstance(name, str):
+            calls.append({"name": None, "args": {}, "error": "name 必须是字符串"})
+            continue
+        args, err = _normalize_args(obj.get("args"))
+        if err:
+            calls.append({"name": name, "args": {}, "error": err})
+        else:
+            calls.append({"name": name, "args": args})
     return calls
 
 
@@ -227,7 +263,8 @@ def _exec_tool(call: dict, tools: dict, approve, emit) -> dict:
     try:
         out = tool["run"](call.get("args") or {})
     except Exception as exc:  # noqa: BLE001  # 单个工具异常不炸循环
-        out = f"工具执行异常:{exc}"
+        # v0.6 feat-043:异常如实标 ok=False(此前误标 True 掩盖崩溃,模型无从自纠)
+        return {"name": name, "ok": False, "output": f"工具执行异常:{exc}"}
     return {"name": name, "ok": True, "output": str(out)[:6000]}
 
 

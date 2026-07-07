@@ -65,6 +65,57 @@ def test_parse_missing_name():
     assert calls[0]["name"] is None and "name" in calls[0]["error"]
 
 
+# --- 参数规范化与校验(v0.6 feat-043) ------------------------------------------
+
+def test_normalize_args_dict_passthrough():
+    assert TL._normalize_args({"q": 1}) == ({"q": 1}, None)
+    assert TL._normalize_args(None) == ({}, None)
+
+
+def test_normalize_args_json_string_parsed():
+    args, err = TL._normalize_args('{"query": "x"}')   # 双重编码,模型常见
+    assert args == {"query": "x"} and err is None
+    assert TL._normalize_args("  ") == ({}, None)       # 空串→{}
+
+
+def test_normalize_args_non_object_rejected():
+    for bad in ([1, 2], 42, True, "not json", '"a string"', "[1,2]"):
+        args, err = TL._normalize_args(bad)
+        assert args == {} and err and "对象" in err, bad
+
+
+def test_parse_coerces_json_string_args():
+    calls = TL.parse_tool_calls('```tool\n{"name":"search","args":"{\\"q\\":1}"}\n```')
+    assert calls == [{"name": "search", "args": {"q": 1}}]
+
+
+def test_parse_rejects_list_args_with_guiding_error():
+    calls = TL.parse_tool_calls('```tool\n{"name":"search","args":[1,2]}\n```')
+    assert calls[0]["name"] == "search" and calls[0]["args"] == {}
+    assert "对象" in calls[0]["error"]
+
+
+def test_parse_rejects_non_string_name():
+    calls = TL.parse_tool_calls('```tool\n{"name":123,"args":{}}\n```')
+    assert calls[0]["name"] is None and "字符串" in calls[0]["error"]
+
+
+def test_exec_bad_args_reported_as_failure_not_success():
+    """畸形 args 经 parse 拦截 → 执行层标 ok=False,不再崩工具、不再误标成功。"""
+    tools = {"echo": {"desc": "e", "args": "x",
+                      "run": lambda a: a.get("x"), "side_effect": False}}
+    calls = TL.parse_tool_calls('```tool\n{"name":"echo","args":[1,2]}\n```')
+    r = TL._exec_tool(calls[0], tools, None, None)
+    assert r["ok"] is False and "对象" in r["output"]
+
+
+def test_exec_tool_exception_marked_failure():
+    tools = {"boom": {"desc": "b", "args": "",
+                      "run": lambda a: 1 / 0, "side_effect": False}}
+    r = TL._exec_tool({"name": "boom", "args": {}}, tools, None, None)
+    assert r["ok"] is False and "异常" in r["output"]
+
+
 # --- build_tools / catalog ----------------------------------------------------
 
 def test_build_tools_shape():

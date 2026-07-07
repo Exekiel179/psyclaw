@@ -431,8 +431,8 @@
       "dependencies": [
         "feat-030"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(_normalize_args:None→{}/dict 原样/JSON 对象字符串→解析/非 dict 与非对象字符串→报错引导;parse_tool_calls 用之,并校验 name 须非空字符串;_exec_tool 工具异常改标 ok=False 而非 True);tests/test_toolloop.py +8 例(dict/None 透传、JSON 字符串解析+空串、非对象拒(list/数字/bool/坏串)、parse 强转 JSON 字符串 args、list-args 带引导错误、非字符串 name 拒、端到端畸形 args 标 ok=False 不崩、异常标失败);实测复现:修前 list-args→'list object has no attribute get' 且 ok=True;修后 ok=False+'args 必须是 JSON 对象'。验证:uv run --python 3.12 pytest → 1250 passed"
     },
     {
       "id": "feat-044",
