@@ -278,3 +278,86 @@ def test_save_tool_rejects_escape_without_writing(tmp_path):
     out = tools["save_file"]["run"]({"path": "../evil.md", "content": "x"})
     assert "拒绝写入" in out
     assert not (tmp_path.parent / "evil.md").exists()
+
+
+# --- 长会话上下文修剪(v0.3 feat-033) -------------------------------------------
+
+def _result_msg(name: str, payload: str) -> dict:
+    return {"role": "user",
+            "content": f"# 工具结果\n\n## {name}\n{payload}\n\n据以上结果继续。"}
+
+
+def test_compress_result_msg_keeps_tool_and_first_line():
+    msg = ("# 工具结果\n\n## search\n命中 8 条结果\n第二行细节很长" + "x" * 500
+           + "\n\n## read_file(失败)\n文件不存在\n\n据以上结果继续。")
+    out = TL._compress_result_msg(msg)
+    assert out.startswith(TL._COMPRESSED_HEAD)
+    assert "## search" in out and "命中 8 条结果" in out
+    assert "## read_file(失败)" in out and "文件不存在" in out
+    assert "第二行细节" not in out          # 只保首行
+    assert len(out) < len(msg)
+
+
+def test_trim_convo_keeps_recent_full_compresses_old():
+    base = [{"role": "user", "content": "任务"}]
+    convo = list(base)
+    for i in range(6):   # 6 轮结果
+        convo.append({"role": "assistant", "content": f"```tool\n{{}}\n```{i}"})
+        convo.append(_result_msg(f"t{i}", "详情" * 100))
+    TL.trim_convo(convo, base_len=len(base))
+    results = [m for m in convo if m["role"] == "user" and
+               m["content"].startswith("# 工具结果")]
+    compressed = [m for m in results if m["content"].startswith(TL._COMPRESSED_HEAD)]
+    assert len(results) == 6 and len(compressed) == 3   # 旧 3 压缩,近 3 完整
+    # 压缩的是最早的 t0..t2
+    assert all(f"## t{i}" in compressed[i]["content"] for i in range(3))
+    # 原始历史(base)与 assistant 消息未动
+    assert convo[0]["content"] == "任务"
+    assert all(m["content"].startswith("```tool") for m in convo if m["role"] == "assistant")
+
+
+def test_trim_convo_idempotent_and_under_threshold_untouched():
+    base_len = 0
+    convo = [_result_msg(f"t{i}", "x" * 50) for i in range(3)]
+    before = [m["content"] for m in convo]
+    TL.trim_convo(convo, base_len)
+    assert [m["content"] for m in convo] == before   # ≤3 条不动
+    convo.append(_result_msg("t3", "y"))
+    TL.trim_convo(convo, base_len)
+    TL.trim_convo(convo, base_len)                   # 再跑一次不重复压缩
+    compressed = [m for m in convo if m["content"].startswith(TL._COMPRESSED_HEAD)]
+    assert len(compressed) == 1
+
+
+def test_trim_convo_never_touches_caller_history():
+    """base_len 之前即便长得像工具结果也不动(调用方 REPL 历史)。"""
+    convo = [_result_msg("history", "旧会话里的工具结果" * 50)]
+    keep = convo[0]["content"]
+    for i in range(5):
+        convo.append(_result_msg(f"t{i}", "z" * 200))
+    TL.trim_convo(convo, base_len=1)
+    assert convo[0]["content"] == keep
+
+
+def test_loop_trims_old_results_end_to_end():
+    """跑满多轮后,早期工具结果在 convo 里被压缩(经 SpyProvider 观察)。"""
+    convo_lens = []
+
+    class SpyProvider(FakeProvider):
+        def chat(self, messages, system=""):
+            convo_lens.append(sum(len(m["content"]) for m in messages))
+            heads = [m["content"].splitlines()[0] for m in messages
+                     if m["role"] == "user" and m["content"].startswith("# 工具结果")]
+            spy_heads.append(heads)
+            return super().chat(messages, system)
+
+    spy_heads: list = []
+    prov = SpyProvider(['```tool\n{"name":"echo","args":{"x":%d}}\n```' % i
+                        for i in range(6)] + ["最终答案"])
+    tools, _ = _tools()
+    res = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}], tools=tools)
+    assert res["stopped"] == "answered"
+    # 最后一次 chat 时:6 条结果中应有 3 条已压缩
+    last = spy_heads[-1]
+    assert len(last) == 6
+    assert sum(1 for h in last if h.startswith(TL._COMPRESSED_HEAD)) == 3

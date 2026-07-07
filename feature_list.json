@@ -331,8 +331,8 @@
       "dependencies": [
         "feat-030"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(_compress_result_msg 每工具保 ## 名+输出首行限 160 字/trim_convo 就地滚动修剪:只动 base_len 后以 # 工具结果 开头的 user 消息,最近 3 条保完整,幂等跳过已压缩;run_tool_loop 每轮回灌后调用);REPL 侧 compact_history 审视结论=已有预算触发+备忘蒸馏+memo 4000 限长+测试覆盖,无需改;tests/test_toolloop.py +5 例(压缩保工具名+首行/近 3 完整旧 3 压缩/幂等+阈下不动/不碰调用方历史/端到端 SpyProvider 验证第 7 轮时 6 条结果 3 条已压缩);验证:uv run --python 3.12 pytest → 1210 passed"
     },
     {
       "id": "feat-034",
