@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.7.0(2026-07-07)
+
+> 主题:**REPL 交互体验**——修方向键/历史/光标(用户报告的 `^[[A` 问题)。
+
+### 修复
+- **REPL 方向键/历史/光标**(feat-047):此前在未装 `prompt_toolkit` 的环境(如 `uv tool`
+  默认装的解释器)里,REPL 按方向键会漏出 `^[[A`、没有命令历史、光标不能左右移动——根因是
+  非 prompt_toolkit 的 TTY 落到了自研逐键 raw reader。现改为优先走 stdlib **readline** 后端:
+  ↑↓ 翻历史、←→ 移光标、Ctrl-A/E/K 等键位、以及 `/` 命令 Tab 补全全部可用;readline 缺失
+  (Windows 等)再退回原 raw reader。装了 `psyclaw[full]` 的仍走 prompt_toolkit(实时联想下拉)。
+
 ## v0.6.0(2026-07-07)
 
 > 主题:**多轮对话 + 工具调用稳**。审计工具循环、实测复现真实故障点后逐个加固。

@@ -481,8 +481,8 @@
       "dependencies": [
         "feat-047"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.6.0→0.7.0;CHANGELOG v0.7.0 段(REPL 方向键 readline 修复,用户可感知);docs/TUTORIAL.md『编辑/翻历史』行(方向键/Ctrl-A-E 可用+装 [full] 得实时联想);TODO §2 + progress 本轮(27) + session-handoff 快照(v0.8 候选=pystat MCP);验证:uv run --python 3.12 pytest → 1270 passed;psyclaw version → 0.7.0"
     }
   ]
 }

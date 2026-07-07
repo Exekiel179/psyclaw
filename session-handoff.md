@@ -4,51 +4,51 @@
 
 ## Current Objective
 
-- Goal: v0.6，重点=多轮对话稳、工具调用不出问题(用户 /goal)
-- Current status: **v0.6.0 已发布**——feat-043..046 全部 done;46 个 feature 全 done
-- Branch / commit: master(v0.6.0 release 提交为最新)
+- Goal: 实现 v0.7 版本(用户 /goal);期间用户插入 REPL 方向键 bug,优先修复
+- Current status: **v0.7.0 已发布**——feat-047/048 done;48 个 feature 全 done
+- Branch / commit: master(v0.7.0 release 提交为最新)
 
 ## Completed This Session
 
-- [x] feat-043 参数规范化(args JSON 字符串解析/非对象引导;工具异常标 ok=False)
-- [x] feat-044 无进展检测(重复相同调用/空回复→no_progress 收敛)
-- [x] feat-045 消息序列不变量(sanitize_messages 防 400)
-- [x] feat-046 多轮集成测试 + 版本 0.6.0 + CHANGELOG
+- [x] feat-047 REPL 方向键/历史/光标(readline 后端,修用户报的 ^[[A)
+- [x] feat-048 版本 0.7.0 + CHANGELOG + TUTORIAL
 
 ## Verification Evidence
 
 | Check | Command | Result |
 |---|---|---|
-| 全量测试 | `uv run --python 3.12 --with pytest python -m pytest -q` | 1264 passed |
-| CLI 版本 | `psyclaw version` | 0.6.0 |
-| 多轮集成 | test_toolloop_multiturn 2 例 | 绿(正常→畸形自纠→截断→未知→重发→答案) |
-| 工具循环 | test_toolloop 60 例 | 绿 |
+| 全量测试 | `uv run --python 3.12 --with pytest python -m pytest -q` | 1270 passed |
+| CLI 版本 | `psyclaw version` | 0.7.0 |
+| readline 路由 | test_repl_ptk 40 例 + smoke | 绿(非 ptk TTY 首选 _readline_input) |
 
-## Files Changed(v0.6)
+## Files Changed(v0.7)
 
-- `psyclaw/toolloop.py`(_normalize_args/_calls_signature/sanitize_messages + 循环加固)
-- `tests/test_toolloop.py`(+20 例)`tests/test_toolloop_multiturn.py`(新增)
-- `pyproject.toml` `psyclaw/__init__.py` `CHANGELOG.md` + TODO/progress/handoff
+- `psyclaw/ui_input.py`(_readline_input/_rl_wrap_prompt + read_line 路由)
+- `tests/test_repl_ptk.py`(改 1 + 新增 6)
+- `pyproject.toml` `psyclaw/__init__.py` `CHANGELOG.md` `docs/TUTORIAL.md` + TODO/progress
 - 未提交:`.claude/`(本地 Claude Code hooks/agents/skills,待用户定夺是否入库)
 
 ## Decisions Made
 
-- 无进展阈值 _MAX_NOPROGRESS=2(相同调用执行 2 次后第 3 次识别为卡住即停)
-- 畸形 args 在 parse 层拦截(报错引导模型),不进工具 run;工具真异常标 ok=False
-- sanitize_messages 每次调 provider 前无条件套用(便宜且防一切拼装意外)
+- 非 ptk TTY 主路径改用 readline(成熟 stdlib,方向键/历史/光标全免费)而非自研 raw reader
+- 原 v0.7 计划(pystat MCP 直连)顺延——发现 pystat 在 registry 有声明但**无 server 文件、
+  无 command**,feat-040 因此不会浮出它;要直连需先建 pystat_server.py(照 mne_server 惯例:
+  惰性 import pingouin,缺失降级为可运行脚本模板),工作量较大,且用户插入的方向键 bug 更急
 
 ## Blockers / Risks
 
 - 本机只有 python3.9,测试/运行走 `uv run --python 3.12`(memory 已记)
-- 多轮加固均用 ScriptedProvider 离线验证;未做真实 LLM 长会话实网压测
+- 方向键修复用单测 + 非交互 smoke 验证;未在真实交互 TTY 里逐键实测(harness 无法按键)。
+  用户可直接 `psyclaw repl` 试 ↑↓←→ 确认
 
 ## Next Session Startup
 
 1. 读 `CLAUDE.md` → `feature_list.json` → `progress.md` → 本交接。
-2. `uv run --python 3.12 --with pytest python -m pytest -q` 确认 1264 绿再动手。
+2. `uv run --python 3.12 --with pytest python -m pytest -q` 确认 1270 绿再动手。
 
 ## Recommended Next Step
 
-- v0.7 候选(未立项):① 各 workflow 分析步直连 pystat MCP(把 feat-040 接进 meta/analysis
-  流程,闭环最高杠杆,v0.5/v0.6 handoff 均提过);② 真实 LLM 多轮长会话实网压测(把离线
-  ScriptedProvider 覆盖延伸到实网,验证截断/无进展/蒸馏在真模型上的表现);③ eval harness。
+- v0.8 候选(未立项):① **pystat MCP 服务器**(psyclaw/mcp/servers/pystat_server.py,惰性
+  pingouin/statsmodels,缺失降级脚本模板)+ registry 补 command → 让 feat-040 浮出 pystat →
+  meta/analysis workflow 分析步可选直连(闭环「统计外移到 MCP」,最高杠杆,历次 handoff 均提);
+  ② 真实交互 TTY 手测方向键;③ eval harness。
