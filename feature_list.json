@@ -352,8 +352,8 @@
         "feat-033",
         "feat-034"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "pyproject.toml version 0.1.0→0.3.0 + psyclaw/__init__.py __version__ 0.2.0→0.3.0(对齐);CHANGELOG.md v0.3.0 段(长会话可靠性 feat-030/033、安全加固 feat-031/032、其他 feat-034/版本统一/陈旧测试修复);TODO.md §2 全部标 ✅;验证:uv run --python 3.12 pytest → 1212 passed;psyclaw version → 0.3.0(uv tool editable 安装即时生效)"
     }
   ]
 }
