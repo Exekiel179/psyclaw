@@ -17,6 +17,30 @@ def test_normalize_type_aliases():
     assert R.normalize_type("nonsense") is None
 
 
+def test_normalize_type_chinese_aliases():
+    """v0.3 feat-034:中文研究类型别名(高频入口,此前『元分析』→None)。"""
+    assert R.normalize_type("元分析") == "meta"
+    assert R.normalize_type("荟萃分析") == "meta"
+    assert R.normalize_type("Meta分析") == "meta"          # lower 归一
+    assert R.normalize_type("文献综述") == "lit-review"
+    assert R.normalize_type("综述") == "lit-review"
+    assert R.normalize_type("实证研究") == "analysis"
+    assert R.normalize_type("数据分析") == "analysis"
+    assert R.normalize_type("定量") == "analysis"
+    assert R.normalize_type("质性研究") == "qualitative"
+    assert R.normalize_type("定性") == "qualitative"
+    assert R.normalize_type(" 元分析 ") == "meta"          # strip 归一
+    assert R.normalize_type("随便什么") is None
+
+
+def test_recommend_skills_chinese_entry():
+    """中文入口端到端:『元分析』能路由到 meta 关键词并出推荐。"""
+    pool = [_sk("meta-tools", "meta-analysis effect size forest plot"),
+            _sk("qual-kit", "thematic coding interview")]
+    recs = R.recommend_skills("元分析", skills=pool)
+    assert recs and recs[0]["name"] == "meta-tools"
+
+
 def test_score_skill_counts_keyword_hits():
     s = _sk("meta-tool", "random-effects meta-analysis with forest plot")
     sc = R.score_skill(s, R.RESEARCH_TYPE_KEYWORDS["meta"])

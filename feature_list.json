@@ -339,8 +339,8 @@
       "name": "normalize_type 中文研究类型别名(v0.3 小修)",
       "description": "skills/recommend.py normalize_type 不识别中文研究类型(『元分析』→None,英文 meta 可)——补中文别名映射(元分析/元/荟萃→meta 等,覆盖 RESEARCH_TYPE_KEYWORDS 全部类型),高频入口。",
       "dependencies": [],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "psyclaw/skills/recommend.py(_TYPE_ALIASES 补 22 个中文别名:文献综述/综述/系统综述→lit-review、元分析/荟萃(分析)/meta分析→meta、实证(研究/分析)/数据分析/统计分析/定量(研究)/量化研究→analysis、质性(研究)/定性(研究)/访谈研究/主题分析→qualitative);tests/test_skill_recommend.py +2 例(中文别名 12 断言含 lower/strip 归一与未知拒/中文入口端到端推荐);验证:uv run --python 3.12 pytest → 1212 passed"
     },
     {
       "id": "feat-035",
