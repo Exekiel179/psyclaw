@@ -383,8 +383,8 @@
         "feat-036",
         "feat-037"
       ],
-      "status": "planned",
-      "evidence": ""
+      "status": "done",
+      "evidence": "docs/COMMANDS.md(agent 行补 --max-iters/--history 与 v0.3/v0.4 特性说明);docs/TUTORIAL.md(REPL 7 件事:新增『shell 命令块每条先确认』行,save 行补 agent 护栏);progress.md 本轮(24) v0.3.0+v0.4 快照;session-handoff.md(Evidence/Decisions/Next=v0.5 候选);验证:uv run --python 3.12 pytest → 1222 passed"
     }
   ]
 }
