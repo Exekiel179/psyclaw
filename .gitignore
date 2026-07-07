@@ -11,6 +11,7 @@ dist/
 ~/.psyclaw/
 ralph.log
 logs/
+/forest.png
 notes/mission.md
 notes/blocked.md
 notes/pending_for_human.md
@@ -20,6 +21,7 @@ notes/decision_request.md
 key.md
 *.env
 .env
+/*.docx
 .claude/CLAUDE.local.md
 .claude/settings.local.json
 

@@ -41,7 +41,7 @@
   "alpha": 0.05,
   "n_total": 50,
   "n_excluded": 0,
-  "input_file": "/sessions/great-happy-lovelace/tmp/pytest-of-great-happy-lovelace/pytest-0/test_cli_delta_r2_in_json0/data.csv",
+  "input_file": "C:\\Users\\Exekiel.000\\AppData\\Local\\Temp\\pytest-of-Exekiel\\pytest-49\\test_cli_delta_r2_in_json0\\data.csv",
   "blocks_results": [
     {
       "block": 1,
