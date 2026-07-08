@@ -48,8 +48,10 @@ def _agent_prompt(role: str) -> str:
 
 def _ask_yn(prompt: str, default: bool = True) -> bool:
     d = "Y/n" if default else "y/N"
+    # readline 安全提示:彩色码用 \001..\002 包裹,否则回显光标错位、y 与命令串行(用户实测)
+    from psyclaw.ui_input import safe_prompt
     try:
-        v = input(ui.warn(f"  ⏸ {prompt} [{d}]: ")).strip().lower()
+        v = input(safe_prompt(ui.warn(f"  ⏸ {prompt} [{d}]: "))).strip().lower()
     except EOFError:
         return default
     return default if not v else v.startswith("y")

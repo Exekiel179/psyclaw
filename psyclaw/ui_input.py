@@ -203,6 +203,19 @@ def _rl_wrap_prompt(prompt: str) -> str:
     return re.sub(r"(\033\[[0-9;]*m)", "\001\\1\002", prompt)
 
 
+def safe_prompt(prompt: str) -> str:
+    """把彩色提示变成 input() 下 readline 安全的形式。
+
+    REPL 一旦 import 过 readline(主输入路径就会),裸 input() 也归 readline 管;
+    此时**未包裹的 ANSI 颜色码会被算进可见宽度**,回显光标错位——用户实测的确认框
+    「[Y/n]: y」与命令回显串在一起。用 \\001..\\002 包住 SGR 序列让 readline 正确算宽;
+    readline 未加载时原样返回(那些控制字符届时不该出现在提示里)。
+    """
+    if "readline" in sys.modules:
+        return _rl_wrap_prompt(prompt)
+    return prompt
+
+
 def _readline_input(prompt: str, commands: dict) -> str:
     """readline 支持的行输入:方向键/历史/光标全可用 + slash 命令 Tab 补全。
 

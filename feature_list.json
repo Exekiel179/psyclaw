@@ -551,6 +551,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/transcript.py(render_conversation/render_full/default_path 纯函数)+ psyclaw/repl.py(/dump 命令 _cmd_dump + _standing_conventions,COMMANDS/HELP_TEXT);tests/test_transcript.py +13 例(两档渲染/元信息/空会话/非串content/未知role/默认路径 + _cmd_dump 端到端写盘/--full含system/拒 data/raw/空会话);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1319 passed"
+  },
+  {
+   "id": "feat-056",
+   "name": "REPL 审批模式(YOLO)+ 确认框渲染 + 自动跟进深度",
+   "description": "修用户实测三坑:①y 请求太多——新增 YOLO 审批模式(/yolo 切换,config approval=yolo 设默认),非危险副作用(shell/文件覆盖/工具)自动放行,只有红线危险命令(rm -rf/push --force/DROP TABLE…)仍问人;data/raw 与密钥文件始终硬拒。②确认框与命令回显串行——统一副作用确认门 _side_effect_ok 把待确认内容单独打一行、只留短提示;loop._ask_yn 经 ui_input.safe_prompt 用 \\001\\002 包裹 ANSI,修 readline 彩色宽度算错。③程序停在深度上限要人说继续——自动跟进深度上限 3→12(YOLO 40),多步分析链一口气跑完。",
+   "dependencies": [
+    "feat-047"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(_side_effect_ok/_confirm_cmd 统一门 + self.yolo/max_auto_depth + /yolo 命令 _cmd_yolo + 提示符 yolo 徽标;_approve/_capture_saves 确认改走 _side_effect_ok;_MAX_AUTO_DEPTH 3→12、_YOLO_AUTO_DEPTH=40);psyclaw/ui_input.py(safe_prompt);psyclaw/loop.py(_ask_yn 经 safe_prompt);tests/test_repl_approval.py +11 例(YOLO 放行/危险仍问/默认逐条/danger 识别/toggle 联动深度/深度回归/safe_prompt 包裹与 noop/_ask_yn EOF 与读值);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1330 passed"
   }
  ]
 }

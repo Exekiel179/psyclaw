@@ -37,6 +37,7 @@ COMMANDS = {
     "/audit": "逐轮审计开关(on/off;每轮多一次 LLM 调用)",
     "/agent": "agent 模式开关(模型自主多步调用工具:search/read_file/save_file/kg_query/recall)",
     "/safemode": "文件读取权限:safe=一切读取须 @ 引用;open(默认)=模型可请求自动读取",
+    "/yolo": "审批模式:on=命令/覆盖/工具副作用自动放行(仅危险命令仍问);off 逐条确认",
     "/plugins": "已加载插件(用户 项目/全局;可注册工具/命令/system 片段)",
     "/clarify": "研究澄清(grill-me 式,不澄清完不开工)",
     "/preregister": "预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取)",
@@ -228,7 +229,10 @@ _READ_SAFE_SYSTEM = (
 
 _READ_RE = re.compile(r"```read\s*\r?\n(?P<body>.*?)```", re.S)
 _MAX_AUTO_READS = 4      # 每轮最多自动读的文件数
-_MAX_AUTO_DEPTH = 3      # 连续自动跟进(读取/选择回传)的深度上限,防打转
+# 连续自动跟进(命令/读取/选择回传)的深度上限,防打转。原为 3——多步分析
+# (下载→装依赖→跑→报错→修→重跑)动辄十几步,3 步就「停下等人说继续」是死胡同;放宽到 12。
+_MAX_AUTO_DEPTH = 12
+_YOLO_AUTO_DEPTH = 40    # YOLO 模式再放宽:整条分析链一口气跑完,不中途停等人
 
 
 def _hitl_confirm(prompt: str) -> bool:
@@ -387,6 +391,12 @@ class ReplSession:
         self.agent_mode = False     # agent 模式:模型自主多步调用工具(纯工具层循环)
         # 文件读取权限:open(默认,模型 ```read 块自动读)| safe(一切读取须用户 @ 引用)
         self.file_access = str(self.conf.get("file_access", "open")).lower()
+        # 审批模式:default(shell/危险命令、文件覆盖、工具副作用逐条人工确认)
+        # | yolo(非危险副作用自动放行,只有红线危险命令仍问;/yolo 切换,config approval=yolo 设默认)。
+        # 可自定义:config 里 approval=yolo|default 或 yolo=true。
+        self.yolo = (str(self.conf.get("approval", "")).lower() in ("yolo", "auto")
+                     or bool(self.conf.get("yolo", False)))
+        self.max_auto_depth = _YOLO_AUTO_DEPTH if self.yolo else _MAX_AUTO_DEPTH
         self.session_name: str | None = None   # /rename 后的会话名(提示符可见)
         self._auto_depth = 0        # 自动跟进(读取/选择回传)深度,防打转
         from datetime import datetime
@@ -553,6 +563,31 @@ class ReplSession:
             finally:
                 self._auto_depth -= 1
 
+    # -- 副作用审批(YOLO / 默认逐条确认)----------------------------------
+    def _side_effect_ok(self, detail: str, *, dangerous: bool = False,
+                        label: str = "副作用") -> bool:
+        """统一的副作用确认门。
+
+        - YOLO 模式:非危险副作用**自动放行**(不打断、不请求 y);
+        - 命中红线的**危险**操作(rm -rf / push --force / DROP TABLE…)即使 YOLO 也仍问人;
+        - 非 YOLO:一律人工确认。
+
+        确认提示只放一句短话,**待确认的内容单独打在上一行**——避免把超长命令塞进
+        input() 提示、被 readline 的彩色宽度算错而与回显的 y 串行(用户实测的「框和输出混在一起」)。
+        受保护的 data/raw 与密钥文件是更上层的**硬拒**,不走这里,YOLO 也绕不过。
+        """
+        if self.yolo and not dangerous:
+            print(ui.dim(f"  ⚡ YOLO 自动放行({label}):{detail[:70]}"))
+            return True
+        print(ui.dim(f"  ┆ 待确认{label}:{detail[:200]}"))
+        tag = "⚠ 危险操作" if dangerous else label
+        return _hitl_confirm(f"  确认{tag}?")
+
+    def _confirm_cmd(self, cmd: str) -> bool:
+        """命令执行确认:危险命令自动识别(YOLO 也问),其余按模式放行/确认。"""
+        return self._side_effect_ok(cmd, dangerous=bool(_DANGEROUS_RE.search(cmd)),
+                                    label="执行 shell 命令")
+
     def _auto_followup(self, reply: str) -> str | None:
         """命令执行 / 读取请求 / 选项选择 → 需要自动回传给模型的消息(无则 None)。
 
@@ -567,14 +602,11 @@ class ReplSession:
             if self.file_access == "safe":
                 print(ui.warn(f"  [安全模式] 模型给出 {len(runs)} 条命令,未自动执行;"
                               "请手动复制运行,或 /safemode off 放开。"))
-            elif self._auto_depth >= _MAX_AUTO_DEPTH:
-                print(ui.dim("  (自动跟进已达深度上限,请手动继续)"))
+            elif self._auto_depth >= self.max_auto_depth:
+                print(ui.dim(f"  (自动跟进已达深度上限 {self.max_auto_depth},请说「继续」;"
+                             "/yolo 可放宽)"))
             else:
-                def _confirm_cmd(c: str) -> bool:
-                    label = ("⚠ 危险命令" if _DANGEROUS_RE.search(c)
-                             else "shell 命令")
-                    return _hitl_confirm(f"  {label},确认执行 {c}?")
-                msg, notes = run_commands(runs, confirm=_confirm_cmd)
+                msg, notes = run_commands(runs, confirm=self._confirm_cmd)
                 for n in notes:
                     print(ui.warn(n) if n.startswith("  ✗") else ui.dim(n))
                 if msg:
@@ -585,8 +617,8 @@ class ReplSession:
             if self.file_access == "safe":
                 print(ui.warn(f"  [安全模式] 模型请求读取 {len(reads)} 个文件已被拒;"
                               "用 @<路径> 显式引用,或 /safemode off 放开。"))
-            elif self._auto_depth >= _MAX_AUTO_DEPTH:
-                print(ui.dim("  (自动读取跟进已达深度上限,请手动继续)"))
+            elif self._auto_depth >= self.max_auto_depth:
+                print(ui.dim(f"  (自动读取跟进已达深度上限 {self.max_auto_depth},请说「继续」)"))
             else:
                 msg, notes = gather_read_results(reads)
                 for n in notes:
@@ -601,7 +633,7 @@ class ReplSession:
             choice = parse_choices(body, heuristic=not self.plan_mode)
         except Exception:  # noqa: BLE001
             choice = None
-        if choice and self._auto_depth < _MAX_AUTO_DEPTH:
+        if choice and self._auto_depth < self.max_auto_depth:
             chosen = pick_interactive(choice)
             if chosen:
                 print(ui.ok("  → 已选:" + "、".join(c[:40] for c in chosen)))
@@ -614,10 +646,10 @@ class ReplSession:
         from psyclaw.toolloop import _short, run_tool_loop
 
         def _approve(call: dict) -> bool:
-            # 真 fail-closed(非 TTY/EOF/中断不批准)+ 参数截断(save_file 的 content
-            # 可能几十 KB,不能整个灌进确认提示)
-            return _hitl_confirm(f"  批准副作用工具 {call['name']}"
-                                 f"({_short(call.get('args') or {}, 120)})?")
+            # YOLO 自动放行工具副作用;否则人工确认。参数截断(save_file 的 content
+            # 可能几十 KB,不整个灌进提示);非 TTY/EOF/中断仍 fail-closed(在 _hitl_confirm)。
+            return self._side_effect_ok(
+                f"{call['name']}({_short(call.get('args') or {}, 120)})", label="工具副作用")
 
         try:
             res = run_tool_loop(
@@ -646,8 +678,8 @@ class ReplSession:
             return
 
         def _confirm(p: Path) -> bool:
-            # 真 fail-closed:非 TTY/EOF/中断一律不覆盖(评审修复:_ask_yn EOF 返 True)
-            return _hitl_confirm(f"  文件已存在,覆盖 {p}?")
+            # YOLO 自动覆盖(data/raw 另有硬拒);否则 fail-closed 人工确认(非 TTY/EOF 不覆盖)
+            return self._side_effect_ok(str(p), label="覆盖已存在文件")
 
         for blk in blocks:
             r = apply_save_block(blk, confirm=_confirm)
@@ -819,6 +851,8 @@ class ReplSession:
             else:
                 print(ui.ok("  [开放模式] 模型可请求读取本地文件(```read 块自动读;"
                             "data/raw 恒受保护)。"))
+        elif cmd == "/yolo":
+            self._cmd_yolo(arg)
         elif cmd == "/agent":
             low = arg.lower()
             self.agent_mode = (low == "on") if low in ("on", "off") \
@@ -936,6 +970,19 @@ class ReplSession:
             snippet = h["user_text"][:60].replace("\n", " ")
             print(f"    [{h['session']}] {snippet}")
 
+    def _cmd_yolo(self, arg: str) -> None:
+        """/yolo [on|off]:切换审批模式。on=非危险副作用自动放行 + 放宽自动跟进深度。"""
+        low = arg.lower()
+        self.yolo = (low == "on") if low in ("on", "off") else not self.yolo
+        self.max_auto_depth = _YOLO_AUTO_DEPTH if self.yolo else _MAX_AUTO_DEPTH
+        if self.yolo:
+            print(ui.err("  [YOLO 模式 开] 命令 / 文件覆盖 / 工具副作用自动放行——"
+                         "只有命中红线的危险命令(rm -rf、push --force、DROP TABLE…)仍会问你。"))
+            print(ui.dim(f"    自动跟进深度放宽到 {self.max_auto_depth} 步,整条分析链一口气跑完。"
+                         "受保护的 data/raw 与密钥文件始终硬拒,YOLO 也绕不过。/yolo off 退出。"))
+        else:
+            print(ui.ok(f"  [YOLO 模式 关] 恢复逐条人工确认;自动跟进深度 {self.max_auto_depth}。"))
+
     # -- 导出对话(feat:导出当前对话 / 完整含隐藏上下文)---------------------
     def _standing_conventions(self) -> str:
         """每轮持续注入、但从不在对话中展示的约定片段(键盘选择/文件读取/命令执行)。
@@ -1013,7 +1060,8 @@ class ReplSession:
                 base += ui.dim(f"·{self.session_name[:12]}")
             modes = ("" if not self.plan_mode else ui.warn(" plan")) \
                 + ("" if not self.agent_mode else ui.accent(" agent")) \
-                + ("" if self.file_access != "safe" else ui.warn(" safe"))
+                + ("" if self.file_access != "safe" else ui.warn(" safe")) \
+                + ("" if not self.yolo else ui.err(" yolo"))
             prompt = base + modes + ui.dim(" ❯ ")
             cmds = dict(COMMANDS)
             if self.plugins:
@@ -1047,6 +1095,7 @@ HELP_TEXT = """\
   /audit      逐轮审计开关(auditor 评分;on/off/log)
   /agent      agent 模式(模型自主多步调工具:search/read_file/save_file/kg_query/recall)
   /safemode   文件读取权限(safe=一切读取须 @ 引用;默认 open=模型可请求自动读取)
+  /yolo [on|off] 审批模式(on=命令/覆盖/工具副作用自动放行,仅危险命令仍问;放宽自动跟进深度)
   /model [m]  查看/切换模型      /provider [p]  查看/切换 provider
   /skills     列出 skills        /mcp           MCP 目录与启用状态
   /gates      门禁自检           /cost          本会话成本粗估
