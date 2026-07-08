@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -47,7 +48,7 @@ COMMANDS = {
     "/design": "实验设计目录(12 设计卡)",
     "/cite": "方法学背书库(决策→文献)",
     "/export": "APA7 输出(Word docx + Markdown)",
-    "/memory": "三层记忆(画像/惯性/教训卡)",
+    "/memory": "三层记忆(画像/惯性/教训卡);/memory verify 再验证环境教训、已恢复的自动失效",
     "/gates": "学术门禁自检(13 条)",
     "/skills": "已注册 skills",
     "/mcp": "MCP 目录与启用状态",
@@ -222,11 +223,11 @@ def distill_env_lessons(output: str) -> list[dict]:
     seen: set = set()
     text = output or ""
 
-    def add(trigger: str, lesson: str) -> None:
+    def add(trigger: str, lesson: str, kind: str) -> None:
         key = (trigger, lesson)
         if key not in seen:
             seen.add(key)
-            out.append({"trigger": trigger, "lesson": lesson})
+            out.append({"trigger": trigger, "lesson": lesson, "kind": kind})
 
     for rx in _CMD_NOTFOUND_RES:
         for m in rx.finditer(text):
@@ -235,16 +236,54 @@ def distill_env_lessons(output: str) -> list[dict]:
                 continue
             alt = _CMD_ALT.get(c)
             hint = f",改用 `{alt}`" if alt else ",换等价命令,或先确认它已安装且在 PATH"
-            add(c, f"本机没有 `{c}` 命令{hint};下次别再直接调 `{c}`")
+            add(c, f"本机没有 `{c}` 命令{hint};下次别再直接调 `{c}`", "cmd")
     for m in _MODULE_NOTFOUND_RE.finditer(text):
         mod = m.group("m").split(".")[0]
         add(mod, f"当前 Python 未安装模块 `{mod}`;需要时先 `pip3 install --user {mod}`,"
-                 f"或改用装有它的解释器/环境,别默认能 import")
+                 f"或改用装有它的解释器/环境,别默认能 import", "module")
     for m in _ATTR_ERR_RE.finditer(text):
         mod, attr = m.group("mod"), m.group("attr")
         add(f"{mod}.{attr}", f"`{mod}` 在本机版本里没有 `{attr}`(可能已改名/移除);"
-                             f"调用前先查该版本实际可用的 API,别照旧写")
+                             f"调用前先查该版本实际可用的 API,别照旧写", "attr")
     return out
+
+
+def probe_env_card_stale(card: dict) -> bool | None:
+    """再验证一张环境教训卡:它说的『不可用』现在是否已可用(→ 该归档)。
+
+    返回 True=卡已过时(该失效归档)/ False=仍成立(环境依旧缺)/ None=无法判定(跳过)。
+    - cmd:  shutil.which(命令) 是否找得到——**秒回、无子进程、注入安全**,startup 也能用。
+    - module/attr: 用 python3(退 python)真跑 `import`/取属性,退出码 0 即已恢复——
+      子进程 list 参数(非 shell)、触发词经 [\\w.] 校验,注入安全;导入较慢,仅 /memory verify 用。
+    只处理带 kind 的卡(本版之后蒸馏的);无 kind 的老卡返回 None 不动它。
+    """
+    kind = card.get("kind")
+    trig = str(card.get("trigger", ""))
+    if kind == "cmd":
+        if not re.fullmatch(r"[\w.\-]+", trig):
+            return None
+        return shutil.which(trig) is not None
+    if kind in ("module", "attr"):
+        interp = shutil.which("python3") or shutil.which("python")
+        if not interp:
+            return None
+        if kind == "module":
+            if not re.fullmatch(r"[\w.]+", trig):
+                return None
+            code = f"import {trig}"
+        else:
+            if "." not in trig or not re.fullmatch(r"[\w.]+", trig):
+                return None
+            mod, _, attr = trig.rpartition(".")
+            code = f"import {mod}; getattr({mod}, {attr!r})"
+        import subprocess
+        try:
+            rc = subprocess.run([interp, "-c", code], capture_output=True,
+                                timeout=8).returncode
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return rc == 0
+    return None
 
 
 def strip_save_blocks(reply: str) -> str:
@@ -690,9 +729,36 @@ class ReplSession:
             print(ui.accent(f"  📎 记下环境教训:{les['lesson'][:72]}"))
             try:                                  # 落持久待确认卡(best-effort,失败不阻塞)
                 from psyclaw.memory import draft_lesson
-                draft_lesson(les["trigger"], les["lesson"], source="error")
+                draft_lesson(les["trigger"], les["lesson"], source="error",
+                             kind=les.get("kind"))
             except Exception:  # noqa: BLE001
                 pass
+
+    def _reprobe_env_lessons(self, include_slow: bool = False) -> int:
+        """自动失效:再验证已生效的环境教训卡,现在能用了的自动归档(active→archived)。
+
+        include_slow=False:只查 cmd 类(shutil.which 秒回,startup 用,零延迟);
+        include_slow=True:连 module/attr 一起真跑 import(子进程,/memory verify 用)。
+        只碰 source=error 的机器生成卡——用户/审计的方法学教训绝不因命令成功而失效。返回归档数。
+        """
+        from psyclaw import memory
+        try:
+            cards = [c for c in memory.active_lessons() if c.get("source") == "error"]
+        except Exception:  # noqa: BLE001
+            return 0
+        archived = 0
+        for c in cards:
+            if not include_slow and c.get("kind") != "cmd":
+                continue
+            if probe_env_card_stale(c) is not True:   # 仅在**确证已恢复**时才失效(防误删)
+                continue
+            if memory.archive_lesson(c["trigger"], c["lesson"],
+                                     reason="环境已恢复(再验证通过),自动失效"):
+                archived += 1
+                self.session_lessons = [le for le in self.session_lessons
+                                        if le.get("trigger") != c["trigger"]]
+                print(ui.ok(f"  ♻ 环境教训自动失效:[{c['trigger']}] 现在可用了,已归档"))
+        return archived
 
     def _noprogress_stop(self, runs: list[dict], reads: list[str]) -> bool:
         """no-progress 检测:命令/读取请求连续重复 ≥ 阈值 → 判原地打转,停自动跟进。
@@ -903,8 +969,14 @@ class ReplSession:
             else:
                 export_cli(arg.split())
         elif cmd == "/memory":
-            from psyclaw.memory import memory_cli
-            memory_cli(arg.split() if arg else ["list"])
+            if arg.strip().lower() == "verify":
+                print(ui.dim("  正在再验证环境教训卡(命令 / 模块 / 属性)…"))
+                n = self._reprobe_env_lessons(include_slow=True)
+                print(ui.ok(f"  ✓ 完成:{n} 条已恢复并归档。") if n else
+                      ui.dim("  没有已恢复的环境教训(都仍成立,或无法判定)。"))
+            else:
+                from psyclaw.memory import memory_cli
+                memory_cli(arg.split() if arg else ["list"])
         elif cmd == "/plan":
             from psyclaw.tasks import set_goal
             low = arg.lower()
@@ -1188,6 +1260,14 @@ class ReplSession:
         except Exception:  # noqa: BLE001
             status = None
         print(ui.startup(__version__, status=status, provider=self.provider.describe()))
+        # 自动失效(轻量):启动时秒验证 cmd 类环境教训——上次说「没有 python」但现在装上了,
+        # 就自动归档,别再用过时的坑误导模型。只 shutil.which、零子进程、无卡则零成本;
+        # 模块/属性类较慢,留给 /memory verify 手动跑。config verify_env_lessons=false 可关。
+        if self.conf.get("verify_env_lessons", True):
+            try:
+                self._reprobe_env_lessons(include_slow=False)
+            except Exception:  # noqa: BLE001  # 再验证失败绝不阻塞启动
+                pass
         print("  " + ui.dim("输入 / 弹出命令联想(↑↓选择 Tab补全) · /exit 退出 · @<文件> 引用") + "\n")
         while True:
             base = ui.paint("psyclaw", "brcyan", "bold")
@@ -1243,7 +1323,7 @@ HELP_TEXT = """\
   /cite [t]   方法学背书库(每个设计决策的文献支撑)
   /export f   APA7 输出(Word + Markdown,确定性模板)
   /review f   审稿模拟(EIC+3审稿人+DA;--revise 闭合写作→评审→修复)
-  /memory     三层记忆(画像/决策惯性/教训卡)
+  /memory     三层记忆(画像/决策惯性/教训卡);/memory verify 再验证环境教训、已恢复的自动失效
   /sessions   历史会话列表       /resume <id>   续接历史会话
   /rename <名> 命名当前会话       /search <词>   跨会话全文检索
   /dump [--full] [路径]  导出当前对话为 Markdown(--full 含 system/备忘等隐藏上下文)

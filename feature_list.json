@@ -581,6 +581,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/repl.py(distill_env_lessons 纯函数 + _CMD_NOTFOUND_RES/_MODULE_NOTFOUND_RE/_ATTR_ERR_RE/_SHELL_NAMES 误匹配保护 + _learn_from_output + __init__ session_lessons/_session_lesson_keys + ask 注入「本会话已知环境限制」+ _auto_followup 调用);tests/test_error_learning.py +14 例(bash/zsh/win 命令不存在、zsh 前缀/dash 行号不误判、模块未装取顶层包、属性改名如 mne.datasets.erpcore、洁净输出无教训、去重、多条、_learn 填充会话+落卡 source=error+去重+draft 抛错 best-effort+洁净不记);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1349 passed;live 复刻 transcript 报错正确蒸馏、无误匹配"
+  },
+  {
+   "id": "feat-059",
+   "name": "环境教训卡自动失效(再验证)",
+   "description": "用户要求:确认过的环境卡支持自动失效。环境教训是负事实(没装 X/命令不存在/API 改名),装上就过时,过时的卡会反向误导模型。实现:distill 给每条环境教训打 kind(cmd/module/attr)并随卡持久化;memory.archive_lesson 落实文档承诺的『被推翻则归档』(active→archived,精确按 trigger+lesson 匹配不误伤,保留可审计不删除);probe_env_card_stale 再验证——cmd 用 shutil.which(秒回、零子进程、注入安全),module/attr 用 python3 真跑 import/取属性(list 参数非 shell、触发词校验、超时兜底)。REPL 两档:启动时秒验证 cmd 类(零延迟,config verify_env_lessons=false 可关),/memory verify 手动全量(含慢的 module/attr)。只碰 source=error 机器卡,只在**确证已恢复**时失效(防误删红线),归档时同步清本会话记忆。/memory list 展示归档区。",
+   "dependencies": [
+    "feat-058"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/memory.py(draft_lesson 加 kind、archive_lesson、list 展示 archived);psyclaw/repl.py(distill 打 kind、probe_env_card_stale、_reprobe_env_lessons、run 启动轻量再验证、/memory verify、import shutil);tests/test_lesson_invalidation.py +13 例(distill 带 kind、archive 移动/精确匹配不误伤/未命中、probe cmd 有无、module import 通/不通/无解释器/非法触发词、_reprobe 归档已恢复且清会话/保留仍缺失的卡/不碰慢类)+ test_error_learning 更新 draft stub 带 kind;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1362 passed;live 隔离记忆:ls 卡自动失效归档、no_such_cmd 卡保留"
   }
  ]
 }
