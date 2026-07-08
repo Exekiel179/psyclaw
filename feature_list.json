@@ -571,6 +571,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/repl.py(_followup_signature 纯函数 + _noprogress_stop + _auto_followup 改双闸:no-progress 主闸 + 高位安全兜底;_MAX_AUTO_DEPTH 12→100、新增 _MAX_FOLLOWUP_REPEAT=2、删 _YOLO_AUTO_DEPTH;__init__ 加判重状态 + config max_auto_depth;ask 顶层轮次重置;_cmd_yolo 不再动深度);tests/test_repl_approval.py +5 例(签名纯函数/连续重复停/30 条不同命令永不停/换请求重置/空轮不累加),原深度联动测试改判「高位兜底」;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1335 passed;live:3 条相同即停、30 条不同不停"
+  },
+  {
+   "id": "feat-058",
+   "name": "错误学习:命令失败蒸馏环境教训",
+   "description": "用户问「能不能做到错误学习」。既有 memory 教训卡只从 audit/手动来,命令失败不入库→模型每轮重复踩坑(python→python3、系统 Python 无 mne、mne.datasets.erpcore 改名)。补上:distill_env_lessons 从命令输出蒸馏三类高信号可泛化教训(命令不存在/模块未装/属性版本改名),含 shell 前缀与行号误匹配保护;_learn_from_output 把教训记进本会话记忆(每轮注入 system,当场止损跨轮不忘)+ best-effort 落 memory 待确认卡(source=error,跨会话经 /memory confirm 生效,沿用既有 HITL 纪律避免环境事实过时被自动固化)。接在 _auto_followup 命令执行后。",
+   "dependencies": [
+    "feat-057"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(distill_env_lessons 纯函数 + _CMD_NOTFOUND_RES/_MODULE_NOTFOUND_RE/_ATTR_ERR_RE/_SHELL_NAMES 误匹配保护 + _learn_from_output + __init__ session_lessons/_session_lesson_keys + ask 注入「本会话已知环境限制」+ _auto_followup 调用);tests/test_error_learning.py +14 例(bash/zsh/win 命令不存在、zsh 前缀/dash 行号不误判、模块未装取顶层包、属性改名如 mne.datasets.erpcore、洁净输出无教训、去重、多条、_learn 填充会话+落卡 source=error+去重+draft 抛错 best-effort+洁净不记);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1349 passed;live 复刻 transcript 报错正确蒸馏、无误匹配"
   }
  ]
 }
