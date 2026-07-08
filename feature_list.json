@@ -561,6 +561,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/repl.py(_side_effect_ok/_confirm_cmd 统一门 + self.yolo/max_auto_depth + /yolo 命令 _cmd_yolo + 提示符 yolo 徽标;_approve/_capture_saves 确认改走 _side_effect_ok;_MAX_AUTO_DEPTH 3→12、_YOLO_AUTO_DEPTH=40);psyclaw/ui_input.py(safe_prompt);psyclaw/loop.py(_ask_yn 经 safe_prompt);tests/test_repl_approval.py +11 例(YOLO 放行/危险仍问/默认逐条/danger 识别/toggle 联动深度/深度回归/safe_prompt 包裹与 noop/_ask_yn EOF 与读值);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1330 passed"
+  },
+  {
+   "id": "feat-057",
+   "name": "流式路径 no-progress 检测(替代低深度上限)",
+   "description": "用户反馈:自动跟进深度上限太低会掐断合法多步分析。改为——命令/读取的自动跟进停机靠 no-progress 检测(连续重复相同请求即判原地打转而停,同 toolloop feat-044 _calls_signature 思路),不再靠低深度上限;深度只保留高位安全兜底(默认 100,可 config max_auto_depth 调,合法任务碰不到),防「每轮换不同请求永不收敛」的极端空转。每个顶层用户轮次重置判重计数;choices 由用户交互驱动不计入。附带审计同类问题:唯一有色 input() 提示是 loop._ask_yn(已 feat-056 经 safe_prompt 修);toolloop 已有 no-progress+max_iters;autoloop 因 backlog 单调收缩(失败→skipped 也入 done)结构上不重复同任务;loop.py MAX_REVIEW_ROUNDS=3 是修订环的刻意收敛界,均非同类 bug。",
+   "dependencies": [
+    "feat-056"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(_followup_signature 纯函数 + _noprogress_stop + _auto_followup 改双闸:no-progress 主闸 + 高位安全兜底;_MAX_AUTO_DEPTH 12→100、新增 _MAX_FOLLOWUP_REPEAT=2、删 _YOLO_AUTO_DEPTH;__init__ 加判重状态 + config max_auto_depth;ask 顶层轮次重置;_cmd_yolo 不再动深度);tests/test_repl_approval.py +5 例(签名纯函数/连续重复停/30 条不同命令永不停/换请求重置/空轮不累加),原深度联动测试改判「高位兜底」;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1335 passed;live:3 条相同即停、30 条不同不停"
   }
  ]
 }
