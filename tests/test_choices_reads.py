@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from psyclaw.choices import format_selection_message, parse_choices, resolve_selection
+from psyclaw import choices as C
+from psyclaw.choices import (format_free_answer, format_selection_message,
+                            parse_choices, resolve_selection)
 from psyclaw.repl import gather_read_results, parse_read_requests
 
 
@@ -62,6 +64,41 @@ def test_resolve_single_select():
 def test_format_selection_message():
     msg = format_selection_message(["研究1a", "研究2a"], "复现哪些实验?")
     assert "研究1a、研究2a" in msg and "复现哪些实验?" in msg
+
+
+def test_format_free_answer():
+    assert format_free_answer("y", "用哪个数据集?") == "(针对「用哪个数据集?」)y"
+    assert format_free_answer("随便", "请选择") == "随便"     # 默认问题不加前缀
+
+
+# --- _pick_numbered:非空非编号输入当自由文本回传,别吞掉(用户实测:打 y 消失)---------
+def _choice(multi=False):
+    return {"question": "用哪个数据集?", "multi": multi, "options": ["sample", "eegbci"]}
+
+
+def test_pick_numbered_valid_number(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda *_a, **_k: "2")
+    chosen, free = C._pick_numbered(_choice())
+    assert chosen == ["eegbci"] and free is None
+
+
+def test_pick_numbered_free_text_not_dropped(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda *_a, **_k: "y")
+    chosen, free = C._pick_numbered(_choice())
+    assert chosen == [] and free == "y"             # y 不是编号 → 作为自由文本回传
+
+
+def test_pick_numbered_empty_is_skip(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda *_a, **_k: "")
+    chosen, free = C._pick_numbered(_choice())
+    assert chosen == [] and free is None            # 回车 = 跳过
+
+
+def test_pick_numbered_eof_is_skip(monkeypatch):
+    def _eof(*_a, **_k):
+        raise EOFError
+    monkeypatch.setattr("builtins.input", _eof)
+    assert C._pick_numbered(_choice()) == ([], None)
 
 
 # --- read 块 -------------------------------------------------------------------
