@@ -64,6 +64,7 @@ COMMANDS = {
     "/resume": "续接历史会话(/resume <id>)",
     "/rename": "给当前会话改名(/rename <新名>)",
     "/search": "全文检索历史对话(/search <词>)",
+    "/dump": "导出当前对话为 Markdown(--full 连同不展示的隐藏上下文一并导出)",
     "/exit": "退出",
 }
 
@@ -864,6 +865,8 @@ class ReplSession:
             self._cmd_rename(arg)
         elif cmd == "/search":
             self._cmd_search(arg)
+        elif cmd == "/dump":
+            self._cmd_dump(arg)
         elif cmd == "/plugins":
             self._cmd_plugins()
         elif self.plugins and cmd in self.plugins.commands:
@@ -933,6 +936,66 @@ class ReplSession:
             snippet = h["user_text"][:60].replace("\n", " ")
             print(f"    [{h['session']}] {snippet}")
 
+    # -- 导出对话(feat:导出当前对话 / 完整含隐藏上下文)---------------------
+    def _standing_conventions(self) -> str:
+        """每轮持续注入、但从不在对话中展示的约定片段(键盘选择/文件读取/命令执行)。
+
+        随 file_access 与 plan_mode 确定性重建——与 ask() 里拼进 system 的口径一致。
+        每轮临时注入的相关知识/历史召回随消息即时生成、不留存,故不在此重建。
+        """
+        parts = [_CHOICES_SYSTEM,
+                 _READ_SAFE_SYSTEM if self.file_access == "safe" else _READ_OPEN_SYSTEM,
+                 _RUN_SYSTEM + ("\n" + _RUN_SAFE_NOTE if self.file_access == "safe" else "")]
+        if self.plan_mode:
+            from psyclaw.tasks import PLAN_MODE_SYSTEM
+            parts.append(PLAN_MODE_SYSTEM)
+        return "\n".join(p for p in parts if p)
+
+    def _cmd_dump(self, arg: str) -> None:
+        """/dump [--full] [路径]:导出当前对话;--full 连同不展示的隐藏上下文一并导出。"""
+        from psyclaw import transcript
+        from psyclaw.context import render_memo
+        toks = arg.split()
+        full = False
+        rest: list[str] = []
+        for t in toks:
+            if t in ("--full", "-f", "full"):
+                full = True
+            else:
+                rest.append(t)
+        if not self.messages:
+            print(ui.dim("  (当前会话暂无对话可导出)"))
+            return
+        from datetime import datetime
+        meta = {
+            "session_id": self.session_id,
+            "session_name": self.session_name or "",
+            "provider": self.provider.describe(),
+            "turns": sum(1 for m in self.messages if m.get("role") == "user"),
+            "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        if full:
+            text = transcript.render_full(
+                self.messages, system=self.system, memo=render_memo(self.memo),
+                conventions=self._standing_conventions(), meta=meta)
+        else:
+            text = transcript.render_conversation(self.messages, meta=meta)
+        target = rest[0] if rest else transcript.default_path(self.session_id, full)
+        p = Path(target).expanduser()
+        if _save_is_protected(p):
+            print(ui.err(f"  ✗ 拒绝写入受保护的 data/raw:{p}"))
+            return
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(text, encoding="utf-8")
+        except OSError as exc:
+            print(ui.err(f"  ✗ 导出失败 {p}:{exc}"))
+            return
+        kind = "完整对话(含隐藏上下文)" if full else "当前对话"
+        print(ui.ok(f"  ✓ 已导出{kind} → {p}({len(text)} 字符)"))
+        if not full:
+            print(ui.dim("    /dump --full 连同 system 提示/决策备忘等不展示的上下文一并导出"))
+
     # -- 主循环 --------------------------------------------------------------
     def run(self) -> int:
         if self.resume_id:
@@ -999,6 +1062,7 @@ HELP_TEXT = """\
   /memory     三层记忆(画像/决策惯性/教训卡)
   /sessions   历史会话列表       /resume <id>   续接历史会话
   /rename <名> 命名当前会话       /search <词>   跨会话全文检索
+  /dump [--full] [路径]  导出当前对话为 Markdown(--full 含 system/备忘等隐藏上下文)
   /clear      清空上下文         /compact       压缩上下文
   /config     配置向导           /exit          退出
   /research [t]    一句话研究编排:文献→设计→写作→评审→总验收(--revise 闭环)
