@@ -19,7 +19,7 @@ def _sess(yolo=False):
     """跳过重构造函数,只装审批相关属性。"""
     s = repl.ReplSession.__new__(repl.ReplSession)
     s.yolo = yolo
-    s.max_auto_depth = repl._YOLO_AUTO_DEPTH if yolo else repl._MAX_AUTO_DEPTH
+    s.max_auto_depth = repl._MAX_AUTO_DEPTH
     return s
 
 
@@ -58,15 +58,13 @@ def test_confirm_cmd_detects_danger(monkeypatch):
     assert not seen
 
 
-# -- /yolo 切换 + 深度联动 --------------------------------------------------
-def test_cmd_yolo_toggles_mode_and_depth(capsys):
+# -- /yolo 切换(仅审批,不再动深度)---------------------------------------
+def test_cmd_yolo_toggles_mode(capsys):
     s = _sess(yolo=False)
     s._cmd_yolo("on")
     assert s.yolo is True
-    assert s.max_auto_depth == repl._YOLO_AUTO_DEPTH
     s._cmd_yolo("off")
     assert s.yolo is False
-    assert s.max_auto_depth == repl._MAX_AUTO_DEPTH
 
 
 def test_cmd_yolo_bare_toggle():
@@ -77,10 +75,66 @@ def test_cmd_yolo_bare_toggle():
     assert s.yolo is False
 
 
-def test_depth_raised_from_old_default():
-    # 回归:旧上限是 3,多步分析会「停等人继续」。现默认已放宽,YOLO 更深。
-    assert repl._MAX_AUTO_DEPTH > 3
-    assert repl._YOLO_AUTO_DEPTH > repl._MAX_AUTO_DEPTH
+def test_depth_is_high_safety_backstop_not_functional_limit():
+    # 回归:旧上限是 3,多步分析会「停等人继续」。现深度只是高位安全兜底,停机靠 no-progress。
+    assert repl._MAX_AUTO_DEPTH >= 50
+    assert repl._MAX_FOLLOWUP_REPEAT <= 3
+
+
+# -- no-progress 检测(流式路径:原地打转即停,替代低深度上限)----------------
+def _sess_np():
+    s = repl.ReplSession.__new__(repl.ReplSession)
+    s._followup_prev_sig = None
+    s._followup_repeat = 0
+    return s
+
+
+def test_followup_signature_pure():
+    sig = repl._followup_signature
+    assert sig([], []) is None                       # 空 → 不参与判重
+    a = sig([{"kind": "shell", "cmd": "python x.py"}], [])
+    b = sig([{"kind": "shell", "cmd": "python x.py"}], [])
+    assert a == b                                    # 相同请求 → 相同签名
+    assert a != sig([{"kind": "shell", "cmd": "python y.py"}], [])
+    # 顺序无关(同一组请求换序仍判相同)
+    assert sig([{"kind": "shell", "cmd": "a"}, {"kind": "shell", "cmd": "b"}], []) \
+        == sig([{"kind": "shell", "cmd": "b"}, {"kind": "shell", "cmd": "a"}], [])
+    # 读取也计入
+    assert sig([], ["f.csv"]) != sig([], ["g.csv"])
+
+
+def test_noprogress_stops_on_repeat(capsys):
+    s = _sess_np()
+    runs = [{"kind": "shell", "cmd": "python fail.py"}]
+    assert s._noprogress_stop(runs, []) is False     # 第 1 次
+    assert s._noprogress_stop(runs, []) is False     # 第 2 次(repeat=1)
+    assert s._noprogress_stop(runs, []) is True      # 第 3 次(repeat=2≥阈值)→ 停
+    assert "无新进展" in capsys.readouterr().out
+
+
+def test_noprogress_never_triggers_on_real_progress():
+    """每轮换不同命令(真有进展)→ 永不触发 no-progress,不会掐断合法多步链。"""
+    s = _sess_np()
+    for i in range(30):
+        runs = [{"kind": "shell", "cmd": f"python step{i}.py"}]
+        assert s._noprogress_stop(runs, []) is False
+
+
+def test_noprogress_resets_on_new_request():
+    s = _sess_np()
+    r1 = [{"kind": "shell", "cmd": "a"}]
+    r2 = [{"kind": "shell", "cmd": "b"}]
+    assert s._noprogress_stop(r1, []) is False
+    assert s._noprogress_stop(r1, []) is False       # repeat=1
+    assert s._noprogress_stop(r2, []) is False       # 换了请求 → 重置
+    assert s._noprogress_stop(r1, []) is False       # 又换回 → 仍重置,不累加
+
+
+def test_noprogress_ignores_empty_rounds():
+    s = _sess_np()
+    assert s._noprogress_stop([], []) is False
+    assert s._noprogress_stop([], []) is False
+    assert s._followup_repeat == 0                   # 空轮不累加计数
 
 
 # -- readline 安全提示(修确认框与回显串行)---------------------------------

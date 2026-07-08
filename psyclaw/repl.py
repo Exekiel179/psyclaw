@@ -229,10 +229,26 @@ _READ_SAFE_SYSTEM = (
 
 _READ_RE = re.compile(r"```read\s*\r?\n(?P<body>.*?)```", re.S)
 _MAX_AUTO_READS = 4      # 每轮最多自动读的文件数
-# 连续自动跟进(命令/读取/选择回传)的深度上限,防打转。原为 3——多步分析
-# (下载→装依赖→跑→报错→修→重跑)动辄十几步,3 步就「停下等人说继续」是死胡同;放宽到 12。
-_MAX_AUTO_DEPTH = 12
-_YOLO_AUTO_DEPTH = 40    # YOLO 模式再放宽:整条分析链一口气跑完,不中途停等人
+# 自动跟进(命令/读取)的停机判据 = **no-progress 检测**(下方),不再靠低深度上限。
+# 原来 3 步的硬上限会掐断合法多步分析(下载→装依赖→跑→报错→修→重跑,十几步很正常);
+# 现改为:连续重复相同的命令/读取请求即判「原地打转」而停(与 toolloop feat-044 一致)。
+# 深度上限只留一个**高位安全兜底**(防「每轮都换不同请求、永不收敛」的极端空转烧 token,
+# 与 toolloop 仍保留 max_iters 兜底同理),合法任务几乎永远碰不到;可经 config max_auto_depth 调。
+_MAX_AUTO_DEPTH = 100
+_MAX_FOLLOWUP_REPEAT = 2   # 命令/读取请求连续重复 ≥ 此值即判无进展停(同 toolloop _MAX_NOPROGRESS)
+
+
+def _followup_signature(runs: list[dict], reads: list[str]):
+    """命令+读取请求的规范签名(排序去序)——连续两轮相同即模型在原地打转。纯函数,可单测。
+
+    只签**自动生成**的跟进(命令/读取);choices 由用户逐次交互驱动,不计入 no-progress。
+    无任何命令/读取时返回 None(该轮不参与判重)。
+    """
+    cmds = tuple(sorted((r.get("kind", ""), r.get("cmd", "")) for r in runs))
+    rds = tuple(sorted(reads))
+    if not cmds and not rds:
+        return None
+    return (cmds, rds)
 
 
 def _hitl_confirm(prompt: str) -> bool:
@@ -396,7 +412,13 @@ class ReplSession:
         # 可自定义:config 里 approval=yolo|default 或 yolo=true。
         self.yolo = (str(self.conf.get("approval", "")).lower() in ("yolo", "auto")
                      or bool(self.conf.get("yolo", False)))
-        self.max_auto_depth = _YOLO_AUTO_DEPTH if self.yolo else _MAX_AUTO_DEPTH
+        # 自动跟进停机靠 no-progress 检测;深度只是高位安全兜底(可 config 调,合法任务碰不到)
+        try:
+            self.max_auto_depth = int(self.conf.get("max_auto_depth", _MAX_AUTO_DEPTH))
+        except (TypeError, ValueError):
+            self.max_auto_depth = _MAX_AUTO_DEPTH
+        self._followup_prev_sig = None   # 上一轮命令/读取请求签名(no-progress 判重)
+        self._followup_repeat = 0        # 连续重复次数
         self.session_name: str | None = None   # /rename 后的会话名(提示符可见)
         self._auto_depth = 0        # 自动跟进(读取/选择回传)深度,防打转
         from datetime import datetime
@@ -461,6 +483,9 @@ class ReplSession:
     def ask(self, text: str, internal: bool = False) -> None:
         from psyclaw.context import compact_history, relevant_knowledge, render_memo
         if not internal:
+            # 新的顶层轮次:重置 no-progress 判重(上一轮的重复计数不跨用户消息累加)
+            self._followup_prev_sig = None
+            self._followup_repeat = 0
             # 路径自动检测:只对**用户输入**做——自动回传消息(读取结果/命令输出)里的
             # 碎片会被误当路径,打出「未找到文件 乱码」噪音(用户实测修复)。
             from psyclaw.path_ingest import process_message
@@ -588,23 +613,52 @@ class ReplSession:
         return self._side_effect_ok(cmd, dangerous=bool(_DANGEROUS_RE.search(cmd)),
                                     label="执行 shell 命令")
 
+    def _noprogress_stop(self, runs: list[dict], reads: list[str]) -> bool:
+        """no-progress 检测:命令/读取请求连续重复 ≥ 阈值 → 判原地打转,停自动跟进。
+
+        滚动更新 self._followup_prev_sig / _followup_repeat(每个顶层轮次开头已重置)。
+        与 toolloop 的 _calls_signature 判重同理——这是流式路径的停机主判据(替代低深度上限)。
+        """
+        sig = _followup_signature(runs, reads)
+        if sig is None:
+            return False
+        if sig == self._followup_prev_sig:
+            self._followup_repeat += 1
+        else:
+            self._followup_prev_sig = sig
+            self._followup_repeat = 0
+        if self._followup_repeat >= _MAX_FOLLOWUP_REPEAT:
+            print(ui.warn(f"  (检测到连续 {self._followup_repeat + 1} 轮重复相同的命令/读取请求且"
+                          "无新进展,已停自动跟进以免空转;请换思路,或说「继续」再试)"))
+            return True
+        return False
+
     def _auto_followup(self, reply: str) -> str | None:
         """命令执行 / 读取请求 / 选项选择 → 需要自动回传给模型的消息(无则 None)。
 
         统一在 **去掉 save 块之后** 的正文上解析——save 的内容是要写盘的文件,
         里面的示例命令/read/复选清单绝不能被当成本轮要执行的请求。
+
+        停机:命令/读取的自动跟进不再靠低深度上限,而是 **no-progress 检测**(连续重复
+        相同请求即停);深度只留高位安全兜底,防极端空转。choices 由用户逐次交互,不设限。
         """
         body = strip_save_blocks(reply)
+        runs = parse_run_requests(body)
+        reads = parse_read_requests(body)
+
+        # 命令/读取是模型**自动生成**的跟进(无需用户输入),可能空转——两道闸拦:
+        if (runs or reads) and self.file_access != "safe":
+            if self._noprogress_stop(runs, reads):     # ① 主闸:原地打转即停
+                return None
+            if self._auto_depth >= self.max_auto_depth:  # ② 高位安全兜底(几乎碰不到)
+                print(ui.dim(f"  (自动跟进已达安全上限 {self.max_auto_depth},请说「继续」再续)"))
+                return None
 
         # ① 命令块(psyclaw/shell):执行并回传输出——命令块吐了没人跑=死胡同(用户实测)
-        runs = parse_run_requests(body)
         if runs:
             if self.file_access == "safe":
                 print(ui.warn(f"  [安全模式] 模型给出 {len(runs)} 条命令,未自动执行;"
                               "请手动复制运行,或 /safemode off 放开。"))
-            elif self._auto_depth >= self.max_auto_depth:
-                print(ui.dim(f"  (自动跟进已达深度上限 {self.max_auto_depth},请说「继续」;"
-                             "/yolo 可放宽)"))
             else:
                 msg, notes = run_commands(runs, confirm=self._confirm_cmd)
                 for n in notes:
@@ -612,13 +666,10 @@ class ReplSession:
                 if msg:
                     return msg
 
-        reads = parse_read_requests(body)
         if reads:
             if self.file_access == "safe":
                 print(ui.warn(f"  [安全模式] 模型请求读取 {len(reads)} 个文件已被拒;"
                               "用 @<路径> 显式引用,或 /safemode off 放开。"))
-            elif self._auto_depth >= self.max_auto_depth:
-                print(ui.dim(f"  (自动读取跟进已达深度上限 {self.max_auto_depth},请说「继续」)"))
             else:
                 msg, notes = gather_read_results(reads)
                 for n in notes:
@@ -971,17 +1022,19 @@ class ReplSession:
             print(f"    [{h['session']}] {snippet}")
 
     def _cmd_yolo(self, arg: str) -> None:
-        """/yolo [on|off]:切换审批模式。on=非危险副作用自动放行 + 放宽自动跟进深度。"""
+        """/yolo [on|off]:切换审批模式。on=非危险副作用自动放行(不再问 y)。
+
+        停机与深度无关:自动跟进靠 no-progress 检测停(原地打转即停),深度只是高位兜底。
+        """
         low = arg.lower()
         self.yolo = (low == "on") if low in ("on", "off") else not self.yolo
-        self.max_auto_depth = _YOLO_AUTO_DEPTH if self.yolo else _MAX_AUTO_DEPTH
         if self.yolo:
             print(ui.err("  [YOLO 模式 开] 命令 / 文件覆盖 / 工具副作用自动放行——"
                          "只有命中红线的危险命令(rm -rf、push --force、DROP TABLE…)仍会问你。"))
-            print(ui.dim(f"    自动跟进深度放宽到 {self.max_auto_depth} 步,整条分析链一口气跑完。"
+            print(ui.dim("    多步分析一口气跑完(靠 no-progress 检测停,不再中途卡深度上限)。"
                          "受保护的 data/raw 与密钥文件始终硬拒,YOLO 也绕不过。/yolo off 退出。"))
         else:
-            print(ui.ok(f"  [YOLO 模式 关] 恢复逐条人工确认;自动跟进深度 {self.max_auto_depth}。"))
+            print(ui.ok("  [YOLO 模式 关] 恢复:shell / 危险命令逐条人工确认。"))
 
     # -- 导出对话(feat:导出当前对话 / 完整含隐藏上下文)---------------------
     def _standing_conventions(self) -> str:
@@ -1095,7 +1148,7 @@ HELP_TEXT = """\
   /audit      逐轮审计开关(auditor 评分;on/off/log)
   /agent      agent 模式(模型自主多步调工具:search/read_file/save_file/kg_query/recall)
   /safemode   文件读取权限(safe=一切读取须 @ 引用;默认 open=模型可请求自动读取)
-  /yolo [on|off] 审批模式(on=命令/覆盖/工具副作用自动放行,仅危险命令仍问;放宽自动跟进深度)
+  /yolo [on|off] 审批模式(on=命令/覆盖/工具副作用自动放行,仅危险命令仍问)
   /model [m]  查看/切换模型      /provider [p]  查看/切换 provider
   /skills     列出 skills        /mcp           MCP 目录与启用状态
   /gates      门禁自检           /cost          本会话成本粗估
