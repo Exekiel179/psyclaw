@@ -95,17 +95,47 @@ def suggest(topic: str) -> dict | None:
 # 3. 教训卡(HITL 确认)
 # ---------------------------------------------------------------------------
 
-def draft_lesson(trigger: str, lesson: str, source: str) -> None:
-    """写入待确认区(critic/用户纠正自动调用)。同内容去重,避免修复环刷屏。"""
+def draft_lesson(trigger: str, lesson: str, source: str, kind: str | None = None) -> None:
+    """写入待确认区(critic/用户纠正自动调用)。同内容去重,避免修复环刷屏。
+
+    kind(可选):环境教训的类别(cmd|module|attr),供「自动失效」再验证时选对探测方式。
+    """
     data = _load("lessons")
     existing = data.get("pending", []) + data.get("active", [])
     if any(c.get("trigger") == trigger and c.get("lesson") == lesson
            for c in existing):
         return
-    data.setdefault("pending", []).append(
-        {"trigger": trigger, "lesson": lesson, "source": source,
-         "ts": int(time.time())})
+    card = {"trigger": trigger, "lesson": lesson, "source": source,
+            "ts": int(time.time())}
+    if kind:
+        card["kind"] = kind
+    data.setdefault("pending", []).append(card)
     _save("lessons", data)
+
+
+def archive_lesson(trigger: str, lesson: str, reason: str = "") -> bool:
+    """把一张生效卡归档(active → archived,不删除,可审计/可复原)。
+
+    实现文档承诺的「被推翻则归档」:环境事实过时(如装上了原本缺的库)时自动调用。
+    精确按 trigger+lesson 匹配,避免误伤同触发词的其他卡。返回是否命中。
+    """
+    data = _load("lessons")
+    active = data.get("active", [])
+    moved = None
+    keep = []
+    for c in active:
+        if moved is None and c.get("trigger") == trigger and c.get("lesson") == lesson:
+            moved = c
+        else:
+            keep.append(c)
+    if moved is None:
+        return False
+    moved["archived_ts"] = int(time.time())
+    moved["archived_reason"] = reason
+    data["active"] = keep
+    data.setdefault("archived", []).append(moved)
+    _save("lessons", data)
+    return True
 
 
 def confirm_lesson(index: int) -> bool:
@@ -186,6 +216,12 @@ def memory_cli(argv: list) -> int:
             print(f"    [待确认 {i}] ({c['source']}) {c['lesson']}")
         for c in data.get("active", []):
             print(f"    [生效] [{c['trigger']}] {c['lesson']} (强度 {c.get('strength', 1)})")
+        arch = data.get("archived", [])
+        if arch:
+            print(f"  ── 已归档教训({len(arch)},自动失效/被推翻)──")
+            for c in arch[-5:]:
+                why = c.get("archived_reason", "")
+                print(f"    [归档] [{c['trigger']}] {c['lesson']}" + (f" — {why}" if why else ""))
         if not data.get("pending") and not data.get("active"):
             print("    (空。critic 审查与用户纠正会生成待确认卡)")
         print("\n  存储:~/.psyclaw/memory/(纯 JSON,可直接审计;只存方法学偏好,不存数据)")

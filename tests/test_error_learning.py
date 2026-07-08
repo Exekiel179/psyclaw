@@ -88,13 +88,14 @@ def _sess():
 def test_learn_populates_session_and_dedups(monkeypatch, capsys):
     drafted = []
     monkeypatch.setattr(memory, "draft_lesson",
-                        lambda t, l, source: drafted.append((t, l, source)))
+                        lambda t, l, source, kind=None: drafted.append((t, l, source, kind)))
     s = _sess()
     s._learn_from_output("python: command not found")
     s._learn_from_output("python: command not found")   # 重复不再加
     assert len(s.session_lessons) == 1
     assert s.session_lessons[0]["trigger"] == "python"
     assert len(drafted) == 1 and drafted[0][2] == "error"   # 落 pending 卡,source=error
+    assert drafted[0][3] == "cmd"                            # kind 一并落卡(供自动失效再验证)
     assert "记下环境教训" in capsys.readouterr().out
 
 
