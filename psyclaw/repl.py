@@ -193,6 +193,60 @@ def run_commands(reqs: list[dict], confirm=None,
     return ("# 命令执行结果\n\n" + "\n\n".join(parts)) if parts else "", notes
 
 
+# ---------------------------------------------------------------------------
+# 错误学习:从命令输出蒸馏「可复用的环境教训」(纯函数,可单测)。
+# 只认高信号、可泛化的失败——命令不存在 / 模块未装 / 属性(版本改名):正是用户实测里
+# 反复重踩的坑(python→python3、系统 Python 无 mne、mne.datasets.erpcore→erp_core)。
+# 蒸馏出的教训进「本会话记忆」(每轮注入,当场止损)+ 落 memory 待确认卡(跨会话复用)。
+# ---------------------------------------------------------------------------
+_CMD_NOTFOUND_RES = [
+    re.compile(r"command not found:\s*(?P<c>[\w.\-]+)", re.I),        # zsh
+    re.compile(r"(?P<c>[\w.\-]+):\s*command not found", re.I),        # bash
+    re.compile(r"(?P<c>[\w.\-]+):\s*not found", re.I),               # sh/dash
+    re.compile(r"[‘'\"](?P<c>[\w.\-]+)[’'\"]\s*不是内部或外部命令"),   # windows cmd
+    re.compile(r"未找到命令[::]\s*(?P<c>[\w.\-]+)"),
+]
+_MODULE_NOTFOUND_RE = re.compile(r"No module named ['\"]?(?P<m>[\w.]+)['\"]?", re.I)
+_ATTR_ERR_RE = re.compile(
+    r"module ['\"](?P<mod>[\w.]+)['\"] has no attribute ['\"](?P<attr>[\w.]+)['\"]")
+_CMD_ALT = {"python": "python3", "pip": "pip3", "py": "python3"}
+# shell 名会被「X: command not found」误当成缺失命令(zsh 格式 `zsh: command not found: python`
+# 里 zsh 只是报错前缀,不是缺的命令)——一律排除。
+_SHELL_NAMES = {"bash", "zsh", "sh", "dash", "fish", "ksh", "csh", "tcsh",
+                "cmd", "powershell", "pwsh", "not", "command"}
+
+
+def distill_env_lessons(output: str) -> list[dict]:
+    """从命令输出蒸馏环境教训 → [{trigger, lesson}](去重保序)。纯函数。"""
+    out: list[dict] = []
+    seen: set = set()
+    text = output or ""
+
+    def add(trigger: str, lesson: str) -> None:
+        key = (trigger, lesson)
+        if key not in seen:
+            seen.add(key)
+            out.append({"trigger": trigger, "lesson": lesson})
+
+    for rx in _CMD_NOTFOUND_RES:
+        for m in rx.finditer(text):
+            c = m.group("c")
+            if not c or c in _SHELL_NAMES or c.isdigit():   # shell 前缀/行号等误匹配保护
+                continue
+            alt = _CMD_ALT.get(c)
+            hint = f",改用 `{alt}`" if alt else ",换等价命令,或先确认它已安装且在 PATH"
+            add(c, f"本机没有 `{c}` 命令{hint};下次别再直接调 `{c}`")
+    for m in _MODULE_NOTFOUND_RE.finditer(text):
+        mod = m.group("m").split(".")[0]
+        add(mod, f"当前 Python 未安装模块 `{mod}`;需要时先 `pip3 install --user {mod}`,"
+                 f"或改用装有它的解释器/环境,别默认能 import")
+    for m in _ATTR_ERR_RE.finditer(text):
+        mod, attr = m.group("mod"), m.group("attr")
+        add(f"{mod}.{attr}", f"`{mod}` 在本机版本里没有 `{attr}`(可能已改名/移除);"
+                             f"调用前先查该版本实际可用的 API,别照旧写")
+    return out
+
+
 def strip_save_blocks(reply: str) -> str:
     """去掉 save 块(含其嵌套围栏内容)——save 的内容是要写盘的文件,里面的
     read/命令/复选清单只是文件内容,绝不能被当成本轮要执行的请求。"""
@@ -419,6 +473,9 @@ class ReplSession:
             self.max_auto_depth = _MAX_AUTO_DEPTH
         self._followup_prev_sig = None   # 上一轮命令/读取请求签名(no-progress 判重)
         self._followup_repeat = 0        # 连续重复次数
+        # 错误学习:本会话从命令失败蒸馏的环境教训(每轮注入,当场止损);跨会话见 memory 待确认卡
+        self.session_lessons: list[dict] = []
+        self._session_lesson_keys: set = set()
         self.session_name: str | None = None   # /rename 后的会话名(提示符可见)
         self._auto_depth = 0        # 自动跟进(读取/选择回传)深度,防打转
         from datetime import datetime
@@ -505,6 +562,11 @@ class ReplSession:
         memo_part = render_memo(self.memo)
         if memo_part:
             system += "\n\n" + memo_part
+        # 错误学习:本会话已踩过的环境坑,每轮注入,防止再犯(python→python3、缺模块、API 改名…)
+        if self.session_lessons:
+            system += ("\n\n# 本会话已知环境限制(命令失败教训,务必遵守别重复踩)\n"
+                       + "\n".join(f"- [{le['trigger']}] {le['lesson']}"
+                                   for le in self.session_lessons[-12:]))
         knowledge = relevant_knowledge(text)
         if knowledge:
             system += "\n\n" + knowledge
@@ -613,6 +675,25 @@ class ReplSession:
         return self._side_effect_ok(cmd, dangerous=bool(_DANGEROUS_RE.search(cmd)),
                                     label="执行 shell 命令")
 
+    def _learn_from_output(self, output: str) -> None:
+        """错误学习:从命令输出蒸馏环境教训 → 本会话记忆(每轮注入)+ memory 待确认卡(跨会话)。
+
+        本会话记忆当场生效止损;跨会话的卡是 pending(经 /memory confirm 才转生效),
+        避免把「装了 mne 之后就过时」的环境事实自动固化——沿用既有教训卡的 HITL 纪律。
+        """
+        for les in distill_env_lessons(output):
+            key = (les["trigger"], les["lesson"])
+            if key in self._session_lesson_keys:
+                continue
+            self._session_lesson_keys.add(key)
+            self.session_lessons.append(les)
+            print(ui.accent(f"  📎 记下环境教训:{les['lesson'][:72]}"))
+            try:                                  # 落持久待确认卡(best-effort,失败不阻塞)
+                from psyclaw.memory import draft_lesson
+                draft_lesson(les["trigger"], les["lesson"], source="error")
+            except Exception:  # noqa: BLE001
+                pass
+
     def _noprogress_stop(self, runs: list[dict], reads: list[str]) -> bool:
         """no-progress 检测:命令/读取请求连续重复 ≥ 阈值 → 判原地打转,停自动跟进。
 
@@ -664,6 +745,7 @@ class ReplSession:
                 for n in notes:
                     print(ui.warn(n) if n.startswith("  ✗") else ui.dim(n))
                 if msg:
+                    self._learn_from_output(msg)   # 错误学习:命令失败 → 蒸馏环境教训
                     return msg
 
         if reads:
