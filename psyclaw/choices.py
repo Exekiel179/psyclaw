@@ -104,6 +104,12 @@ def format_selection_message(chosen: list[str], question: str = "") -> str:
     return f"我的选择{head}:" + "、".join(chosen)
 
 
+def format_free_answer(text: str, question: str = "") -> str:
+    """用户没选编号、而是直接打字作答 → 带上问题上下文回传给模型(别把输入吞掉)。"""
+    head = f"(针对「{question}」)" if question and question != "请选择" else ""
+    return f"{head}{text}".strip()
+
+
 # ---------------------------------------------------------------------------
 # 交互层(薄壳,三级降级)
 # ---------------------------------------------------------------------------
@@ -122,26 +128,39 @@ def _pick_ptk(choice: dict):
     return [res] if res else []
 
 
-def _pick_numbered(choice: dict) -> list[str]:
-    """编号输入兜底:打印编号清单,输入 1,3 / 全部 / 回车跳过。"""
+def _pick_numbered(choice: dict) -> tuple[list[str], str | None]:
+    """编号输入兜底。返回 (选中项, 自由文本)。
+
+    输入是有效编号/全部/原文 → (选中项, None);空(回车)→ ([], None);
+    **非空但不是有效编号 → ([], 原文)**:别把输入吞掉(用户实测:打 `y` 直接消失)——
+    当作对该问题的自由作答回传给模型继续,而不是「未选择」死胡同。
+    """
     from psyclaw import ui
     print(ui.accent(f"  {choice['question']}"))
     for i, o in enumerate(choice["options"], 1):
         print(f"    {ui.ok(str(i)):>4}. {o[:90]}")
     tip = "编号(可多选,如 1,3)或 全部" if choice["multi"] else "编号(单选)"
     try:
-        raw = input(f"  选择 [{tip};回车跳过]: ")
+        raw = input(f"  选择 [{tip};或直接打字作答;回车跳过]: ")
     except (EOFError, KeyboardInterrupt):
-        return []
-    return resolve_selection(raw, choice["options"], choice["multi"])
+        return [], None
+    chosen = resolve_selection(raw, choice["options"], choice["multi"])
+    if chosen:
+        return chosen, None
+    return [], (raw.strip() or None)
 
 
-def pick_interactive(choice: dict) -> list[str]:
-    """弹键盘选择器。prompt_toolkit 可用走对话框,否则编号输入。返回选中项([]=跳过)。"""
+def pick_interactive(choice: dict) -> tuple[list[str], str | None]:
+    """弹键盘选择器。返回 (选中项, 自由文本):
+
+    - (选中项, None):用户选了编号/选项;
+    - ([], 自由文本):用户没选编号、直接打字作答(转发给模型,不丢);
+    - ([], None):跳过(回车 / 非 TTY / 对话框取消)。
+    """
     import sys
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        return []          # 非 TTY(脚本/管道)不弹,不阻塞
+        return [], None          # 非 TTY(脚本/管道)不弹,不阻塞
     try:
-        return _pick_ptk(choice)
+        return _pick_ptk(choice), None    # 对话框只能选既有项(或取消),无自由文本
     except Exception:  # noqa: BLE001  # 未装 ptk / 对话框失败 → 编号兜底
         return _pick_numbered(choice)

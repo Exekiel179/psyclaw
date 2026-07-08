@@ -591,6 +591,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/memory.py(draft_lesson 加 kind、archive_lesson、list 展示 archived);psyclaw/repl.py(distill 打 kind、probe_env_card_stale、_reprobe_env_lessons、run 启动轻量再验证、/memory verify、import shutil);tests/test_lesson_invalidation.py +13 例(distill 带 kind、archive 移动/精确匹配不误伤/未命中、probe cmd 有无、module import 通/不通/无解释器/非法触发词、_reprobe 归档已恢复且清会话/保留仍缺失的卡/不碰慢类)+ test_error_learning 更新 draft stub 带 kind;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1362 passed;live 隔离记忆:ls 卡自动失效归档、no_such_cmd 卡保留"
+  },
+  {
+   "id": "feat-060",
+   "name": "选择器非编号输入不再吞掉(当自由作答转发)",
+   "description": "用户实测:单选选择器提示『编号(单选)』,用户按 y/n 确认的肌肉记忆打了 `y`,resolve_selection 认不出→返回 []→打印『未选择』把输入吞掉,变成死胡同要重打。修:pick_interactive/_pick_numbered 返回 (选中项, 自由文本) 二元组——非空但非有效编号的输入当作对该问题的自由作答,经 format_free_answer 带问题上下文回传给模型继续,而不是丢弃;空(回车/EOF/对话框取消)才算跳过。提示补『或直接打字作答』。",
+   "dependencies": [
+    "feat-057"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/choices.py(format_free_answer;_pick_numbered/pick_interactive 改返 (chosen, free) 二元组,非编号非空→自由文本;提示更新);psyclaw/repl.py(_auto_followup choices 分支处理 free→format_free_answer 转发,不再『未选择』吞输入);tests/test_choices_reads.py +5 例(format_free_answer 带/不带前缀、_pick_numbered 有效编号/自由文本 y 不丢/空跳过/EOF 跳过);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1367 passed"
   }
  ]
 }

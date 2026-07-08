@@ -825,19 +825,22 @@ class ReplSession:
                 if msg:
                     return msg
         try:
-            from psyclaw.choices import (format_selection_message, parse_choices,
-                                         pick_interactive)
+            from psyclaw.choices import (format_free_answer, format_selection_message,
+                                         parse_choices, pick_interactive)
             # 规划模式的 ## TASKS 就是 - [ ] 清单——那是任务看板,不是给用户选的选项;
             # 只认显式 choices 块,复选启发式关闭(评审修复:否则每条计划回复都弹选择器)。
             choice = parse_choices(body, heuristic=not self.plan_mode)
         except Exception:  # noqa: BLE001
             choice = None
         if choice and self._auto_depth < self.max_auto_depth:
-            chosen = pick_interactive(choice)
+            chosen, free = pick_interactive(choice)
             if chosen:
                 print(ui.ok("  → 已选:" + "、".join(c[:40] for c in chosen)))
                 return format_selection_message(chosen, choice["question"])
-            print(ui.dim("  (未选择;可直接输入你的回复)"))
+            if free:   # 用户没选编号、直接打字(如 y)→ 当自由作答转发给模型,别吞掉(用户实测)
+                print(ui.dim(f"  → 「{free[:40]}」不是编号,已作为你的回复发给模型继续"))
+                return format_free_answer(free, choice["question"])
+            print(ui.dim("  (跳过选择;可直接输入你的回复)"))
         return None
 
     def _run_agent(self, system: str) -> str | None:
