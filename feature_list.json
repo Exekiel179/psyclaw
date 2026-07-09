@@ -627,6 +627,16 @@
    ],
    "status": "done",
    "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.10.0→0.11.0;CHANGELOG.md v0.11.0 段(/dump//yolo/错误学习/自动失效/图片渲染 新增 + no-progress/确认框/选择器 修复);docs/COMMANDS.md 加 REPL 交互命令表;TODO §2 + progress 本轮(31) + session-handoff 快照;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;psyclaw version → 0.11.0"
+  },
+  {
+   "id": "feat-063",
+   "name": "no-progress 只管自主回合(修误判用户逐条确认)",
+   "description": "用户实测:非 YOLO 下逐条打 y 确认同一命令,被 no-progress 误判成『连续 3 轮重复、原地打转』而掐断。no-progress 本意是拦模型自主空转,用户在逐条确认本身就是在推进、且是自己的判断权,不该被 harness 掐。修:_round_is_autonomous 判定这一轮会不会不问人就执行(非 YOLO 的 shell/危险命令要人确认=非自主;YOLO 非危险自动跑、psyclaw 子命令、自动读=自主),no-progress 只在自主回合计数,非自主回合重置判重;高位安全兜底(100)始终生效。",
+   "dependencies": [
+    "feat-057"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(_round_is_autonomous;_auto_followup 改:深度兜底始终生效、no-progress 仅自主回合、非自主重置判重);tests/test_repl_approval.py +6 例(非YOLO shell 非自主/psyclaw 自主/YOLO shell 自主/YOLO 危险非自主/纯读自主/混合有 shell 非自主);CHANGELOG v0.11 feat-057 行补注;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1388 passed"
   }
  ]
 }
