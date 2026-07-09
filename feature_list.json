@@ -611,6 +611,22 @@
    ],
    "status": "done",
    "evidence": "psyclaw/imgview.py(is_image/find_image_paths/_proto_from_env/supports_inline/render_iterm2/render_kitty/render_escape);psyclaw/repl.py(/img 命令 _cmd_img + _render_images_in 自动渲染接 _auto_followup 命令后 + COMMANDS/HELP_TEXT + image_protocol config 覆盖);tests/test_imgview.py +15 例(is_image、路径提取去重、env 探测 kitty/iterm2 家族/tmux 不支持、force 覆盖、iterm2/kitty 转义形状、render_escape 端到端 iterm2/kitty-png、kitty 拒非 png、none 不渲染、拒非图/缺失/超限);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;live:Warp 环境探测为 iterm2、转义正确产出"
+  },
+  {
+   "id": "feat-062",
+   "name": "v0.11.0 发布收尾",
+   "description": "版本 0.10.0→0.11.0;CHANGELOG v0.11 段(REPL 交互体验大修 + 错误自学习闭环 + 图片内联,覆盖 feat-055~061);docs/COMMANDS 加 REPL 交互命令(/dump //yolo //img //memory verify)+ 错误自学习说明;progress/session-handoff 快照;全量回归绿。",
+   "dependencies": [
+    "feat-055",
+    "feat-056",
+    "feat-057",
+    "feat-058",
+    "feat-059",
+    "feat-060",
+    "feat-061"
+   ],
+   "status": "done",
+   "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.10.0→0.11.0;CHANGELOG.md v0.11.0 段(/dump//yolo/错误学习/自动失效/图片渲染 新增 + no-progress/确认框/选择器 修复);docs/COMMANDS.md 加 REPL 交互命令表;TODO §2 + progress 本轮(31) + session-handoff 快照;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;psyclaw version → 0.11.0"
   }
  ]
 }
