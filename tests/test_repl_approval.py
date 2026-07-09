@@ -20,6 +20,7 @@ def _sess(yolo=False):
     s = repl.ReplSession.__new__(repl.ReplSession)
     s.yolo = yolo
     s.max_auto_depth = repl._MAX_AUTO_DEPTH
+    s._auto_approve_labels = set()
     return s
 
 
@@ -40,9 +41,67 @@ def test_yolo_still_confirms_dangerous(monkeypatch):
 def test_default_mode_always_confirms(monkeypatch):
     s = _sess(yolo=False)
     calls = []
-    monkeypatch.setattr(repl, "_hitl_confirm", lambda p: calls.append(p) or True)
+    monkeypatch.setattr(repl, "_hitl_confirm_all", lambda p: calls.append(p) or "yes")
     assert s._side_effect_ok("ls -la", label="执行") is True
-    assert calls, "非 YOLO 必须逐条确认"
+    assert calls, "非 YOLO 非危险必须逐条确认(三态)"
+
+
+# -- 「全部同意(a)」:确认一次,同类本会话不再问(用户实测)---------------------
+def test_all_makes_label_sticky(monkeypatch):
+    s = _sess(yolo=False)
+    monkeypatch.setattr(repl, "_hitl_confirm_all", lambda p: "all")
+    assert s._side_effect_ok("cp a b", label="执行 shell 命令") is True
+    assert "执行 shell 命令" in s._auto_approve_labels
+    # 之后同类不再问:把确认换成会炸的,证明根本没被调用
+    def _boom(p):
+        raise AssertionError("同类不该再问")
+    monkeypatch.setattr(repl, "_hitl_confirm_all", _boom)
+    assert s._side_effect_ok("cp c d", label="执行 shell 命令") is True
+
+
+def test_all_is_per_label(monkeypatch):
+    s = _sess(yolo=False)
+    monkeypatch.setattr(repl, "_hitl_confirm_all", lambda p: "all")
+    s._side_effect_ok("cp a b", label="执行 shell 命令")
+    # 另一类(覆盖文件)仍要问
+    asked = []
+    monkeypatch.setattr(repl, "_hitl_confirm_all", lambda p: asked.append(p) or "yes")
+    s._side_effect_ok("/f.py", label="覆盖已存在文件")
+    assert asked, "『全部同意』只对说过的那一类生效,别的类仍问"
+
+
+def test_all_never_offered_for_dangerous(monkeypatch):
+    s = _sess(yolo=False)
+    # 危险走两态 _hitl_confirm,不进 _auto_approve_labels
+    monkeypatch.setattr(repl, "_hitl_confirm", lambda p: True)
+    assert s._side_effect_ok("rm -rf x", dangerous=True, label="执行 shell 命令") is True
+    assert "执行 shell 命令" not in s._auto_approve_labels
+    # 即便之前对该类说过 all,危险仍逐条问(红线不放松)
+    s._auto_approve_labels.add("执行 shell 命令")
+    calls = []
+    monkeypatch.setattr(repl, "_hitl_confirm", lambda p: calls.append(p) or False)
+    assert s._side_effect_ok("rm -rf y", dangerous=True, label="执行 shell 命令") is False
+    assert calls, "危险操作即使说过 all 也必须逐条问"
+
+
+def test_hitl_confirm_all_non_tty_fail_closed():
+    assert repl._hitl_confirm_all("go?") == "no"     # pytest 非 TTY → fail-closed
+
+
+def test_hitl_confirm_all_parsing(monkeypatch):
+    import builtins
+
+    class _TTY:
+        def isatty(self):
+            return True
+
+    monkeypatch.setattr("sys.stdin", _TTY())
+    monkeypatch.setattr("sys.stdout", _TTY())
+    for raw, exp in [("a", "all"), ("all", "all"), ("全部", "all"),
+                     ("", "yes"), ("y", "yes"), ("是", "yes"),
+                     ("n", "no"), ("nope", "no")]:
+        monkeypatch.setattr(builtins, "input", lambda *a, _v=raw, **k: _v)
+        assert repl._hitl_confirm_all("go?") == exp, raw
 
 
 def test_confirm_cmd_detects_danger(monkeypatch):
