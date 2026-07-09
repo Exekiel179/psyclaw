@@ -100,6 +100,16 @@
 | `figures` | 图表主题层 + FIG.honest 诚实性核查 + Okabe-Ito 调色板 |
 | `provenance <产物>` | 复现溯源:给生成脚本/图打包 代码+环境+说明+决策轨迹(`<产物>.provenance.json`);`--journal` 按数据可得性要求收紧 |
 
+### REPL 交互命令(v0.11 新增,仅 `psyclaw repl` 内)
+| 命令 | 作用 |
+|---|---|
+| `/dump [--full] [路径]` | 导出当前对话为 Markdown;`--full` 连同不展示的隐藏上下文(system/决策备忘/约定片段)一并导出;拒写 `data/raw` |
+| `/yolo [on\|off]` | 审批模式:开=命令/文件覆盖/工具副作用自动放行,仅红线危险命令仍问;`config approval=yolo` 设默认。停机靠 no-progress 检测,不再卡低深度上限 |
+| `/img <路径>`（`/show`） | 终端内联渲染图片(iTerm2/WezTerm/VSCode/Warp/kitty;命令出图会自动显示);`config image_protocol` 可强制 iterm2\|kitty\|none |
+| `/memory verify` | 再验证环境教训卡:环境已恢复(装上库/命令有了)的自动失效归档,别再用过时的坑误导模型 |
+
+> 错误自学习(v0.11):REPL 里命令失败会自动蒸馏「环境教训」(命令不存在/模块未装/API 改名),本会话每轮注入止损,并落 `/memory` 待确认卡跨会话复用。
+
 ---
 
 ## 统计去哪了?

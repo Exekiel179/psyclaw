@@ -2,7 +2,28 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-07(晚:v0.3→…→v0.9→**v0.10.0 发布**)
+**Last Updated:** 2026-07-09(v0.10→**v0.11.0 发布**:REPL 交互大修 + 错误自学习 + 图片渲染)
+
+## 本轮(31):v0.11.0 发布 ——feat-055~062 done(REPL 交互体验大修 + 错误自学习闭环 + 图片内联)
+
+起于用户一次真实 MNE/ERP 分析实测,把一连串卡点逐个治本:
+- feat-055 `/dump` 导出对话(当前 / `--full` 含隐藏上下文;纯渲染 `transcript.py`)。
+- feat-056 `/yolo` 审批模式(非危险副作用自动放行,危险仍问)+ 修确认框与命令回显串行
+  (`safe_prompt` 包裹 ANSI)+ 深度先 3→12/40。
+- feat-057 流式路径 **no-progress 检测**(连续重复相同请求即停),深度降为高位安全兜底(100)。
+- feat-058 **错误自学习**:命令失败蒸馏环境教训(命令不存在/模块未装/API 改名),
+  本会话每轮注入止损 + 落 memory 待确认卡跨会话。
+- feat-059 **环境教训卡自动失效**:环境恢复了就归档(`archive_lesson`),启动秒验证 cmd 类
+  + `/memory verify` 全量;只在确证已恢复时失效(防误删)。
+- feat-060 选择器非编号输入不吞掉(`y` 当自由作答转发,不再死胡同)。
+- feat-061 **终端内联渲染图片**(`imgview.py` 纯 stdlib iTerm2/kitty;`/img` + 命令出图自动显示)。
+- feat-062 版本 0.10.0→0.11.0 + CHANGELOG v0.11 + COMMANDS REPL 命令表。
+
+全量 **1382 passed**;`psyclaw version` → 0.11.0。62 个 feature 全 done。
+安装为 `uv tool` editable(指向本仓库),改动即时生效,无需重装。
+
+---
+
 
 ## 本轮(30):v0.10.0 发布 ——feat-053/054 done(数据→结果端到端闭环)
 
