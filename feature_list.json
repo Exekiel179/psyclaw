@@ -601,6 +601,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/choices.py(format_free_answer;_pick_numbered/pick_interactive 改返 (chosen, free) 二元组,非编号非空→自由文本;提示更新);psyclaw/repl.py(_auto_followup choices 分支处理 free→format_free_answer 转发,不再『未选择』吞输入);tests/test_choices_reads.py +5 例(format_free_answer 带/不带前缀、_pick_numbered 有效编号/自由文本 y 不丢/空跳过/EOF 跳过);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1367 passed"
+  },
+  {
+   "id": "feat-061",
+   "name": "终端内联渲染图片",
+   "description": "用户问能不能渲染图片。分析常出图(matplotlib savefig)但 REPL 只打印路径。新增 psyclaw/imgview.py 纯 stdlib 内联渲染(终端解码,只 base64 原始字节,不违反纯核):iTerm2 内联图片协议(OSC 1337,任意格式)+ kitty 图形协议(_G 分块,f=100 仅 PNG);按环境变量探测终端(iTerm2/WezTerm/VSCode/Warp/kitty;tmux/screen/非 TTY 不渲染),config image_protocol 可强制 iterm2|kitty|none|auto。REPL:/img(/show)手动渲染;命令执行后自动扫描输出里的图片路径(存在即渲染,最多 3 张)。8MB 上限。",
+   "dependencies": [
+    "feat-058"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/imgview.py(is_image/find_image_paths/_proto_from_env/supports_inline/render_iterm2/render_kitty/render_escape);psyclaw/repl.py(/img 命令 _cmd_img + _render_images_in 自动渲染接 _auto_followup 命令后 + COMMANDS/HELP_TEXT + image_protocol config 覆盖);tests/test_imgview.py +15 例(is_image、路径提取去重、env 探测 kitty/iterm2 家族/tmux 不支持、force 覆盖、iterm2/kitty 转义形状、render_escape 端到端 iterm2/kitty-png、kitty 拒非 png、none 不渲染、拒非图/缺失/超限);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;live:Warp 环境探测为 iterm2、转义正确产出"
   }
  ]
 }

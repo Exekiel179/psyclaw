@@ -67,6 +67,7 @@ COMMANDS = {
     "/rename": "给当前会话改名(/rename <新名>)",
     "/search": "全文检索历史对话(/search <词>)",
     "/dump": "导出当前对话为 Markdown(--full 连同不展示的隐藏上下文一并导出)",
+    "/img": "在终端内联渲染图片(/img <路径>;iTerm2/WezTerm/VSCode/Warp/kitty;命令出图会自动显示)",
     "/exit": "退出",
 }
 
@@ -734,6 +735,55 @@ class ReplSession:
             except Exception:  # noqa: BLE001
                 pass
 
+    # -- 图片内联渲染(终端支持时把分析出的图显示在对话里)---------------------
+    def _cmd_img(self, arg: str) -> None:
+        """/img <路径>:在终端内联渲染一张图片(不支持则打印路径)。"""
+        from psyclaw import imgview
+        if not arg.strip():
+            print("  用法:/img <图片路径>(png/jpg/gif/webp/bmp;支持的终端内联显示)")
+            return
+        p = Path(arg.strip().strip("\"'")).expanduser()
+        if not p.is_file():
+            print(ui.warn(f"  未找到:{p}"))
+            return
+        if not imgview.is_image(p):
+            print(ui.warn(f"  不是可渲染的图片类型:{p.suffix}"))
+            return
+        force = self.conf.get("image_protocol")
+        esc = imgview.render_escape(p, force=force)
+        if esc:
+            print(ui.dim(f"  🖼 {p.name}({p.stat().st_size // 1024} KB)"))
+            sys.stdout.write(esc)
+            sys.stdout.flush()
+        else:
+            proto = imgview.supports_inline(force)
+            if not proto:
+                print(ui.dim("  当前终端不支持内联图片(iTerm2/WezTerm/VSCode/Warp/kitty 可;"
+                             "config image_protocol 可强制)。文件在:" + str(p)))
+            else:
+                print(ui.warn(f"  渲染失败(可能超过 {imgview.MAX_IMG_BYTES // 1024 // 1024}MB"
+                              f" 上限或格式受限)。文件在:{p}"))
+
+    def _render_images_in(self, text: str) -> None:
+        """命令输出里提到的图片文件,若存在且终端支持,自动内联渲染(最多 3 张)。"""
+        from psyclaw import imgview
+        force = self.conf.get("image_protocol")
+        if not imgview.supports_inline(force):
+            return
+        shown = 0
+        for raw in imgview.find_image_paths(text):
+            if shown >= 3:
+                break
+            p = Path(raw).expanduser()
+            if not p.is_file():
+                continue
+            esc = imgview.render_escape(p, force=force)
+            if esc:
+                print(ui.dim(f"  🖼 {p.name}"))
+                sys.stdout.write(esc)
+                sys.stdout.flush()
+                shown += 1
+
     def _reprobe_env_lessons(self, include_slow: bool = False) -> int:
         """自动失效:再验证已生效的环境教训卡,现在能用了的自动归档(active→archived)。
 
@@ -812,6 +862,7 @@ class ReplSession:
                     print(ui.warn(n) if n.startswith("  ✗") else ui.dim(n))
                 if msg:
                     self._learn_from_output(msg)   # 错误学习:命令失败 → 蒸馏环境教训
+                    self._render_images_in(msg)    # 命令出图 → 终端内联渲染(支持时)
                     return msg
 
         if reads:
@@ -1109,6 +1160,8 @@ class ReplSession:
             self._cmd_search(arg)
         elif cmd == "/dump":
             self._cmd_dump(arg)
+        elif cmd in ("/img", "/show"):
+            self._cmd_img(arg)
         elif cmd == "/plugins":
             self._cmd_plugins()
         elif self.plugins and cmd in self.plugins.commands:
@@ -1330,6 +1383,7 @@ HELP_TEXT = """\
   /sessions   历史会话列表       /resume <id>   续接历史会话
   /rename <名> 命名当前会话       /search <词>   跨会话全文检索
   /dump [--full] [路径]  导出当前对话为 Markdown(--full 含 system/备忘等隐藏上下文)
+  /img <路径>  终端内联渲染图片(iTerm2/WezTerm/VSCode/Warp/kitty;命令出图会自动显示)
   /clear      清空上下文         /compact       压缩上下文
   /config     配置向导           /exit          退出
   /research [t]    一句话研究编排:文献→设计→写作→评审→总验收(--revise 闭环)
