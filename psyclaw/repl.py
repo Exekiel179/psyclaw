@@ -810,6 +810,21 @@ class ReplSession:
                 print(ui.ok(f"  ♻ 环境教训自动失效:[{c['trigger']}] 现在可用了,已归档"))
         return archived
 
+    def _round_is_autonomous(self, runs: list[dict], reads: list[str]) -> bool:
+        """这一轮跟进会不会**不问人**就执行?
+
+        会逐条问人(用户打 y 确认)= 用户在亲手推进,不是模型自主空转——no-progress 不该管。
+        - shell / 危险命令:非 YOLO 要人确认 → 非自主;YOLO 且非危险自动跑 → 自主。
+        - psyclaw 子命令、开放模式自动读文件:不问人 → 自主。
+        no-progress 只在自主回合计数,免得用户逐条确认被误判成「原地打转」而掐断(用户实测)。
+        """
+        for r in runs:
+            danger = bool(_DANGEROUS_RE.search(r.get("cmd", "")))
+            if r.get("kind") != "psyclaw" or danger:      # 需要确认的命令
+                if not (self.yolo and not danger):        # 非 YOLO、或危险 → 会问人
+                    return False
+        return True
+
     def _noprogress_stop(self, runs: list[dict], reads: list[str]) -> bool:
         """no-progress 检测:命令/读取请求连续重复 ≥ 阈值 → 判原地打转,停自动跟进。
 
@@ -843,13 +858,18 @@ class ReplSession:
         runs = parse_run_requests(body)
         reads = parse_read_requests(body)
 
-        # 命令/读取是模型**自动生成**的跟进(无需用户输入),可能空转——两道闸拦:
+        # 自动跟进可能空转,两道闸拦——但 no-progress 只针对**自主**回合(YOLO 自动跑 / 自动读):
+        # 用户在逐条确认(打 y)本身就是在推进,不该被判「原地打转」而掐断(用户实测)。
         if (runs or reads) and self.file_access != "safe":
-            if self._noprogress_stop(runs, reads):     # ① 主闸:原地打转即停
-                return None
-            if self._auto_depth >= self.max_auto_depth:  # ② 高位安全兜底(几乎碰不到)
+            if self._auto_depth >= self.max_auto_depth:   # ① 高位安全兜底,始终生效
                 print(ui.dim(f"  (自动跟进已达安全上限 {self.max_auto_depth},请说「继续」再续)"))
                 return None
+            if self._round_is_autonomous(runs, reads):
+                if self._noprogress_stop(runs, reads):    # ② no-progress 只管自主空转
+                    return None
+            else:                                          # 人在逐条确认 → 不算空转,重置判重
+                self._followup_prev_sig = None
+                self._followup_repeat = 0
 
         # ① 命令块(psyclaw/shell):执行并回传输出——命令块吐了没人跑=死胡同(用户实测)
         if runs:

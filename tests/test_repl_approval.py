@@ -137,6 +137,38 @@ def test_noprogress_ignores_empty_rounds():
     assert s._followup_repeat == 0                   # 空轮不累加计数
 
 
+# -- no-progress 只管自主回合:用户逐条确认(打 y)不该被误判掐断(用户实测) ----------
+def test_round_autonomous_nonyolo_shell_needs_human():
+    s = _sess(yolo=False)
+    assert s._round_is_autonomous([{"kind": "shell", "cmd": "python x.py"}], []) is False
+
+
+def test_round_autonomous_nonyolo_psyclaw_is_auto():
+    s = _sess(yolo=False)
+    assert s._round_is_autonomous([{"kind": "psyclaw", "cmd": "version"}], []) is True
+
+
+def test_round_autonomous_yolo_shell_is_auto():
+    s = _sess(yolo=True)
+    assert s._round_is_autonomous([{"kind": "shell", "cmd": "python x.py"}], []) is True
+
+
+def test_round_autonomous_yolo_dangerous_needs_human():
+    s = _sess(yolo=True)
+    assert s._round_is_autonomous([{"kind": "shell", "cmd": "rm -rf /tmp/x"}], []) is False
+
+
+def test_round_autonomous_reads_only_is_auto():
+    s = _sess(yolo=False)
+    assert s._round_is_autonomous([], ["a.csv"]) is True
+
+
+def test_round_autonomous_mixed_shell_needs_human():
+    s = _sess(yolo=False)
+    runs = [{"kind": "psyclaw", "cmd": "version"}, {"kind": "shell", "cmd": "ls"}]
+    assert s._round_is_autonomous(runs, []) is False   # 有一条要确认就算非自主
+
+
 # -- readline 安全提示(修确认框与回显串行)---------------------------------
 def test_safe_prompt_wraps_ansi_when_readline_loaded(monkeypatch):
     monkeypatch.setitem(sys.modules, "readline", object())
