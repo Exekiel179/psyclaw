@@ -637,6 +637,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/repl.py(_round_is_autonomous;_auto_followup 改:深度兜底始终生效、no-progress 仅自主回合、非自主重置判重);tests/test_repl_approval.py +6 例(非YOLO shell 非自主/psyclaw 自主/YOLO shell 自主/YOLO 危险非自主/纯读自主/混合有 shell 非自主);CHANGELOG v0.11 feat-057 行补注;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1388 passed"
+  },
+  {
+   "id": "feat-064",
+   "name": "确认支持「全部同意」(Y/n/a 会话级黏性)",
+   "description": "用户实测:逐条确认同类副作用(尤其覆盖代码文件)太烦,『确认一次同类就该统一、本对话内一致』。非危险副作用的确认改三态 [Y/n/a]:a=本会话该类(执行 shell/覆盖已存在文件/工具副作用,按 label 分类)不再逐条问,记入 self._auto_approve_labels;YOLO 仍全放行。危险操作(命中红线)永远逐条问、不给『全部』(红线不放松),data/raw 与密钥硬拒不变。比 /yolo 更细粒度的中间档。",
+   "dependencies": [
+    "feat-056"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(_hitl_confirm_all 三态 yes/no/all fail-closed;_side_effect_ok 重构:危险两态、非危险 YOLO 或已同意此类自动放行、否则三态 a→加 label 到 _auto_approve_labels;__init__ 加 _auto_approve_labels);tests/test_repl_approval.py +5 例(默认三态确认、a 使同类黏性、per-label 隔离、危险不给 all 且说过 all 仍问、_hitl_confirm_all 非 TTY fail-closed + 解析 a/all/全部/空/y/是/n/nope);CHANGELOG v0.11 补;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1393 passed"
   }
  ]
 }

@@ -362,6 +362,27 @@ def _hitl_confirm(prompt: str) -> bool:
         return False
 
 
+def _hitl_confirm_all(prompt: str) -> str:
+    """三态人工确认:返回 "yes" / "no" / "all"。
+
+    all = 本会话此类不再逐条问(用户实测:「确认一次,同类就统一,别一直问」)。
+    fail-closed:非 TTY / EOF / Ctrl+C 一律 "no"。空(回车)沿用原默认=yes。
+    """
+    import sys as _sys
+    if not (_sys.stdin.isatty() and _sys.stdout.isatty()):
+        return "no"
+    from psyclaw.ui_input import safe_prompt
+    try:
+        v = input(safe_prompt(ui.warn(f"{prompt} [Y/n/a=全部本会话不再问]: "))).strip().lower()
+    except BaseException:  # noqa: BLE001
+        return "no"
+    if v in ("a", "all", "全部", "都", "always"):
+        return "all"
+    if not v or v.startswith("y") or v in ("是", "好", "ok"):
+        return "yes"
+    return "no"
+
+
 # 敏感文件denylist:自动读取(read 块/agent read_file)绝不碰密钥类文件(铁律「不碰密钥」)。
 _SECRET_NAMES = {".env", ".netrc", "credentials", "credentials.json", "id_rsa",
                  "id_ed25519", "id_ecdsa", "id_dsa"}
@@ -516,6 +537,8 @@ class ReplSession:
         # 错误学习:本会话从命令失败蒸馏的环境教训(每轮注入,当场止损);跨会话见 memory 待确认卡
         self.session_lessons: list[dict] = []
         self._session_lesson_keys: set = set()
+        # 「全部同意」:用户对某类副作用(执行 shell/覆盖文件/工具)说过 a 后,本会话该类不再逐条问
+        self._auto_approve_labels: set = set()
         self.session_name: str | None = None   # /rename 后的会话名(提示符可见)
         self._auto_depth = 0        # 自动跟进(读取/选择回传)深度,防打转
         from datetime import datetime
@@ -690,25 +713,32 @@ class ReplSession:
             finally:
                 self._auto_depth -= 1
 
-    # -- 副作用审批(YOLO / 默认逐条确认)----------------------------------
+    # -- 副作用审批(YOLO / 「全部同意」/ 默认逐条确认)----------------------
     def _side_effect_ok(self, detail: str, *, dangerous: bool = False,
                         label: str = "副作用") -> bool:
         """统一的副作用确认门。
 
-        - YOLO 模式:非危险副作用**自动放行**(不打断、不请求 y);
-        - 命中红线的**危险**操作(rm -rf / push --force / DROP TABLE…)即使 YOLO 也仍问人;
-        - 非 YOLO:一律人工确认。
+        - 命中红线的**危险**操作(rm -rf / push --force / DROP TABLE…):永远逐条问,
+          **不给「全部同意」**,即使 YOLO / 之前说过 a 也照问(红线不放松)。
+        - 非危险:① YOLO 全放行 ② 本会话已对该类说过「全部同意(a)」→ 自动放行
+          ③ 否则三态确认 Y/n/a——选 a 则**本会话该类不再逐条问**(用户实测:确认一次同类就统一)。
 
-        确认提示只放一句短话,**待确认的内容单独打在上一行**——避免把超长命令塞进
-        input() 提示、被 readline 的彩色宽度算错而与回显的 y 串行(用户实测的「框和输出混在一起」)。
-        受保护的 data/raw 与密钥文件是更上层的**硬拒**,不走这里,YOLO 也绕不过。
+        待确认内容单独打在上一行(短提示,免与回显 y 串行);data/raw 与密钥是更上层硬拒。
         """
-        if self.yolo and not dangerous:
-            print(ui.dim(f"  ⚡ YOLO 自动放行({label}):{detail[:70]}"))
+        if dangerous:
+            print(ui.dim(f"  ┆ 待确认{label}:{detail[:200]}"))
+            return _hitl_confirm("  确认⚠ 危险操作?")
+        if self.yolo or label in self._auto_approve_labels:
+            why = "YOLO" if self.yolo else "本会话已同意此类"
+            print(ui.dim(f"  ⚡ 自动放行({why}·{label}):{detail[:60]}"))
             return True
         print(ui.dim(f"  ┆ 待确认{label}:{detail[:200]}"))
-        tag = "⚠ 危险操作" if dangerous else label
-        return _hitl_confirm(f"  确认{tag}?")
+        ans = _hitl_confirm_all(f"  确认{label}?")
+        if ans == "all":
+            self._auto_approve_labels.add(label)
+            print(ui.ok(f"    ✓ 本会话起「{label}」不再逐条确认(/yolo 一次全放行;重开会话复位)"))
+            return True
+        return ans == "yes"
 
     def _confirm_cmd(self, cmd: str) -> bool:
         """命令执行确认:危险命令自动识别(YOLO 也问),其余按模式放行/确认。"""
