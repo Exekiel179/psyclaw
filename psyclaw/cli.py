@@ -106,6 +106,22 @@ def cmd_agent(args: argparse.Namespace) -> int:
                         approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
     print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
     print(res["final"])
+    # feat-065:循环内蒸馏的环境教训落跨会话待确认卡(HITL:psyclaw memory confirm 才生效)
+    if res.get("lessons"):
+        from psyclaw.memory import draft_lesson
+        for le in res["lessons"]:
+            try:
+                draft_lesson(le["trigger"], le["lesson"], source="error",
+                             kind=le.get("kind"))
+            except Exception:  # noqa: BLE001  # 落卡失败不影响任务结果
+                break
+        print(ui.dim(f"  📎 蒸馏环境教训 {len(res['lessons'])} 条"
+                     "(psyclaw memory 查看,confirm 后跨会话生效)"))
+    # feat-065:结果里提到的图片,终端支持时内联渲染
+    from psyclaw.repl import render_images_in_text
+    render_images_in_text("\n".join(
+        [res["final"]] + [str(t.get("output", "")) for t in res["trace"]]),
+        force=conf.get("image_protocol"))
     log_agent_run(".", task, res)   # feat-037:落运行痕迹(失败静默)
     return 0
 

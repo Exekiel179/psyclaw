@@ -287,6 +287,31 @@ def probe_env_card_stale(card: dict) -> bool | None:
     return None
 
 
+def render_images_in_text(text: str, force: str | None = None, limit: int = 3) -> int:
+    """文本里提到的图片文件,若存在且终端支持,内联渲染;返回渲染张数。
+
+    REPL(命令输出/agent 结果)与 `psyclaw agent` CLI 共用(feat-065);
+    终端不支持 / 文件不存在 / 超限一律静默跳过,由调用方回退打印路径。
+    """
+    from psyclaw import imgview
+    if not imgview.supports_inline(force):
+        return 0
+    shown = 0
+    for raw in imgview.find_image_paths(text):
+        if shown >= limit:
+            break
+        p = Path(raw).expanduser()
+        if not p.is_file():
+            continue
+        esc = imgview.render_escape(p, force=force)
+        if esc:
+            print(ui.dim(f"  🖼 {p.name}"))
+            sys.stdout.write(esc)
+            sys.stdout.flush()
+            shown += 1
+    return shown
+
+
 def strip_save_blocks(reply: str) -> str:
     """去掉 save 块(含其嵌套围栏内容)——save 的内容是要写盘的文件,里面的
     read/命令/复选清单只是文件内容,绝不能被当成本轮要执行的请求。"""
@@ -751,7 +776,11 @@ class ReplSession:
         本会话记忆当场生效止损;跨会话的卡是 pending(经 /memory confirm 才转生效),
         避免把「装了 mne 之后就过时」的环境事实自动固化——沿用既有教训卡的 HITL 纪律。
         """
-        for les in distill_env_lessons(output):
+        self._ingest_lessons(distill_env_lessons(output))
+
+    def _ingest_lessons(self, lessons: list[dict]) -> None:
+        """把已蒸馏的教训并入会话记忆 + 落待确认卡(agent 循环产出的 lessons 也走这里,feat-065)。"""
+        for les in lessons:
             key = (les["trigger"], les["lesson"])
             if key in self._session_lesson_keys:
                 continue
@@ -796,23 +825,7 @@ class ReplSession:
 
     def _render_images_in(self, text: str) -> None:
         """命令输出里提到的图片文件,若存在且终端支持,自动内联渲染(最多 3 张)。"""
-        from psyclaw import imgview
-        force = self.conf.get("image_protocol")
-        if not imgview.supports_inline(force):
-            return
-        shown = 0
-        for raw in imgview.find_image_paths(text):
-            if shown >= 3:
-                break
-            p = Path(raw).expanduser()
-            if not p.is_file():
-                continue
-            esc = imgview.render_escape(p, force=force)
-            if esc:
-                print(ui.dim(f"  🖼 {p.name}"))
-                sys.stdout.write(esc)
-                sys.stdout.flush()
-                shown += 1
+        render_images_in_text(text, force=self.conf.get("image_protocol"))
 
     def _reprobe_env_lessons(self, include_slow: bool = False) -> int:
         """自动失效:再验证已生效的环境教训卡,现在能用了的自动归档(active→archived)。
@@ -964,6 +977,8 @@ class ReplSession:
         if res["trace"]:
             print(ui.dim(f"  [agent:{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · "
                          f"{res['stopped']}]"))
+        # feat-065:循环内蒸馏的环境教训并入会话记忆(每轮注入)+ 落跨会话待确认卡
+        self._ingest_lessons(res.get("lessons") or [])
         from psyclaw.toolloop import log_agent_run
         task_head = next((m["content"] for m in reversed(self.messages)
                           if m.get("role") == "user"), "")
@@ -972,6 +987,9 @@ class ReplSession:
         blk.write(res["final"])
         blk.close()
         print()
+        # feat-065:最终答案与工具输出里提到的图,终端支持时内联渲染(分析出图即见)
+        self._render_images_in("\n".join(
+            [res["final"]] + [str(t.get("output", "")) for t in res["trace"]]))
         return res["final"]
 
     def _capture_saves(self, reply: str) -> None:
