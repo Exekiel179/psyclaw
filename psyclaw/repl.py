@@ -392,16 +392,18 @@ def _hitl_confirm_all(prompt: str) -> str:
 
     all = 本会话此类不再逐条问(用户实测:「确认一次,同类就统一,别一直问」)。
     fail-closed:非 TTY / EOF / Ctrl+C 一律 "no"。空(回车)沿用原默认=yes。
+    提示逐项写明含义(feat-067,用户实测:`[Y/n/a=…]` 缩写看不懂 a 是什么)。
     """
     import sys as _sys
     if not (_sys.stdin.isatty() and _sys.stdout.isatty()):
         return "no"
     from psyclaw.ui_input import safe_prompt
     try:
-        v = input(safe_prompt(ui.warn(f"{prompt} [Y/n/a=全部本会话不再问]: "))).strip().lower()
+        v = input(safe_prompt(ui.warn(
+            f"{prompt} [回车=同意 / n=拒绝 / a=同意且本会话此类不再问]: "))).strip().lower()
     except BaseException:  # noqa: BLE001
         return "no"
-    if v in ("a", "all", "全部", "都", "always"):
+    if v in ("a", "all", "全部", "都", "always", "都同意"):
         return "all"
     if not v or v.startswith("y") or v in ("是", "好", "ok"):
         return "yes"
