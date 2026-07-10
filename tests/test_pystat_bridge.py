@@ -135,3 +135,106 @@ def test_step_analysis_survives_pystat_unavailable(tmp_path, monkeypatch):
     assert out["ran_via_pystat"] is False
     assert (tmp_path / "outputs" / "analysis.py").exists()
     assert not (tmp_path / "outputs" / "analysis_result.txt").exists()
+def test_real_result_guard():
+    assert PB._real_result(None) is None
+    assert PB._real_result("") is None
+    assert PB._real_result("统计库未安装(pip install …)。脚本骨架:\n```python\n…") is None
+    assert PB._real_result('{"pooled_effect": 0.38}') == '{"pooled_effect": 0.38}'
+def test_run_via_pystat_script_skeleton_not_treated_as_result():
+    out = PB.run_via_pystat(
+        {"analysis": "descriptives"}, "d.csv",
+        client_factory=lambda: _FakeClient(result="统计库未安装(...)。脚本骨架:..."))
+    assert out is None
+def test_run_meta_via_pystat_calls_tool():
+    fc = _FakeClient(result='{"pooled_effect": 0.38, "ci95": [0.24, 0.52]}')
+    out = PB.run_meta_via_pystat("effects.csv", client_factory=lambda: fc)
+    assert out and "pooled_effect" in out
+    assert fc.calls == [("pystat_meta", {"csv_path": "effects.csv"})]
+def test_run_meta_via_pystat_failsafe():
+    assert PB.run_meta_via_pystat("e.csv", client_factory=lambda: None) is None
+    assert PB.run_meta_via_pystat(
+        "e.csv", client_factory=lambda: _FakeClient(boom=True)) is None
+_EFFECTS = "study,d,se\nA,0.4,0.15\nB,0.3,0.12\nC,0.5,0.2\n"
+def _meta_ctx(tmp_path):
+    import types
+    from psyclaw.workflows import steps_meta as SM
+    csv = tmp_path / "effects.csv"
+    csv.write_text(_EFFECTS, encoding="utf-8")
+    ctx = types.SimpleNamespace(data={"effects_csv": str(csv)}, artifacts={},
+                                project=tmp_path, clar="(无)", topic="正念元分析",
+                                provider=None)
+    ctx.data["effects_info"] = SM.validate_effects(str(csv))
+    return ctx
+def test_step_meta_script_writes_result_when_pystat_runs(tmp_path, monkeypatch):
+    from psyclaw.workflows import steps_meta as SM
+    ctx = _meta_ctx(tmp_path)
+    monkeypatch.setattr("psyclaw.workflows.pystat_bridge.run_meta_via_pystat",
+                        lambda path: '{"pooled_effect": 0.38, "i2_percent": 12.0}')
+    out = SM.step_meta_script(ctx)
+    assert out["ran_via_pystat"] is True
+    res = tmp_path / "outputs" / "meta_result.txt"
+    assert res.exists() and "pooled_effect" in res.read_text(encoding="utf-8")
+    assert (tmp_path / "outputs" / "meta_analysis.py").exists()   # 脚本仍照写
+def test_step_meta_script_survives_pystat_unavailable(tmp_path, monkeypatch):
+    from psyclaw.workflows import steps_meta as SM
+    ctx = _meta_ctx(tmp_path)
+    monkeypatch.setattr("psyclaw.workflows.pystat_bridge.run_meta_via_pystat",
+                        lambda path: None)
+    out = SM.step_meta_script(ctx)
+    assert out["ran_via_pystat"] is False
+    assert not (tmp_path / "outputs" / "meta_result.txt").exists()
+def test_step_write_meta_injects_real_result(tmp_path, monkeypatch):
+    from psyclaw.output import writing_backend
+    from psyclaw.workflows import steps_meta as SM
+    ctx = _meta_ctx(tmp_path)
+    ctx.data["meta_result"] = '{"pooled_effect": 0.38, "ci95": [0.24, 0.52]}'
+    seen = {}
+    def _fake_write(topic, context, provider, project):
+        seen["context"] = context
+        return "稿件正文", {}
+    monkeypatch.setattr(writing_backend, "write_paper", _fake_write)
+    SM.step_write_meta(ctx)
+    assert "实际元分析结果" in seen["context"]
+    assert "0.38" in seen["context"]              # 真实数值确实进了写作上下文
+def test_step_write_meta_without_result_keeps_old_context(tmp_path, monkeypatch):
+    from psyclaw.output import writing_backend
+    from psyclaw.workflows import steps_meta as SM
+    ctx = _meta_ctx(tmp_path)
+    seen = {}
+    monkeypatch.setattr(writing_backend, "write_paper",
+                        lambda t, c, p, pr: (seen.update(context=c) or "稿件", {}))
+    SM.step_write_meta(ctx)
+    assert "实际元分析结果" not in seen["context"]   # 没跑出结果就不假装有
+def test_step_write_analysis_injects_real_result(tmp_path, monkeypatch):
+    import types
+    from psyclaw.output import writing_backend
+    from psyclaw.workflows import steps_analysis as SA
+    ctx = types.SimpleNamespace(
+        data={"analysis_rec": {"analysis": "ttest", "rationale": "二分类+连续"},
+              "analysis_result": "T=3.2, p=.004, d=0.81, CI95=[0.3, 1.3]"},
+        artifacts={}, project=tmp_path, clar="(无)", topic="RT 组间差异",
+        provider=None)
+    seen = {}
+    monkeypatch.setattr(writing_backend, "write_paper",
+                        lambda t, c, p, pr: (seen.update(context=c) or "稿件", {}))
+    SA.step_write_analysis(ctx)
+    assert "实际分析结果" in seen["context"] and "d=0.81" in seen["context"]
+def test_pystat_meta_offline_returns_script_not_fake_numbers(tmp_path):
+    """本测试环境未装 statsmodels → 必须返回脚本骨架,绝不假装算出结果。"""
+    import pytest
+    try:
+        import statsmodels  # noqa: F401
+        pytest.skip("本环境装了 statsmodels,离线路径不适用")
+    except ImportError:
+        pass
+    from psyclaw.mcp.servers.pystat_server import pystat_meta
+    csv = tmp_path / "effects.csv"
+    csv.write_text(_EFFECTS, encoding="utf-8")
+    out = pystat_meta({"csv_path": str(csv)})
+    assert "统计库未安装" in out and "combine_effects" in out
+def test_pystat_meta_invalid_csv_fails_closed(tmp_path):
+    from psyclaw.mcp.servers.pystat_server import pystat_meta
+    csv = tmp_path / "bad.csv"
+    csv.write_text("a,b\n1,2\n", encoding="utf-8")
+    out = pystat_meta({"csv_path": str(csv)})
+    assert "校验失败" in out

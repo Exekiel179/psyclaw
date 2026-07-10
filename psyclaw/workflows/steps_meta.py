@@ -193,7 +193,21 @@ def step_meta_script(ctx) -> dict:
         pass
     print(ui.dim("  可复现元分析脚本 → outputs/meta_analysis.py"
                  "(在装了 [stats] 的环境跑:python outputs/meta_analysis.py)"))
-    return {"script": "outputs/meta_analysis.py"}
+    # v0.12 feat-072:best-effort 经 pystat MCP 直接出结果(对齐 analysis 流程);失败有脚本兜底
+    ran = False
+    try:
+        from psyclaw.workflows.pystat_bridge import run_meta_via_pystat
+        result = run_meta_via_pystat(ctx.data["effects_csv"])
+        if result:
+            res_path = ctx.project / "outputs" / "meta_result.txt"
+            res_path.write_text(result, encoding="utf-8")
+            ctx.artifacts["meta_result"] = "outputs/meta_result.txt"
+            ctx.data["meta_result"] = result
+            ran = True
+            print(ui.ok("  ✓ 已经 pystat MCP 运行 → outputs/meta_result.txt"))
+    except Exception:  # noqa: BLE001 — 直跑是增强,失败不阻断
+        pass
+    return {"script": "outputs/meta_analysis.py", "ran_via_pystat": ran}
 
 
 def step_write_meta(ctx) -> dict:
@@ -209,6 +223,11 @@ def step_write_meta(ctx) -> dict:
         "I²/τ²/Q 异质性、Egger 发表偏倚检验。统计由 outputs/meta_analysis.py "
         "在外部 statsmodels 环境运行,结果回填本稿(只引用脚本实际产出,不杜撰数值)。\n"
         f"\n# 澄清卡\n{ctx.clar}")
+    # v0.12 feat-072:pystat 真跑出的结果注入写作上下文——结果节引用真实数值,不再是空骨架
+    result = ctx.data.get("meta_result")
+    if result:
+        context += ("\n\n# 实际元分析结果(pystat MCP 已运行;结果节**只引用以下真实数值**,"
+                    "合并效应+95% CI 必报,不杜撰、不外推)\n" + str(result)[:4000])
     draft, _meta = write_paper(ctx.topic, context, ctx.provider, ctx.project)
     if not draft.strip():
         raise ValueError("写作阶段未产出稿(provider 返回空)")

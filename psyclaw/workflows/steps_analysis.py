@@ -221,6 +221,11 @@ def step_write_analysis(ctx) -> dict:
         "统计由 outputs/analysis.py 在外部 pingouin/scipy 环境运行,"
         "结果回填本稿(只引用脚本实际产出,不杜撰数值;效应量+CI 必报)。\n\n"
         f"# 澄清卡\n{ctx.clar}")
+    # v0.12 feat-072:pystat 真跑出的结果注入写作上下文——结果节引用真实数值,不再是空骨架
+    result = ctx.data.get("analysis_result")
+    if result:
+        context += ("\n\n# 实际分析结果(pystat MCP 已运行;结果节**只引用以下真实数值**,"
+                    "效应量+95% CI 必报,不杜撰、不外推)\n" + str(result)[:4000])
     draft, _meta = write_paper(ctx.topic, context, ctx.provider, ctx.project)
     if not draft.strip():
         raise ValueError("写作阶段未产出稿(provider 返回空)")
