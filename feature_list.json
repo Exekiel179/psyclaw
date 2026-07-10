@@ -741,6 +741,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/evalharness.py(CASES/run_evals/format_report);psyclaw/cli.py(cmd_eval+eval 子命令+COMMAND_CATEGORIES);tests/test_evalharness.py +10 例(全绿契约/子集/未知用例 fail-closed/用例崩溃记失败/CLI 落盘与退出码)。实测:`uv run --python 3.12 python -m psyclaw eval` → 6 用例 28/28 通过 exit=0,报告落 .psyclaw/eval_report.json;`--case nope` → 未知评测用例 exit=1。全量 `uv run --python 3.12 --with pytest python -m pytest -q` → 1452 passed"
+    },
+    {
+      "id": "feat-074",
+      "name": "provenance 深化:期刊 data_availability=required 驱动强制 replication-package 声明",
+      "description": "① provenance.build_replication_declaration:清点复现材料(分析脚本 sha256+数据指纹+环境清单)生成可直接放进稿件数据可得性节的确定性声明文本;缺项时 statement 置空并列 missing。② build_provenance 恒附 replication_package + replication_package_declared(非强制期刊也可自愿附,但只有 required 才被门禁强制);provenance_complete 判据不变(不破坏既有契约)。③ 新门禁 REPRO.replication_package(trigger provenance_check,block):required 且未声明 → 拦;非强制/旧 sidecar 放行(条件式判据,同 axis_from_zero_or_flagged 模式;门禁只增不删)。④ .provenance.md 渲染声明节(完整给全文,缺项列清单);CLI psyclaw provenance 打印声明状态与缺项修复提示。",
+      "dependencies": [
+        "feat-016"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/provenance.py(build_replication_declaration+build_provenance 附声明+_render_md 声明节);psyclaw/gates/rules.yaml(REPRO.replication_package);psyclaw/gates/checker.py(replication_package_declared 条件判据);psyclaw/cli.py(cmd_provenance 展示)。tests/test_provenance.py +8 例(完整声明含真指纹/required 缺数据不声明/encouraged 可选不拦/md 两态/门禁拦-放-旧契约/端到端 required 期刊真 sidecar 过门禁)。实测:psyclaw provenance <脚本> --journal psych-science --data data.csv → 声明生成 ✓溯源完整 exit=0;不带 --data → 列缺项 exit=1;psyclaw gates → 22 条规则 ✓;全量 pytest → 1460 passed;psyclaw eval → 28/28"
     }
   ]
 }
