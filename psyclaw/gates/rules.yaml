@@ -97,6 +97,12 @@ gates:
     action: block
     fix: 生成的脚本/图须带复现溯源(确切代码+环境+自然语言说明)；跑 psyclaw provenance <产物> 生成 <产物>.provenance.json
 
+  - id: REPRO.replication_package
+    trigger: provenance_check
+    requires: [replication_package_declared]
+    action: block
+    fix: 该期刊 data_availability=required，须附 replication-package 声明；跑 psyclaw provenance <产物> --journal <期刊> --data <数据文件> 生成(非强制期刊自动放行)
+
   - id: MEASURE.ethics
     trigger: scale_score_used
     requires: [ethics_reviewed]

@@ -779,13 +779,18 @@ def cmd_provenance(args: argparse.Namespace) -> int:
     if prov.get("journal"):
         req = "要求(须带数据指纹)" if prov.get("data_availability_required") else "非强制"
         print(ui.dim(f"  期刊:{prov['journal']} · 数据可得性 {req}"))
+    decl = prov.get("replication_package") or {}
+    if decl.get("complete"):
+        print(ui.dim("  Replication package 声明已生成(见 .provenance.md,可直接放进稿件)"))
     print(ui.dim(f"  → {prov['_sidecar']}"))
     if prov["provenance_complete"]:
         print(ui.ok("  ✓ 溯源完整(代码+环境+说明"
                     + ("+数据指纹)" if prov.get("data_availability_required") else ")")))
         return 0
     if prov.get("data_availability_required") and not prov.get("data_availability_ok"):
-        print(ui.warn("  ⚠ 该期刊要求数据可得性,但缺数据指纹 —— 加 --data <数据文件>"))
+        print(ui.warn("  ⚠ 该期刊强制 replication-package 声明,当前缺:"
+                      + ";".join(decl.get("missing") or ["数据指纹"])
+                      + " —— 加 --data <数据文件>"))
     else:
         print(ui.warn("  ⚠ 溯源不完整(缺代码/环境/说明)"))
     return 1

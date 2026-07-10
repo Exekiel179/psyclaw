@@ -113,6 +113,49 @@ def _history_pointers(project_dir: str) -> list[str]:
     return [rel for rel in _HISTORY_CANDIDATES if (project / rel).exists()]
 
 
+def build_replication_declaration(prov: dict) -> dict:
+    """replication-package 声明(feat-074):清点复现材料并生成可放进稿件
+    「数据可得性声明」节的确定性文本。
+
+    complete = 分析脚本 + 数据指纹都在(环境清单随溯源包必有)。
+    期刊画像 data_availability=required 时,门禁 REPRO.replication_package
+    据 sidecar 的 ``replication_package_declared`` 强制这份声明;非强制期刊
+    也照常生成(作者仍可自愿附上),只是不作门禁判据。
+    """
+    items: list[dict] = []
+    missing: list[str] = []
+    if prov.get("code_present"):
+        items.append({"kind": "analysis_script", "path": prov.get("artifact"),
+                      "sha256": prov.get("artifact_sha256")})
+    else:
+        missing.append("分析脚本(产物读不到)")
+    data = prov.get("data") or {}
+    if data.get("sha256"):
+        items.append({"kind": "data", "path": data.get("path"),
+                      "sha256": data["sha256"]})
+    else:
+        missing.append("数据指纹(--data 指向数据文件,或 --fingerprint 传入)")
+    env = prov.get("environment") or {}
+    pkgs = {k: v for k, v in (env.get("packages") or {}).items() if v}
+    items.append({"kind": "environment",
+                  "python": env.get("python"), "packages": pkgs})
+
+    complete = not missing
+    if complete:
+        pkg_note = ", ".join(f"{k}={v}" for k, v in pkgs.items()) or "见溯源包"
+        statement = (
+            "本研究提供复现材料包(replication package):"
+            f"分析脚本 {prov.get('artifact')}(sha256 {str(prov.get('artifact_sha256'))[:16]}…)、"
+            f"数据文件 {data.get('path') or '(指纹由调用方提供)'}"
+            f"(sha256 {str(data.get('sha256'))[:16]}…)、"
+            f"运行环境 Python {env.get('python')}({pkg_note})。"
+            f"完整溯源清单见 {prov.get('artifact')}.provenance.json。")
+    else:
+        statement = ""
+    return {"items": items, "missing": missing,
+            "complete": complete, "statement": statement}
+
+
 def build_provenance(artifact_path: str, description: str = "",
                      project_dir: str = ".", data_path: str | None = None,
                      data_fingerprint: str | None = None,
@@ -152,6 +195,11 @@ def build_provenance(artifact_path: str, description: str = "",
     prov["data_availability_required"] = data_required
     data_ok = (not data_required) or bool(data and data.get("sha256"))
     prov["data_availability_ok"] = data_ok
+    # feat-074:replication-package 声明照常生成(非强制期刊也可自愿附);
+    # 但只有 data_availability=required 时才由门禁 REPRO.replication_package 强制。
+    decl = build_replication_declaration(prov)
+    prov["replication_package"] = decl
+    prov["replication_package_declared"] = decl["complete"]
     prov["provenance_complete"] = complete and data_ok
     return prov
 
@@ -174,6 +222,14 @@ def _render_md(prov: dict) -> str:
     if prov.get("journal"):
         req = "要求(必须带数据指纹)" if prov.get("data_availability_required") else "非强制"
         lines.append(f"- 期刊定制:{prov['journal']} · 数据可得性 {req}")
+    decl = prov.get("replication_package") or {}
+    if decl.get("complete"):
+        lines += ["", "## Replication package 声明(可直接放进稿件数据可得性节)", "",
+                  decl["statement"]]
+    elif prov.get("data_availability_required"):
+        lines += ["", "## Replication package 声明", "",
+                  "⚠ 该期刊强制 replication-package 声明,当前缺:"
+                  + ";".join(decl.get("missing", []))]
     lines.append("")
     if prov["provenance_complete"]:
         lines.append("✓ 溯源完整")
