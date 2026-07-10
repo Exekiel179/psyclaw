@@ -647,6 +647,17 @@
    ],
    "status": "done",
    "evidence": "psyclaw/repl.py(_hitl_confirm_all 三态 yes/no/all fail-closed;_side_effect_ok 重构:危险两态、非危险 YOLO 或已同意此类自动放行、否则三态 a→加 label 到 _auto_approve_labels;__init__ 加 _auto_approve_labels);tests/test_repl_approval.py +5 例(默认三态确认、a 使同类黏性、per-label 隔离、危险不给 all 且说过 all 仍问、_hitl_confirm_all 非 TTY fail-closed + 解析 a/all/全部/空/y/是/n/nope);CHANGELOG v0.11 补;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1393 passed"
+  },
+  {
+   "id": "feat-065",
+   "name": "错误自学习+图片内联渲染接入 agent 模式(toolloop)",
+   "description": "v0.11 的错误自学习(feat-058)与图片内联渲染(feat-061)只覆盖 REPL 命令路径;agent 模式(纯工具层循环)里工具失败同样值得蒸馏、分析出图同样该内联可见。toolloop:失败(ok=False)的工具结果经 distill_env_lessons 蒸馏,当轮回灌给模型止损,并累积在返回的 lessons 里;只看 ok=False——ok 输出可能是 read_file 读到的日志/源码,报错字样是内容不是本机事实,学了会误伤。REPL _run_agent:res.lessons 并入会话记忆(_ingest_lessons,从 _learn_from_output 拆出复用)+ 落跨会话待确认卡;final+trace 输出里的图片经 render_images_in_text(模块级,从 _render_images_in 提出)内联渲染。CLI psyclaw agent 同样落卡 + 渲染。",
+   "dependencies": [
+    "feat-058",
+    "feat-061"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/toolloop.py(collect_env_lessons 纯函数 + run_tool_loop 回灌『# 环境教训』并返回 lessons,5 个返回路径全带);psyclaw/repl.py(_ingest_lessons 拆出、render_images_in_text 模块级、_run_agent 接入两者);psyclaw/cli.py(cmd_agent 落卡 + 渲染);tests/test_agent_learning.py +11 例(循环蒸馏/回灌/ok=True 不学/跨轮去重/无工具空 lessons/seen_keys/REPL 并入去重落卡/iterm2 渲染/none 协议/缺文件/limit);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1404 passed"
   }
  ]
 }

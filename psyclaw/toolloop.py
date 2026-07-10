@@ -412,22 +412,53 @@ def read_agent_runs(project_dir: str, limit: int = 10) -> list[dict]:
     return out
 
 
+# --- 错误自学习接入 agent 模式(v0.12 feat-065) ---------------------------------
+# REPL 的错误学习(feat-058)只覆盖命令执行路径;agent 循环里工具失败(缺模块/命令/
+# API 改名)同样值得蒸馏。只看 ok=False 的结果——ok 输出可能是 read_file 读到的日志/
+# 源码,里面的报错字样是**内容**不是本机事实,学了会误伤(纯函数,可单测)。
+
+_LESSON_FEEDBACK_HEAD = "# 环境教训(本次运行已确认的本机限制,调整方案别重复踩)"
+
+
+def collect_env_lessons(results: list[dict], seen_keys: set) -> list[dict]:
+    """从失败的工具结果蒸馏环境教训(去重靠调用方传入的 seen_keys,跨轮累积)。"""
+    try:
+        from psyclaw.repl import distill_env_lessons
+    except Exception:  # noqa: BLE001  # 蒸馏不可用不拖垮循环
+        return []
+    fresh: list[dict] = []
+    for r in results:
+        if r.get("ok"):
+            continue
+        for les in distill_env_lessons(str(r.get("output", ""))):
+            key = (les["trigger"], les["lesson"])
+            if key not in seen_keys:
+                seen_keys.add(key)
+                fresh.append(les)
+    return fresh
+
+
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
                   project_dir: str = ".", max_iters: int = 24,
                   approve=None, emit=None) -> dict:
-    """跑纯工具层循环。返回 {final, iters, stopped, trace}。
+    """跑纯工具层循环。返回 {final, iters, stopped, trace, lessons}。
 
     每轮:provider.chat → 解析 tool 块;无块=最终答案;有块=执行(副作用需 approve)→ 回灌 → 续。
 
     截断防护(修「工具调用中途提前停止」):输出含未闭合 ```tool 块、或 provider 报
     stop_reason=max_tokens 且无完整调用时,**不**当最终答案——回灌续写提示让模型重发完整
     tool 块;连续截断 > _MAX_TRUNC_STREAK 次才放弃(stopped="truncated",不静默)。
+
+    错误自学习(feat-065):失败的工具结果蒸馏出环境教训后,当轮回灌给模型止损,
+    并累积在返回的 lessons 里,由调用方(REPL/CLI)落会话记忆与跨会话待确认卡。
     """
     tools = tools if tools is not None else build_tools(project_dir)
     full_system = system + "\n" + render_tool_catalog(tools)
     convo = [dict(m) for m in messages]
     base_len = len(convo)   # 修剪只动此后循环追加的消息,不碰调用方原始历史
     trace: list[dict] = []
+    lessons: list[dict] = []
+    lesson_keys: set = set()
     trunc_streak = 0
     empty_streak = 0
     repeat_streak = 0
@@ -445,11 +476,13 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
                 empty_streak += 1
                 if empty_streak > _MAX_NOPROGRESS:
                     return {"final": "(模型连续多轮返回空回复,已停止;请重述任务或换 provider)",
-                            "iters": it, "stopped": "no_progress", "trace": trace}
+                            "iters": it, "stopped": "no_progress", "trace": trace,
+                            "lessons": lessons}
                 convo.append({"role": "assistant", "content": "(空回复)"})
                 convo.append({"role": "user", "content": _EMPTY_NUDGE})
                 continue
-            return {"final": reply, "iters": it, "stopped": "answered", "trace": trace}
+            return {"final": reply, "iters": it, "stopped": "answered", "trace": trace,
+                    "lessons": lessons}
         empty_streak = 0
         # 连续相同 (name,args) 调用 → 判定卡住,收敛而非空转(feat-044)
         if calls:
@@ -459,14 +492,16 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
             if repeat_streak >= _MAX_NOPROGRESS:
                 return {"final": f"(检测到连续 {repeat_streak + 1} 轮重复相同的工具调用且无新"
                         "进展,已停止以免空转;请换思路或缩小任务)",
-                        "iters": it, "stopped": "no_progress", "trace": trace}
+                        "iters": it, "stopped": "no_progress", "trace": trace,
+                        "lessons": lessons}
         convo.append({"role": "assistant", "content": reply})
         if not calls:  # 截断且无一个完整调用 → 请求续写,不执行任何工具
             trunc_streak += 1
             if trunc_streak > _MAX_TRUNC_STREAK:
                 return {"final": reply + f"\n\n(输出连续 {trunc_streak} 次在 tool 块中被"
                         "截断,已停止;可调高 PSYCLAW_MAX_TOKENS 或缩小任务)",
-                        "iters": it, "stopped": "truncated", "trace": trace}
+                        "iters": it, "stopped": "truncated", "trace": trace,
+                        "lessons": lessons}
             if emit:
                 emit("输出被截断,请求模型重发完整 tool 块…")
             convo.append({"role": "user", "content": _TRUNC_NUDGE})
@@ -475,9 +510,17 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
         results = [_exec_tool(c, tools, approve, emit) for c in calls]
         trace.extend(results)
         feedback = _render_results(results)
+        fresh = collect_env_lessons(results, lesson_keys)
+        if fresh:
+            lessons.extend(fresh)
+            if emit:
+                emit(f"记下环境教训 {len(fresh)} 条")
+            feedback += ("\n\n" + _LESSON_FEEDBACK_HEAD + "\n"
+                         + "\n".join(f"- [{le['trigger']}] {le['lesson']}" for le in fresh))
         if cut:  # 有完整调用但尾部还挂着截断的残块 → 一并告知,避免模型以为已发出
             feedback += "\n\n(注意:你上一条输出末尾有一个被截断的 tool 块未被执行,如仍需要请重发完整块。)"
         convo.append({"role": "user", "content": feedback})
         trim_convo(convo, base_len)   # feat-033:旧轮次工具结果滚动压缩,防上下文无界增长
     return {"final": f"(达到工具调用上限 {max_iters},未收敛;可提高上限或缩小任务)",
-            "iters": max_iters, "stopped": "max_iters", "trace": trace}
+            "iters": max_iters, "stopped": "max_iters", "trace": trace,
+            "lessons": lessons}
