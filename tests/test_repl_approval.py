@@ -264,3 +264,40 @@ def test_ask_yn_reads_yes(monkeypatch):
     assert _ask_yn("go?", default=False) is True
     monkeypatch.setattr(builtins, "input", lambda *_a, **_k: "n")
     assert _ask_yn("go?", default=True) is False
+class TestCmdApprovalScope:
+    def test_plain_program(self):
+        assert repl.cmd_approval_scope("pytest -q tests/") == "pytest"
+        assert repl.cmd_approval_scope("ls -la") == "ls"
+    def test_subcommand_tools_include_second_token(self):
+        assert repl.cmd_approval_scope("git status -sb") == "git status"
+        assert repl.cmd_approval_scope("git push origin dev") == "git push"
+        assert repl.cmd_approval_scope("python3 analyze.py --out x.png") \
+            == "python3 analyze.py"
+        assert repl.cmd_approval_scope("bash -c 'echo hi'") == "bash -c"
+    def test_path_stripped_to_program_name(self):
+        assert repl.cmd_approval_scope("/usr/bin/python3 run.py") == "python3 run.py"
+    def test_compound_commands_not_generalized(self):
+        scope = repl.cmd_approval_scope("cat a.csv | head -5")
+        assert "|" in scope                       # 复合命令:范围=整条原文
+        assert repl.cmd_approval_scope("a && b") == "a && b"
+    def test_empty(self):
+        assert repl.cmd_approval_scope("  ") == "空命令"
+    def test_confirm_cmd_uses_scoped_label(self, monkeypatch):
+        s = _sess()
+        labels = []
+        monkeypatch.setattr(
+            repl.ReplSession, "_side_effect_ok",
+            lambda self, d, dangerous=False, label="": labels.append(label) or True)
+        s._confirm_cmd("git status -sb")
+        assert labels == ["执行 shell 命令(git status)"]
+    def test_scoped_all_does_not_leak_to_other_programs(self, monkeypatch):
+        """同意了 git status 的「全部」,跑 rm 依然要问。"""
+        s = _sess()
+        s._auto_approve_labels = {"执行 shell 命令(git status)"}
+        asked = []
+        monkeypatch.setattr(repl, "_hitl_confirm_all",
+                            lambda p: asked.append(p) or "no")
+        assert s._confirm_cmd("git status") is True          # 已同意的范围放行
+        assert not asked
+        assert s._confirm_cmd("rm outputs/tmp.txt") is False  # 别的程序照问
+        assert asked
