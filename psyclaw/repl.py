@@ -86,7 +86,9 @@ _FENCE_RE = re.compile(r"^```")
 _CHOICES_SYSTEM = (
     "\n# 让用户选择(键盘选择器)\n需要用户在若干选项里选择时,除正文说明外,附一个块:\n"
     "```choices\n{\"question\": \"问题\", \"multi\": true, \"options\": [\"选项A\", \"选项B\"]}\n"
-    "```\nPsyClaw 会弹出键盘选择器并把用户的选择自动回传给你;不要只写复选清单等用户打字。")
+    "```\nPsyClaw 会弹出键盘选择器并把用户的选择自动回传给你;不要只写复选清单等用户打字。"
+    "**先在正文把各方案的内容/取舍写清楚**,选项文字要自包含且简短(一行说清是什么),"
+    "不要写「方案A」这种脱离正文就看不懂的标签。")
 
 # 「直接跑命令」:模型输出 psyclaw/shell 块,REPL 执行并把输出自动回传(用户实测:
 # 命令块没人执行,回合看着像结束了——死胡同必须消灭)。psyclaw 子命令进程内跑;
@@ -285,6 +287,36 @@ def probe_env_card_stale(card: dict) -> bool | None:
             return None
         return rc == 0
     return None
+
+
+# 「全部同意」的命令前缀分类(feat-070):这些程序的行为由第一个参数决定
+# (git status ≠ git push),范围要带上它;其余程序按程序名归类即可(pytest、ls…)。
+_SUBCMD_TOOLS = frozenset({
+    "git", "uv", "uvx", "npm", "pnpm", "yarn", "pip", "pip3", "conda", "brew",
+    "docker", "kubectl", "cargo", "make", "python", "python3", "node", "ruby",
+    "perl", "bash", "sh", "zsh", "Rscript",
+})
+
+
+def cmd_approval_scope(cmd: str) -> str:
+    """把一条 shell 命令归类成「全部同意」的范围键。纯函数,可单测。
+
+    - 一般程序 → 程序名(`pytest -q` → `pytest`):同意 pytest 不放行 rm;
+    - 子命令型/解释器型程序 → 程序名+第二个词(`git status`、`python3 analyze.py`、
+      `bash -c`):同意 `git status` 不放行 `git push`;
+    - 管道/连接符(| && ; >)的复合命令 → 整条原文(不拆,复合行为不外推);
+    - 危险命令另有红线,永远逐条问,不进这里。
+    """
+    raw = (cmd or "").strip()
+    if not raw:
+        return "空命令"
+    if any(t in raw for t in ("|", "&&", "||", ";", ">", "<", "`", "$(")):
+        return raw[:80]                      # 复合命令:范围=整条,不泛化
+    toks = raw.split()
+    head = toks[0].replace("\\", "/").rsplit("/", 1)[-1]   # 剥路径取程序名
+    if head in _SUBCMD_TOOLS and len(toks) > 1:
+        return f"{head} {toks[1]}"
+    return head
 
 
 def render_images_in_text(text: str, force: str | None = None, limit: int = 3) -> int:
@@ -782,9 +814,13 @@ class ReplSession:
         return ans == "yes"
 
     def _confirm_cmd(self, cmd: str) -> bool:
-        """命令执行确认:危险命令自动识别(YOLO 也问),其余按模式放行/确认。"""
+        """命令执行确认:危险命令自动识别(YOLO 也问),其余按模式放行/确认。
+
+        「全部同意(a)」的范围按 cmd_approval_scope 限定到命令前缀(feat-070,
+        用户反馈:放行所有 shell 命令范围太大)——同意 `git status` 不放行 `rm`。
+        """
         return self._side_effect_ok(cmd, dangerous=bool(_DANGEROUS_RE.search(cmd)),
-                                    label="执行 shell 命令")
+                                    label=f"执行 shell 命令({cmd_approval_scope(cmd)})")
 
     def _learn_from_output(self, output: str) -> None:
         """错误学习:从命令输出蒸馏环境教训 → 本会话记忆(每轮注入)+ memory 待确认卡(跨会话)。
