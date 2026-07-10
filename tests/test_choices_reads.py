@@ -136,3 +136,54 @@ def test_gather_caps_files(tmp_path):
         files.append(str(p))
     msg, _ = gather_read_results(files, limit=4)
     assert "其余 2 个" in msg
+def _feed(keys):
+    it = iter(keys)
+    return lambda: next(it)
+def _single():
+    return {"question": "选哪个?", "multi": False, "options": ["甲", "乙", "丙"]}
+def _multi():
+    return {"question": "要哪些?", "multi": True, "options": ["甲", "乙", "丙"]}
+def test_inline_single_down_enter():
+    from psyclaw.choices import _pick_inline
+    chosen, free = _pick_inline(_single(), get_key=_feed(["DOWN", "ENTER"]))
+    assert chosen == ["乙"] and free is None
+def test_inline_single_digit_selects_immediately():
+    from psyclaw.choices import _pick_inline
+    chosen, free = _pick_inline(_single(), get_key=_feed(["3"]))
+    assert chosen == ["丙"] and free is None
+def test_inline_multi_space_toggle_enter():
+    from psyclaw.choices import _pick_inline
+    chosen, free = _pick_inline(
+        _multi(), get_key=_feed([" ", "DOWN", "DOWN", " ", "ENTER"]))
+    assert chosen == ["甲", "丙"] and free is None
+def test_inline_multi_untoggle():
+    from psyclaw.choices import _pick_inline
+    chosen, _ = _pick_inline(_multi(), get_key=_feed([" ", " ", "DOWN", " ", "ENTER"]))
+    assert chosen == ["乙"]                      # 甲勾了又取消
+def test_inline_multi_enter_without_checks_takes_highlight():
+    from psyclaw.choices import _pick_inline
+    chosen, _ = _pick_inline(_multi(), get_key=_feed(["DOWN", "ENTER"]))
+    assert chosen == ["乙"]
+def test_inline_esc_skips():
+    from psyclaw.choices import _pick_inline
+    assert _pick_inline(_single(), get_key=_feed(["ESC"])) == ([], None)
+def test_inline_up_wraps_around():
+    from psyclaw.choices import _pick_inline
+    chosen, _ = _pick_inline(_single(), get_key=_feed(["UP", "ENTER"]))
+    assert chosen == ["丙"]                      # 首行向上回绕到末行
+def test_inline_free_text_keeps_first_char():
+    from psyclaw.choices import _pick_inline
+    chosen, free = _pick_inline(
+        _single(), get_key=_feed(["都"]), read_rest=lambda _="": "行你决定")
+    assert chosen == [] and free == "都行你决定"   # 打字不吞,首字符保留(承 feat-060)
+def test_inline_multi_digit_toggles():
+    from psyclaw.choices import _pick_inline
+    chosen, _ = _pick_inline(_multi(), get_key=_feed(["2", "ENTER"]))
+    assert chosen == ["乙"]
+def test_inline_no_altscreen_escapes(capsys):
+    """回归:渲染绝不进备用屏/清屏(Windows 蓝色独立屏幕的根源已弃)。"""
+    from psyclaw.choices import _pick_inline
+    _pick_inline(_single(), get_key=_feed(["ENTER"]))
+    out = capsys.readouterr().out
+    assert "\x1b[?1049h" not in out and "\x1b[2J" not in out
+    assert "选哪个?" in out and "1. 甲" in out

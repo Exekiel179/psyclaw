@@ -669,6 +669,26 @@
    ],
    "status": "done",
    "evidence": "psyclaw/memory.py(draft_lesson 再现分支 active strength+1 / pending hits+1;memory_prompt 按强度排序;memory_cli 显示 hits);tests/test_audit_memory.py TestLessonReinforcement +5 例(active 加固不建新卡/pending 计 hits/仅精确 trigger+lesson 对匹配/prompt 强度排序/CLI 显示再现次数);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1409 passed"
+  },
+  {
+   "id": "feat-067",
+   "name": "确认提示措辞重设计(用户反馈:a 不易懂)",
+   "description": "用户实测:三态确认 `[Y/n/a=全部本会话不再问]` 里的 a 缩写含义不明,不方便理解使用。改为逐项自解释:`[回车=同意 / n=拒绝 / a=同意且本会话此类不再问]`;同义词多收「都同意」。语义与 fail-closed 纪律不变(非 TTY/EOF/Ctrl+C 一律拒)。",
+   "dependencies": [
+    "feat-064"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(_hitl_confirm_all 提示文案 + 同义词);既有 tests/test_repl_approval.py 覆盖三态解析行为不回归;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1419 passed"
+  },
+  {
+   "id": "feat-068",
+   "name": "选择器改原地内联(用户反馈:弃 Windows 全屏蓝色对话框)",
+   "description": "用户实测:选项框在 Windows 上是 prompt_toolkit radiolist/checkboxlist_dialog 的蓝色独立全屏,突兀。重写为 Claude Code 式原地内联选择器 _pick_inline:↑↓ 移动高亮、数字键跳选(单选即选定)、空格勾选(多选)、回车确认(多选没勾=选高亮项)、Esc/Ctrl+C 跳过、其它可打印字符=自由作答(转行输入,首字符保留,承 feat-060 不吞输入);渲染只用 ANSI 行控制(\\033[K+光标上移)在对话流里原地重画,不清屏不进备用屏;键流(get_key)与行读取(read_rest)可注入,离线可单测。降级链:内联 → 编号输入 → 非 TTY 不弹。_pick_ptk 全屏对话框删除。",
+   "dependencies": [
+    "feat-060"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/choices.py(_pick_inline 新增;pick_interactive 换用;_pick_ptk 删除;模块 docstring 更新);tests/test_choices_reads.py +10 例(down+enter/数字即选/空格勾选/勾了取消/多选无勾取高亮/Esc 跳过/UP 回绕/自由作答保首字符/多选数字切换/回归不进备用屏不清屏);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1419 passed"
   }
  ]
 }

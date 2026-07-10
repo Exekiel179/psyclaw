@@ -10,9 +10,11 @@
 - 兜底启发式:模型自发写的复选清单行(``• [ ] xxx`` / ``- [ ] xxx``)≥2 条也自动识别
   (multi=True;问题取清单前最近的一行正文)。
 
-选择器三级降级(对齐 ui_input 的纪律):prompt_toolkit 对话框(方向键+空格勾选+回车)
+选择器三级降级(对齐 ui_input 的纪律):**原地内联选择器**(↑↓ 移动 · 空格勾选 ·
+回车确认 · 打字=自由作答;只用 ANSI 行控制,不清屏不进备用屏——v0.12 feat-068,
+用户实测:prompt_toolkit 全屏对话框在 Windows 上是突兀的蓝色独立屏幕,已弃用)
 → 编号输入(``1,3`` / ``全部`` / 回车跳过)→ 非 TTY 不弹(打印提示,不阻塞脚本)。
-解析与选择解析均为纯函数,可单测;交互层薄壳。
+解析与选择解析均为纯函数,可单测;内联选择器的键流与行读取可注入,同样可单测。
 """
 
 from __future__ import annotations
@@ -114,18 +116,75 @@ def format_free_answer(text: str, question: str = "") -> str:
 # 交互层(薄壳,三级降级)
 # ---------------------------------------------------------------------------
 
-def _pick_ptk(choice: dict):
-    """prompt_toolkit 对话框:方向键移动 + 空格勾选(多选)/回车选定。失败抛异常→兜底。"""
-    from prompt_toolkit.shortcuts import checkboxlist_dialog, radiolist_dialog
-    values = [(o, o[:76]) for o in choice["options"]]
-    if choice["multi"]:
-        res = checkboxlist_dialog(
-            title="键盘选择(空格勾选 · 回车确认 · Tab 到确定)",
-            text=choice["question"], values=values).run()
-        return list(res) if res else []
-    res = radiolist_dialog(title="键盘选择(方向键 · 回车确认)",
-                           text=choice["question"], values=values).run()
-    return [res] if res else []
+def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str], str | None]:
+    """原地内联选择器(Claude Code 式,feat-068)。返回 (选中项, 自由文本)。
+
+    键位:↑↓ 移动高亮 · 数字键跳选 · 空格勾选(多选) · 回车确认 · Esc/Ctrl+C 跳过 ·
+    其它可打印字符 = 自由作答(转入行输入,首字符保留,feat-060 的「不吞输入」延续)。
+    渲染只用 ANSI 行控制(\\033[K + 光标上移)在对话流里原地重画——不清屏、
+    不进备用屏(prompt_toolkit 全屏对话框在 Windows 上是蓝色独立屏幕,弃用)。
+    get_key / read_rest 可注入假键流与行读取,离线可单测。
+    """
+    import sys
+    from psyclaw import ui
+    from psyclaw.ui_input import _get_key
+    keyf = get_key or _get_key
+    readf = read_rest or input
+    opts = choice["options"]
+    multi = bool(choice["multi"])
+    n = len(opts)
+    sel = 0
+    checked: set[int] = set()
+    hint = ("↑↓ 移动 · 空格勾选 · 回车确认 · Esc 跳过 · 直接打字作答" if multi
+            else "↑↓ 移动 · 回车选定 · Esc 跳过 · 直接打字作答")
+    out = sys.stdout
+    out.write(ui.accent(f"  {choice['question']}") + ui.dim(f"  ({hint})") + "\n")
+
+    def _draw(first: bool = False) -> None:
+        if not first:
+            out.write(f"\033[{n}A")            # 光标回菜单首行,原地重画
+        for i, o in enumerate(opts):
+            box = ("[x] " if i in checked else "[ ] ") if multi else ""
+            line = f"{box}{i + 1}. {o[:86]}"
+            if i == sel:
+                out.write("\033[K  " + ui.paint("▸ " + line, "brcyan", "bold") + "\n")
+            else:
+                out.write("\033[K    " + line + "\n")
+        out.flush()
+
+    _draw(first=True)
+    try:
+        while True:
+            key = keyf()
+            if key == "UP":
+                sel = (sel - 1) % n
+            elif key in ("DOWN", "TAB"):
+                sel = (sel + 1) % n
+            elif key == " " and multi:
+                checked.symmetric_difference_update({sel})
+            elif key == "ENTER":
+                if multi and checked:
+                    return [opts[i] for i in sorted(checked)], None
+                return [opts[sel]], None       # 多选没勾任何项=选高亮那个;单选同
+            elif key in ("ESC", "EOF"):
+                return [], None
+            elif key.isdigit() and key != "0" and int(key) <= n:
+                sel = int(key) - 1
+                if not multi:
+                    _draw()
+                    return [opts[sel]], None   # 单选:数字即选定(同编号输入的心智)
+                checked.symmetric_difference_update({sel})
+            elif key and len(key) == 1 and key.isprintable():
+                # 自由作答:不吞输入——退出菜单转行输入,首字符保留
+                out.write(ui.dim("  作答: ") + key)
+                out.flush()
+                rest = readf("")
+                text = (key + rest).strip()
+                return [], (text or None)
+            _draw()
+    except KeyboardInterrupt:
+        out.write("\n")
+        return [], None
 
 
 def _pick_numbered(choice: dict) -> tuple[list[str], str | None]:
@@ -161,6 +220,6 @@ def pick_interactive(choice: dict) -> tuple[list[str], str | None]:
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         return [], None          # 非 TTY(脚本/管道)不弹,不阻塞
     try:
-        return _pick_ptk(choice), None    # 对话框只能选既有项(或取消),无自由文本
-    except Exception:  # noqa: BLE001  # 未装 ptk / 对话框失败 → 编号兜底
+        return _pick_inline(choice)       # 原地内联(feat-068);含自由作答
+    except Exception:  # noqa: BLE001  # 终端不支持读键/ANSI → 编号兜底
         return _pick_numbered(choice)
