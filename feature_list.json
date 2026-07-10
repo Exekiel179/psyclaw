@@ -689,6 +689,17 @@
    ],
    "status": "done",
    "evidence": "psyclaw/choices.py(_pick_inline 新增;pick_interactive 换用;_pick_ptk 删除;模块 docstring 更新);tests/test_choices_reads.py +10 例(down+enter/数字即选/空格勾选/勾了取消/多选无勾取高亮/Esc 跳过/UP 回绕/自由作答保首字符/多选数字切换/回归不进备用屏不清屏);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1419 passed"
+  },
+  {
+   "id": "feat-069",
+   "name": "@图片 引用内联渲染",
+   "description": "REPL 里 @path 引用图片文件(png/jpg/gif/webp/bmp)时:终端支持则直接内联显示给用户(render_images_in_text 复用 feat-061/065 通道,config image_protocol 可强制);上下文只注入元信息(路径+大小+是否已显示+「像素内容你不可见」)——此前 @图片 会走 smart_excerpt 把二进制乱码灌进上下文,一并修掉。文本文件的智能摘录行为不变。",
+   "dependencies": [
+    "feat-061",
+    "feat-065"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(_expand_files 图片分支:内联渲染+元信息注入,不再对图片跑 smart_excerpt);tests/test_agent_learning.py +3 例(渲染+元信息注入+二进制不进上下文/终端不支持时的提示/文本文件不回归);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1422 passed"
   }
  ]
 }

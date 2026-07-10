@@ -137,3 +137,30 @@ def test_render_images_in_text_limit(tmp_path, capsys):
         paths.append(str(p))
     n = repl.render_images_in_text("\n".join(paths), force="iterm2", limit=3)
     assert n == 3
+def _img_sess(proto="iterm2"):
+    s = repl.ReplSession.__new__(repl.ReplSession)
+    s.conf = {"image_protocol": proto}
+    return s
+def test_expand_at_image_renders_and_injects_meta(tmp_path, capsys):
+    img = tmp_path / "erp_wave.png"
+    img.write_bytes(b"\x89PNG fake data")
+    s = _img_sess()
+    out = s._expand_files(f"帮我看看 @{img} 这张图")
+    printed = capsys.readouterr().out
+    assert "\033]1337;" in printed                 # 内联转义已输出给用户
+    assert "引用了图片" in out                      # 模型收到元信息……
+    assert "PNG fake" not in out                   # ……而不是二进制内容
+    assert "帮我看看" in out and "这张图" in out    # 其余文本原样保留
+def test_expand_at_image_unsupported_terminal_notes(tmp_path, capsys):
+    img = tmp_path / "plot.png"
+    img.write_bytes(b"x")
+    s = _img_sess(proto="none")
+    out = s._expand_files(f"@{img}")
+    assert "不支持内联显示" in out
+    assert "不支持内联" in capsys.readouterr().out
+def test_expand_at_text_file_still_excerpts(tmp_path, capsys):
+    f = tmp_path / "notes.md"
+    f.write_text("# 假设\nH1: 正念降低焦虑\n", encoding="utf-8")
+    s = _img_sess()
+    out = s._expand_files(f"@{f}")
+    assert "正念降低焦虑" in out                    # 文本文件行为不回归

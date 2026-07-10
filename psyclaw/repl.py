@@ -611,12 +611,26 @@ class ReplSession:
 
     # -- 文件引用 ----------------------------------------------------------
     def _expand_files(self, text: str) -> str:
-        """把 @path 替换为文件内容块。"""
+        """把 @path 替换为文件内容块;@图片 则内联渲染(feat-069)。"""
         out_parts = []
         for token in text.split():
             if token.startswith("@") and len(token) > 1:
                 p = Path(token[1:]).expanduser()
                 if p.exists() and p.is_file():
+                    from psyclaw import imgview
+                    if imgview.is_image(p):
+                        # 图片:终端支持则内联显示给用户;上下文只注入元信息——
+                        # 二进制像素既不该灌给模型,smart_excerpt 也只会摘出乱码
+                        n = render_images_in_text(
+                            str(p), force=self.conf.get("image_protocol"))
+                        note = "已在终端内联显示" if n else "当前终端不支持内联显示"
+                        out_parts.append(
+                            f"(用户引用了图片 {p}({p.stat().st_size // 1024} KB),"
+                            f"{note}。其像素内容你不可见;如需数值请引导用户跑分析或描述图内容)")
+                        if not n:
+                            print(ui.dim(f"  [图片 {p.name}:终端不支持内联,"
+                                         "config image_protocol 可强制]"))
+                        continue
                     from psyclaw.context import smart_excerpt
                     excerpt = smart_excerpt(p)
                     out_parts.append("\n" + excerpt + "\n")
