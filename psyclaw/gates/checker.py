@@ -190,6 +190,12 @@ REQUIREMENT_CHECKS = {
     # R-2 复现溯源门控 — sidecar 由 psyclaw provenance 生成(<产物>.provenance.json)
     # 完整=确切代码 + 环境 + 自然语言说明三要素齐(决策轨迹尽力采集,不作硬判据)。
     "provenance_complete": lambda d, base: d.get("provenance_complete") is True,
+    # R-2 深化(feat-074)— 期刊画像 data_availability=required 才强制
+    # replication-package 声明;非强制期刊放行(条件式,同 axis_from_zero_or_flagged)。
+    "replication_package_declared": lambda d, base: (
+        not d.get("data_availability_required")
+        or d.get("replication_package_declared") is True
+    ),
     # FIG.honest 门控 — figure sidecar (by psyclaw figures --check)
     "axis_from_zero_or_flagged": lambda d, base: (
         d.get("axis_from_zero", True) is not False
