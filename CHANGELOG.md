@@ -1,5 +1,48 @@
 # Changelog
 
+## v0.12.0(2026-07-11)
+
+> 主题:**自学习进 agent 模式 + 数据→结果→稿件闭环补完 + 可评测(eval harness)**。
+> 把 v0.11 的错误自学习/图片渲染从 REPL 扩到 agent(toolloop),补上 v0.10 遗留的
+> 「真结果回填稿件」,再给整个编排层配一套确定性离线评测;期间根据用户实测反馈
+> 修了 4 个交互问题。
+
+### 新增
+- **eval harness**(feat-073):`psyclaw eval` 确定性离线评测——6 用例 28 检查覆盖
+  分析/元分析编排、文献初筛诚实降级、门禁 fail-closed、错误自学习、toolloop 纪律;
+  不调 LLM、不联网、不依赖统计库,秒级复跑;`--case`/`--json`,报告落
+  `.psyclaw/eval_report.json`,有失败退出码 1。用例崩溃记失败 check,绝不静默。
+- **replication-package 声明**(feat-074):`provenance --journal <期刊>` 遇
+  `data_availability=required`(Psych Science/JPSP/Psych Bulletin)时强制生成
+  replication-package 声明(脚本 sha256+数据指纹+环境清单,文本可直接放进稿件
+  数据可得性节);新门禁 `REPRO.replication_package` 拦「要求却未声明」,
+  非强制期刊/旧 sidecar 放行(门禁只增不删)。
+- **错误自学习 + 图片渲染进 agent 模式**(feat-065):toolloop 失败工具结果当轮
+  蒸馏环境教训回灌止损(只看 ok=False,防把读到的日志当本机事实),随结果返回
+  `lessons` 由 REPL/CLI 落卡;`render_images_in_text` 共用,agent 出图也内联显示。
+- **教训卡正向加固**(feat-066):同一环境教训再现 → active 卡强度+1(记
+  `reinforced_ts`)、pending 卡 hits+1;注入按强度降序,CLI 显示再现次数。
+- **@图片 引用内联渲染**(feat-069):`@路径` 是图片时终端直接显示,上下文只注入
+  元信息;修掉此前把二进制乱码灌进上下文的问题。
+- **pystat 元分析闭环**(feat-072):pystat MCP 新增 `pystat_meta`(DL 随机效应:
+  合并效应+95%CI+I²/τ²/Q+Egger);meta 流程 best-effort 直跑落
+  `outputs/meta_result.txt`;写作步把 pystat **真跑结果**注入上下文(结果节只引用
+  真实数值,效应量+CI 必报);`_real_result` 守卫——「统计库未安装」的脚本骨架
+  不算真结果,不制造『看着像跑过了』的假象。[stats] 数值实测:statsmodels/pingouin
+  真装真跑,生成脚本与 MCP 工具输出数值一致。
+
+### 改进 / 修复(均来自用户实测反馈)
+- **确认提示自解释**(feat-067):`[Y/n/a=…]` 改
+  `[回车=同意 / n=拒绝 / a=同意且本会话此类不再问]`,行为不变。
+- **选择器改原地内联**(feat-068):弃 prompt_toolkit 全屏蓝色对话框(Windows 上
+  突兀),Claude Code 式 `_pick_inline`:↑↓/数字/空格/回车/Esc/打字自由作答,
+  ANSI 原地重画不清屏不进备用屏。
+- **「全部同意」按命令前缀限定**(feat-070):对 `git status` 说 a 不再放行所有
+  shell 命令——`cmd_approval_scope` 按程序/子命令归类(`git status ≠ git push`,
+  复合命令不泛化);危险命令红线不变(永远逐条问)。
+- **选择器看得见方案详情**(feat-071):按终端宽度截断 + 高亮项下方 2 行详情区
+  给全文;系统约定选项文字自包含、方案细节先写正文。
+
 ## v0.11.0(2026-07-09)
 
 > 主题:**REPL 交互体验大修 + 错误自学习闭环 + 图片内联渲染**。
