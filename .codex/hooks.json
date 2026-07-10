@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 '/Users/exekiel/Claude/Projects/psyclaw/.codex/hooks/protect-paths.py'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 '/Users/exekiel/Claude/Projects/psyclaw/.codex/hooks/compile-check.py'"
+          }
+        ]
+      }
+    ]
+  }
+}

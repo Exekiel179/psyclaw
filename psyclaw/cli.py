@@ -512,6 +512,34 @@ def cmd_gates(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_eval(args: argparse.Namespace) -> int:
+    """确定性离线评测(feat-073):编排/门禁/自学习契约的端到端 scorecard。"""
+    import json
+    from pathlib import Path
+
+    from psyclaw import ui
+    from psyclaw.evalharness import format_report, run_evals
+    try:
+        report = run_evals(args.case or None)
+    except ValueError as exc:
+        print(ui.err(str(exc)))
+        return 1
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(format_report(report))
+    out = Path(".psyclaw") / "eval_report.json"
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(report, ensure_ascii=False, indent=2),
+                       encoding="utf-8")
+        if not args.json:
+            print(ui.dim(f"报告已写入 {out}"))
+    except OSError as exc:
+        print(ui.dim(f"(报告落盘失败,不影响评测结果:{exc})"))
+    return 0 if report["all_passed"] else 1
+
+
 def cmd_scale(args: argparse.Namespace) -> int:
     from psyclaw.psych.scales import print_scale
     print_scale(args.scale_id)
@@ -994,7 +1022,7 @@ CORE_COMMANDS = {
 # 成熟库/MCP——本 CLI 只保留研究编排 + 知识参考 + 文献/写作 harness。
 COMMAND_CATEGORIES = [
     ("环境 / 系统", ["guide", "status", "repl", "version", "doctor", "config", "setup",
-                  "skills", "mcp", "plugins", "gates", "commands"]),
+                  "skills", "mcp", "plugins", "gates", "eval", "commands"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score"]),
@@ -1177,6 +1205,13 @@ def build_parser() -> argparse.ArgumentParser:
                       help="作为 stdio MCP 服务器运行(mne/spss/mplus/stata)")
     pmcp.set_defaults(func=cmd_mcp)
     sub.add_parser("gates", help="跑学术规范门禁自检").set_defaults(func=cmd_gates)
+
+    pev = sub.add_parser(
+        "eval", help="确定性离线评测(编排/门禁/自学习契约,不调 LLM/不联网)")
+    pev.add_argument("--case", action="append",
+                     help="只跑指定用例(可重复给多个);缺省跑全部")
+    pev.add_argument("--json", action="store_true", help="输出机器可读 JSON")
+    pev.set_defaults(func=cmd_eval)
 
     ps = sub.add_parser("scale", help="量表库查询(DASS/PHQ-9/GAD-7/TIPI…)")
     ps.add_argument("scale_id", nargs="?", default=None, help="量表 id,留空列出全部")

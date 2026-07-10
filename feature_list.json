@@ -1,735 +1,746 @@
 {
- "_comment": "PsyClaw 能力清单 — harness 一等原语 (learn-harness-engineering L08)。2026-06 起 PsyClaw 重定位为纯研究编排 harness:统计计算整体外移到成熟库/MCP,本仓不内置任何统计实现。每轮只推进 ONE 个 status != done 的 feature;done 必须带 evidence。",
- "features": [
-  {
-   "id": "feat-001",
-   "name": "统计层整体外移 (删除 ~42 手写统计模块)",
-   "description": "删除 psych/ 下全部统计方法模块(anova/ttest/regression/efa/cfa/survival/...)、对应 CLI 子命令与测试;统计交给外部成熟库(scipy/pingouin/statsmodels/lifelines/...)或 MCP。psyclaw 自身零统计库依赖,只留研究编排 harness。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "git rm 42 模块 + 41 测试;cli/loop/pipeline/repl/scales/preregister 去统计纠缠;psyclaw/ 零 scipy/numpy/pingouin import;全量 pytest 944 passed;pyproject 统计库降为可选 [stats] extra"
-  },
-  {
-   "id": "feat-002",
-   "name": "研究编排流水线 (research)",
-   "description": "psyclaw research <topic>:澄清门禁→文献→设计→写作(APA-JARS)→同行评审→总验收,fail-closed verdict。--freeform 走通用 HITL 回路(planner→executor→critic)。统计外移后不再含内置统计阶段。",
-   "dependencies": [
-    "feat-001"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/pipeline.py + loop.py;tests/test_pipeline.py 绿;PHASES=[literature,design,writing,review,gates]"
-  },
-  {
-   "id": "feat-003",
-   "name": "审稿模拟 review panel",
-   "description": "EIC + R1/R2/R3 + Devil's Advocate 多视角同行评审,保守 fail-closed 编辑决定,产可解析意见 + response letter",
-   "dependencies": [
-    "feat-002"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/review.py + agents/reviewer.md + tests/test_review.py"
-  },
-  {
-   "id": "feat-004",
-   "name": "研究澄清 clarify (LLM 驱动追问)",
-   "description": "grill-me 式 17 槽位澄清,LLM 评估+追问+fail-safe 降级;不澄清完不开工(CLARIFY.complete 门禁)",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/psych/clarify.py + tests/test_clarify.py (21 例)"
-  },
-  {
-   "id": "feat-005",
-   "name": "预注册 / 分析声明 (preregister + declare-test)",
-   "description": "OSF/AsPredicted 双格式预注册模板(据澄清卡抽取);declare-test 预注册单个计划分析(研究者自由度门禁)。功效计算外移,样本量依据取澄清卡 power 槽位。",
-   "dependencies": [
-    "feat-004"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/psych/preregister.py + analysis_plan.py;tests/test_preregister.py + test_analysis_plan.py 绿"
-  },
-  {
-   "id": "feat-006",
-   "name": "知识参考目录 + 量表计分",
-   "description": "scale/norms/assume/method/design/cite/ethics 只读知识目录;score 量表自动计分(反向题翻转+子量表总分,信度计算外移)。纯查阅+数据准备,无统计推断。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/psych/{knowledge,scales,ethics}.py;tests/test_scale_score.py + test_custom_scales.py + test_ethics.py 绿"
-  },
-  {
-   "id": "feat-007",
-   "name": "文献检索 + 写作输出 (lit + export)",
-   "description": "lit 合法 OA 文献检索+全文获取+PRISMA 计数+综述合成;export APA7/心理学报/心理科学 确定性模板(Word docx + Markdown);JARS 检查清单",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/psych/{lit_cli,litsearch,synthesize}.py + output/{apa7,cn_journal,jars}.py;对应测试绿"
-  },
-  {
-   "id": "feat-008",
-   "name": "三层自进化记忆",
-   "description": "profile 显式 + habits 带半衰期自动学习 + lessons HITL 确认;纯 JSON 可审计,只存方法学偏好",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/memory.py + tests/test_audit_memory.py"
-  },
-  {
-   "id": "feat-009",
-   "name": "学术规范门禁 gates",
-   "description": "效应量+CI 必报、前提诊断、预注册/探索区分、APA7、复现脚本等机器可校验门禁,不达标阻断。统计虽外移,门禁判据仍在(供写作产出与外部统计结果对照)。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "gates/PSYCLAW.md + rules.yaml + checker.py;psyclaw gates 自检;tests/test_gates.py 绿"
-  },
-  {
-   "id": "feat-010",
-   "name": "REPL + 路径注入 + Markdown 渲染 + 渐进式披露",
-   "description": "三级降级 REPL、对话自动检测本地数据路径(原始数据不入上下文)、Markdown→ANSI;默认 --help 只示常用命令,psyclaw commands 看全部分类",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/{repl,ui_input,path_ingest,md_render,cli}.py;tests/test_{repl_ptk,path_ingest,cli_help}.py 绿"
-  },
-  {
-   "id": "feat-011",
-   "name": "harness 工程化契约",
-   "description": "feature_list/init/progress/handoff 物化 learn-harness-engineering 5 子系统(instructions/state/verification/scope/lifecycle)",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "feature_list.json + init.sh + progress.md + session-handoff.md + CLAUDE.md Harness 契约段"
-  },
-  {
-   "id": "feat-012",
-   "name": "Workflow 层:按研究类型路由的可组合流程引擎",
-   "description": "四层架构(路由→流程→子功能→skill/MCP)+ 两横切(harness/memory)。声明式 workflow 定义 + 引擎(gate/HITL/机器可读总验收);四条研究流程按类型路由,每类一条顶层命令;子功能可单用/可拼装。见 docs/ARCHITECTURE.md。",
-   "dependencies": [
-    "feat-002"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/workflows/{engine,steps,steps_meta,steps_analysis,steps_qual,registry}.py;四条流程齐:review-lit(文献综述)/meta(元分析)/analysis(实证)/qualitative(质性);子功能 screen_papers/validate_effects+generate_meta_script/profile_data+recommend_analysis+generate_analysis_script/load_transcripts;统计外移=meta/analysis 生成委托 statsmodels/pingouin 的可复现脚本(均经 C:\\Python314 实跑 exit 0);质性=LLM 辅助编码研究者复核;tests/test_workflows.py 35 例;全量 949 passed。后续增强:分析步可选直连 MCP、质性编码升级专用 skill"
-  },
-  {
-   "id": "feat-013",
-   "name": "会话持久化 session store (SQLite+FTS5) + resume/rename",
-   "description": "可全文检索的跨会话对话持久化,替代纯内存 compact_history 跨会话丢失。在既有 recall.ContextArchive(已按 session 分轮存 SQLite + 关键词/向量召回)之上补:① sessions 元数据表(id/name/created/updated,旧库从 turns 回填)② FTS5 全文索引(unicode61;未编译 FTS5 的环境回落 LIKE 子串;回落期落库的历史轮次在 FTS 可用时惰性回填)③ 会话生命周期 API(ensure/rename/list/session_turns/search/delete)。命令:REPL slash `/sessions /resume /rename /search`(resume 把历史轮次载回 messages、续写到同一会话);顶层 `psyclaw resume [id]`(进 REPL 续接,不给 id 续接最近一次)+ `psyclaw session list|search|rename|delete`。纯 stdlib(sqlite3),不碰统计/data-raw。",
-   "dependencies": [
-    "feat-010"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/recall.py 扩展 ContextArchive(sessions 表 + _init_fts FTS5 探测/回落/回填 + record 维护会话与 FTS + ensure_session/rename_session/list_sessions/session_turns/search(FTS5 MATCH bm25 排序,回落 LIKE)/delete_session);psyclaw/repl.py ReplSession(resume_id) + _resume_session 载回历史 + /sessions //resume //rename //search slash 命令 + COMMANDS/HELP_TEXT;psyclaw/cli.py cmd_resume/cmd_session + resume/session 顶层命令(catalog 归『记忆/消息/IO』,names==catalogued 通过)。tests/test_session_store.py 11 例(建会话/幂等/改名/计数/顺序/FTS 检索中英词/LIKE 回落/空查询/删除/FTS 回填/旧库 sessions 回填)。本机 sqlite 3.50.4 FTS5 可用。全量 C:\\Python314 pytest 1062 passed;CLI end-to-end:seed 两会话 → session list/search 焦虑(FTS5 命中)/rename 均正确。"
-  },
-  {
-   "id": "feat-014",
-   "name": "自主科研回路 auto-loop (Ralph 式自循环)",
-   "description": "在 <type>-loop 之上的自驱动元回路:每轮① 感知发现(discover_backlog 从仓库状态重新推导待办)→② 派发(路由到对应 workflow,实现 sub-agent)→③ 独立验收(verify_result 只读落盘 workflow_summary.json+标志产物,与执行解耦)→④ 记状态(notes/autoloop_state.json 外部记忆)→⑤ 决定(stop:backlog 空/门禁 blocker/迭代上限)。控制流全确定性纯函数,LLM 只在被派发流程内部;澄清未完=硬 blocker 写 decision_request,流程验收不过=标记跳过写 blocked.md 换下一个任务,不空转重试;只读 data/clean+根目录(不碰受保护的 data/raw,分类 CSV 只读表头)。",
-   "dependencies": [
-    "feat-012"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/autoloop.py(discover_backlog/classify_csv/select_next/verify_result/decide/state/run_autoloop)+ cli.py auto-loop 命令;tests/test_autoloop.py 33 例;全量 C:\\Python314 pytest 991 passed;离线 mock end-to-end 实跑:数据表 scores.csv → 自动发现 analysis-loop → 派发(profile→推荐 ttest→生成 pingouin 脚本→写→评审)→ 独立验收通过(workflow=analysis + outputs/analysis.py 落盘)→ 记 autoloop_state.json(完成 1)→ 次轮 backlog 空收敛停止,exit 0。经两轮多视角代码评审(4 视角发现 + 对修复的对抗复审)修复 5 处:classify_csv 收紧列名集(id,d,v 不再误判效应量表→避免数据漏 analysis)、_dispatch 不固化派生 goal(否则误触发 lit-loop,已 end-to-end 验证)、_clarify_card 异常 fail-closed、派发异常不炸回路(记跳过续跑)、max_iters 优先于 blocker 不误写 decision_request"
-  },
-  {
-   "id": "feat-015",
-   "name": "引用保真核查 cite-check(反杜撰参考文献)",
-   "description": "独立验收稿件里每一条文内引用是否都能溯源到检索命中的允许键(notes/evidence_map.json 的 references[].key,回落 lit_search.json);比不上的 = 孤儿引用(疑似杜撰)。补上 synthesize_review『只准引用真实键』指令之后一直缺失的**核验环节**——实现与验收分离,对齐 Claude Science『独立 reviewer 核查每条引用』。纯文本比对:不算统计、不碰 data/raw、只读稿件与 notes/ 检索产物;比对粒度=(首位作者姓氏,4 位年份)。落 notes/citation_audit.json sidecar,WRITE.citations 门禁(trigger citation_check)据 no_fabricated_citations 对**检出的**孤儿引用 block;无语料/无引用时置 manual_review 显式转人工核(不过度拦)。参考 GitHub 项目 Awesome-Journal-Skills(brycewang-stanford,Stanford REAP × CoPaper.AI)的期刊定制思路——本轮先做通用版,期刊画像层后续再叠加。",
-   "dependencies": [
-    "feat-007",
-    "feat-009"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/psych/citations.py(extract_intext_citations/audit_citations/load_allowed/run_citation_audit 纯函数,可单测)+ gates/checker.py 注册 no_fabricated_citations + KIND_TRIGGERS['citation']={citation_check} + rules.yaml WRITE.citations 门禁 + cli.py cite-check 命令(catalog 归入『研究前规划/预注册』,names==catalogued 校验通过);tests/test_citations.py 19 例;全量 C:\\Python314 pytest 1010 passed;gates 自检显示 WRITE.citations [block] 校验:自动;CLI end-to-end:evidence_map 允许键 Smith et al.(2020) + 稿件含 Ghost et al.(2099) → cite-check 检出孤儿 1 条、rc=1。测试期间修正 2 处真实缺陷:叙述式连接词去掉逗号(否则『However, Ghost et al.(2099)』把转折词误并入作者段→误判姓氏)、无检索语料时不产孤儿(纯 manual_review 不过度拦);另在核验前截除参考文献/证据图谱区(其本身即允许键语料,否则末位作者会冒出假孤儿)。"
-  },
-  {
-   "id": "feat-016",
-   "name": "复现溯源 provenance(代码+环境+说明+决策轨迹)",
-   "description": "给 analysis/meta 生成的可复现脚本(outputs/analysis.py / meta_analysis.py)与图打包 Claude Science 式**溯源包**:① 确切代码(code+sha256)② 运行环境(Python+平台+统计库版本)③ 自然语言说明(缺省从脚本 docstring 派生)④ 决策轨迹(plan/design/澄清卡/workflow_summary 指针)——补上『脚本能复跑但不记录产它的环境与决策』的空缺,强化 REPRO 复现门禁。纯元数据采集:不 import 也不运行任何统计库(版本经 importlib.metadata 读 dist 元数据),数据指纹只对 data/clean+根按需单向哈希、受保护的 data/raw 只记路径不哈希(亦可由调用方直接传入指纹)。参考 Claude Science『每个结果可复现、可溯源到代码/环境/消息历史』;本轮为通用版,后续可由期刊画像的 data_availability 驱动是否强制 replication-package。",
-   "dependencies": [
-    "feat-009",
-    "feat-012"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/provenance.py(capture_environment/build_provenance/write_provenance 纯 stdlib:hashlib+importlib.metadata+platform+sys)+ gates/checker.py 注册 provenance_complete + KIND_TRIGGERS['provenance']={provenance_check} + rules.yaml REPRO.provenance 门禁 + cli.py provenance 命令(catalog 归入『记忆/消息/IO』,names==catalogued 通过);tests/test_provenance.py 11 例(含 data/raw 绝不哈希、data/clean 单向哈希、调用方指纹优先、docstring 派生说明、决策轨迹指针、门禁 block/pass);全量 C:\\Python314 pytest 1021 passed;gates 自检 REPRO.provenance [block] 校验:自动;CLI end-to-end:outputs/analysis.py → 采集 sha256+Python 3.14.2+平台+说明+notes/plan.md 轨迹 + data/clean/scores.csv 指纹 → 溯源完整 rc=0。"
-  },
-  {
-   "id": "feat-017",
-   "name": "外部技能包发现(接上 AcademicForge / AJS)",
-   "description": "让 skills 加载器除内置 psyclaw/skills 外,还发现标准安装根下的第三方 Agent Skill 技能包:.claude/skills 与 .opencode/skills(项目级 + 用户级)+ 环境变量 PSYCLAW_SKILLS_PATH。AcademicForge(HughYau/AcademicForge,curate 了 Claude Science 生态的 ~140 科研 + 82 AI-research skills、78+ 数据库,Minecraft mod-loader 式一站装)、AJS 等 `bash install.sh` 后即被 `psyclaw skills` 列出、供研究编排参考。统一解析标准 SKILL.md frontmatter(agentskills.io 兼容),按 name 去重内置优先,平铺 <skill>/SKILL.md 与一层学科嵌套 <domain>/<skill>/SKILL.md 两种布局都吃。边界诚实:PsyClaw 只**发现+呈现+路由指引**这些 Agent Skill(给宿主 Agent 读的 markdown 指令),真正执行发生在 Claude Code 等宿主读取 SKILL.md 时,不由本体 Python 跑。",
-   "dependencies": [
-    "feat-010"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/skills/loader.py(external_skill_roots + list_skills(project_dir, include_external) + 每条标 source/path)+ cli.py cmd_skills 按来源分组呈现(内置 / 外部按根分组,每根截断 12 条;空时给 AcademicForge install 指引与已扫描根);tests/test_skills_loader.py 7 例(项目级 .claude/skills 发现、PSYCLAW_SKILLS_PATH env、一层学科嵌套、include_external=False 跳过、同名去重内置优先、external_skill_roots 只留存在根);全量 C:\\Python314 pytest 1028 passed;CLI end-to-end:PSYCLAW_SKILLS_PATH 指向模拟 AcademicForge 安装(.claude/skills/{genomics,scientific-writing}/SKILL.md)→ `psyclaw skills` 在对应根下分组列出 forge-genomics / forge-sci-writing。"
-  },
-  {
-   "id": "feat-018",
-   "name": "按研究类型推荐外部技能包(skill 路由)",
-   "description": "在 feat-017『发现』之上补『路由指引』:据研究类型(lit-review/meta/analysis/qualitative)用中英双语关键词打分,从发现到的第三方技能包(AcademicForge/AJS)里挑出最相关的推荐,供研究者在对应 loop 里挑用。`psyclaw skills --for <type>`(亦接受 *-loop 别名)。纯确定性打分(关键词命中计数)、可单测;关键词特意选具体词(meta-analysis/thematic/计量…)避免 metadata 类误命中;仍不执行任何 skill(执行属宿主 Agent)。",
-   "dependencies": [
-    "feat-017"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/skills/recommend.py(normalize_type/score_skill/recommend_skills + RESEARCH_TYPE_KEYWORDS 四类中英双语关键词 + _TYPE_ALIASES)+ cli.py skills --for(未知类型报错列可选、external_only 只推第三方);tests/test_skill_recommend.py 6 例(别名归一、命中计数、类型匹配区分 meta/qual、未知类型空、external_only 排内置、top_k);全量 C:\\Python314 pytest 1047 passed;CLI end-to-end:模拟 AcademicForge 装 forge-meta/forge-qual → `skills --for meta-loop` 命中 forge-meta(matched meta-analysis/forest plot/heterogeneity/random-effects),不误推 forge-qual。",
-   "notes": "后续可把推荐挂进 auto-loop 感知阶段(为发现的 <type>-loop 顺带列相关技能包)。"
-  },
-  {
-   "id": "feat-019",
-   "name": "期刊画像层 + cite-check/provenance 期刊定制(AJS 思路)",
-   "description": "AJS(brycewang-stanford/Awesome-Journal-Skills)核心主张『一套泛泛的学术写作助手学不会期刊间差异』的心理学落地:journals.json 固化 5 本期刊(心理学报/心理科学/Psychological Science/JPSP/Psychological Bulletin)的引用风格/摘要与字数/版块/报告标准/数据可得性/预注册/退稿红线;`psyclaw journal [id]` 只读浏览(对齐 method/design 知识目录)。并让此前两处通用改进按期刊定制:cite-check `--journal`(引用风格核对为**软提示** + 退稿红线自查清单;孤儿引用仍是唯一硬判据)、provenance `--journal`(要求数据可得性的期刊 data_availability=required 须带数据指纹才算 provenance_complete)。纯知识数据,不含统计。",
-   "dependencies": [
-    "feat-015",
-    "feat-016"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/psych/journals.json(5 期刊画像)+ journals.py(load_journals/get_journal 别名+名称子串匹配/list_journal_ids/requires_data_availability/expected_citation_format/print_journal)+ citations.py detect_citation_format(纯函数:author-year|numeric|mixed|none)+ run_citation_audit(journal=) 附风格软提示与红线 + provenance.py build_provenance(journal=) 据 required 收紧完整性 + cli.py journal 命令(catalog 归『知识目录(只读)』,names==catalogued 通过)+ cite-check/provenance --journal;tests/test_journals.py 13 例;全量 C:\\Python314 pytest 1047 passed;CLI end-to-end:`journal jpsp` 显示画像;`cite-check --journal psych-science` 检出 numeric≠期望 author-year(不一致);`provenance --journal psych-science` 无数据指纹→不完整、补 --data→完整。"
-  },
-  {
-   "id": "feat-020",
-   "name": "auto-loop 感知阶段挂 skill 推荐",
-   "description": "把 feat-018 的按研究类型技能推荐接进 feat-014 auto-loop 的 ① 感知阶段:每轮发现待办(lit-loop/meta-loop/analysis-loop/qual-loop)时,自动在该待办下列出装在 .claude/skills 里、与该研究类型相关的外部技能包(AcademicForge/AJS),把『发现工作』与『发现工具』接上,免去手动跑 skills --for。纯指路、纯加在感知输出上:auto-loop 派发的仍是仓内 workflow,推荐的 Agent Skill 是给宿主 Agent 读的 markdown,psyclaw 不执行它们——不改派发/验收逻辑,零风险增量。技能池每轮一次性 list_skills 预取(避免每个待办各扫一遍磁盘),blocker 待办不推荐,推荐/发现失败 fail-safe 不阻塞主流程。",
-   "dependencies": [
-    "feat-014",
-    "feat-018"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/autoloop.py:新增 skill_hints(action, project_dir, skills, top_k) 薄封装 recommend_skills(external_only,失败返回 [])+ _print_sense(增 project_dir 参数,一次性预取 list_skills 池,每个非 blocker 待办打印『↳ 相关技能包:…』)+ run_autoloop 传 project_dir;tests/test_autoloop.py +3 例(action 类型匹配、无匹配/空池空、bundled-only 不推)共 36 例;全量 C:\\Python314 pytest 1065 passed;离线 end-to-end:seed .claude/skills 装 forge-meta/forge-analysis + 数据表 scores.csv → 感知阶段在 analysis-loop 待办下列出 forge-analysis 等相关技能包。"
-  },
-  {
-   "id": "feat-021",
-   "name": "PDF 正文抽取(读本地论文 PDF)",
-   "description": "修复用户实测痛点:REPL 引用/自动检测到本地 .pdf 时,旧代码把 PDF 当文本 read_text → 塞给 LLM 的是二进制乱码(PDF 头尾 + zlib 压缩流),LLM 只能说读不了。新增 pdf_extract:三级 best-effort 抽取——① 可选库 pypdf/pdfplumber(装了效果最好,正确处理字体编码,非硬依赖)② 纯 stdlib 兜底(zlib 解 FlateDecode 流 + 手写扫描器抽文本操作符,平衡括号 + 转义)③ 质量门(抽出不像正文=扫描件/加密/CID 字体 → 诚实返回提示装 pypdf 或粘贴文本/OCR,绝不注入乱码)。经 smart_excerpt 的 .pdf 分支接入,@file 与自动路径检测两条路都覆盖。只读、不碰统计。",
-   "dependencies": [
-    "feat-010"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/pdf_extract.py(extract_pdf_text/_via_lib/_via_stdlib/_read_literal 平衡括号扫描/_decode_literal(转义+八进制)/_decode_hex/_bytes_to_str(UTF-16BE BOM/latin-1)/_looks_like_text 质量门)+ psyclaw/context.py smart_excerpt 增 .pdf → _pdf_excerpt 分支(ok→<pdf>正文,失败→诚实 note);tests/test_pdf_extract.py 8 例(未压缩/FlateDecode/非PDF拒/无文本诚实提示/质量门/截断/smart_excerpt 路由不泄二进制/失败给提示);修复关键缺陷:字面量正则不支持嵌套括号(如 (p < .05))→ 改手写深度扫描;全量 C:\\Python314 pytest 1073 passed;本机 pypdf+pdfplumber 均可用(用户实跑将走高质量抽取)。"
-  },
-  {
-   "id": "feat-022",
-   "name": "来源路由树 search(按任务类型路由检索,主通道+兜底)",
-   "description": "据任务类型把检索路由到最合适的来源+模式:factual→学术库+精确、conceptual→学术库+语义(默认)、trend→学术库+时间序列(按年份窗口)、local→本地会话全文检索。决策树只选**主通道**但永远带一个**兜底通道**(主通道零命中即走兜底),规避『单一模式误路由把结果打空』。复用既有能力:academic=litsearch(OpenAlex/EuropePMC/arXiv)、local=会话 FTS(feat-013)、trend=litsearch 按年份窗口。控制流纯确定性(classify_task/route 可单测),execute_route 薄分发。来源集可扩展(加 web/MCP 源只需登记+加一条分发),core 不引入网络新依赖。psyclaw search <query> [--type factual|conceptual|trend|local]。",
-   "dependencies": [
-    "feat-007",
-    "feat-013"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/search_router.py(classify_task 中英双语关键词/route 主通道+兜底计划/execute_route 主空则兜底/_run_channel 分发 litsearch|ContextArchive.search/_temporal_search 年份窗口)+ cli.py search 命令(catalog 新增『检索/知识图谱』类,lit 一并归入,names==catalogued 通过);tests/test_search_router.py 10 例(四类归类+默认/route 主兜底不同/未知类型回落/trend=temporal/local=exact/execute 主命中不兜底/主空走兜底);全量 C:\\Python314 pytest 1093 passed;'焦虑研究近年趋势' → trend/temporal(+semantic 兜底)。",
-   "notes": "web/MCP 源为后续扩展点(core 不内置通用网页检索)。"
-  },
-  {
-   "id": "feat-024",
-   "name": "「天然」保存文件(REPL 无需命令即可落盘)",
-   "description": "解决用户实测:PsyClaw REPL 是纯对话循环,LLM 没有写文件的动作通道,只能punt『我无法创建文件』让用户复制粘贴。不引入 function-calling 架构(重、依赖 provider、安全升级),改用**提示约定 + 自动落盘**:系统提示告诉模型『要保存文件时用 ```save path=… 块输出内容』,ask() 每轮自动扫描回复里的 save 块并写盘——完全对齐既有 _capture_plan『解析模型回复→写 notes/plan.md』的套路,provider 无关(不需 function-calling API)。用户只需自然地说『存到 method.txt』。护栏守铁律:**绝不写受保护的 data/raw**、目标已存在**覆盖前交互确认**、非交互(非 TTY)不静默 clobber、写完回报路径与字符数。",
-   "dependencies": [
-    "feat-010"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py:parse_save_blocks(纯函数,正则解析 ```save path=… 块,支持 path=/裸路径/带引号/Windows 反斜杠路径/多块/剥尾换行)+ _save_is_protected(data/raw 守卫)+ apply_save_block(护栏写盘,status∈{saved,refused-raw,skipped-exists,error};confirm(path)→True 才覆盖,缺省不覆盖)+ _capture_saves(方法,覆盖走 loop._ask_yn,非 TTY fail-safe 不覆盖)+ _SAVE_SYSTEM 注入 _build_system_prompt + ask() 每轮调用;tests/test_repl_save.py 9 例(解析单/多/裸/引号/Windows 路径/无块 + data/raw 拒 + 新建 + 存在跳过 + 确认覆盖);全量 C:\\Python314 pytest 1102 passed;end-to-end:含 ```save 块的模型回复 → 自动写出 method.txt(研究1+权限管理内容)。"
-  },
-  {
-   "id": "feat-025",
-   "name": "纯工具层循环 agent(模型自主多步调工具,provider 无关保底)",
-   "description": "让模型自主多步调用工具,作为 provider 无关的保底(用户明确要求)。**不绑 provider 原生 function-calling**(那样 mock 和不支持的模型就废了),改用**文本约定的工具协议**——模型在回复里输出 ```tool JSON 块,循环解析→执行→把结果回灌→模型续,直到给出不含 tool 块的最终答案;任何文本模型都能跑,这是保底,支持原生 tool-calling 的 provider 以后可另接高性能通道。工具集把既有能力暴露为可调用:search(来源路由 feat-022)/read_file(含 PDF 抽取 feat-021)/save_file(feat-024 护栏)/kg_query(feat-023)/recall(feat-013)。守 PsyClaw fail-closed:副作用工具(save_file)需 approve 批准(HITL 留在环里)、max_iters 防打转、只读工具自动跑、data/raw 硬护栏在工具内继续生效、emit 事件流对接『流式中间结果』。REPL /agent 模式 + 顶层 psyclaw agent <task> [--auto]。",
-   "dependencies": [
-    "feat-010",
-    "feat-021",
-    "feat-022",
-    "feat-023",
-    "feat-024"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(parse_tool_calls 纯函数/build_tools 5 工具 search·read_file·save_file[side_effect]·kg_query·recall/render_tool_catalog/_exec_tool(未知/副作用 approve 门/异常不炸)/_render_results/run_tool_loop 主循环[无块=answered/到顶=max_iters])+ psyclaw/repl.py(agent_mode + /agent 开关 + _run_agent + ask() if/else 分支 + _approve 走 _ask_yn 非TTY拒 + COMMANDS/HELP)+ psyclaw/cli.py agent 一次性命令(--auto/--max-iters,catalog 归『研究流程/编排回路』,names==catalogued 通过);tests/test_toolloop.py 13 例(解析单/多/无/坏JSON/缺name + build/catalog + 循环收敛/上限/副作用需批准/批准执行/未知工具/emit);全量 C:\\Python314 pytest 1115 passed;离线 end-to-end:脚本 provider → recall → save_file(批准)→ 最终答案,3 轮 answered 收敛,out.txt 实际写出。",
-   "notes": "原生 function-calling 通道(为支持的 provider)+ MCP 工具接入 为后续增强点。"
-  },
-  {
-   "id": "feat-026",
-   "name": "易用性收敛套件:status / 本地感知 / 门禁用户跳过 / check / 入口决策树",
-   "description": "整项目易用性审查(易用性/降认知成本为主,准确性为次)后的一揽子落地:① psyclaw status 一屏态势(目标/澄清/回路/等人决策**直接打印内容**/最近产物/下一步建议,复用 discover_backlog)——状态不再散落 8 个文件;② 本地项目感知 project_sense(用户实测:psyclaw 感知不到文件夹)——有界目录树每轮注入 REPL system(限深/限条/跳噪声;**data/raw 只报数不列名**),agent 工具集加 list_dir;③ 门禁用户跳过(用户决定:不分级,显式要求即可跳)——run_workflow/auto-loop/四 type-loop 加 --skip-gates,跳过留痕 notes/gate_skips.md + 总验收带 gates_skipped + exploratory 标注,默认 fail-closed 行为不变;④ psyclaw check 投稿前一键质检(JARS+引用保真(+期刊风格)+复现溯源+KG 溯源,一屏 ✓/✗/⚠,每项独立 fail-safe);⑤ 入口收敛:guide 重写为『默认三条路径(status→auto-loop→check)+按需分支』决策树,session 帮助淡出 search 子动作(统一入口=psyclaw search)。",
-   "dependencies": [
-    "feat-012",
-    "feat-014",
-    "feat-015",
-    "feat-016",
-    "feat-022",
-    "feat-023",
-    "feat-025"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/status.py(collect_status 纯采集各块独立 fail-safe + print_status)+ psyclaw/project_sense.py(scan_tree 有界/render_tree 折叠计数/project_brief ≤1500字符)+ repl.py ask() 注入 brief + toolloop build_tools 加 list_dir + workflows/engine.py run_workflow(skip_gates)+_record_gate_skip 留痕+summary.gates_skipped/exploratory + autoloop discover_backlog(skip_clarify)/_dispatch/run_autoloop(skip_gates)+ cli.py status/check 命令 + 5 个 loop --skip-gates + guide 决策树 + session 帮助改写(names==catalogued 通过,命令 44 条);tests/test_status_sense.py 10 + test_gate_skip.py 4 + test_checkup.py 6;全量 C:\\Python314 pytest 1135 passed;end-to-end:status 直接亮出 clarify blocker 与建议、check 抓出 JARS 缺项+杜撰引用 Ghost(2099)、guide 出默认三条路径、data/raw 文件名未泄入目录树。"
-  },
-  {
-   "id": "feat-027",
-   "name": "REPL 交互升级:键盘选择器 + 文件读取权限(open/safe)+ 会话名可见",
-   "description": "三个用户实测痛点:① 模型列复选清单『• [ ] 研究1a…』但 REPL 不支持键盘选择 → psyclaw/choices.py:模型输出 ```choices JSON 块(system 约定)或自发复选清单(启发式,≥2 条)→ 弹键盘选择器(prompt_toolkit 对话框方向键+空格勾选 → 编号输入兜底 → 非 TTY 不弹),选完自动回传续聊;② 模型说『我无法读取CSV』要用户 @ 引用 → 文件读取权限模式:open(默认)=模型输出 ```read 块 REPL 自动读取注入(smart_excerpt:CSV 结构+样例行/PDF 抽正文;data/raw 恒拒;每轮≤4 文件;自动跟进深度≤3 防打转),safe(/safemode)=一切读取须 @ 显式引用;③ /rename 后看不出改了名 → 会话名进提示符(psyclaw·名字 ❯),plan/agent/safe 模式同显,resume 带回名字。",
-   "dependencies": [
-    "feat-010",
-    "feat-013",
-    "feat-021"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/choices.py(parse_choices 块+复选启发式/resolve_selection 编号·全部·原文·取消/format_selection_message/pick_interactive 三级降级)+ repl.py(_CHOICES_SYSTEM/_READ_OPEN_SYSTEM/_READ_SAFE_SYSTEM 动态注入 + parse_read_requests/gather_read_results 纯函数 + _auto_followup 读取→选择→自动回传(深度上限)+ /safemode + session_name 进提示符);tests/test_choices_reads.py 12 例(含用户实测的 • [ ] 格式、data/raw 拒读内容不泄、文件数上限);全量 C:\\Python314 pytest 1154 passed。"
-  },
-  {
-   "id": "feat-028",
-   "name": "插件系统 + skill/MCP/plugins 统一 内置/用户(项目/全局)scope",
-   "description": "① 插件系统(用户要求):放 <项目>/.psyclaw/plugins/*.py 或 ~/.psyclaw/plugins/*.py,暴露 register(api)——api.add_tool(进 agent 工具循环,side_effect 照走批准门)/add_command(进 REPL slash+补全联想)/add_system(追加 system 提示)。每个插件独立 fail-safe 加载(坏插件不拖垮宿主,错误可见);内置同名优先不被劫持。psyclaw plugins + REPL /plugins 列出。② 统一 scope(用户要求):skills(builtin/project/global/custom,按根目录 is_relative_to 归类——修了字符串前缀误判 F:/proj-data∈F:/proj 的真 bug)、MCP(内置 registry.yaml + 用户 .psyclaw/mcp.yaml 项目/全局合并,内置优先防劫持)、plugins(项目/全局),三处列表均标注 内置/用户·项目/用户·全局。",
-   "dependencies": [
-    "feat-017",
-    "feat-025"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/plugins.py(PluginApi/PluginRegistry/plugin_dirs 项目优先/load_plugins 逐插件隔离/merge_plugin_tools 内置优先)+ toolloop.build_tools 并入插件工具 + repl.py(__init__ 加载/系统片段注入/插件 slash 分发+补全/ /plugins)+ cli.py plugins 命令 + cmd_skills/cmd_mcp 标 scope + skills/loader.py _root_scope(is_relative_to)+ mcp/manager.py user_registries/_all_entries(catalog 45 条,names==catalogued 通过);tests/test_plugins_scope.py 8 例(注册三扩展点/坏插件隔离/缺 register/下划线跳过/内置不被劫持/build_tools 并入/skills scope/McP 用户注册表 scope+同名内置优先);全量 C:\\Python314 pytest 1154 passed;e2e:项目插件 lab.py → psyclaw plugins 列出[用户·项目]+工具+命令。"
-  },
-  {
-   "id": "feat-029",
-   "name": "v0.2 发布:命令简单化 + 用户别名 + 内置 skill 同步 + CHANGELOG",
-   "description": "用户定调 v0.2:『机制可以复杂,但命令要简单化;支持用户自定义;内置 skill 能同步更新』。① 命令简单化:--help 收敛到 CORE_COMMANDS(全部命令照常可调用,epilog 动态指路 psyclaw commands / guide / TUTORIAL);② 用户别名:~/.psyclaw/aliases.yaml(全局)+ <项目>/.psyclaw/aliases.yaml(项目覆盖全局),一行一条『qc: check --journal xinlixuebao』→ psyclaw qc 稿件.md,shlex 解析带引号参数,**内置命令优先不可劫持**,任何异常 fail-safe 不阻塞 CLI,psyclaw commands 底部列出你的别名;③ 内置 skill 同步:纳入另一会话实现的 skills --sync(upstream.json 清单 → <skill>/upstream/ 同步,ctx2skill/opid 适配层薄壳)及其测试;④ __version__ 0.1.0→0.2.0 + CHANGELOG.md(v0.1→v0.2 全量变更)。",
-   "dependencies": [
-    "feat-026",
-    "feat-028"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/aliases.py(alias_files 全局在前项目覆盖/_parse errors=replace fail-safe/load_aliases/expand_alias 纯函数·内置优先·shlex·坏定义原样)+ cli.py main() 别名展开(异常不阻塞)+ build_parser 末尾 --help 收敛(快照 _psyclaw_help 后过滤 _choices_actions,epilog 动态报『只列 N 条/全部 M 条』)+ cmd_commands 列别名 + psyclaw/skills/sync.py+ctx2skill/opid(另一会话实现,本轮纳入提交)+ __init__ 0.2.0 + CHANGELOG.md;tests/test_aliases.py 6 例(展开+余参追加/内置不劫持/透传/引号+注释/坏文件/坏定义)+ test_cli_help 帮助收敛新契约(shown==CORE∩all、未列命令仍可调、epilog 指路);全量 C:\\Python314 pytest 1163 passed;e2e:--help 尾行『只列 31 条…全部 51 条』、psyclaw version=0.2.0、别名 qc 展开为 check --journal xinlixuebao 实跑。"
-  },
-  {
-   "id": "feat-023",
-   "name": "带引用的轻量知识图谱 kg(边由构造即带引用)",
-   "description": "SQLite nodes/edges 知识图谱(stdlib,无 Neo4j),把研究里的构念/论文/人物/机构/技术串起来帮 Agent 理解全貌。核心纪律=**边必带来源**:add_edge 拒绝无 source_ref 的边(反幻觉关系);verify 复用 feat-015 cite-check 的 _canon_key 规范化,核对每条 citation 边的来源是否真在检索语料(notes/evidence_map.json 允许键),溯源不到=孤儿=疑似杜撰关系。主题范围非全局:seed_from_evidence_map 从既有 evidence_map(构念×支持文献)直接种出天然带引用的图。基础实体消歧(归一名+类型去重);ego 子图 BFS + mermaid 渲染(边标来源)。存 .psyclaw/kg/graph.db。psyclaw kg seed|show <实体>|verify|stats。",
-   "dependencies": [
-    "feat-007",
-    "feat-015"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/kg.py(KnowledgeGraph:_db(nodes UNIQUE(norm,type)/edges UNIQUE(src,dst,rel,src_ref))/add_node 去重/add_edge 拒无来源/neighbors 出入边/subgraph BFS/seed_from_evidence_map/verify 复用 citations._canon_key+load_allowed/stats 自证 uncited=0 不变量)+ render_mermaid;cli.py kg 命令(catalog『检索/知识图谱』,names==catalogued 通过);tests/test_kg.py 10 例(节点去重/边必带来源/建点+stats/邻居出入/子图深度/种图/缺 evidence_map/verify 溯源+孤儿检出/非citation边跳过/mermaid);全量 C:\\Python314 pytest 1093 passed;CLI end-to-end:evidence_map 种 2 带引用边 → kg show 出 mermaid 子图(边标引用)→ kg verify 0 孤儿,加杜撰边 Ghost(2099) → verify 抓成孤儿。"
-  },
-  {
-   "id": "feat-030",
-   "name": "toolloop 截断防护——工具调用中途不再提前停止",
-   "description": "修复长任务提前停止的三个根因:(1) provider 输出被 max_tokens 截断时 ```tool 块未闭合,parse_tool_calls 解析不出调用,run_tool_loop 误判为最终答案而静默终止——新增 has_truncated_tool_block 检测未闭合块 + provider.last_stop_reason==max_tokens 检查,触发续写提示(_TRUNC_NUDGE)让模型重发完整块,连续截断 >_MAX_TRUNC_STREAK(2) 次才停(stopped=truncated,不静默);完整调用+尾部截断残块时执行完整的并在回灌里告知残块未执行。(2) anthropic_api/openai_compat 此前完全忽略 stop_reason/finish_reason——base.Provider 加 last_stop_reason 属性,anthropic 从 message_delta 捕获,openai 系捕获 finish_reason 并归一化(length→max_tokens);anthropic max_tokens 4096→PSYCLAW_MAX_TOKENS 环境变量可配(默认 8192)。(3) agent 命令 max_iters 默认 6→24(长研究任务多步调用;auto-loop 的 6 是研究阶段数语义,不动)。",
-   "dependencies": [
-    "feat-014"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(has_truncated_tool_block/_MAX_TRUNC_STREAK/_TRUNC_NUDGE/run_tool_loop 截断分支)+ providers/base.py(last_stop_reason)+ anthropic_api.py + openai_compat.py + cli.py(agent --max-iters 24);tests/test_toolloop.py 新增 6 例(未闭合检测/截断不当答案继续/连续截断放弃 stopped=truncated/stop_reason=max_tokens 触发重试/完整调用+残块执行并告知/默认上限≥24);另修 tests/test_mcp_servers.py 2 例陈旧断言(3d9b183 改 mplus/stata 为 detect: 门控后测试未同步,改为 enabled iff shutil.which);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1190 passed(修前 1188 passed 2 failed,失败为上述陈旧断言,已确认与本改动无关后修正)。"
-  },
-  {
-   "id": "feat-031",
-   "name": "shell 执行 fail-closed 安全加固(v0.3,外审 HIGH)",
-   "description": "repl.py run_commands 现仅靠 _DANGEROUS_RE 正则拒绝清单把关 LLM 生成的 shell 命令(subprocess shell=True 自动执行)——拒绝清单不是安全边界。改为:shell 类命令每条都须 confirm(cmd)→True 才执行(fail-closed,非 TTY 不批),_DANGEROUS_RE 降级为确认提示里的 ⚠ 危险标签;psyclaw 进程内子命令保持自动(自家 argparse 编排,交互式命令已有 _INTERACTIVE_CMDS 守卫)。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(run_commands:shell 类每条须 confirm→True 否则拒,danger 时 psyclaw 类也须确认;_DANGEROUS_RE 降级为 ⚠ 标签注释;_auto_followup 调用处 _confirm_cmd 按危险与否换提示措辞);tests/test_review_fixes_v02.py:原 test_run_commands_executes_shell 改为带 confirm 契约 + 新增 5 例(普通 shell 无 confirm 拒/confirm 拒绝拒/psyclaw 类自动/psyclaw 危险模式仍须确认/逐条 confirm 回调);验证:uv run --python 3.12 pytest → 1195 passed"
-  },
-  {
-   "id": "feat-032",
-   "name": "save_file 路径允许清单(v0.3,外审 MEDIUM)",
-   "description": "toolloop build_tools 的 _save 现以 confirm=lambda p:True 调 apply_save_block,可写任意路径。改为:Path.resolve() 后必须 is_relative_to(项目根),拒软链接目标、拒凭据类路径(~/.ssh/~/.aws/~/.gnupg/.netrc/.env/*.pem),拒绝消息带完整解析路径;data/raw 铁律照旧在 apply_save_block 内生效。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(save_path_denied 纯函数:resolve 后须 is_relative_to 项目根/拒已存在软链目标/拒凭据类名单 _CRED_NAMES+_CRED_SUFFIXES+_CRED_DIR_PARTS;_save 先过护栏再 apply_save_block,工具描述更新);tests/test_toolloop.py +10 例(根内放行/../逃逸/项目外绝对路径/~/.ssh/凭据名/凭据目录/软链目标/途径软链目录逃逸/空路径/端到端拒写不落盘);验证:uv run --python 3.12 pytest → 1205 passed"
-  },
-  {
-   "id": "feat-033",
-   "name": "长会话上下文修剪(v0.3,「对话长期维持」另一半)",
-   "description": "toolloop run_tool_loop 的 convo 无界增长(默认 24 轮 × 每轮 ≤6000 字符/工具回灌)会撑爆 provider 上下文或触发更频繁截断。循环内滚动修剪:保 system+最初任务+最近 N 轮完整,更早的工具结果消息压缩为一行摘要(工具名+结果首行);修剪对模型透明(摘要行说明可用 recall 找回)。附带审视 repl compact_history 现契约并补质量测试。",
-   "dependencies": [
-    "feat-030"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(_compress_result_msg 每工具保 ## 名+输出首行限 160 字/trim_convo 就地滚动修剪:只动 base_len 后以 # 工具结果 开头的 user 消息,最近 3 条保完整,幂等跳过已压缩;run_tool_loop 每轮回灌后调用);REPL 侧 compact_history 审视结论=已有预算触发+备忘蒸馏+memo 4000 限长+测试覆盖,无需改;tests/test_toolloop.py +5 例(压缩保工具名+首行/近 3 完整旧 3 压缩/幂等+阈下不动/不碰调用方历史/端到端 SpyProvider 验证第 7 轮时 6 条结果 3 条已压缩);验证:uv run --python 3.12 pytest → 1210 passed"
-  },
-  {
-   "id": "feat-034",
-   "name": "normalize_type 中文研究类型别名(v0.3 小修)",
-   "description": "skills/recommend.py normalize_type 不识别中文研究类型(『元分析』→None,英文 meta 可)——补中文别名映射(元分析/元/荟萃→meta 等,覆盖 RESEARCH_TYPE_KEYWORDS 全部类型),高频入口。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/skills/recommend.py(_TYPE_ALIASES 补 22 个中文别名:文献综述/综述/系统综述→lit-review、元分析/荟萃(分析)/meta分析→meta、实证(研究/分析)/数据分析/统计分析/定量(研究)/量化研究→analysis、质性(研究)/定性(研究)/访谈研究/主题分析→qualitative);tests/test_skill_recommend.py +2 例(中文别名 12 断言含 lower/strip 归一与未知拒/中文入口端到端推荐);验证:uv run --python 3.12 pytest → 1212 passed"
-  },
-  {
-   "id": "feat-035",
-   "name": "v0.3 发布收尾(版本对齐 + CHANGELOG)",
-   "description": "版本不一致:pyproject.toml=0.1.0、__version__=0.2.0(v0.2 发布轮漏改 pyproject)。统一升 0.3.0;CHANGELOG.md 增 v0.3 段(feat-030..034);全量回归绿后打收尾提交。",
-   "dependencies": [
-    "feat-031",
-    "feat-032",
-    "feat-033",
-    "feat-034"
-   ],
-   "status": "done",
-   "evidence": "pyproject.toml version 0.1.0→0.3.0 + psyclaw/__init__.py __version__ 0.2.0→0.3.0(对齐);CHANGELOG.md v0.3.0 段(长会话可靠性 feat-030/033、安全加固 feat-031/032、其他 feat-034/版本统一/陈旧测试修复);TODO.md §2 全部标 ✅;验证:uv run --python 3.12 pytest → 1212 passed;psyclaw version → 0.3.0(uv tool editable 安装即时生效)"
-  },
-  {
-   "id": "feat-036",
-   "name": "provider 网络层健壮性(v0.4:重试+错误显性化)",
-   "description": "base._post_sse 现在 HTTP/网络错误只抛裸异常,调用方(REPL/_run_agent)只显示「provider 错误」,且无重试——网络瞬断/限流直接杀死整个 agent 长任务。改为:429/5xx/URLError/timeout 指数退避重试(≤3 次,仅在首字节产出前,流中断不重试防重复消费);HTTPError 读响应 body(截断)拼进异常消息(API 的 error JSON 通常在 body 里,裸 status 无法定位);4xx(非 429)不重试直接显性报错。stdlib only,time.sleep 可测试注入。",
-   "dependencies": [
-    "feat-030"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/providers/base.py(_post_sse 重写:首字节前 429/5xx/529/URLError/timeout 指数退避重试 ≤3 次(_sleep 可注入),4xx 非 429 不重试;_http_error_detail 读 body 截 300 字拼 RuntimeError;流开始后异常向上传播不重试防重复消费);tests/test_providers.py +6 例(成功透传跳 [DONE]/429×2 后成功且退避 [1.0,2.0]/URLError+503 混合重试/400 不重试且 body 进消息/持续失败 3/3 报错/流中断不重试);验证:uv run --python 3.12 pytest → 1218 passed"
-  },
-  {
-   "id": "feat-037",
-   "name": "agent 运行痕迹持久化(v0.4:agent_runs.jsonl + --history)",
-   "description": "run_tool_loop 的 trace/final 只活在当轮终端,跑完即失——崩溃/关窗后无法回看 agent 做了什么(可观测性缺口,也是复现溯源的输入)。新增 toolloop.log_agent_run(project_dir, task, res) 追加 .psyclaw/agent_runs.jsonl(ts/task 头/iters/stopped/工具调用名列表/final 头);cli cmd_agent 跑完自动记;psyclaw agent --history [n] 回看最近 n 次(默认 10);REPL _run_agent 同样落痕。",
-   "dependencies": [
-    "feat-030"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(log_agent_run 追加 .psyclaw/agent_runs.jsonl:ts/task 头/iters/stopped/工具名列表/final 头,各头截 200 字,OSError 静默;read_agent_runs 新→旧读 limit 条,坏行跳过,缺文件 []);cli.py cmd_agent(--history [n] 回看默认 10、task 改 nargs=* 配合、跑完自动 log);repl.py _run_agent 同样落痕;.psyclaw/ 已在 .gitignore。tests/test_toolloop.py +4 例(写读新→旧/limit+缺文件/坏行跳过/头截断);验证:uv run --python 3.12 pytest → 1222 passed;live e2e:agent 实跑后 --history 回显 [2 轮 · 1 工具 · answered] 列出项目根目录结构"
-  },
-  {
-   "id": "feat-038",
-   "name": "v0.4 收尾:docs 同步 + harness 快照",
-   "description": "README/docs/COMMANDS.md 同步 v0.3+v0.4 用户可感知变化(shell 命令逐条确认是行为变化必须写清;save_file 只写项目根;PSYCLAW_MAX_TOKENS;agent --history);progress.md/session-handoff.md 快照;全量回归绿。",
-   "dependencies": [
-    "feat-036",
-    "feat-037"
-   ],
-   "status": "done",
-   "evidence": "docs/COMMANDS.md(agent 行补 --max-iters/--history 与 v0.3/v0.4 特性说明);docs/TUTORIAL.md(REPL 7 件事:新增『shell 命令块每条先确认』行,save 行补 agent 护栏);progress.md 本轮(24) v0.3.0+v0.4 快照;session-handoff.md(Evidence/Decisions/Next=v0.5 候选);验证:uv run --python 3.12 pytest → 1222 passed"
-  },
-  {
-   "id": "feat-039",
-   "name": "MCP stdio 客户端(v0.5:连接内置/用户 MCP 服务器)",
-   "description": "psyclaw/mcp/client.py:JSON-RPC 2.0 over stdio 客户端(与 server_base.py 对偶)。subprocess 起服务器(command 字符串 shlex 拆分,`python` 用 sys.executable 兜底本机无 python),换行分隔 JSON-RPC:initialize→notifications/initialized→tools/list→tools/call。每步超时 fail-safe(不挂死 agent),进程异常/坏 JSON 优雅降级返回错误串。上下文管理器 close 收尾杀进程。stdlib only(subprocess/json/shlex)。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/mcp/client.py(MCPClient:惰性 start 起子进程+initialize/notifications/initialized 握手,后台读线程+queue 按 id 匹配响应,_request 超时/EOF fail-safe 返回错误 dict;list_tools/call_tool 归一错误为可读串不抛;resolve_command 把 python/python3 换 sys.executable 兜底本机无 python;上下文管理器 close 幂等杀进程);tests/_mcp_echo_server.py 夹具(基于 server_base 的 echo/boom 服务器)+ tests/test_mcp_client.py 8 例(command 解析/list 往返/call 往返中文/服务器错误可读/未知工具/坏命令降级/超时不挂死/close 幂等);验证:uv run --python 3.12 pytest → 1230 passed(真实 subprocess 往返)"
-  },
-  {
-   "id": "feat-040",
-   "name": "agent 循环接入 MCP 工具(v0.5:编排纵深)",
-   "description": "toolloop.build_tools 合并已启用 MCP 服务器暴露的工具(list_mcp_catalog_with_health 里 enabled+健康的,惰性连接:工具被调时才起子进程)。MCP 工具名加前缀防撞内置(mcp__<server>__<tool>);标 side_effect=True 走 fail-closed 批准(外部执行,保守)。连接失败不拖垮工具集(与既有插件加载同构)。catalog 里对模型说明这些是外部 MCP 工具。",
-   "dependencies": [
-    "feat-039"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/mcp/agent_tools.py(merge_mcp_tools:只并 enabled+health.ok+有 command 的服务器,tools/list 短超时 10s,mcp__<server>__<tool> 前缀防撞,一律 side_effect=True fail-closed;客户端进程级缓存 _clients 按 command 复用+atexit 收尾;PSYCLAW_MCP_TOOLS=0 可关;任何异常不外抛);toolloop.build_tools 在插件合并后调 merge_mcp_tools(与插件加载同构);tests/test_mcp_agent_tools.py 7 例(前缀+side_effect+schema hint/真调 echo 服务器/跳过禁用+不健康+无 command/env 关闭/坏命令不炸/catalog 异常吞掉/客户端缓存复用);验证:uv run --python 3.12 pytest → 1237 passed;live e2e:build_tools('.') 实际浮出真实 mne-mcp 4 工具(mne_info/preprocess_plan/erp_components/stats_guidance),内置 6+MCP 4=10"
-  },
-  {
-   "id": "feat-041",
-   "name": "compact_history LLM 蒸馏升级(v0.5:长会话质量)",
-   "description": "context.compact_history 现在靠 _distill 规则截断早期轮次为备忘。升级:可选传 provider,用它把被丢弃轮次蒸馏成结构化决策摘要(比规则截断保真);provider 缺失/异常/无 key → fail-safe 回落现有规则蒸馏(zero-dep 契约不破)。纯函数可测(注入 fake provider)。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/context.py(_llm_distill:provider 有 key 时用 _DISTILL_SYSTEM 把被丢弃轮次蒸馏成结构化决策备忘,provider=None/无 key(mock)/异常/空输出→返回 None 回落规则蒸馏 _distill;compact_history 加 provider 可选参,zero-dep 契约不破);repl.py ask 流程传 self.provider(无 key 自动回落);tests/test_context.py +5 例(有 key 用 LLM 且带蒸馏 system/provider 异常回落规则蒸馏不抛/无 key 不调 LLM/None 与默认一致/预算下不调 LLM);验证:uv run --python 3.12 pytest → 1242 passed"
-  },
-  {
-   "id": "feat-042",
-   "name": "v0.5.0 发布收尾",
-   "description": "版本 0.3.0→0.5.0(pyproject+__init__);CHANGELOG v0.5 段(MCP client/agent 接入/蒸馏升级);docs/COMMANDS+ARCHITECTURE 记 agent 可调 MCP 工具;progress/session-handoff 快照;全量回归绿。",
-   "dependencies": [
-    "feat-039",
-    "feat-040",
-    "feat-041"
-   ],
-   "status": "done",
-   "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.3.0→0.5.0(跳过未发版 0.4);CHANGELOG.md v0.5.0 段(编排纵深 feat-039/040、长会话 feat-041、含 v0.4 工件 feat-036/037/038);docs/COMMANDS.md(统计三条路补 agent 直连 MCP + PSYCLAW_MCP_TOOLS)、docs/ARCHITECTURE.md(L3 加 v0.5 agent 直连 MCP 段);TODO §2 + progress 本轮(25) + session-handoff 快照;验证:uv run --python 3.12 pytest → 1242 passed;psyclaw version → 0.5.0(uv tool editable)"
-  },
-  {
-   "id": "feat-043",
-   "name": "工具调用参数规范化与校验(v0.6:多轮工具调用不崩)",
-   "description": "parse_tool_calls 现在把 args 原样返回:模型输出 args 为 list/数字/双重编码 JSON 字符串(\"args\":\"{...}\")时,内置工具 a.get(...) 抛 AttributeError,且 _exec_tool 竟标 ok=True(掩盖崩溃)。修:parse 规范化 args——dict 保留;JSON 对象字符串→解析为 dict;其余非 dict→{name:None,error:'args 必须是 JSON 对象'} 引导模型改;name 须非空字符串(否则 error)。_exec_tool 工具异常改标 ok=False(如实报失败,模型能自纠)。纯函数可测。",
-   "dependencies": [
-    "feat-030"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(_normalize_args:None→{}/dict 原样/JSON 对象字符串→解析/非 dict 与非对象字符串→报错引导;parse_tool_calls 用之,并校验 name 须非空字符串;_exec_tool 工具异常改标 ok=False 而非 True);tests/test_toolloop.py +8 例(dict/None 透传、JSON 字符串解析+空串、非对象拒(list/数字/bool/坏串)、parse 强转 JSON 字符串 args、list-args 带引导错误、非字符串 name 拒、端到端畸形 args 标 ok=False 不崩、异常标失败);实测复现:修前 list-args→'list object has no attribute get' 且 ok=True;修后 ok=False+'args 必须是 JSON 对象'。验证:uv run --python 3.12 pytest → 1250 passed"
-  },
-  {
-   "id": "feat-044",
-   "name": "工具循环无进展检测(v0.6:多轮不空转/不卡死)",
-   "description": "当前只有 max_iters 与截断兜底;模型反复用**相同参数**调同一工具(常见混乱模式)会白耗到 max_iters,空回复也被当最终答案。加:① 空/纯空白回复(无 tool 块、非截断)→ 视为无进展,回灌一次追问而非当答案;② 连续相同 (name,args) 调用达阈值 → stopped=no_progress,附清晰说明停止(不静默、不空转到 24 轮)。有限纠偏后收敛。",
-   "dependencies": [
-    "feat-043"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(_calls_signature 键序无关签名;run_tool_loop 加 empty_streak/repeat_streak/prev_sig:空/纯空白回复→追问 _EMPTY_NUDGE 而非当答案,连续 >_MAX_NOPROGRESS(2) 空→stopped=no_progress;连续相同 (name,args) 达 _MAX_NOPROGRESS→stopped=no_progress 收敛,不空转到 max_iters);tests/test_toolloop.py +6 例(签名键序无关/空回复追问后答/空连击停/重复调用停且执行恰 2 次/变参不误触/非空答案立即返回)+ 改 test_loop_max_iters 用变参(否则先中无进展检测);验证:uv run --python 3.12 pytest → 1256 passed"
-  },
-  {
-   "id": "feat-045",
-   "name": "消息序列不变量守卫(v0.6:多轮不触发 provider 400)",
-   "description": "provider(Anthropic/OpenAI)对空 content 消息、非交替角色会 400。工具循环回灌/续写路径需保证:绝不向 convo 追加空 content 的 assistant/user 消息;最终答案为空时有限重试一次而非返回空 final;assistant→user 交替不被 nudge 打破。加不变量检查函数 + 循环内应用。",
-   "dependencies": [
-    "feat-044"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(sanitize_messages 纯函数:丢非 user/assistant 角色与空 content、合并连续同角色、丢开头 assistant 保首条 user;run_tool_loop 每次 provider.chat 前套用);tests/test_toolloop.py +6 例(丢空 content、合并同角色、首条须 user、丢未知角色、None content、端到端断言 provider 每次只收合法序列:非空 content+角色交替+首条 user);验证:uv run --python 3.12 pytest → 1262 passed"
-  },
-  {
-   "id": "feat-046",
-   "name": "v0.6 发布收尾 + 多轮集成测试",
-   "description": "新增贴近真实的多轮工具调用集成测试(混合:正常调用→畸形 args 自纠→重复调用检测→截断续写→最终答案),证明『多轮对话工具调用不出问题』;版本 0.5.0→0.6.0;CHANGELOG v0.6 段;progress/handoff 快照;全量回归绿。",
-   "dependencies": [
-    "feat-043",
-    "feat-044",
-    "feat-045"
-   ],
-   "status": "done",
-   "evidence": "tests/test_toolloop_multiturn.py 新增(ScriptedProvider 走真实多轮:正常调用→双重编码 JSON 字符串 args 自纠成功→list args 拦截失败→未知工具→max_tokens 截断续写→重发→答案;断言工具只在合法参数时执行[x=1,2,3]、畸形/未知如实标 ok=False、provider 每次只收合法序列;+连续失败不误判无进展仍能答案);版本 0.5.0→0.6.0(pyproject+__init__);CHANGELOG v0.6 段;TODO/progress/session-handoff 快照;验证:uv run --python 3.12 pytest → 1264 passed;psyclaw version → 0.6.0"
-  },
-  {
-   "id": "feat-047",
-   "name": "REPL 方向键/历史/光标(readline 后端)——修 ^[[A 泄漏(v0.7)",
-   "description": "用户报:psyclaw REPL 不支持方向键,按 ↑ 显示 ^[[A。根因:tool 装在 uv py3.12(无 prompt_toolkit),非 ptk TTY 落到自研 _read_line_interactive 逐键 raw reader——只把 ↑↓ 映射到 slash 联想、←→ 变 ESC,无命令历史/光标移动,且终端兼容性差会漏转义。修:非 ptk TTY 优先走 readline-backed 输入(stdlib readline 一挂即得方向键/↑↓历史/←→光标/Ctrl-A/E/K),slash 命令用 readline 补全器(整行补全、libedit/gnu 均绑 Tab),ANSI 提示用 \\001\\002 包裹让宽度计算正确;readline 不可用(Windows)再退 raw reader,再退裸 input。ptk premium 路径不变。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/ui_input.py(_readline_input:import readline 即得方向键/↑↓历史/←→光标/Ctrl-A-E-K,装整行 slash 补全器 set_completer+set_completer_delims('')、libedit 绑 'bind ^I rl_complete'/gnu 绑 'tab: complete'、结束 finally 复原;_rl_wrap_prompt 用 \\001\\002 包 ANSI SGR 让宽度计算正确;read_line 非 ptk TTY 改为优先 _readline_input,readline 缺失→raw reader→input);tests/test_repl_ptk.py 改 1 例(降级链新增 readline 层)+新增 6 例(非 ptk TTY 首选 readline/readline 缺失退 raw/KI 穿透/wrap ANSI/无 ANSI 不变/补全器候选+复原);根因:tool 装在 uv py3.12 无 prompt_toolkit,旧路径落自研 raw reader 不支持方向键。验证:uv run --python 3.12 pytest → 1270 passed;smoke:_readline_input 真 import readline 可用"
-  },
-  {
-   "id": "feat-048",
-   "name": "v0.7 发布收尾",
-   "description": "版本 0.6.0→0.7.0;CHANGELOG v0.7 段(REPL 方向键修复,用户可感知);TUTORIAL 补一句(方向键/历史可用,装 [full] 得实时补全);progress/handoff 快照;全量回归绿。",
-   "dependencies": [
-    "feat-047"
-   ],
-   "status": "done",
-   "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.6.0→0.7.0;CHANGELOG v0.7.0 段(REPL 方向键 readline 修复,用户可感知);docs/TUTORIAL.md『编辑/翻历史』行(方向键/Ctrl-A-E 可用+装 [full] 得实时联想);TODO §2 + progress 本轮(27) + session-handoff 快照(v0.8 候选=pystat MCP);验证:uv run --python 3.12 pytest → 1270 passed;psyclaw version → 0.7.0"
-  },
-  {
-   "id": "feat-049",
-   "name": "pystat MCP 服务器——闭环『统计外移到 MCP』(v0.8)",
-   "description": "registry 早声明 pystat(enable_when always)却无 server 文件、无 command,feat-040 因此浮不出它。建 psyclaw/mcp/servers/pystat_server.py 照 mne_server.py 惯例:惰性 import pingouin/pandas(缺失→返回可直接运行的脚本骨架,不假装算结果;在则真跑返回 JSON);工具 pystat_describe/pystat_ttest/pystat_correlation/pystat_anova/pystat_regression/pystat_guidance,每个脚本/结果都带效应量+95%CI(符合 gates STAT.effect_size)与前提/严谨性提示;纯 stdlib 骨架(顶层不 import 统计库)。registry 补 command=python -m psyclaw.mcp.servers.pystat_server → health find_spec ok → feat-040 自动浮出 mcp__pystat__* 到 agent 工具集,agent 可直接把 t 检验/方差/回归委托 pystat。",
-   "dependencies": [
-    "feat-040"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/mcp/servers/pystat_server.py(6 工具 describe/ttest/correlation/anova/regression/guidance,照 mne_server 惯例:惰性 _has_pingouin,缺失→可运行脚本骨架/在则真跑返回 JSON;每脚本带效应量+95%CI[bootci/cohen-d/CI95%/np2/标准化β+CI]与前提+严谨性提示;顶层零统计 import);registry.yaml pystat 补 command=python -m ...pystat_server + origin builtin;tests/test_pystat_server.py 12 例(6 工具降级脚本+CI 提示+guidance/MCP client 真 subprocess 往返 list+call/AST 校验顶层不 import pingouin/pandas/numpy/scipy/statsmodels);live 验证:list_mcp_catalog pystat command+enabled+health ok;build_tools('.') 浮出 6 个 mcp__pystat__* 到 agent 工具集——闭环『统计外移到 MCP』,agent 可直接委托 t 检验/方差/回归。验证:uv run --python 3.12 pytest → 1282 passed"
-  },
-  {
-   "id": "feat-050",
-   "name": "v0.8 发布收尾",
-   "description": "版本 0.7.0→0.8.0;CHANGELOG v0.8 段(pystat MCP:agent 可直连统计后端);docs/COMMANDS+ARCHITECTURE 记 pystat;progress/handoff 快照;全量回归绿。",
-   "dependencies": [
-    "feat-049"
-   ],
-   "status": "done",
-   "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.7.0→0.8.0;CHANGELOG v0.8.0 段(pystat MCP:agent 可直连统计后端,闭环统计外移);docs/ARCHITECTURE.md L3 加 v0.8 pystat 段、docs/COMMANDS.md 统计三条路 --serve 补 pystat 默认启用;TODO §2 + progress 本轮(28) + session-handoff 快照(v0.9 候选=workflow 分析步默认走 pystat);验证:uv run --python 3.12 pytest → 1282 passed;psyclaw version → 0.8.0"
-  },
-  {
-   "id": "feat-051",
-   "name": "setup 一键配置缺失的基础环境(v0.9)",
-   "description": "用户需求:一条命令把跑 psyclaw 所缺的基础环境配好。现有 setup 偏项目脚手架、能力装是 opt-in。新增 psyclaw/env_setup.py:diagnose() 检查 base 环境四项——① 配置文件是否已建(_source != defaults)② LLM provider 是否配了 key(否则 agent 落 mock)③ stats 组(pingouin/pandas/scipy:pystat 真算、跑生成脚本)④ full 组(prompt_toolkit/rich:REPL 增强);每项给 ✓/✗+确切修法+能否自动装。bootstrap(apply) 一键 pip 装可自动修的缺失组(stats/full),不能自动的(API key)列为待手动。CLI:setup 加 --env(诊断+报告,--online 实装缺失组)。纯逻辑依赖注入(detect/provider/installer 可 fake),不实际联网即可测。fail-safe:装失败不阻断,如实报。",
-   "dependencies": [],
-   "status": "done",
-   "evidence": "psyclaw/env_setup.py(diagnose 检查 base 四项:配置文件 _source!=defaults、provider 有 key 且非 mock、stats 组、full 组;每项 ok/detail/fix/auto;plan_installs 挑缺失且可自动装的组;bootstrap(apply) 调 installer 装缺失组后重诊断,装失败记 _error 不抛;format_report 渲染;依赖注入 detect_fn/config_fn/provider_fn/installer 可测);cli.py setup 加 --env(诊断+上色报告,--online 实装,all_ok→exit 0/1);tests/test_env_setup.py 11 例(全就绪/缺配置+key/缺组 auto/provider 异常/plan 只挑 auto/bootstrap 不 apply 只报/apply 装+重诊断/装失败如实报/manual 列非 auto/report 可读);live:psyclaw setup --env 正确报 config✓provider✓ stats✗ full✗ + 确切修法 + 可自动安装提示。验证:uv run --python 3.12 pytest → 1293 passed"
-  },
-  {
-   "id": "feat-052",
-   "name": "v0.9 发布收尾",
-   "description": "版本 0.8.0→0.9.0;CHANGELOG v0.9 段(setup --env 一键环境配置);docs/COMMANDS setup 行补 --env;progress/handoff 快照;全量回归绿。",
-   "dependencies": [
-    "feat-051"
-   ],
-   "status": "done",
-   "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.8.0→0.9.0;CHANGELOG v0.9.0 段(setup --env 一键配置基础环境);docs/COMMANDS.md setup --env 行;TODO §2 + progress 本轮(29) + session-handoff 快照(v1.0 候选);验证:uv run --python 3.12 pytest → 1293 passed;psyclaw version → 0.9.0"
-  },
-  {
-   "id": "feat-053",
-   "name": "workflow 分析步接 pystat MCP——端到端闭环(v0.10)",
-   "description": "v0.8 建了 pystat MCP、v0.5 让 agent 能调,但 analysis workflow 的 step_analysis 仍只生成 outputs/analysis.py 让用户手动跑。补最后一公里:新增 psyclaw/workflows/pystat_bridge.py:rec_to_pystat_call(纯映射 recommend_analysis 的 {analysis,group/dv/iv/x/y} → pystat 工具名+args:ttest/anova/regression/correlation/descriptives 五分支)+ run_via_pystat(经 MCPClient 跑 pystat,client_factory 可注入;不可用/异常 fail-safe 返回 None)。step_analysis 生成脚本后 best-effort 经 pystat 跑,有结果存 outputs/analysis_result.txt 并提示——pingouin 在则真数值、不在则 pystat 降级脚本,either way 多一个具体产物;失败绝不阻断流程(仍有脚本)。至此 数据→profile→推荐→pystat 出结果 端到端闭环。",
-   "dependencies": [
-    "feat-049"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/workflows/pystat_bridge.py(rec_to_pystat_call 纯映射 5 分支 ttest/anova[group→between]/regression[iv→predictors 逗号连]/correlation/descriptives+未知 None;run_via_pystat 经 MCPClient 跑 pystat,client_factory 可注入,不可映射不建客户端、无客户端/异常/空结果→None fail-safe;_default_pystat_client 查目录 enabled+健康+command);steps_analysis.step_analysis 生成脚本后 best-effort 经 pystat 跑,有结果存 outputs/analysis_result.txt+记 artifacts,失败不阻断(脚本兜底);tests/test_pystat_bridge.py 13 例(5 映射+未知/注入客户端调对工具/无客户端/不可映射不建/异常吞/空结果 None/step 端到端写结果+脚本照写/step pystat 不可用仍活);e2e:run_via_pystat 经真实 pystat MCP subprocess 连通(本机无 pingouin→降级脚本 458 字,装 [stats] 则真数值)。验证:uv run --python 3.12 pytest → 1306 passed。至此 数据→profile→推荐→pystat 出结果 端到端闭环。"
-  },
-  {
-   "id": "feat-054",
-   "name": "v0.10 发布收尾",
-   "description": "版本 0.9.0→0.10.0;CHANGELOG v0.10 段(workflow 分析步接 pystat,端到端闭环);docs/ARCHITECTURE 记闭环完成;progress/handoff 快照;全量回归绿。",
-   "dependencies": [
-    "feat-053"
-   ],
-   "status": "done",
-   "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.9.0→0.10.0;CHANGELOG v0.10.0 段(analysis 分析步接 pystat MCP,数据→结果端到端闭环);docs/ARCHITECTURE.md L3 加 v0.10 闭环段;TODO §2 + progress 本轮(30) + session-handoff 快照(v0.11 候选=结果回填稿件);验证:uv run --python 3.12 pytest → 1306 passed;psyclaw version → 0.10.0"
-  },
-  {
-   "id": "feat-055",
-   "name": "REPL 导出对话(/dump)",
-   "description": "REPL 新增 /dump 命令导出当前对话为 Markdown;/dump --full 连同平时不展示的隐藏上下文(system 提示/滚动决策备忘 memo/每轮持续注入的约定片段)一并导出。护栏:拒写 data/raw。纯渲染逻辑外移到 psyclaw/transcript.py 可单测。",
-   "dependencies": [
-    "feat-013"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/transcript.py(render_conversation/render_full/default_path 纯函数)+ psyclaw/repl.py(/dump 命令 _cmd_dump + _standing_conventions,COMMANDS/HELP_TEXT);tests/test_transcript.py +13 例(两档渲染/元信息/空会话/非串content/未知role/默认路径 + _cmd_dump 端到端写盘/--full含system/拒 data/raw/空会话);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1319 passed"
-  },
-  {
-   "id": "feat-056",
-   "name": "REPL 审批模式(YOLO)+ 确认框渲染 + 自动跟进深度",
-   "description": "修用户实测三坑:①y 请求太多——新增 YOLO 审批模式(/yolo 切换,config approval=yolo 设默认),非危险副作用(shell/文件覆盖/工具)自动放行,只有红线危险命令(rm -rf/push --force/DROP TABLE…)仍问人;data/raw 与密钥文件始终硬拒。②确认框与命令回显串行——统一副作用确认门 _side_effect_ok 把待确认内容单独打一行、只留短提示;loop._ask_yn 经 ui_input.safe_prompt 用 \\001\\002 包裹 ANSI,修 readline 彩色宽度算错。③程序停在深度上限要人说继续——自动跟进深度上限 3→12(YOLO 40),多步分析链一口气跑完。",
-   "dependencies": [
-    "feat-047"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(_side_effect_ok/_confirm_cmd 统一门 + self.yolo/max_auto_depth + /yolo 命令 _cmd_yolo + 提示符 yolo 徽标;_approve/_capture_saves 确认改走 _side_effect_ok;_MAX_AUTO_DEPTH 3→12、_YOLO_AUTO_DEPTH=40);psyclaw/ui_input.py(safe_prompt);psyclaw/loop.py(_ask_yn 经 safe_prompt);tests/test_repl_approval.py +11 例(YOLO 放行/危险仍问/默认逐条/danger 识别/toggle 联动深度/深度回归/safe_prompt 包裹与 noop/_ask_yn EOF 与读值);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1330 passed"
-  },
-  {
-   "id": "feat-057",
-   "name": "流式路径 no-progress 检测(替代低深度上限)",
-   "description": "用户反馈:自动跟进深度上限太低会掐断合法多步分析。改为——命令/读取的自动跟进停机靠 no-progress 检测(连续重复相同请求即判原地打转而停,同 toolloop feat-044 _calls_signature 思路),不再靠低深度上限;深度只保留高位安全兜底(默认 100,可 config max_auto_depth 调,合法任务碰不到),防「每轮换不同请求永不收敛」的极端空转。每个顶层用户轮次重置判重计数;choices 由用户交互驱动不计入。附带审计同类问题:唯一有色 input() 提示是 loop._ask_yn(已 feat-056 经 safe_prompt 修);toolloop 已有 no-progress+max_iters;autoloop 因 backlog 单调收缩(失败→skipped 也入 done)结构上不重复同任务;loop.py MAX_REVIEW_ROUNDS=3 是修订环的刻意收敛界,均非同类 bug。",
-   "dependencies": [
-    "feat-056"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(_followup_signature 纯函数 + _noprogress_stop + _auto_followup 改双闸:no-progress 主闸 + 高位安全兜底;_MAX_AUTO_DEPTH 12→100、新增 _MAX_FOLLOWUP_REPEAT=2、删 _YOLO_AUTO_DEPTH;__init__ 加判重状态 + config max_auto_depth;ask 顶层轮次重置;_cmd_yolo 不再动深度);tests/test_repl_approval.py +5 例(签名纯函数/连续重复停/30 条不同命令永不停/换请求重置/空轮不累加),原深度联动测试改判「高位兜底」;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1335 passed;live:3 条相同即停、30 条不同不停"
-  },
-  {
-   "id": "feat-058",
-   "name": "错误学习:命令失败蒸馏环境教训",
-   "description": "用户问「能不能做到错误学习」。既有 memory 教训卡只从 audit/手动来,命令失败不入库→模型每轮重复踩坑(python→python3、系统 Python 无 mne、mne.datasets.erpcore 改名)。补上:distill_env_lessons 从命令输出蒸馏三类高信号可泛化教训(命令不存在/模块未装/属性版本改名),含 shell 前缀与行号误匹配保护;_learn_from_output 把教训记进本会话记忆(每轮注入 system,当场止损跨轮不忘)+ best-effort 落 memory 待确认卡(source=error,跨会话经 /memory confirm 生效,沿用既有 HITL 纪律避免环境事实过时被自动固化)。接在 _auto_followup 命令执行后。",
-   "dependencies": [
-    "feat-057"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(distill_env_lessons 纯函数 + _CMD_NOTFOUND_RES/_MODULE_NOTFOUND_RE/_ATTR_ERR_RE/_SHELL_NAMES 误匹配保护 + _learn_from_output + __init__ session_lessons/_session_lesson_keys + ask 注入「本会话已知环境限制」+ _auto_followup 调用);tests/test_error_learning.py +14 例(bash/zsh/win 命令不存在、zsh 前缀/dash 行号不误判、模块未装取顶层包、属性改名如 mne.datasets.erpcore、洁净输出无教训、去重、多条、_learn 填充会话+落卡 source=error+去重+draft 抛错 best-effort+洁净不记);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1349 passed;live 复刻 transcript 报错正确蒸馏、无误匹配"
-  },
-  {
-   "id": "feat-059",
-   "name": "环境教训卡自动失效(再验证)",
-   "description": "用户要求:确认过的环境卡支持自动失效。环境教训是负事实(没装 X/命令不存在/API 改名),装上就过时,过时的卡会反向误导模型。实现:distill 给每条环境教训打 kind(cmd/module/attr)并随卡持久化;memory.archive_lesson 落实文档承诺的『被推翻则归档』(active→archived,精确按 trigger+lesson 匹配不误伤,保留可审计不删除);probe_env_card_stale 再验证——cmd 用 shutil.which(秒回、零子进程、注入安全),module/attr 用 python3 真跑 import/取属性(list 参数非 shell、触发词校验、超时兜底)。REPL 两档:启动时秒验证 cmd 类(零延迟,config verify_env_lessons=false 可关),/memory verify 手动全量(含慢的 module/attr)。只碰 source=error 机器卡,只在**确证已恢复**时失效(防误删红线),归档时同步清本会话记忆。/memory list 展示归档区。",
-   "dependencies": [
-    "feat-058"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/memory.py(draft_lesson 加 kind、archive_lesson、list 展示 archived);psyclaw/repl.py(distill 打 kind、probe_env_card_stale、_reprobe_env_lessons、run 启动轻量再验证、/memory verify、import shutil);tests/test_lesson_invalidation.py +13 例(distill 带 kind、archive 移动/精确匹配不误伤/未命中、probe cmd 有无、module import 通/不通/无解释器/非法触发词、_reprobe 归档已恢复且清会话/保留仍缺失的卡/不碰慢类)+ test_error_learning 更新 draft stub 带 kind;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1362 passed;live 隔离记忆:ls 卡自动失效归档、no_such_cmd 卡保留"
-  },
-  {
-   "id": "feat-060",
-   "name": "选择器非编号输入不再吞掉(当自由作答转发)",
-   "description": "用户实测:单选选择器提示『编号(单选)』,用户按 y/n 确认的肌肉记忆打了 `y`,resolve_selection 认不出→返回 []→打印『未选择』把输入吞掉,变成死胡同要重打。修:pick_interactive/_pick_numbered 返回 (选中项, 自由文本) 二元组——非空但非有效编号的输入当作对该问题的自由作答,经 format_free_answer 带问题上下文回传给模型继续,而不是丢弃;空(回车/EOF/对话框取消)才算跳过。提示补『或直接打字作答』。",
-   "dependencies": [
-    "feat-057"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/choices.py(format_free_answer;_pick_numbered/pick_interactive 改返 (chosen, free) 二元组,非编号非空→自由文本;提示更新);psyclaw/repl.py(_auto_followup choices 分支处理 free→format_free_answer 转发,不再『未选择』吞输入);tests/test_choices_reads.py +5 例(format_free_answer 带/不带前缀、_pick_numbered 有效编号/自由文本 y 不丢/空跳过/EOF 跳过);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1367 passed"
-  },
-  {
-   "id": "feat-061",
-   "name": "终端内联渲染图片",
-   "description": "用户问能不能渲染图片。分析常出图(matplotlib savefig)但 REPL 只打印路径。新增 psyclaw/imgview.py 纯 stdlib 内联渲染(终端解码,只 base64 原始字节,不违反纯核):iTerm2 内联图片协议(OSC 1337,任意格式)+ kitty 图形协议(_G 分块,f=100 仅 PNG);按环境变量探测终端(iTerm2/WezTerm/VSCode/Warp/kitty;tmux/screen/非 TTY 不渲染),config image_protocol 可强制 iterm2|kitty|none|auto。REPL:/img(/show)手动渲染;命令执行后自动扫描输出里的图片路径(存在即渲染,最多 3 张)。8MB 上限。",
-   "dependencies": [
-    "feat-058"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/imgview.py(is_image/find_image_paths/_proto_from_env/supports_inline/render_iterm2/render_kitty/render_escape);psyclaw/repl.py(/img 命令 _cmd_img + _render_images_in 自动渲染接 _auto_followup 命令后 + COMMANDS/HELP_TEXT + image_protocol config 覆盖);tests/test_imgview.py +15 例(is_image、路径提取去重、env 探测 kitty/iterm2 家族/tmux 不支持、force 覆盖、iterm2/kitty 转义形状、render_escape 端到端 iterm2/kitty-png、kitty 拒非 png、none 不渲染、拒非图/缺失/超限);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;live:Warp 环境探测为 iterm2、转义正确产出"
-  },
-  {
-   "id": "feat-062",
-   "name": "v0.11.0 发布收尾",
-   "description": "版本 0.10.0→0.11.0;CHANGELOG v0.11 段(REPL 交互体验大修 + 错误自学习闭环 + 图片内联,覆盖 feat-055~061);docs/COMMANDS 加 REPL 交互命令(/dump //yolo //img //memory verify)+ 错误自学习说明;progress/session-handoff 快照;全量回归绿。",
-   "dependencies": [
-    "feat-055",
-    "feat-056",
-    "feat-057",
-    "feat-058",
-    "feat-059",
-    "feat-060",
-    "feat-061"
-   ],
-   "status": "done",
-   "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.10.0→0.11.0;CHANGELOG.md v0.11.0 段(/dump//yolo/错误学习/自动失效/图片渲染 新增 + no-progress/确认框/选择器 修复);docs/COMMANDS.md 加 REPL 交互命令表;TODO §2 + progress 本轮(31) + session-handoff 快照;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;psyclaw version → 0.11.0"
-  },
-  {
-   "id": "feat-063",
-   "name": "no-progress 只管自主回合(修误判用户逐条确认)",
-   "description": "用户实测:非 YOLO 下逐条打 y 确认同一命令,被 no-progress 误判成『连续 3 轮重复、原地打转』而掐断。no-progress 本意是拦模型自主空转,用户在逐条确认本身就是在推进、且是自己的判断权,不该被 harness 掐。修:_round_is_autonomous 判定这一轮会不会不问人就执行(非 YOLO 的 shell/危险命令要人确认=非自主;YOLO 非危险自动跑、psyclaw 子命令、自动读=自主),no-progress 只在自主回合计数,非自主回合重置判重;高位安全兜底(100)始终生效。",
-   "dependencies": [
-    "feat-057"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(_round_is_autonomous;_auto_followup 改:深度兜底始终生效、no-progress 仅自主回合、非自主重置判重);tests/test_repl_approval.py +6 例(非YOLO shell 非自主/psyclaw 自主/YOLO shell 自主/YOLO 危险非自主/纯读自主/混合有 shell 非自主);CHANGELOG v0.11 feat-057 行补注;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1388 passed"
-  },
-  {
-   "id": "feat-064",
-   "name": "确认支持「全部同意」(Y/n/a 会话级黏性)",
-   "description": "用户实测:逐条确认同类副作用(尤其覆盖代码文件)太烦,『确认一次同类就该统一、本对话内一致』。非危险副作用的确认改三态 [Y/n/a]:a=本会话该类(执行 shell/覆盖已存在文件/工具副作用,按 label 分类)不再逐条问,记入 self._auto_approve_labels;YOLO 仍全放行。危险操作(命中红线)永远逐条问、不给『全部』(红线不放松),data/raw 与密钥硬拒不变。比 /yolo 更细粒度的中间档。",
-   "dependencies": [
-    "feat-056"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(_hitl_confirm_all 三态 yes/no/all fail-closed;_side_effect_ok 重构:危险两态、非危险 YOLO 或已同意此类自动放行、否则三态 a→加 label 到 _auto_approve_labels;__init__ 加 _auto_approve_labels);tests/test_repl_approval.py +5 例(默认三态确认、a 使同类黏性、per-label 隔离、危险不给 all 且说过 all 仍问、_hitl_confirm_all 非 TTY fail-closed + 解析 a/all/全部/空/y/是/n/nope);CHANGELOG v0.11 补;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1393 passed"
-  },
-  {
-   "id": "feat-065",
-   "name": "错误自学习+图片内联渲染接入 agent 模式(toolloop)",
-   "description": "v0.11 的错误自学习(feat-058)与图片内联渲染(feat-061)只覆盖 REPL 命令路径;agent 模式(纯工具层循环)里工具失败同样值得蒸馏、分析出图同样该内联可见。toolloop:失败(ok=False)的工具结果经 distill_env_lessons 蒸馏,当轮回灌给模型止损,并累积在返回的 lessons 里;只看 ok=False——ok 输出可能是 read_file 读到的日志/源码,报错字样是内容不是本机事实,学了会误伤。REPL _run_agent:res.lessons 并入会话记忆(_ingest_lessons,从 _learn_from_output 拆出复用)+ 落跨会话待确认卡;final+trace 输出里的图片经 render_images_in_text(模块级,从 _render_images_in 提出)内联渲染。CLI psyclaw agent 同样落卡 + 渲染。",
-   "dependencies": [
-    "feat-058",
-    "feat-061"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/toolloop.py(collect_env_lessons 纯函数 + run_tool_loop 回灌『# 环境教训』并返回 lessons,5 个返回路径全带);psyclaw/repl.py(_ingest_lessons 拆出、render_images_in_text 模块级、_run_agent 接入两者);psyclaw/cli.py(cmd_agent 落卡 + 渲染);tests/test_agent_learning.py +11 例(循环蒸馏/回灌/ok=True 不学/跨轮去重/无工具空 lessons/seen_keys/REPL 并入去重落卡/iterm2 渲染/none 协议/缺文件/limit);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1404 passed"
-  },
-  {
-   "id": "feat-066",
-   "name": "教训卡正向加固(再现即强度+1)",
-   "description": "memory 文档早已承诺「被再次印证则强度+1」但一直未实现——draft_lesson 遇同内容卡只是静默去重,教训再现的证据被丢弃。改为再现即加固:active 同卡 strength+1 并记 reinforced_ts(跨会话再踩同一坑=教训真实且仍成立);pending 同卡 hits+1(确认时用户可见「已再现 n 次」,证据更足);都没有才新建待确认卡。memory_prompt 注入按强度降序排(截断 [:10] 时优先保住最可靠的);CLI list 显示 pending 的再现次数。调用方(REPL/agent/critic)零改动自动受益。",
-   "dependencies": [
-    "feat-058",
-    "feat-065"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/memory.py(draft_lesson 再现分支 active strength+1 / pending hits+1;memory_prompt 按强度排序;memory_cli 显示 hits);tests/test_audit_memory.py TestLessonReinforcement +5 例(active 加固不建新卡/pending 计 hits/仅精确 trigger+lesson 对匹配/prompt 强度排序/CLI 显示再现次数);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1409 passed"
-  },
-  {
-   "id": "feat-067",
-   "name": "确认提示措辞重设计(用户反馈:a 不易懂)",
-   "description": "用户实测:三态确认 `[Y/n/a=全部本会话不再问]` 里的 a 缩写含义不明,不方便理解使用。改为逐项自解释:`[回车=同意 / n=拒绝 / a=同意且本会话此类不再问]`;同义词多收「都同意」。语义与 fail-closed 纪律不变(非 TTY/EOF/Ctrl+C 一律拒)。",
-   "dependencies": [
-    "feat-064"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(_hitl_confirm_all 提示文案 + 同义词);既有 tests/test_repl_approval.py 覆盖三态解析行为不回归;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1419 passed"
-  },
-  {
-   "id": "feat-068",
-   "name": "选择器改原地内联(用户反馈:弃 Windows 全屏蓝色对话框)",
-   "description": "用户实测:选项框在 Windows 上是 prompt_toolkit radiolist/checkboxlist_dialog 的蓝色独立全屏,突兀。重写为 Claude Code 式原地内联选择器 _pick_inline:↑↓ 移动高亮、数字键跳选(单选即选定)、空格勾选(多选)、回车确认(多选没勾=选高亮项)、Esc/Ctrl+C 跳过、其它可打印字符=自由作答(转行输入,首字符保留,承 feat-060 不吞输入);渲染只用 ANSI 行控制(\\033[K+光标上移)在对话流里原地重画,不清屏不进备用屏;键流(get_key)与行读取(read_rest)可注入,离线可单测。降级链:内联 → 编号输入 → 非 TTY 不弹。_pick_ptk 全屏对话框删除。",
-   "dependencies": [
-    "feat-060"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/choices.py(_pick_inline 新增;pick_interactive 换用;_pick_ptk 删除;模块 docstring 更新);tests/test_choices_reads.py +10 例(down+enter/数字即选/空格勾选/勾了取消/多选无勾取高亮/Esc 跳过/UP 回绕/自由作答保首字符/多选数字切换/回归不进备用屏不清屏);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1419 passed"
-  },
-  {
-   "id": "feat-069",
-   "name": "@图片 引用内联渲染",
-   "description": "REPL 里 @path 引用图片文件(png/jpg/gif/webp/bmp)时:终端支持则直接内联显示给用户(render_images_in_text 复用 feat-061/065 通道,config image_protocol 可强制);上下文只注入元信息(路径+大小+是否已显示+「像素内容你不可见」)——此前 @图片 会走 smart_excerpt 把二进制乱码灌进上下文,一并修掉。文本文件的智能摘录行为不变。",
-   "dependencies": [
-    "feat-061",
-    "feat-065"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(_expand_files 图片分支:内联渲染+元信息注入,不再对图片跑 smart_excerpt);tests/test_agent_learning.py +3 例(渲染+元信息注入+二进制不进上下文/终端不支持时的提示/文本文件不回归);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1422 passed"
-  },
-  {
-   "id": "feat-070",
-   "name": "shell「全部同意」按命令前缀限定范围(用户反馈)",
-   "description": "用户实测:对 shell 命令说「全部同意(a)」会放行**所有**后续 shell 命令,范围太大。cmd_approval_scope 纯函数把命令归类:一般程序→程序名(pytest);子命令型/解释器型(git/uv/npm/pip/docker/python/bash…)→程序名+第二个词(git status ≠ git push,python3 analyze.py 按脚本);含管道/连接符的复合命令→整条原文不泛化;路径前缀剥掉取程序名。_confirm_cmd 的 label 由「执行 shell 命令」改为「执行 shell 命令(<范围>)」,_auto_approve_labels 天然按范围隔离。危险命令红线不变(永远逐条问)。",
-   "dependencies": [
-    "feat-064"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/repl.py(cmd_approval_scope + _SUBCMD_TOOLS;_confirm_cmd 用范围化 label);tests/test_repl_approval.py TestCmdApprovalScope +7 例(一般程序/子命令型/路径剥离/复合不泛化/空命令/label 集成/同意 git status 不放行 rm);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1431 passed"
-  },
-  {
-   "id": "feat-071",
-   "name": "选择器看得见方案详情(用户反馈)",
-   "description": "用户实测:选项框出来时看不见选项所说的方案。三管齐下:① 全屏对话框已弃(feat-068),正文说明留在屏上;② _pick_inline 按终端宽度截断,高亮项被截断时下方固定 2 行详情区(▏前缀,dim)给全文,重画几何稳定;③ _CHOICES_SYSTEM 约定模型先在正文写清各方案、选项文字自包含简短,不写「方案A」这种脱离正文看不懂的标签。",
-   "dependencies": [
-    "feat-068"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/choices.py(_pick_inline 宽度感知截断 + 2 行详情区);psyclaw/repl.py(_CHOICES_SYSTEM 补选项自包含约定);tests/test_choices_reads.py +2 例(超宽高亮项详情区给全文/短选项无详情区);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1431 passed"
-  },
-  {
-   "id": "feat-072",
-   "name": "v0.10 遗留收尾:写作回填真结果 + meta 接 pystat + [stats] 数值实测",
-   "description": "数据→结果→稿件闭环补完:① pystat MCP 新增 pystat_meta 工具(随机效应 DL 元分析:合并效应+95%CI+I²/τ²/Q+Egger,列定位/脚本骨架复用 steps_meta,statsmodels 未装返回可运行脚本不假装有结果);② pystat_bridge 加 run_meta_via_pystat + _real_result 守卫(「统计库未安装」的脚本骨架不算真结果,run_via_pystat 同样收紧——学术诚信:不制造『看着像跑过了』的假象);③ step_meta_script best-effort 直跑落 outputs/meta_result.txt;④ step_write_analysis/step_write_meta 把 pystat 真跑结果注入写作上下文(结果节只引用真实数值,效应量+CI 必报);⑤ [stats] 数值实测:statsmodels/pingouin 真装真跑。",
-   "dependencies": [
-    "feat-053"
-   ],
-   "status": "done",
-   "evidence": "psyclaw/mcp/servers/pystat_server.py(pystat_meta);psyclaw/workflows/pystat_bridge.py(run_meta_via_pystat/_real_result);psyclaw/workflows/steps_meta.py(step_meta_script 直跑+step_write_meta 注入);psyclaw/workflows/steps_analysis.py(step_write_analysis 注入);tests/test_pystat_bridge.py +11 例(守卫/骨架不算结果/meta 桥/步骤落盘/写作注入/离线返脚本/坏表 fail-closed);离线全量 1442 passed;数值实测(uv+清华镜像):pystat_meta→合并效应 0.327 CI[0.200,0.455] τ²=0.0021 I²=9.7% Q=4.43 Egger p=.0045,生成 meta 脚本执行数值一致;pystat_ttest→T=-7.11 p=.0004 d=5.03 CI95[-0.67,-0.33],生成 analysis 脚本(正态/方差齐/t 检验)端到端可跑"
-  }
- ]
+  "_comment": "PsyClaw 能力清单 — harness 一等原语 (learn-harness-engineering L08)。2026-06 起 PsyClaw 重定位为纯研究编排 harness:统计计算整体外移到成熟库/MCP,本仓不内置任何统计实现。每轮只推进 ONE 个 status != done 的 feature;done 必须带 evidence。",
+  "features": [
+    {
+      "id": "feat-001",
+      "name": "统计层整体外移 (删除 ~42 手写统计模块)",
+      "description": "删除 psych/ 下全部统计方法模块(anova/ttest/regression/efa/cfa/survival/...)、对应 CLI 子命令与测试;统计交给外部成熟库(scipy/pingouin/statsmodels/lifelines/...)或 MCP。psyclaw 自身零统计库依赖,只留研究编排 harness。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "git rm 42 模块 + 41 测试;cli/loop/pipeline/repl/scales/preregister 去统计纠缠;psyclaw/ 零 scipy/numpy/pingouin import;全量 pytest 944 passed;pyproject 统计库降为可选 [stats] extra"
+    },
+    {
+      "id": "feat-002",
+      "name": "研究编排流水线 (research)",
+      "description": "psyclaw research <topic>:澄清门禁→文献→设计→写作(APA-JARS)→同行评审→总验收,fail-closed verdict。--freeform 走通用 HITL 回路(planner→executor→critic)。统计外移后不再含内置统计阶段。",
+      "dependencies": [
+        "feat-001"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/pipeline.py + loop.py;tests/test_pipeline.py 绿;PHASES=[literature,design,writing,review,gates]"
+    },
+    {
+      "id": "feat-003",
+      "name": "审稿模拟 review panel",
+      "description": "EIC + R1/R2/R3 + Devil's Advocate 多视角同行评审,保守 fail-closed 编辑决定,产可解析意见 + response letter",
+      "dependencies": [
+        "feat-002"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/review.py + agents/reviewer.md + tests/test_review.py"
+    },
+    {
+      "id": "feat-004",
+      "name": "研究澄清 clarify (LLM 驱动追问)",
+      "description": "grill-me 式 17 槽位澄清,LLM 评估+追问+fail-safe 降级;不澄清完不开工(CLARIFY.complete 门禁)",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/psych/clarify.py + tests/test_clarify.py (21 例)"
+    },
+    {
+      "id": "feat-005",
+      "name": "预注册 / 分析声明 (preregister + declare-test)",
+      "description": "OSF/AsPredicted 双格式预注册模板(据澄清卡抽取);declare-test 预注册单个计划分析(研究者自由度门禁)。功效计算外移,样本量依据取澄清卡 power 槽位。",
+      "dependencies": [
+        "feat-004"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/psych/preregister.py + analysis_plan.py;tests/test_preregister.py + test_analysis_plan.py 绿"
+    },
+    {
+      "id": "feat-006",
+      "name": "知识参考目录 + 量表计分",
+      "description": "scale/norms/assume/method/design/cite/ethics 只读知识目录;score 量表自动计分(反向题翻转+子量表总分,信度计算外移)。纯查阅+数据准备,无统计推断。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/psych/{knowledge,scales,ethics}.py;tests/test_scale_score.py + test_custom_scales.py + test_ethics.py 绿"
+    },
+    {
+      "id": "feat-007",
+      "name": "文献检索 + 写作输出 (lit + export)",
+      "description": "lit 合法 OA 文献检索+全文获取+PRISMA 计数+综述合成;export APA7/心理学报/心理科学 确定性模板(Word docx + Markdown);JARS 检查清单",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/psych/{lit_cli,litsearch,synthesize}.py + output/{apa7,cn_journal,jars}.py;对应测试绿"
+    },
+    {
+      "id": "feat-008",
+      "name": "三层自进化记忆",
+      "description": "profile 显式 + habits 带半衰期自动学习 + lessons HITL 确认;纯 JSON 可审计,只存方法学偏好",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/memory.py + tests/test_audit_memory.py"
+    },
+    {
+      "id": "feat-009",
+      "name": "学术规范门禁 gates",
+      "description": "效应量+CI 必报、前提诊断、预注册/探索区分、APA7、复现脚本等机器可校验门禁,不达标阻断。统计虽外移,门禁判据仍在(供写作产出与外部统计结果对照)。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "gates/PSYCLAW.md + rules.yaml + checker.py;psyclaw gates 自检;tests/test_gates.py 绿"
+    },
+    {
+      "id": "feat-010",
+      "name": "REPL + 路径注入 + Markdown 渲染 + 渐进式披露",
+      "description": "三级降级 REPL、对话自动检测本地数据路径(原始数据不入上下文)、Markdown→ANSI;默认 --help 只示常用命令,psyclaw commands 看全部分类",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/{repl,ui_input,path_ingest,md_render,cli}.py;tests/test_{repl_ptk,path_ingest,cli_help}.py 绿"
+    },
+    {
+      "id": "feat-011",
+      "name": "harness 工程化契约",
+      "description": "feature_list/init/progress/handoff 物化 learn-harness-engineering 5 子系统(instructions/state/verification/scope/lifecycle)",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "feature_list.json + init.sh + progress.md + session-handoff.md + CLAUDE.md Harness 契约段"
+    },
+    {
+      "id": "feat-012",
+      "name": "Workflow 层:按研究类型路由的可组合流程引擎",
+      "description": "四层架构(路由→流程→子功能→skill/MCP)+ 两横切(harness/memory)。声明式 workflow 定义 + 引擎(gate/HITL/机器可读总验收);四条研究流程按类型路由,每类一条顶层命令;子功能可单用/可拼装。见 docs/ARCHITECTURE.md。",
+      "dependencies": [
+        "feat-002"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/workflows/{engine,steps,steps_meta,steps_analysis,steps_qual,registry}.py;四条流程齐:review-lit(文献综述)/meta(元分析)/analysis(实证)/qualitative(质性);子功能 screen_papers/validate_effects+generate_meta_script/profile_data+recommend_analysis+generate_analysis_script/load_transcripts;统计外移=meta/analysis 生成委托 statsmodels/pingouin 的可复现脚本(均经 C:\\Python314 实跑 exit 0);质性=LLM 辅助编码研究者复核;tests/test_workflows.py 35 例;全量 949 passed。后续增强:分析步可选直连 MCP、质性编码升级专用 skill"
+    },
+    {
+      "id": "feat-013",
+      "name": "会话持久化 session store (SQLite+FTS5) + resume/rename",
+      "description": "可全文检索的跨会话对话持久化,替代纯内存 compact_history 跨会话丢失。在既有 recall.ContextArchive(已按 session 分轮存 SQLite + 关键词/向量召回)之上补:① sessions 元数据表(id/name/created/updated,旧库从 turns 回填)② FTS5 全文索引(unicode61;未编译 FTS5 的环境回落 LIKE 子串;回落期落库的历史轮次在 FTS 可用时惰性回填)③ 会话生命周期 API(ensure/rename/list/session_turns/search/delete)。命令:REPL slash `/sessions /resume /rename /search`(resume 把历史轮次载回 messages、续写到同一会话);顶层 `psyclaw resume [id]`(进 REPL 续接,不给 id 续接最近一次)+ `psyclaw session list|search|rename|delete`。纯 stdlib(sqlite3),不碰统计/data-raw。",
+      "dependencies": [
+        "feat-010"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/recall.py 扩展 ContextArchive(sessions 表 + _init_fts FTS5 探测/回落/回填 + record 维护会话与 FTS + ensure_session/rename_session/list_sessions/session_turns/search(FTS5 MATCH bm25 排序,回落 LIKE)/delete_session);psyclaw/repl.py ReplSession(resume_id) + _resume_session 载回历史 + /sessions //resume //rename //search slash 命令 + COMMANDS/HELP_TEXT;psyclaw/cli.py cmd_resume/cmd_session + resume/session 顶层命令(catalog 归『记忆/消息/IO』,names==catalogued 通过)。tests/test_session_store.py 11 例(建会话/幂等/改名/计数/顺序/FTS 检索中英词/LIKE 回落/空查询/删除/FTS 回填/旧库 sessions 回填)。本机 sqlite 3.50.4 FTS5 可用。全量 C:\\Python314 pytest 1062 passed;CLI end-to-end:seed 两会话 → session list/search 焦虑(FTS5 命中)/rename 均正确。"
+    },
+    {
+      "id": "feat-014",
+      "name": "自主科研回路 auto-loop (Ralph 式自循环)",
+      "description": "在 <type>-loop 之上的自驱动元回路:每轮① 感知发现(discover_backlog 从仓库状态重新推导待办)→② 派发(路由到对应 workflow,实现 sub-agent)→③ 独立验收(verify_result 只读落盘 workflow_summary.json+标志产物,与执行解耦)→④ 记状态(notes/autoloop_state.json 外部记忆)→⑤ 决定(stop:backlog 空/门禁 blocker/迭代上限)。控制流全确定性纯函数,LLM 只在被派发流程内部;澄清未完=硬 blocker 写 decision_request,流程验收不过=标记跳过写 blocked.md 换下一个任务,不空转重试;只读 data/clean+根目录(不碰受保护的 data/raw,分类 CSV 只读表头)。",
+      "dependencies": [
+        "feat-012"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/autoloop.py(discover_backlog/classify_csv/select_next/verify_result/decide/state/run_autoloop)+ cli.py auto-loop 命令;tests/test_autoloop.py 33 例;全量 C:\\Python314 pytest 991 passed;离线 mock end-to-end 实跑:数据表 scores.csv → 自动发现 analysis-loop → 派发(profile→推荐 ttest→生成 pingouin 脚本→写→评审)→ 独立验收通过(workflow=analysis + outputs/analysis.py 落盘)→ 记 autoloop_state.json(完成 1)→ 次轮 backlog 空收敛停止,exit 0。经两轮多视角代码评审(4 视角发现 + 对修复的对抗复审)修复 5 处:classify_csv 收紧列名集(id,d,v 不再误判效应量表→避免数据漏 analysis)、_dispatch 不固化派生 goal(否则误触发 lit-loop,已 end-to-end 验证)、_clarify_card 异常 fail-closed、派发异常不炸回路(记跳过续跑)、max_iters 优先于 blocker 不误写 decision_request"
+    },
+    {
+      "id": "feat-015",
+      "name": "引用保真核查 cite-check(反杜撰参考文献)",
+      "description": "独立验收稿件里每一条文内引用是否都能溯源到检索命中的允许键(notes/evidence_map.json 的 references[].key,回落 lit_search.json);比不上的 = 孤儿引用(疑似杜撰)。补上 synthesize_review『只准引用真实键』指令之后一直缺失的**核验环节**——实现与验收分离,对齐 Claude Science『独立 reviewer 核查每条引用』。纯文本比对:不算统计、不碰 data/raw、只读稿件与 notes/ 检索产物;比对粒度=(首位作者姓氏,4 位年份)。落 notes/citation_audit.json sidecar,WRITE.citations 门禁(trigger citation_check)据 no_fabricated_citations 对**检出的**孤儿引用 block;无语料/无引用时置 manual_review 显式转人工核(不过度拦)。参考 GitHub 项目 Awesome-Journal-Skills(brycewang-stanford,Stanford REAP × CoPaper.AI)的期刊定制思路——本轮先做通用版,期刊画像层后续再叠加。",
+      "dependencies": [
+        "feat-007",
+        "feat-009"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/psych/citations.py(extract_intext_citations/audit_citations/load_allowed/run_citation_audit 纯函数,可单测)+ gates/checker.py 注册 no_fabricated_citations + KIND_TRIGGERS['citation']={citation_check} + rules.yaml WRITE.citations 门禁 + cli.py cite-check 命令(catalog 归入『研究前规划/预注册』,names==catalogued 校验通过);tests/test_citations.py 19 例;全量 C:\\Python314 pytest 1010 passed;gates 自检显示 WRITE.citations [block] 校验:自动;CLI end-to-end:evidence_map 允许键 Smith et al.(2020) + 稿件含 Ghost et al.(2099) → cite-check 检出孤儿 1 条、rc=1。测试期间修正 2 处真实缺陷:叙述式连接词去掉逗号(否则『However, Ghost et al.(2099)』把转折词误并入作者段→误判姓氏)、无检索语料时不产孤儿(纯 manual_review 不过度拦);另在核验前截除参考文献/证据图谱区(其本身即允许键语料,否则末位作者会冒出假孤儿)。"
+    },
+    {
+      "id": "feat-016",
+      "name": "复现溯源 provenance(代码+环境+说明+决策轨迹)",
+      "description": "给 analysis/meta 生成的可复现脚本(outputs/analysis.py / meta_analysis.py)与图打包 Claude Science 式**溯源包**:① 确切代码(code+sha256)② 运行环境(Python+平台+统计库版本)③ 自然语言说明(缺省从脚本 docstring 派生)④ 决策轨迹(plan/design/澄清卡/workflow_summary 指针)——补上『脚本能复跑但不记录产它的环境与决策』的空缺,强化 REPRO 复现门禁。纯元数据采集:不 import 也不运行任何统计库(版本经 importlib.metadata 读 dist 元数据),数据指纹只对 data/clean+根按需单向哈希、受保护的 data/raw 只记路径不哈希(亦可由调用方直接传入指纹)。参考 Claude Science『每个结果可复现、可溯源到代码/环境/消息历史』;本轮为通用版,后续可由期刊画像的 data_availability 驱动是否强制 replication-package。",
+      "dependencies": [
+        "feat-009",
+        "feat-012"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/provenance.py(capture_environment/build_provenance/write_provenance 纯 stdlib:hashlib+importlib.metadata+platform+sys)+ gates/checker.py 注册 provenance_complete + KIND_TRIGGERS['provenance']={provenance_check} + rules.yaml REPRO.provenance 门禁 + cli.py provenance 命令(catalog 归入『记忆/消息/IO』,names==catalogued 通过);tests/test_provenance.py 11 例(含 data/raw 绝不哈希、data/clean 单向哈希、调用方指纹优先、docstring 派生说明、决策轨迹指针、门禁 block/pass);全量 C:\\Python314 pytest 1021 passed;gates 自检 REPRO.provenance [block] 校验:自动;CLI end-to-end:outputs/analysis.py → 采集 sha256+Python 3.14.2+平台+说明+notes/plan.md 轨迹 + data/clean/scores.csv 指纹 → 溯源完整 rc=0。"
+    },
+    {
+      "id": "feat-017",
+      "name": "外部技能包发现(接上 AcademicForge / AJS)",
+      "description": "让 skills 加载器除内置 psyclaw/skills 外,还发现标准安装根下的第三方 Agent Skill 技能包:.claude/skills 与 .opencode/skills(项目级 + 用户级)+ 环境变量 PSYCLAW_SKILLS_PATH。AcademicForge(HughYau/AcademicForge,curate 了 Claude Science 生态的 ~140 科研 + 82 AI-research skills、78+ 数据库,Minecraft mod-loader 式一站装)、AJS 等 `bash install.sh` 后即被 `psyclaw skills` 列出、供研究编排参考。统一解析标准 SKILL.md frontmatter(agentskills.io 兼容),按 name 去重内置优先,平铺 <skill>/SKILL.md 与一层学科嵌套 <domain>/<skill>/SKILL.md 两种布局都吃。边界诚实:PsyClaw 只**发现+呈现+路由指引**这些 Agent Skill(给宿主 Agent 读的 markdown 指令),真正执行发生在 Claude Code 等宿主读取 SKILL.md 时,不由本体 Python 跑。",
+      "dependencies": [
+        "feat-010"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/skills/loader.py(external_skill_roots + list_skills(project_dir, include_external) + 每条标 source/path)+ cli.py cmd_skills 按来源分组呈现(内置 / 外部按根分组,每根截断 12 条;空时给 AcademicForge install 指引与已扫描根);tests/test_skills_loader.py 7 例(项目级 .claude/skills 发现、PSYCLAW_SKILLS_PATH env、一层学科嵌套、include_external=False 跳过、同名去重内置优先、external_skill_roots 只留存在根);全量 C:\\Python314 pytest 1028 passed;CLI end-to-end:PSYCLAW_SKILLS_PATH 指向模拟 AcademicForge 安装(.claude/skills/{genomics,scientific-writing}/SKILL.md)→ `psyclaw skills` 在对应根下分组列出 forge-genomics / forge-sci-writing。"
+    },
+    {
+      "id": "feat-018",
+      "name": "按研究类型推荐外部技能包(skill 路由)",
+      "description": "在 feat-017『发现』之上补『路由指引』:据研究类型(lit-review/meta/analysis/qualitative)用中英双语关键词打分,从发现到的第三方技能包(AcademicForge/AJS)里挑出最相关的推荐,供研究者在对应 loop 里挑用。`psyclaw skills --for <type>`(亦接受 *-loop 别名)。纯确定性打分(关键词命中计数)、可单测;关键词特意选具体词(meta-analysis/thematic/计量…)避免 metadata 类误命中;仍不执行任何 skill(执行属宿主 Agent)。",
+      "dependencies": [
+        "feat-017"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/skills/recommend.py(normalize_type/score_skill/recommend_skills + RESEARCH_TYPE_KEYWORDS 四类中英双语关键词 + _TYPE_ALIASES)+ cli.py skills --for(未知类型报错列可选、external_only 只推第三方);tests/test_skill_recommend.py 6 例(别名归一、命中计数、类型匹配区分 meta/qual、未知类型空、external_only 排内置、top_k);全量 C:\\Python314 pytest 1047 passed;CLI end-to-end:模拟 AcademicForge 装 forge-meta/forge-qual → `skills --for meta-loop` 命中 forge-meta(matched meta-analysis/forest plot/heterogeneity/random-effects),不误推 forge-qual。",
+      "notes": "后续可把推荐挂进 auto-loop 感知阶段(为发现的 <type>-loop 顺带列相关技能包)。"
+    },
+    {
+      "id": "feat-019",
+      "name": "期刊画像层 + cite-check/provenance 期刊定制(AJS 思路)",
+      "description": "AJS(brycewang-stanford/Awesome-Journal-Skills)核心主张『一套泛泛的学术写作助手学不会期刊间差异』的心理学落地:journals.json 固化 5 本期刊(心理学报/心理科学/Psychological Science/JPSP/Psychological Bulletin)的引用风格/摘要与字数/版块/报告标准/数据可得性/预注册/退稿红线;`psyclaw journal [id]` 只读浏览(对齐 method/design 知识目录)。并让此前两处通用改进按期刊定制:cite-check `--journal`(引用风格核对为**软提示** + 退稿红线自查清单;孤儿引用仍是唯一硬判据)、provenance `--journal`(要求数据可得性的期刊 data_availability=required 须带数据指纹才算 provenance_complete)。纯知识数据,不含统计。",
+      "dependencies": [
+        "feat-015",
+        "feat-016"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/psych/journals.json(5 期刊画像)+ journals.py(load_journals/get_journal 别名+名称子串匹配/list_journal_ids/requires_data_availability/expected_citation_format/print_journal)+ citations.py detect_citation_format(纯函数:author-year|numeric|mixed|none)+ run_citation_audit(journal=) 附风格软提示与红线 + provenance.py build_provenance(journal=) 据 required 收紧完整性 + cli.py journal 命令(catalog 归『知识目录(只读)』,names==catalogued 通过)+ cite-check/provenance --journal;tests/test_journals.py 13 例;全量 C:\\Python314 pytest 1047 passed;CLI end-to-end:`journal jpsp` 显示画像;`cite-check --journal psych-science` 检出 numeric≠期望 author-year(不一致);`provenance --journal psych-science` 无数据指纹→不完整、补 --data→完整。"
+    },
+    {
+      "id": "feat-020",
+      "name": "auto-loop 感知阶段挂 skill 推荐",
+      "description": "把 feat-018 的按研究类型技能推荐接进 feat-014 auto-loop 的 ① 感知阶段:每轮发现待办(lit-loop/meta-loop/analysis-loop/qual-loop)时,自动在该待办下列出装在 .claude/skills 里、与该研究类型相关的外部技能包(AcademicForge/AJS),把『发现工作』与『发现工具』接上,免去手动跑 skills --for。纯指路、纯加在感知输出上:auto-loop 派发的仍是仓内 workflow,推荐的 Agent Skill 是给宿主 Agent 读的 markdown,psyclaw 不执行它们——不改派发/验收逻辑,零风险增量。技能池每轮一次性 list_skills 预取(避免每个待办各扫一遍磁盘),blocker 待办不推荐,推荐/发现失败 fail-safe 不阻塞主流程。",
+      "dependencies": [
+        "feat-014",
+        "feat-018"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/autoloop.py:新增 skill_hints(action, project_dir, skills, top_k) 薄封装 recommend_skills(external_only,失败返回 [])+ _print_sense(增 project_dir 参数,一次性预取 list_skills 池,每个非 blocker 待办打印『↳ 相关技能包:…』)+ run_autoloop 传 project_dir;tests/test_autoloop.py +3 例(action 类型匹配、无匹配/空池空、bundled-only 不推)共 36 例;全量 C:\\Python314 pytest 1065 passed;离线 end-to-end:seed .claude/skills 装 forge-meta/forge-analysis + 数据表 scores.csv → 感知阶段在 analysis-loop 待办下列出 forge-analysis 等相关技能包。"
+    },
+    {
+      "id": "feat-021",
+      "name": "PDF 正文抽取(读本地论文 PDF)",
+      "description": "修复用户实测痛点:REPL 引用/自动检测到本地 .pdf 时,旧代码把 PDF 当文本 read_text → 塞给 LLM 的是二进制乱码(PDF 头尾 + zlib 压缩流),LLM 只能说读不了。新增 pdf_extract:三级 best-effort 抽取——① 可选库 pypdf/pdfplumber(装了效果最好,正确处理字体编码,非硬依赖)② 纯 stdlib 兜底(zlib 解 FlateDecode 流 + 手写扫描器抽文本操作符,平衡括号 + 转义)③ 质量门(抽出不像正文=扫描件/加密/CID 字体 → 诚实返回提示装 pypdf 或粘贴文本/OCR,绝不注入乱码)。经 smart_excerpt 的 .pdf 分支接入,@file 与自动路径检测两条路都覆盖。只读、不碰统计。",
+      "dependencies": [
+        "feat-010"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/pdf_extract.py(extract_pdf_text/_via_lib/_via_stdlib/_read_literal 平衡括号扫描/_decode_literal(转义+八进制)/_decode_hex/_bytes_to_str(UTF-16BE BOM/latin-1)/_looks_like_text 质量门)+ psyclaw/context.py smart_excerpt 增 .pdf → _pdf_excerpt 分支(ok→<pdf>正文,失败→诚实 note);tests/test_pdf_extract.py 8 例(未压缩/FlateDecode/非PDF拒/无文本诚实提示/质量门/截断/smart_excerpt 路由不泄二进制/失败给提示);修复关键缺陷:字面量正则不支持嵌套括号(如 (p < .05))→ 改手写深度扫描;全量 C:\\Python314 pytest 1073 passed;本机 pypdf+pdfplumber 均可用(用户实跑将走高质量抽取)。"
+    },
+    {
+      "id": "feat-022",
+      "name": "来源路由树 search(按任务类型路由检索,主通道+兜底)",
+      "description": "据任务类型把检索路由到最合适的来源+模式:factual→学术库+精确、conceptual→学术库+语义(默认)、trend→学术库+时间序列(按年份窗口)、local→本地会话全文检索。决策树只选**主通道**但永远带一个**兜底通道**(主通道零命中即走兜底),规避『单一模式误路由把结果打空』。复用既有能力:academic=litsearch(OpenAlex/EuropePMC/arXiv)、local=会话 FTS(feat-013)、trend=litsearch 按年份窗口。控制流纯确定性(classify_task/route 可单测),execute_route 薄分发。来源集可扩展(加 web/MCP 源只需登记+加一条分发),core 不引入网络新依赖。psyclaw search <query> [--type factual|conceptual|trend|local]。",
+      "dependencies": [
+        "feat-007",
+        "feat-013"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/search_router.py(classify_task 中英双语关键词/route 主通道+兜底计划/execute_route 主空则兜底/_run_channel 分发 litsearch|ContextArchive.search/_temporal_search 年份窗口)+ cli.py search 命令(catalog 新增『检索/知识图谱』类,lit 一并归入,names==catalogued 通过);tests/test_search_router.py 10 例(四类归类+默认/route 主兜底不同/未知类型回落/trend=temporal/local=exact/execute 主命中不兜底/主空走兜底);全量 C:\\Python314 pytest 1093 passed;'焦虑研究近年趋势' → trend/temporal(+semantic 兜底)。",
+      "notes": "web/MCP 源为后续扩展点(core 不内置通用网页检索)。"
+    },
+    {
+      "id": "feat-024",
+      "name": "「天然」保存文件(REPL 无需命令即可落盘)",
+      "description": "解决用户实测:PsyClaw REPL 是纯对话循环,LLM 没有写文件的动作通道,只能punt『我无法创建文件』让用户复制粘贴。不引入 function-calling 架构(重、依赖 provider、安全升级),改用**提示约定 + 自动落盘**:系统提示告诉模型『要保存文件时用 ```save path=… 块输出内容』,ask() 每轮自动扫描回复里的 save 块并写盘——完全对齐既有 _capture_plan『解析模型回复→写 notes/plan.md』的套路,provider 无关(不需 function-calling API)。用户只需自然地说『存到 method.txt』。护栏守铁律:**绝不写受保护的 data/raw**、目标已存在**覆盖前交互确认**、非交互(非 TTY)不静默 clobber、写完回报路径与字符数。",
+      "dependencies": [
+        "feat-010"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py:parse_save_blocks(纯函数,正则解析 ```save path=… 块,支持 path=/裸路径/带引号/Windows 反斜杠路径/多块/剥尾换行)+ _save_is_protected(data/raw 守卫)+ apply_save_block(护栏写盘,status∈{saved,refused-raw,skipped-exists,error};confirm(path)→True 才覆盖,缺省不覆盖)+ _capture_saves(方法,覆盖走 loop._ask_yn,非 TTY fail-safe 不覆盖)+ _SAVE_SYSTEM 注入 _build_system_prompt + ask() 每轮调用;tests/test_repl_save.py 9 例(解析单/多/裸/引号/Windows 路径/无块 + data/raw 拒 + 新建 + 存在跳过 + 确认覆盖);全量 C:\\Python314 pytest 1102 passed;end-to-end:含 ```save 块的模型回复 → 自动写出 method.txt(研究1+权限管理内容)。"
+    },
+    {
+      "id": "feat-025",
+      "name": "纯工具层循环 agent(模型自主多步调工具,provider 无关保底)",
+      "description": "让模型自主多步调用工具,作为 provider 无关的保底(用户明确要求)。**不绑 provider 原生 function-calling**(那样 mock 和不支持的模型就废了),改用**文本约定的工具协议**——模型在回复里输出 ```tool JSON 块,循环解析→执行→把结果回灌→模型续,直到给出不含 tool 块的最终答案;任何文本模型都能跑,这是保底,支持原生 tool-calling 的 provider 以后可另接高性能通道。工具集把既有能力暴露为可调用:search(来源路由 feat-022)/read_file(含 PDF 抽取 feat-021)/save_file(feat-024 护栏)/kg_query(feat-023)/recall(feat-013)。守 PsyClaw fail-closed:副作用工具(save_file)需 approve 批准(HITL 留在环里)、max_iters 防打转、只读工具自动跑、data/raw 硬护栏在工具内继续生效、emit 事件流对接『流式中间结果』。REPL /agent 模式 + 顶层 psyclaw agent <task> [--auto]。",
+      "dependencies": [
+        "feat-010",
+        "feat-021",
+        "feat-022",
+        "feat-023",
+        "feat-024"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(parse_tool_calls 纯函数/build_tools 5 工具 search·read_file·save_file[side_effect]·kg_query·recall/render_tool_catalog/_exec_tool(未知/副作用 approve 门/异常不炸)/_render_results/run_tool_loop 主循环[无块=answered/到顶=max_iters])+ psyclaw/repl.py(agent_mode + /agent 开关 + _run_agent + ask() if/else 分支 + _approve 走 _ask_yn 非TTY拒 + COMMANDS/HELP)+ psyclaw/cli.py agent 一次性命令(--auto/--max-iters,catalog 归『研究流程/编排回路』,names==catalogued 通过);tests/test_toolloop.py 13 例(解析单/多/无/坏JSON/缺name + build/catalog + 循环收敛/上限/副作用需批准/批准执行/未知工具/emit);全量 C:\\Python314 pytest 1115 passed;离线 end-to-end:脚本 provider → recall → save_file(批准)→ 最终答案,3 轮 answered 收敛,out.txt 实际写出。",
+      "notes": "原生 function-calling 通道(为支持的 provider)+ MCP 工具接入 为后续增强点。"
+    },
+    {
+      "id": "feat-026",
+      "name": "易用性收敛套件:status / 本地感知 / 门禁用户跳过 / check / 入口决策树",
+      "description": "整项目易用性审查(易用性/降认知成本为主,准确性为次)后的一揽子落地:① psyclaw status 一屏态势(目标/澄清/回路/等人决策**直接打印内容**/最近产物/下一步建议,复用 discover_backlog)——状态不再散落 8 个文件;② 本地项目感知 project_sense(用户实测:psyclaw 感知不到文件夹)——有界目录树每轮注入 REPL system(限深/限条/跳噪声;**data/raw 只报数不列名**),agent 工具集加 list_dir;③ 门禁用户跳过(用户决定:不分级,显式要求即可跳)——run_workflow/auto-loop/四 type-loop 加 --skip-gates,跳过留痕 notes/gate_skips.md + 总验收带 gates_skipped + exploratory 标注,默认 fail-closed 行为不变;④ psyclaw check 投稿前一键质检(JARS+引用保真(+期刊风格)+复现溯源+KG 溯源,一屏 ✓/✗/⚠,每项独立 fail-safe);⑤ 入口收敛:guide 重写为『默认三条路径(status→auto-loop→check)+按需分支』决策树,session 帮助淡出 search 子动作(统一入口=psyclaw search)。",
+      "dependencies": [
+        "feat-012",
+        "feat-014",
+        "feat-015",
+        "feat-016",
+        "feat-022",
+        "feat-023",
+        "feat-025"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/status.py(collect_status 纯采集各块独立 fail-safe + print_status)+ psyclaw/project_sense.py(scan_tree 有界/render_tree 折叠计数/project_brief ≤1500字符)+ repl.py ask() 注入 brief + toolloop build_tools 加 list_dir + workflows/engine.py run_workflow(skip_gates)+_record_gate_skip 留痕+summary.gates_skipped/exploratory + autoloop discover_backlog(skip_clarify)/_dispatch/run_autoloop(skip_gates)+ cli.py status/check 命令 + 5 个 loop --skip-gates + guide 决策树 + session 帮助改写(names==catalogued 通过,命令 44 条);tests/test_status_sense.py 10 + test_gate_skip.py 4 + test_checkup.py 6;全量 C:\\Python314 pytest 1135 passed;end-to-end:status 直接亮出 clarify blocker 与建议、check 抓出 JARS 缺项+杜撰引用 Ghost(2099)、guide 出默认三条路径、data/raw 文件名未泄入目录树。"
+    },
+    {
+      "id": "feat-027",
+      "name": "REPL 交互升级:键盘选择器 + 文件读取权限(open/safe)+ 会话名可见",
+      "description": "三个用户实测痛点:① 模型列复选清单『• [ ] 研究1a…』但 REPL 不支持键盘选择 → psyclaw/choices.py:模型输出 ```choices JSON 块(system 约定)或自发复选清单(启发式,≥2 条)→ 弹键盘选择器(prompt_toolkit 对话框方向键+空格勾选 → 编号输入兜底 → 非 TTY 不弹),选完自动回传续聊;② 模型说『我无法读取CSV』要用户 @ 引用 → 文件读取权限模式:open(默认)=模型输出 ```read 块 REPL 自动读取注入(smart_excerpt:CSV 结构+样例行/PDF 抽正文;data/raw 恒拒;每轮≤4 文件;自动跟进深度≤3 防打转),safe(/safemode)=一切读取须 @ 显式引用;③ /rename 后看不出改了名 → 会话名进提示符(psyclaw·名字 ❯),plan/agent/safe 模式同显,resume 带回名字。",
+      "dependencies": [
+        "feat-010",
+        "feat-013",
+        "feat-021"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/choices.py(parse_choices 块+复选启发式/resolve_selection 编号·全部·原文·取消/format_selection_message/pick_interactive 三级降级)+ repl.py(_CHOICES_SYSTEM/_READ_OPEN_SYSTEM/_READ_SAFE_SYSTEM 动态注入 + parse_read_requests/gather_read_results 纯函数 + _auto_followup 读取→选择→自动回传(深度上限)+ /safemode + session_name 进提示符);tests/test_choices_reads.py 12 例(含用户实测的 • [ ] 格式、data/raw 拒读内容不泄、文件数上限);全量 C:\\Python314 pytest 1154 passed。"
+    },
+    {
+      "id": "feat-028",
+      "name": "插件系统 + skill/MCP/plugins 统一 内置/用户(项目/全局)scope",
+      "description": "① 插件系统(用户要求):放 <项目>/.psyclaw/plugins/*.py 或 ~/.psyclaw/plugins/*.py,暴露 register(api)——api.add_tool(进 agent 工具循环,side_effect 照走批准门)/add_command(进 REPL slash+补全联想)/add_system(追加 system 提示)。每个插件独立 fail-safe 加载(坏插件不拖垮宿主,错误可见);内置同名优先不被劫持。psyclaw plugins + REPL /plugins 列出。② 统一 scope(用户要求):skills(builtin/project/global/custom,按根目录 is_relative_to 归类——修了字符串前缀误判 F:/proj-data∈F:/proj 的真 bug)、MCP(内置 registry.yaml + 用户 .psyclaw/mcp.yaml 项目/全局合并,内置优先防劫持)、plugins(项目/全局),三处列表均标注 内置/用户·项目/用户·全局。",
+      "dependencies": [
+        "feat-017",
+        "feat-025"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/plugins.py(PluginApi/PluginRegistry/plugin_dirs 项目优先/load_plugins 逐插件隔离/merge_plugin_tools 内置优先)+ toolloop.build_tools 并入插件工具 + repl.py(__init__ 加载/系统片段注入/插件 slash 分发+补全/ /plugins)+ cli.py plugins 命令 + cmd_skills/cmd_mcp 标 scope + skills/loader.py _root_scope(is_relative_to)+ mcp/manager.py user_registries/_all_entries(catalog 45 条,names==catalogued 通过);tests/test_plugins_scope.py 8 例(注册三扩展点/坏插件隔离/缺 register/下划线跳过/内置不被劫持/build_tools 并入/skills scope/McP 用户注册表 scope+同名内置优先);全量 C:\\Python314 pytest 1154 passed;e2e:项目插件 lab.py → psyclaw plugins 列出[用户·项目]+工具+命令。"
+    },
+    {
+      "id": "feat-029",
+      "name": "v0.2 发布:命令简单化 + 用户别名 + 内置 skill 同步 + CHANGELOG",
+      "description": "用户定调 v0.2:『机制可以复杂,但命令要简单化;支持用户自定义;内置 skill 能同步更新』。① 命令简单化:--help 收敛到 CORE_COMMANDS(全部命令照常可调用,epilog 动态指路 psyclaw commands / guide / TUTORIAL);② 用户别名:~/.psyclaw/aliases.yaml(全局)+ <项目>/.psyclaw/aliases.yaml(项目覆盖全局),一行一条『qc: check --journal xinlixuebao』→ psyclaw qc 稿件.md,shlex 解析带引号参数,**内置命令优先不可劫持**,任何异常 fail-safe 不阻塞 CLI,psyclaw commands 底部列出你的别名;③ 内置 skill 同步:纳入另一会话实现的 skills --sync(upstream.json 清单 → <skill>/upstream/ 同步,ctx2skill/opid 适配层薄壳)及其测试;④ __version__ 0.1.0→0.2.0 + CHANGELOG.md(v0.1→v0.2 全量变更)。",
+      "dependencies": [
+        "feat-026",
+        "feat-028"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/aliases.py(alias_files 全局在前项目覆盖/_parse errors=replace fail-safe/load_aliases/expand_alias 纯函数·内置优先·shlex·坏定义原样)+ cli.py main() 别名展开(异常不阻塞)+ build_parser 末尾 --help 收敛(快照 _psyclaw_help 后过滤 _choices_actions,epilog 动态报『只列 N 条/全部 M 条』)+ cmd_commands 列别名 + psyclaw/skills/sync.py+ctx2skill/opid(另一会话实现,本轮纳入提交)+ __init__ 0.2.0 + CHANGELOG.md;tests/test_aliases.py 6 例(展开+余参追加/内置不劫持/透传/引号+注释/坏文件/坏定义)+ test_cli_help 帮助收敛新契约(shown==CORE∩all、未列命令仍可调、epilog 指路);全量 C:\\Python314 pytest 1163 passed;e2e:--help 尾行『只列 31 条…全部 51 条』、psyclaw version=0.2.0、别名 qc 展开为 check --journal xinlixuebao 实跑。"
+    },
+    {
+      "id": "feat-023",
+      "name": "带引用的轻量知识图谱 kg(边由构造即带引用)",
+      "description": "SQLite nodes/edges 知识图谱(stdlib,无 Neo4j),把研究里的构念/论文/人物/机构/技术串起来帮 Agent 理解全貌。核心纪律=**边必带来源**:add_edge 拒绝无 source_ref 的边(反幻觉关系);verify 复用 feat-015 cite-check 的 _canon_key 规范化,核对每条 citation 边的来源是否真在检索语料(notes/evidence_map.json 允许键),溯源不到=孤儿=疑似杜撰关系。主题范围非全局:seed_from_evidence_map 从既有 evidence_map(构念×支持文献)直接种出天然带引用的图。基础实体消歧(归一名+类型去重);ego 子图 BFS + mermaid 渲染(边标来源)。存 .psyclaw/kg/graph.db。psyclaw kg seed|show <实体>|verify|stats。",
+      "dependencies": [
+        "feat-007",
+        "feat-015"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/kg.py(KnowledgeGraph:_db(nodes UNIQUE(norm,type)/edges UNIQUE(src,dst,rel,src_ref))/add_node 去重/add_edge 拒无来源/neighbors 出入边/subgraph BFS/seed_from_evidence_map/verify 复用 citations._canon_key+load_allowed/stats 自证 uncited=0 不变量)+ render_mermaid;cli.py kg 命令(catalog『检索/知识图谱』,names==catalogued 通过);tests/test_kg.py 10 例(节点去重/边必带来源/建点+stats/邻居出入/子图深度/种图/缺 evidence_map/verify 溯源+孤儿检出/非citation边跳过/mermaid);全量 C:\\Python314 pytest 1093 passed;CLI end-to-end:evidence_map 种 2 带引用边 → kg show 出 mermaid 子图(边标引用)→ kg verify 0 孤儿,加杜撰边 Ghost(2099) → verify 抓成孤儿。"
+    },
+    {
+      "id": "feat-030",
+      "name": "toolloop 截断防护——工具调用中途不再提前停止",
+      "description": "修复长任务提前停止的三个根因:(1) provider 输出被 max_tokens 截断时 ```tool 块未闭合,parse_tool_calls 解析不出调用,run_tool_loop 误判为最终答案而静默终止——新增 has_truncated_tool_block 检测未闭合块 + provider.last_stop_reason==max_tokens 检查,触发续写提示(_TRUNC_NUDGE)让模型重发完整块,连续截断 >_MAX_TRUNC_STREAK(2) 次才停(stopped=truncated,不静默);完整调用+尾部截断残块时执行完整的并在回灌里告知残块未执行。(2) anthropic_api/openai_compat 此前完全忽略 stop_reason/finish_reason——base.Provider 加 last_stop_reason 属性,anthropic 从 message_delta 捕获,openai 系捕获 finish_reason 并归一化(length→max_tokens);anthropic max_tokens 4096→PSYCLAW_MAX_TOKENS 环境变量可配(默认 8192)。(3) agent 命令 max_iters 默认 6→24(长研究任务多步调用;auto-loop 的 6 是研究阶段数语义,不动)。",
+      "dependencies": [
+        "feat-014"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(has_truncated_tool_block/_MAX_TRUNC_STREAK/_TRUNC_NUDGE/run_tool_loop 截断分支)+ providers/base.py(last_stop_reason)+ anthropic_api.py + openai_compat.py + cli.py(agent --max-iters 24);tests/test_toolloop.py 新增 6 例(未闭合检测/截断不当答案继续/连续截断放弃 stopped=truncated/stop_reason=max_tokens 触发重试/完整调用+残块执行并告知/默认上限≥24);另修 tests/test_mcp_servers.py 2 例陈旧断言(3d9b183 改 mplus/stata 为 detect: 门控后测试未同步,改为 enabled iff shutil.which);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1190 passed(修前 1188 passed 2 failed,失败为上述陈旧断言,已确认与本改动无关后修正)。"
+    },
+    {
+      "id": "feat-031",
+      "name": "shell 执行 fail-closed 安全加固(v0.3,外审 HIGH)",
+      "description": "repl.py run_commands 现仅靠 _DANGEROUS_RE 正则拒绝清单把关 LLM 生成的 shell 命令(subprocess shell=True 自动执行)——拒绝清单不是安全边界。改为:shell 类命令每条都须 confirm(cmd)→True 才执行(fail-closed,非 TTY 不批),_DANGEROUS_RE 降级为确认提示里的 ⚠ 危险标签;psyclaw 进程内子命令保持自动(自家 argparse 编排,交互式命令已有 _INTERACTIVE_CMDS 守卫)。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(run_commands:shell 类每条须 confirm→True 否则拒,danger 时 psyclaw 类也须确认;_DANGEROUS_RE 降级为 ⚠ 标签注释;_auto_followup 调用处 _confirm_cmd 按危险与否换提示措辞);tests/test_review_fixes_v02.py:原 test_run_commands_executes_shell 改为带 confirm 契约 + 新增 5 例(普通 shell 无 confirm 拒/confirm 拒绝拒/psyclaw 类自动/psyclaw 危险模式仍须确认/逐条 confirm 回调);验证:uv run --python 3.12 pytest → 1195 passed"
+    },
+    {
+      "id": "feat-032",
+      "name": "save_file 路径允许清单(v0.3,外审 MEDIUM)",
+      "description": "toolloop build_tools 的 _save 现以 confirm=lambda p:True 调 apply_save_block,可写任意路径。改为:Path.resolve() 后必须 is_relative_to(项目根),拒软链接目标、拒凭据类路径(~/.ssh/~/.aws/~/.gnupg/.netrc/.env/*.pem),拒绝消息带完整解析路径;data/raw 铁律照旧在 apply_save_block 内生效。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(save_path_denied 纯函数:resolve 后须 is_relative_to 项目根/拒已存在软链目标/拒凭据类名单 _CRED_NAMES+_CRED_SUFFIXES+_CRED_DIR_PARTS;_save 先过护栏再 apply_save_block,工具描述更新);tests/test_toolloop.py +10 例(根内放行/../逃逸/项目外绝对路径/~/.ssh/凭据名/凭据目录/软链目标/途径软链目录逃逸/空路径/端到端拒写不落盘);验证:uv run --python 3.12 pytest → 1205 passed"
+    },
+    {
+      "id": "feat-033",
+      "name": "长会话上下文修剪(v0.3,「对话长期维持」另一半)",
+      "description": "toolloop run_tool_loop 的 convo 无界增长(默认 24 轮 × 每轮 ≤6000 字符/工具回灌)会撑爆 provider 上下文或触发更频繁截断。循环内滚动修剪:保 system+最初任务+最近 N 轮完整,更早的工具结果消息压缩为一行摘要(工具名+结果首行);修剪对模型透明(摘要行说明可用 recall 找回)。附带审视 repl compact_history 现契约并补质量测试。",
+      "dependencies": [
+        "feat-030"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(_compress_result_msg 每工具保 ## 名+输出首行限 160 字/trim_convo 就地滚动修剪:只动 base_len 后以 # 工具结果 开头的 user 消息,最近 3 条保完整,幂等跳过已压缩;run_tool_loop 每轮回灌后调用);REPL 侧 compact_history 审视结论=已有预算触发+备忘蒸馏+memo 4000 限长+测试覆盖,无需改;tests/test_toolloop.py +5 例(压缩保工具名+首行/近 3 完整旧 3 压缩/幂等+阈下不动/不碰调用方历史/端到端 SpyProvider 验证第 7 轮时 6 条结果 3 条已压缩);验证:uv run --python 3.12 pytest → 1210 passed"
+    },
+    {
+      "id": "feat-034",
+      "name": "normalize_type 中文研究类型别名(v0.3 小修)",
+      "description": "skills/recommend.py normalize_type 不识别中文研究类型(『元分析』→None,英文 meta 可)——补中文别名映射(元分析/元/荟萃→meta 等,覆盖 RESEARCH_TYPE_KEYWORDS 全部类型),高频入口。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/skills/recommend.py(_TYPE_ALIASES 补 22 个中文别名:文献综述/综述/系统综述→lit-review、元分析/荟萃(分析)/meta分析→meta、实证(研究/分析)/数据分析/统计分析/定量(研究)/量化研究→analysis、质性(研究)/定性(研究)/访谈研究/主题分析→qualitative);tests/test_skill_recommend.py +2 例(中文别名 12 断言含 lower/strip 归一与未知拒/中文入口端到端推荐);验证:uv run --python 3.12 pytest → 1212 passed"
+    },
+    {
+      "id": "feat-035",
+      "name": "v0.3 发布收尾(版本对齐 + CHANGELOG)",
+      "description": "版本不一致:pyproject.toml=0.1.0、__version__=0.2.0(v0.2 发布轮漏改 pyproject)。统一升 0.3.0;CHANGELOG.md 增 v0.3 段(feat-030..034);全量回归绿后打收尾提交。",
+      "dependencies": [
+        "feat-031",
+        "feat-032",
+        "feat-033",
+        "feat-034"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml version 0.1.0→0.3.0 + psyclaw/__init__.py __version__ 0.2.0→0.3.0(对齐);CHANGELOG.md v0.3.0 段(长会话可靠性 feat-030/033、安全加固 feat-031/032、其他 feat-034/版本统一/陈旧测试修复);TODO.md §2 全部标 ✅;验证:uv run --python 3.12 pytest → 1212 passed;psyclaw version → 0.3.0(uv tool editable 安装即时生效)"
+    },
+    {
+      "id": "feat-036",
+      "name": "provider 网络层健壮性(v0.4:重试+错误显性化)",
+      "description": "base._post_sse 现在 HTTP/网络错误只抛裸异常,调用方(REPL/_run_agent)只显示「provider 错误」,且无重试——网络瞬断/限流直接杀死整个 agent 长任务。改为:429/5xx/URLError/timeout 指数退避重试(≤3 次,仅在首字节产出前,流中断不重试防重复消费);HTTPError 读响应 body(截断)拼进异常消息(API 的 error JSON 通常在 body 里,裸 status 无法定位);4xx(非 429)不重试直接显性报错。stdlib only,time.sleep 可测试注入。",
+      "dependencies": [
+        "feat-030"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/providers/base.py(_post_sse 重写:首字节前 429/5xx/529/URLError/timeout 指数退避重试 ≤3 次(_sleep 可注入),4xx 非 429 不重试;_http_error_detail 读 body 截 300 字拼 RuntimeError;流开始后异常向上传播不重试防重复消费);tests/test_providers.py +6 例(成功透传跳 [DONE]/429×2 后成功且退避 [1.0,2.0]/URLError+503 混合重试/400 不重试且 body 进消息/持续失败 3/3 报错/流中断不重试);验证:uv run --python 3.12 pytest → 1218 passed"
+    },
+    {
+      "id": "feat-037",
+      "name": "agent 运行痕迹持久化(v0.4:agent_runs.jsonl + --history)",
+      "description": "run_tool_loop 的 trace/final 只活在当轮终端,跑完即失——崩溃/关窗后无法回看 agent 做了什么(可观测性缺口,也是复现溯源的输入)。新增 toolloop.log_agent_run(project_dir, task, res) 追加 .psyclaw/agent_runs.jsonl(ts/task 头/iters/stopped/工具调用名列表/final 头);cli cmd_agent 跑完自动记;psyclaw agent --history [n] 回看最近 n 次(默认 10);REPL _run_agent 同样落痕。",
+      "dependencies": [
+        "feat-030"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(log_agent_run 追加 .psyclaw/agent_runs.jsonl:ts/task 头/iters/stopped/工具名列表/final 头,各头截 200 字,OSError 静默;read_agent_runs 新→旧读 limit 条,坏行跳过,缺文件 []);cli.py cmd_agent(--history [n] 回看默认 10、task 改 nargs=* 配合、跑完自动 log);repl.py _run_agent 同样落痕;.psyclaw/ 已在 .gitignore。tests/test_toolloop.py +4 例(写读新→旧/limit+缺文件/坏行跳过/头截断);验证:uv run --python 3.12 pytest → 1222 passed;live e2e:agent 实跑后 --history 回显 [2 轮 · 1 工具 · answered] 列出项目根目录结构"
+    },
+    {
+      "id": "feat-038",
+      "name": "v0.4 收尾:docs 同步 + harness 快照",
+      "description": "README/docs/COMMANDS.md 同步 v0.3+v0.4 用户可感知变化(shell 命令逐条确认是行为变化必须写清;save_file 只写项目根;PSYCLAW_MAX_TOKENS;agent --history);progress.md/session-handoff.md 快照;全量回归绿。",
+      "dependencies": [
+        "feat-036",
+        "feat-037"
+      ],
+      "status": "done",
+      "evidence": "docs/COMMANDS.md(agent 行补 --max-iters/--history 与 v0.3/v0.4 特性说明);docs/TUTORIAL.md(REPL 7 件事:新增『shell 命令块每条先确认』行,save 行补 agent 护栏);progress.md 本轮(24) v0.3.0+v0.4 快照;session-handoff.md(Evidence/Decisions/Next=v0.5 候选);验证:uv run --python 3.12 pytest → 1222 passed"
+    },
+    {
+      "id": "feat-039",
+      "name": "MCP stdio 客户端(v0.5:连接内置/用户 MCP 服务器)",
+      "description": "psyclaw/mcp/client.py:JSON-RPC 2.0 over stdio 客户端(与 server_base.py 对偶)。subprocess 起服务器(command 字符串 shlex 拆分,`python` 用 sys.executable 兜底本机无 python),换行分隔 JSON-RPC:initialize→notifications/initialized→tools/list→tools/call。每步超时 fail-safe(不挂死 agent),进程异常/坏 JSON 优雅降级返回错误串。上下文管理器 close 收尾杀进程。stdlib only(subprocess/json/shlex)。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/mcp/client.py(MCPClient:惰性 start 起子进程+initialize/notifications/initialized 握手,后台读线程+queue 按 id 匹配响应,_request 超时/EOF fail-safe 返回错误 dict;list_tools/call_tool 归一错误为可读串不抛;resolve_command 把 python/python3 换 sys.executable 兜底本机无 python;上下文管理器 close 幂等杀进程);tests/_mcp_echo_server.py 夹具(基于 server_base 的 echo/boom 服务器)+ tests/test_mcp_client.py 8 例(command 解析/list 往返/call 往返中文/服务器错误可读/未知工具/坏命令降级/超时不挂死/close 幂等);验证:uv run --python 3.12 pytest → 1230 passed(真实 subprocess 往返)"
+    },
+    {
+      "id": "feat-040",
+      "name": "agent 循环接入 MCP 工具(v0.5:编排纵深)",
+      "description": "toolloop.build_tools 合并已启用 MCP 服务器暴露的工具(list_mcp_catalog_with_health 里 enabled+健康的,惰性连接:工具被调时才起子进程)。MCP 工具名加前缀防撞内置(mcp__<server>__<tool>);标 side_effect=True 走 fail-closed 批准(外部执行,保守)。连接失败不拖垮工具集(与既有插件加载同构)。catalog 里对模型说明这些是外部 MCP 工具。",
+      "dependencies": [
+        "feat-039"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/mcp/agent_tools.py(merge_mcp_tools:只并 enabled+health.ok+有 command 的服务器,tools/list 短超时 10s,mcp__<server>__<tool> 前缀防撞,一律 side_effect=True fail-closed;客户端进程级缓存 _clients 按 command 复用+atexit 收尾;PSYCLAW_MCP_TOOLS=0 可关;任何异常不外抛);toolloop.build_tools 在插件合并后调 merge_mcp_tools(与插件加载同构);tests/test_mcp_agent_tools.py 7 例(前缀+side_effect+schema hint/真调 echo 服务器/跳过禁用+不健康+无 command/env 关闭/坏命令不炸/catalog 异常吞掉/客户端缓存复用);验证:uv run --python 3.12 pytest → 1237 passed;live e2e:build_tools('.') 实际浮出真实 mne-mcp 4 工具(mne_info/preprocess_plan/erp_components/stats_guidance),内置 6+MCP 4=10"
+    },
+    {
+      "id": "feat-041",
+      "name": "compact_history LLM 蒸馏升级(v0.5:长会话质量)",
+      "description": "context.compact_history 现在靠 _distill 规则截断早期轮次为备忘。升级:可选传 provider,用它把被丢弃轮次蒸馏成结构化决策摘要(比规则截断保真);provider 缺失/异常/无 key → fail-safe 回落现有规则蒸馏(zero-dep 契约不破)。纯函数可测(注入 fake provider)。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/context.py(_llm_distill:provider 有 key 时用 _DISTILL_SYSTEM 把被丢弃轮次蒸馏成结构化决策备忘,provider=None/无 key(mock)/异常/空输出→返回 None 回落规则蒸馏 _distill;compact_history 加 provider 可选参,zero-dep 契约不破);repl.py ask 流程传 self.provider(无 key 自动回落);tests/test_context.py +5 例(有 key 用 LLM 且带蒸馏 system/provider 异常回落规则蒸馏不抛/无 key 不调 LLM/None 与默认一致/预算下不调 LLM);验证:uv run --python 3.12 pytest → 1242 passed"
+    },
+    {
+      "id": "feat-042",
+      "name": "v0.5.0 发布收尾",
+      "description": "版本 0.3.0→0.5.0(pyproject+__init__);CHANGELOG v0.5 段(MCP client/agent 接入/蒸馏升级);docs/COMMANDS+ARCHITECTURE 记 agent 可调 MCP 工具;progress/session-handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-039",
+        "feat-040",
+        "feat-041"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.3.0→0.5.0(跳过未发版 0.4);CHANGELOG.md v0.5.0 段(编排纵深 feat-039/040、长会话 feat-041、含 v0.4 工件 feat-036/037/038);docs/COMMANDS.md(统计三条路补 agent 直连 MCP + PSYCLAW_MCP_TOOLS)、docs/ARCHITECTURE.md(L3 加 v0.5 agent 直连 MCP 段);TODO §2 + progress 本轮(25) + session-handoff 快照;验证:uv run --python 3.12 pytest → 1242 passed;psyclaw version → 0.5.0(uv tool editable)"
+    },
+    {
+      "id": "feat-043",
+      "name": "工具调用参数规范化与校验(v0.6:多轮工具调用不崩)",
+      "description": "parse_tool_calls 现在把 args 原样返回:模型输出 args 为 list/数字/双重编码 JSON 字符串(\"args\":\"{...}\")时,内置工具 a.get(...) 抛 AttributeError,且 _exec_tool 竟标 ok=True(掩盖崩溃)。修:parse 规范化 args——dict 保留;JSON 对象字符串→解析为 dict;其余非 dict→{name:None,error:'args 必须是 JSON 对象'} 引导模型改;name 须非空字符串(否则 error)。_exec_tool 工具异常改标 ok=False(如实报失败,模型能自纠)。纯函数可测。",
+      "dependencies": [
+        "feat-030"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(_normalize_args:None→{}/dict 原样/JSON 对象字符串→解析/非 dict 与非对象字符串→报错引导;parse_tool_calls 用之,并校验 name 须非空字符串;_exec_tool 工具异常改标 ok=False 而非 True);tests/test_toolloop.py +8 例(dict/None 透传、JSON 字符串解析+空串、非对象拒(list/数字/bool/坏串)、parse 强转 JSON 字符串 args、list-args 带引导错误、非字符串 name 拒、端到端畸形 args 标 ok=False 不崩、异常标失败);实测复现:修前 list-args→'list object has no attribute get' 且 ok=True;修后 ok=False+'args 必须是 JSON 对象'。验证:uv run --python 3.12 pytest → 1250 passed"
+    },
+    {
+      "id": "feat-044",
+      "name": "工具循环无进展检测(v0.6:多轮不空转/不卡死)",
+      "description": "当前只有 max_iters 与截断兜底;模型反复用**相同参数**调同一工具(常见混乱模式)会白耗到 max_iters,空回复也被当最终答案。加:① 空/纯空白回复(无 tool 块、非截断)→ 视为无进展,回灌一次追问而非当答案;② 连续相同 (name,args) 调用达阈值 → stopped=no_progress,附清晰说明停止(不静默、不空转到 24 轮)。有限纠偏后收敛。",
+      "dependencies": [
+        "feat-043"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(_calls_signature 键序无关签名;run_tool_loop 加 empty_streak/repeat_streak/prev_sig:空/纯空白回复→追问 _EMPTY_NUDGE 而非当答案,连续 >_MAX_NOPROGRESS(2) 空→stopped=no_progress;连续相同 (name,args) 达 _MAX_NOPROGRESS→stopped=no_progress 收敛,不空转到 max_iters);tests/test_toolloop.py +6 例(签名键序无关/空回复追问后答/空连击停/重复调用停且执行恰 2 次/变参不误触/非空答案立即返回)+ 改 test_loop_max_iters 用变参(否则先中无进展检测);验证:uv run --python 3.12 pytest → 1256 passed"
+    },
+    {
+      "id": "feat-045",
+      "name": "消息序列不变量守卫(v0.6:多轮不触发 provider 400)",
+      "description": "provider(Anthropic/OpenAI)对空 content 消息、非交替角色会 400。工具循环回灌/续写路径需保证:绝不向 convo 追加空 content 的 assistant/user 消息;最终答案为空时有限重试一次而非返回空 final;assistant→user 交替不被 nudge 打破。加不变量检查函数 + 循环内应用。",
+      "dependencies": [
+        "feat-044"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(sanitize_messages 纯函数:丢非 user/assistant 角色与空 content、合并连续同角色、丢开头 assistant 保首条 user;run_tool_loop 每次 provider.chat 前套用);tests/test_toolloop.py +6 例(丢空 content、合并同角色、首条须 user、丢未知角色、None content、端到端断言 provider 每次只收合法序列:非空 content+角色交替+首条 user);验证:uv run --python 3.12 pytest → 1262 passed"
+    },
+    {
+      "id": "feat-046",
+      "name": "v0.6 发布收尾 + 多轮集成测试",
+      "description": "新增贴近真实的多轮工具调用集成测试(混合:正常调用→畸形 args 自纠→重复调用检测→截断续写→最终答案),证明『多轮对话工具调用不出问题』;版本 0.5.0→0.6.0;CHANGELOG v0.6 段;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-043",
+        "feat-044",
+        "feat-045"
+      ],
+      "status": "done",
+      "evidence": "tests/test_toolloop_multiturn.py 新增(ScriptedProvider 走真实多轮:正常调用→双重编码 JSON 字符串 args 自纠成功→list args 拦截失败→未知工具→max_tokens 截断续写→重发→答案;断言工具只在合法参数时执行[x=1,2,3]、畸形/未知如实标 ok=False、provider 每次只收合法序列;+连续失败不误判无进展仍能答案);版本 0.5.0→0.6.0(pyproject+__init__);CHANGELOG v0.6 段;TODO/progress/session-handoff 快照;验证:uv run --python 3.12 pytest → 1264 passed;psyclaw version → 0.6.0"
+    },
+    {
+      "id": "feat-047",
+      "name": "REPL 方向键/历史/光标(readline 后端)——修 ^[[A 泄漏(v0.7)",
+      "description": "用户报:psyclaw REPL 不支持方向键,按 ↑ 显示 ^[[A。根因:tool 装在 uv py3.12(无 prompt_toolkit),非 ptk TTY 落到自研 _read_line_interactive 逐键 raw reader——只把 ↑↓ 映射到 slash 联想、←→ 变 ESC,无命令历史/光标移动,且终端兼容性差会漏转义。修:非 ptk TTY 优先走 readline-backed 输入(stdlib readline 一挂即得方向键/↑↓历史/←→光标/Ctrl-A/E/K),slash 命令用 readline 补全器(整行补全、libedit/gnu 均绑 Tab),ANSI 提示用 \\001\\002 包裹让宽度计算正确;readline 不可用(Windows)再退 raw reader,再退裸 input。ptk premium 路径不变。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/ui_input.py(_readline_input:import readline 即得方向键/↑↓历史/←→光标/Ctrl-A-E-K,装整行 slash 补全器 set_completer+set_completer_delims('')、libedit 绑 'bind ^I rl_complete'/gnu 绑 'tab: complete'、结束 finally 复原;_rl_wrap_prompt 用 \\001\\002 包 ANSI SGR 让宽度计算正确;read_line 非 ptk TTY 改为优先 _readline_input,readline 缺失→raw reader→input);tests/test_repl_ptk.py 改 1 例(降级链新增 readline 层)+新增 6 例(非 ptk TTY 首选 readline/readline 缺失退 raw/KI 穿透/wrap ANSI/无 ANSI 不变/补全器候选+复原);根因:tool 装在 uv py3.12 无 prompt_toolkit,旧路径落自研 raw reader 不支持方向键。验证:uv run --python 3.12 pytest → 1270 passed;smoke:_readline_input 真 import readline 可用"
+    },
+    {
+      "id": "feat-048",
+      "name": "v0.7 发布收尾",
+      "description": "版本 0.6.0→0.7.0;CHANGELOG v0.7 段(REPL 方向键修复,用户可感知);TUTORIAL 补一句(方向键/历史可用,装 [full] 得实时补全);progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-047"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.6.0→0.7.0;CHANGELOG v0.7.0 段(REPL 方向键 readline 修复,用户可感知);docs/TUTORIAL.md『编辑/翻历史』行(方向键/Ctrl-A-E 可用+装 [full] 得实时联想);TODO §2 + progress 本轮(27) + session-handoff 快照(v0.8 候选=pystat MCP);验证:uv run --python 3.12 pytest → 1270 passed;psyclaw version → 0.7.0"
+    },
+    {
+      "id": "feat-049",
+      "name": "pystat MCP 服务器——闭环『统计外移到 MCP』(v0.8)",
+      "description": "registry 早声明 pystat(enable_when always)却无 server 文件、无 command,feat-040 因此浮不出它。建 psyclaw/mcp/servers/pystat_server.py 照 mne_server.py 惯例:惰性 import pingouin/pandas(缺失→返回可直接运行的脚本骨架,不假装算结果;在则真跑返回 JSON);工具 pystat_describe/pystat_ttest/pystat_correlation/pystat_anova/pystat_regression/pystat_guidance,每个脚本/结果都带效应量+95%CI(符合 gates STAT.effect_size)与前提/严谨性提示;纯 stdlib 骨架(顶层不 import 统计库)。registry 补 command=python -m psyclaw.mcp.servers.pystat_server → health find_spec ok → feat-040 自动浮出 mcp__pystat__* 到 agent 工具集,agent 可直接把 t 检验/方差/回归委托 pystat。",
+      "dependencies": [
+        "feat-040"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/mcp/servers/pystat_server.py(6 工具 describe/ttest/correlation/anova/regression/guidance,照 mne_server 惯例:惰性 _has_pingouin,缺失→可运行脚本骨架/在则真跑返回 JSON;每脚本带效应量+95%CI[bootci/cohen-d/CI95%/np2/标准化β+CI]与前提+严谨性提示;顶层零统计 import);registry.yaml pystat 补 command=python -m ...pystat_server + origin builtin;tests/test_pystat_server.py 12 例(6 工具降级脚本+CI 提示+guidance/MCP client 真 subprocess 往返 list+call/AST 校验顶层不 import pingouin/pandas/numpy/scipy/statsmodels);live 验证:list_mcp_catalog pystat command+enabled+health ok;build_tools('.') 浮出 6 个 mcp__pystat__* 到 agent 工具集——闭环『统计外移到 MCP』,agent 可直接委托 t 检验/方差/回归。验证:uv run --python 3.12 pytest → 1282 passed"
+    },
+    {
+      "id": "feat-050",
+      "name": "v0.8 发布收尾",
+      "description": "版本 0.7.0→0.8.0;CHANGELOG v0.8 段(pystat MCP:agent 可直连统计后端);docs/COMMANDS+ARCHITECTURE 记 pystat;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-049"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.7.0→0.8.0;CHANGELOG v0.8.0 段(pystat MCP:agent 可直连统计后端,闭环统计外移);docs/ARCHITECTURE.md L3 加 v0.8 pystat 段、docs/COMMANDS.md 统计三条路 --serve 补 pystat 默认启用;TODO §2 + progress 本轮(28) + session-handoff 快照(v0.9 候选=workflow 分析步默认走 pystat);验证:uv run --python 3.12 pytest → 1282 passed;psyclaw version → 0.8.0"
+    },
+    {
+      "id": "feat-051",
+      "name": "setup 一键配置缺失的基础环境(v0.9)",
+      "description": "用户需求:一条命令把跑 psyclaw 所缺的基础环境配好。现有 setup 偏项目脚手架、能力装是 opt-in。新增 psyclaw/env_setup.py:diagnose() 检查 base 环境四项——① 配置文件是否已建(_source != defaults)② LLM provider 是否配了 key(否则 agent 落 mock)③ stats 组(pingouin/pandas/scipy:pystat 真算、跑生成脚本)④ full 组(prompt_toolkit/rich:REPL 增强);每项给 ✓/✗+确切修法+能否自动装。bootstrap(apply) 一键 pip 装可自动修的缺失组(stats/full),不能自动的(API key)列为待手动。CLI:setup 加 --env(诊断+报告,--online 实装缺失组)。纯逻辑依赖注入(detect/provider/installer 可 fake),不实际联网即可测。fail-safe:装失败不阻断,如实报。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": "psyclaw/env_setup.py(diagnose 检查 base 四项:配置文件 _source!=defaults、provider 有 key 且非 mock、stats 组、full 组;每项 ok/detail/fix/auto;plan_installs 挑缺失且可自动装的组;bootstrap(apply) 调 installer 装缺失组后重诊断,装失败记 _error 不抛;format_report 渲染;依赖注入 detect_fn/config_fn/provider_fn/installer 可测);cli.py setup 加 --env(诊断+上色报告,--online 实装,all_ok→exit 0/1);tests/test_env_setup.py 11 例(全就绪/缺配置+key/缺组 auto/provider 异常/plan 只挑 auto/bootstrap 不 apply 只报/apply 装+重诊断/装失败如实报/manual 列非 auto/report 可读);live:psyclaw setup --env 正确报 config✓provider✓ stats✗ full✗ + 确切修法 + 可自动安装提示。验证:uv run --python 3.12 pytest → 1293 passed"
+    },
+    {
+      "id": "feat-052",
+      "name": "v0.9 发布收尾",
+      "description": "版本 0.8.0→0.9.0;CHANGELOG v0.9 段(setup --env 一键环境配置);docs/COMMANDS setup 行补 --env;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-051"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.8.0→0.9.0;CHANGELOG v0.9.0 段(setup --env 一键配置基础环境);docs/COMMANDS.md setup --env 行;TODO §2 + progress 本轮(29) + session-handoff 快照(v1.0 候选);验证:uv run --python 3.12 pytest → 1293 passed;psyclaw version → 0.9.0"
+    },
+    {
+      "id": "feat-053",
+      "name": "workflow 分析步接 pystat MCP——端到端闭环(v0.10)",
+      "description": "v0.8 建了 pystat MCP、v0.5 让 agent 能调,但 analysis workflow 的 step_analysis 仍只生成 outputs/analysis.py 让用户手动跑。补最后一公里:新增 psyclaw/workflows/pystat_bridge.py:rec_to_pystat_call(纯映射 recommend_analysis 的 {analysis,group/dv/iv/x/y} → pystat 工具名+args:ttest/anova/regression/correlation/descriptives 五分支)+ run_via_pystat(经 MCPClient 跑 pystat,client_factory 可注入;不可用/异常 fail-safe 返回 None)。step_analysis 生成脚本后 best-effort 经 pystat 跑,有结果存 outputs/analysis_result.txt 并提示——pingouin 在则真数值、不在则 pystat 降级脚本,either way 多一个具体产物;失败绝不阻断流程(仍有脚本)。至此 数据→profile→推荐→pystat 出结果 端到端闭环。",
+      "dependencies": [
+        "feat-049"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/workflows/pystat_bridge.py(rec_to_pystat_call 纯映射 5 分支 ttest/anova[group→between]/regression[iv→predictors 逗号连]/correlation/descriptives+未知 None;run_via_pystat 经 MCPClient 跑 pystat,client_factory 可注入,不可映射不建客户端、无客户端/异常/空结果→None fail-safe;_default_pystat_client 查目录 enabled+健康+command);steps_analysis.step_analysis 生成脚本后 best-effort 经 pystat 跑,有结果存 outputs/analysis_result.txt+记 artifacts,失败不阻断(脚本兜底);tests/test_pystat_bridge.py 13 例(5 映射+未知/注入客户端调对工具/无客户端/不可映射不建/异常吞/空结果 None/step 端到端写结果+脚本照写/step pystat 不可用仍活);e2e:run_via_pystat 经真实 pystat MCP subprocess 连通(本机无 pingouin→降级脚本 458 字,装 [stats] 则真数值)。验证:uv run --python 3.12 pytest → 1306 passed。至此 数据→profile→推荐→pystat 出结果 端到端闭环。"
+    },
+    {
+      "id": "feat-054",
+      "name": "v0.10 发布收尾",
+      "description": "版本 0.9.0→0.10.0;CHANGELOG v0.10 段(workflow 分析步接 pystat,端到端闭环);docs/ARCHITECTURE 记闭环完成;progress/handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-053"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.9.0→0.10.0;CHANGELOG v0.10.0 段(analysis 分析步接 pystat MCP,数据→结果端到端闭环);docs/ARCHITECTURE.md L3 加 v0.10 闭环段;TODO §2 + progress 本轮(30) + session-handoff 快照(v0.11 候选=结果回填稿件);验证:uv run --python 3.12 pytest → 1306 passed;psyclaw version → 0.10.0"
+    },
+    {
+      "id": "feat-055",
+      "name": "REPL 导出对话(/dump)",
+      "description": "REPL 新增 /dump 命令导出当前对话为 Markdown;/dump --full 连同平时不展示的隐藏上下文(system 提示/滚动决策备忘 memo/每轮持续注入的约定片段)一并导出。护栏:拒写 data/raw。纯渲染逻辑外移到 psyclaw/transcript.py 可单测。",
+      "dependencies": [
+        "feat-013"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/transcript.py(render_conversation/render_full/default_path 纯函数)+ psyclaw/repl.py(/dump 命令 _cmd_dump + _standing_conventions,COMMANDS/HELP_TEXT);tests/test_transcript.py +13 例(两档渲染/元信息/空会话/非串content/未知role/默认路径 + _cmd_dump 端到端写盘/--full含system/拒 data/raw/空会话);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1319 passed"
+    },
+    {
+      "id": "feat-056",
+      "name": "REPL 审批模式(YOLO)+ 确认框渲染 + 自动跟进深度",
+      "description": "修用户实测三坑:①y 请求太多——新增 YOLO 审批模式(/yolo 切换,config approval=yolo 设默认),非危险副作用(shell/文件覆盖/工具)自动放行,只有红线危险命令(rm -rf/push --force/DROP TABLE…)仍问人;data/raw 与密钥文件始终硬拒。②确认框与命令回显串行——统一副作用确认门 _side_effect_ok 把待确认内容单独打一行、只留短提示;loop._ask_yn 经 ui_input.safe_prompt 用 \\001\\002 包裹 ANSI,修 readline 彩色宽度算错。③程序停在深度上限要人说继续——自动跟进深度上限 3→12(YOLO 40),多步分析链一口气跑完。",
+      "dependencies": [
+        "feat-047"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(_side_effect_ok/_confirm_cmd 统一门 + self.yolo/max_auto_depth + /yolo 命令 _cmd_yolo + 提示符 yolo 徽标;_approve/_capture_saves 确认改走 _side_effect_ok;_MAX_AUTO_DEPTH 3→12、_YOLO_AUTO_DEPTH=40);psyclaw/ui_input.py(safe_prompt);psyclaw/loop.py(_ask_yn 经 safe_prompt);tests/test_repl_approval.py +11 例(YOLO 放行/危险仍问/默认逐条/danger 识别/toggle 联动深度/深度回归/safe_prompt 包裹与 noop/_ask_yn EOF 与读值);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1330 passed"
+    },
+    {
+      "id": "feat-057",
+      "name": "流式路径 no-progress 检测(替代低深度上限)",
+      "description": "用户反馈:自动跟进深度上限太低会掐断合法多步分析。改为——命令/读取的自动跟进停机靠 no-progress 检测(连续重复相同请求即判原地打转而停,同 toolloop feat-044 _calls_signature 思路),不再靠低深度上限;深度只保留高位安全兜底(默认 100,可 config max_auto_depth 调,合法任务碰不到),防「每轮换不同请求永不收敛」的极端空转。每个顶层用户轮次重置判重计数;choices 由用户交互驱动不计入。附带审计同类问题:唯一有色 input() 提示是 loop._ask_yn(已 feat-056 经 safe_prompt 修);toolloop 已有 no-progress+max_iters;autoloop 因 backlog 单调收缩(失败→skipped 也入 done)结构上不重复同任务;loop.py MAX_REVIEW_ROUNDS=3 是修订环的刻意收敛界,均非同类 bug。",
+      "dependencies": [
+        "feat-056"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(_followup_signature 纯函数 + _noprogress_stop + _auto_followup 改双闸:no-progress 主闸 + 高位安全兜底;_MAX_AUTO_DEPTH 12→100、新增 _MAX_FOLLOWUP_REPEAT=2、删 _YOLO_AUTO_DEPTH;__init__ 加判重状态 + config max_auto_depth;ask 顶层轮次重置;_cmd_yolo 不再动深度);tests/test_repl_approval.py +5 例(签名纯函数/连续重复停/30 条不同命令永不停/换请求重置/空轮不累加),原深度联动测试改判「高位兜底」;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1335 passed;live:3 条相同即停、30 条不同不停"
+    },
+    {
+      "id": "feat-058",
+      "name": "错误学习:命令失败蒸馏环境教训",
+      "description": "用户问「能不能做到错误学习」。既有 memory 教训卡只从 audit/手动来,命令失败不入库→模型每轮重复踩坑(python→python3、系统 Python 无 mne、mne.datasets.erpcore 改名)。补上:distill_env_lessons 从命令输出蒸馏三类高信号可泛化教训(命令不存在/模块未装/属性版本改名),含 shell 前缀与行号误匹配保护;_learn_from_output 把教训记进本会话记忆(每轮注入 system,当场止损跨轮不忘)+ best-effort 落 memory 待确认卡(source=error,跨会话经 /memory confirm 生效,沿用既有 HITL 纪律避免环境事实过时被自动固化)。接在 _auto_followup 命令执行后。",
+      "dependencies": [
+        "feat-057"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(distill_env_lessons 纯函数 + _CMD_NOTFOUND_RES/_MODULE_NOTFOUND_RE/_ATTR_ERR_RE/_SHELL_NAMES 误匹配保护 + _learn_from_output + __init__ session_lessons/_session_lesson_keys + ask 注入「本会话已知环境限制」+ _auto_followup 调用);tests/test_error_learning.py +14 例(bash/zsh/win 命令不存在、zsh 前缀/dash 行号不误判、模块未装取顶层包、属性改名如 mne.datasets.erpcore、洁净输出无教训、去重、多条、_learn 填充会话+落卡 source=error+去重+draft 抛错 best-effort+洁净不记);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1349 passed;live 复刻 transcript 报错正确蒸馏、无误匹配"
+    },
+    {
+      "id": "feat-059",
+      "name": "环境教训卡自动失效(再验证)",
+      "description": "用户要求:确认过的环境卡支持自动失效。环境教训是负事实(没装 X/命令不存在/API 改名),装上就过时,过时的卡会反向误导模型。实现:distill 给每条环境教训打 kind(cmd/module/attr)并随卡持久化;memory.archive_lesson 落实文档承诺的『被推翻则归档』(active→archived,精确按 trigger+lesson 匹配不误伤,保留可审计不删除);probe_env_card_stale 再验证——cmd 用 shutil.which(秒回、零子进程、注入安全),module/attr 用 python3 真跑 import/取属性(list 参数非 shell、触发词校验、超时兜底)。REPL 两档:启动时秒验证 cmd 类(零延迟,config verify_env_lessons=false 可关),/memory verify 手动全量(含慢的 module/attr)。只碰 source=error 机器卡,只在**确证已恢复**时失效(防误删红线),归档时同步清本会话记忆。/memory list 展示归档区。",
+      "dependencies": [
+        "feat-058"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/memory.py(draft_lesson 加 kind、archive_lesson、list 展示 archived);psyclaw/repl.py(distill 打 kind、probe_env_card_stale、_reprobe_env_lessons、run 启动轻量再验证、/memory verify、import shutil);tests/test_lesson_invalidation.py +13 例(distill 带 kind、archive 移动/精确匹配不误伤/未命中、probe cmd 有无、module import 通/不通/无解释器/非法触发词、_reprobe 归档已恢复且清会话/保留仍缺失的卡/不碰慢类)+ test_error_learning 更新 draft stub 带 kind;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1362 passed;live 隔离记忆:ls 卡自动失效归档、no_such_cmd 卡保留"
+    },
+    {
+      "id": "feat-060",
+      "name": "选择器非编号输入不再吞掉(当自由作答转发)",
+      "description": "用户实测:单选选择器提示『编号(单选)』,用户按 y/n 确认的肌肉记忆打了 `y`,resolve_selection 认不出→返回 []→打印『未选择』把输入吞掉,变成死胡同要重打。修:pick_interactive/_pick_numbered 返回 (选中项, 自由文本) 二元组——非空但非有效编号的输入当作对该问题的自由作答,经 format_free_answer 带问题上下文回传给模型继续,而不是丢弃;空(回车/EOF/对话框取消)才算跳过。提示补『或直接打字作答』。",
+      "dependencies": [
+        "feat-057"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/choices.py(format_free_answer;_pick_numbered/pick_interactive 改返 (chosen, free) 二元组,非编号非空→自由文本;提示更新);psyclaw/repl.py(_auto_followup choices 分支处理 free→format_free_answer 转发,不再『未选择』吞输入);tests/test_choices_reads.py +5 例(format_free_answer 带/不带前缀、_pick_numbered 有效编号/自由文本 y 不丢/空跳过/EOF 跳过);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1367 passed"
+    },
+    {
+      "id": "feat-061",
+      "name": "终端内联渲染图片",
+      "description": "用户问能不能渲染图片。分析常出图(matplotlib savefig)但 REPL 只打印路径。新增 psyclaw/imgview.py 纯 stdlib 内联渲染(终端解码,只 base64 原始字节,不违反纯核):iTerm2 内联图片协议(OSC 1337,任意格式)+ kitty 图形协议(_G 分块,f=100 仅 PNG);按环境变量探测终端(iTerm2/WezTerm/VSCode/Warp/kitty;tmux/screen/非 TTY 不渲染),config image_protocol 可强制 iterm2|kitty|none|auto。REPL:/img(/show)手动渲染;命令执行后自动扫描输出里的图片路径(存在即渲染,最多 3 张)。8MB 上限。",
+      "dependencies": [
+        "feat-058"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/imgview.py(is_image/find_image_paths/_proto_from_env/supports_inline/render_iterm2/render_kitty/render_escape);psyclaw/repl.py(/img 命令 _cmd_img + _render_images_in 自动渲染接 _auto_followup 命令后 + COMMANDS/HELP_TEXT + image_protocol config 覆盖);tests/test_imgview.py +15 例(is_image、路径提取去重、env 探测 kitty/iterm2 家族/tmux 不支持、force 覆盖、iterm2/kitty 转义形状、render_escape 端到端 iterm2/kitty-png、kitty 拒非 png、none 不渲染、拒非图/缺失/超限);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;live:Warp 环境探测为 iterm2、转义正确产出"
+    },
+    {
+      "id": "feat-062",
+      "name": "v0.11.0 发布收尾",
+      "description": "版本 0.10.0→0.11.0;CHANGELOG v0.11 段(REPL 交互体验大修 + 错误自学习闭环 + 图片内联,覆盖 feat-055~061);docs/COMMANDS 加 REPL 交互命令(/dump //yolo //img //memory verify)+ 错误自学习说明;progress/session-handoff 快照;全量回归绿。",
+      "dependencies": [
+        "feat-055",
+        "feat-056",
+        "feat-057",
+        "feat-058",
+        "feat-059",
+        "feat-060",
+        "feat-061"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml + psyclaw/__init__.py 版本 0.10.0→0.11.0;CHANGELOG.md v0.11.0 段(/dump//yolo/错误学习/自动失效/图片渲染 新增 + no-progress/确认框/选择器 修复);docs/COMMANDS.md 加 REPL 交互命令表;TODO §2 + progress 本轮(31) + session-handoff 快照;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1382 passed;psyclaw version → 0.11.0"
+    },
+    {
+      "id": "feat-063",
+      "name": "no-progress 只管自主回合(修误判用户逐条确认)",
+      "description": "用户实测:非 YOLO 下逐条打 y 确认同一命令,被 no-progress 误判成『连续 3 轮重复、原地打转』而掐断。no-progress 本意是拦模型自主空转,用户在逐条确认本身就是在推进、且是自己的判断权,不该被 harness 掐。修:_round_is_autonomous 判定这一轮会不会不问人就执行(非 YOLO 的 shell/危险命令要人确认=非自主;YOLO 非危险自动跑、psyclaw 子命令、自动读=自主),no-progress 只在自主回合计数,非自主回合重置判重;高位安全兜底(100)始终生效。",
+      "dependencies": [
+        "feat-057"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(_round_is_autonomous;_auto_followup 改:深度兜底始终生效、no-progress 仅自主回合、非自主重置判重);tests/test_repl_approval.py +6 例(非YOLO shell 非自主/psyclaw 自主/YOLO shell 自主/YOLO 危险非自主/纯读自主/混合有 shell 非自主);CHANGELOG v0.11 feat-057 行补注;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1388 passed"
+    },
+    {
+      "id": "feat-064",
+      "name": "确认支持「全部同意」(Y/n/a 会话级黏性)",
+      "description": "用户实测:逐条确认同类副作用(尤其覆盖代码文件)太烦,『确认一次同类就该统一、本对话内一致』。非危险副作用的确认改三态 [Y/n/a]:a=本会话该类(执行 shell/覆盖已存在文件/工具副作用,按 label 分类)不再逐条问,记入 self._auto_approve_labels;YOLO 仍全放行。危险操作(命中红线)永远逐条问、不给『全部』(红线不放松),data/raw 与密钥硬拒不变。比 /yolo 更细粒度的中间档。",
+      "dependencies": [
+        "feat-056"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(_hitl_confirm_all 三态 yes/no/all fail-closed;_side_effect_ok 重构:危险两态、非危险 YOLO 或已同意此类自动放行、否则三态 a→加 label 到 _auto_approve_labels;__init__ 加 _auto_approve_labels);tests/test_repl_approval.py +5 例(默认三态确认、a 使同类黏性、per-label 隔离、危险不给 all 且说过 all 仍问、_hitl_confirm_all 非 TTY fail-closed + 解析 a/all/全部/空/y/是/n/nope);CHANGELOG v0.11 补;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1393 passed"
+    },
+    {
+      "id": "feat-065",
+      "name": "错误自学习+图片内联渲染接入 agent 模式(toolloop)",
+      "description": "v0.11 的错误自学习(feat-058)与图片内联渲染(feat-061)只覆盖 REPL 命令路径;agent 模式(纯工具层循环)里工具失败同样值得蒸馏、分析出图同样该内联可见。toolloop:失败(ok=False)的工具结果经 distill_env_lessons 蒸馏,当轮回灌给模型止损,并累积在返回的 lessons 里;只看 ok=False——ok 输出可能是 read_file 读到的日志/源码,报错字样是内容不是本机事实,学了会误伤。REPL _run_agent:res.lessons 并入会话记忆(_ingest_lessons,从 _learn_from_output 拆出复用)+ 落跨会话待确认卡;final+trace 输出里的图片经 render_images_in_text(模块级,从 _render_images_in 提出)内联渲染。CLI psyclaw agent 同样落卡 + 渲染。",
+      "dependencies": [
+        "feat-058",
+        "feat-061"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(collect_env_lessons 纯函数 + run_tool_loop 回灌『# 环境教训』并返回 lessons,5 个返回路径全带);psyclaw/repl.py(_ingest_lessons 拆出、render_images_in_text 模块级、_run_agent 接入两者);psyclaw/cli.py(cmd_agent 落卡 + 渲染);tests/test_agent_learning.py +11 例(循环蒸馏/回灌/ok=True 不学/跨轮去重/无工具空 lessons/seen_keys/REPL 并入去重落卡/iterm2 渲染/none 协议/缺文件/limit);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1404 passed"
+    },
+    {
+      "id": "feat-066",
+      "name": "教训卡正向加固(再现即强度+1)",
+      "description": "memory 文档早已承诺「被再次印证则强度+1」但一直未实现——draft_lesson 遇同内容卡只是静默去重,教训再现的证据被丢弃。改为再现即加固:active 同卡 strength+1 并记 reinforced_ts(跨会话再踩同一坑=教训真实且仍成立);pending 同卡 hits+1(确认时用户可见「已再现 n 次」,证据更足);都没有才新建待确认卡。memory_prompt 注入按强度降序排(截断 [:10] 时优先保住最可靠的);CLI list 显示 pending 的再现次数。调用方(REPL/agent/critic)零改动自动受益。",
+      "dependencies": [
+        "feat-058",
+        "feat-065"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/memory.py(draft_lesson 再现分支 active strength+1 / pending hits+1;memory_prompt 按强度排序;memory_cli 显示 hits);tests/test_audit_memory.py TestLessonReinforcement +5 例(active 加固不建新卡/pending 计 hits/仅精确 trigger+lesson 对匹配/prompt 强度排序/CLI 显示再现次数);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1409 passed"
+    },
+    {
+      "id": "feat-067",
+      "name": "确认提示措辞重设计(用户反馈:a 不易懂)",
+      "description": "用户实测:三态确认 `[Y/n/a=全部本会话不再问]` 里的 a 缩写含义不明,不方便理解使用。改为逐项自解释:`[回车=同意 / n=拒绝 / a=同意且本会话此类不再问]`;同义词多收「都同意」。语义与 fail-closed 纪律不变(非 TTY/EOF/Ctrl+C 一律拒)。",
+      "dependencies": [
+        "feat-064"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(_hitl_confirm_all 提示文案 + 同义词);既有 tests/test_repl_approval.py 覆盖三态解析行为不回归;验证:uv run --python 3.12 --with pytest python -m pytest -q → 1419 passed"
+    },
+    {
+      "id": "feat-068",
+      "name": "选择器改原地内联(用户反馈:弃 Windows 全屏蓝色对话框)",
+      "description": "用户实测:选项框在 Windows 上是 prompt_toolkit radiolist/checkboxlist_dialog 的蓝色独立全屏,突兀。重写为 Claude Code 式原地内联选择器 _pick_inline:↑↓ 移动高亮、数字键跳选(单选即选定)、空格勾选(多选)、回车确认(多选没勾=选高亮项)、Esc/Ctrl+C 跳过、其它可打印字符=自由作答(转行输入,首字符保留,承 feat-060 不吞输入);渲染只用 ANSI 行控制(\\033[K+光标上移)在对话流里原地重画,不清屏不进备用屏;键流(get_key)与行读取(read_rest)可注入,离线可单测。降级链:内联 → 编号输入 → 非 TTY 不弹。_pick_ptk 全屏对话框删除。",
+      "dependencies": [
+        "feat-060"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/choices.py(_pick_inline 新增;pick_interactive 换用;_pick_ptk 删除;模块 docstring 更新);tests/test_choices_reads.py +10 例(down+enter/数字即选/空格勾选/勾了取消/多选无勾取高亮/Esc 跳过/UP 回绕/自由作答保首字符/多选数字切换/回归不进备用屏不清屏);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1419 passed"
+    },
+    {
+      "id": "feat-069",
+      "name": "@图片 引用内联渲染",
+      "description": "REPL 里 @path 引用图片文件(png/jpg/gif/webp/bmp)时:终端支持则直接内联显示给用户(render_images_in_text 复用 feat-061/065 通道,config image_protocol 可强制);上下文只注入元信息(路径+大小+是否已显示+「像素内容你不可见」)——此前 @图片 会走 smart_excerpt 把二进制乱码灌进上下文,一并修掉。文本文件的智能摘录行为不变。",
+      "dependencies": [
+        "feat-061",
+        "feat-065"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(_expand_files 图片分支:内联渲染+元信息注入,不再对图片跑 smart_excerpt);tests/test_agent_learning.py +3 例(渲染+元信息注入+二进制不进上下文/终端不支持时的提示/文本文件不回归);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1422 passed"
+    },
+    {
+      "id": "feat-070",
+      "name": "shell「全部同意」按命令前缀限定范围(用户反馈)",
+      "description": "用户实测:对 shell 命令说「全部同意(a)」会放行**所有**后续 shell 命令,范围太大。cmd_approval_scope 纯函数把命令归类:一般程序→程序名(pytest);子命令型/解释器型(git/uv/npm/pip/docker/python/bash…)→程序名+第二个词(git status ≠ git push,python3 analyze.py 按脚本);含管道/连接符的复合命令→整条原文不泛化;路径前缀剥掉取程序名。_confirm_cmd 的 label 由「执行 shell 命令」改为「执行 shell 命令(<范围>)」,_auto_approve_labels 天然按范围隔离。危险命令红线不变(永远逐条问)。",
+      "dependencies": [
+        "feat-064"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(cmd_approval_scope + _SUBCMD_TOOLS;_confirm_cmd 用范围化 label);tests/test_repl_approval.py TestCmdApprovalScope +7 例(一般程序/子命令型/路径剥离/复合不泛化/空命令/label 集成/同意 git status 不放行 rm);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1431 passed"
+    },
+    {
+      "id": "feat-071",
+      "name": "选择器看得见方案详情(用户反馈)",
+      "description": "用户实测:选项框出来时看不见选项所说的方案。三管齐下:① 全屏对话框已弃(feat-068),正文说明留在屏上;② _pick_inline 按终端宽度截断,高亮项被截断时下方固定 2 行详情区(▏前缀,dim)给全文,重画几何稳定;③ _CHOICES_SYSTEM 约定模型先在正文写清各方案、选项文字自包含简短,不写「方案A」这种脱离正文看不懂的标签。",
+      "dependencies": [
+        "feat-068"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/choices.py(_pick_inline 宽度感知截断 + 2 行详情区);psyclaw/repl.py(_CHOICES_SYSTEM 补选项自包含约定);tests/test_choices_reads.py +2 例(超宽高亮项详情区给全文/短选项无详情区);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1431 passed"
+    },
+    {
+      "id": "feat-072",
+      "name": "v0.10 遗留收尾:写作回填真结果 + meta 接 pystat + [stats] 数值实测",
+      "description": "数据→结果→稿件闭环补完:① pystat MCP 新增 pystat_meta 工具(随机效应 DL 元分析:合并效应+95%CI+I²/τ²/Q+Egger,列定位/脚本骨架复用 steps_meta,statsmodels 未装返回可运行脚本不假装有结果);② pystat_bridge 加 run_meta_via_pystat + _real_result 守卫(「统计库未安装」的脚本骨架不算真结果,run_via_pystat 同样收紧——学术诚信:不制造『看着像跑过了』的假象);③ step_meta_script best-effort 直跑落 outputs/meta_result.txt;④ step_write_analysis/step_write_meta 把 pystat 真跑结果注入写作上下文(结果节只引用真实数值,效应量+CI 必报);⑤ [stats] 数值实测:statsmodels/pingouin 真装真跑。",
+      "dependencies": [
+        "feat-053"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/mcp/servers/pystat_server.py(pystat_meta);psyclaw/workflows/pystat_bridge.py(run_meta_via_pystat/_real_result);psyclaw/workflows/steps_meta.py(step_meta_script 直跑+step_write_meta 注入);psyclaw/workflows/steps_analysis.py(step_write_analysis 注入);tests/test_pystat_bridge.py +11 例(守卫/骨架不算结果/meta 桥/步骤落盘/写作注入/离线返脚本/坏表 fail-closed);离线全量 1442 passed;数值实测(uv+清华镜像):pystat_meta→合并效应 0.327 CI[0.200,0.455] τ²=0.0021 I²=9.7% Q=4.43 Egger p=.0045,生成 meta 脚本执行数值一致;pystat_ttest→T=-7.11 p=.0004 d=5.03 CI95[-0.67,-0.33],生成 analysis 脚本(正态/方差齐/t 检验)端到端可跑"
+    },
+    {
+      "id": "feat-073",
+      "name": "eval harness:确定性离线评测框架(编排/门禁/自学习契约)",
+      "description": "psyclaw/evalharness.py:6 个确定性离线用例共 28 项检查——① analysis_pipeline(画像→推荐→脚本可编译且委托 pingouin,统计外移铁律)② meta_pipeline(效应量表校验→statsmodels 脚本;单研究/无方差 fail-closed)③ lit_screen(PRISMA 计数自洽;跨语言零重叠诚实降级全纳入待人工复核)④ gates_enforcement(合规 sidecar 放行、缺效应量+CI 阻断、缺失/坏 JSON fail-closed)⑤ error_learning(cmd/module/attr 三类蒸馏;ok=True 输出不误学;去重)⑥ toolloop_discipline(失败教训回灌、重复调用止损、副作用无批准拒执行)。不调 LLM、不联网、不依赖统计库,秒级复跑;用例崩溃记失败 check 不静默。CLI `psyclaw eval [--case ... --json]` 打 scorecard 并落 .psyclaw/eval_report.json,退出码如实(有失败=1)。",
+      "dependencies": [
+        "feat-065",
+        "feat-072"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/evalharness.py(CASES/run_evals/format_report);psyclaw/cli.py(cmd_eval+eval 子命令+COMMAND_CATEGORIES);tests/test_evalharness.py +10 例(全绿契约/子集/未知用例 fail-closed/用例崩溃记失败/CLI 落盘与退出码)。实测:`uv run --python 3.12 python -m psyclaw eval` → 6 用例 28/28 通过 exit=0,报告落 .psyclaw/eval_report.json;`--case nope` → 未知评测用例 exit=1。全量 `uv run --python 3.12 --with pytest python -m pytest -q` → 1452 passed"
+    }
+  ]
 }
