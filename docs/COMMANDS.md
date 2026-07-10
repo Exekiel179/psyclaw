@@ -8,7 +8,7 @@
 
 ---
 
-## 命令总览(45 条)
+## 命令总览(46 条)
 
 > 默认路径:`psyclaw status`(看态势)→ `psyclaw auto-loop`(一键推进;门禁拦你可 `--skip-gates`
 > 显式跳过,留痕 + 产出标探索性)→ `psyclaw check 稿件.md`(投稿前一键质检)。
@@ -24,6 +24,7 @@
 | `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH`;`--for <研究类型>` 按类型推荐)/ MCP 目录(内置 registry + 用户 `.psyclaw/mcp.yaml` 项目/全局)——**均标注 内置/用户·项目/用户·全局** |
 | `plugins` | 列出插件(用户 项目 `.psyclaw/plugins/` / 全局 `~/.psyclaw/plugins/`;`register(api)` 注册 agent 工具 / REPL 命令 / system 片段) |
 | `gates` | 学术规范门禁自检 |
+| `eval` | **确定性离线评测**(v0.12):编排/门禁/自学习契约的端到端 scorecard(6 用例 28 检查,不调 LLM/不联网/无统计库);`--case` 选用例、`--json` 机器可读;报告落 `.psyclaw/eval_report.json`,有失败退出码 1 |
 | `commands` | 按职能分类列出全部命令 |
 | `status` | **一屏项目态势**:目标/澄清/回路/等人决策(直接打印内容)/最近产物/下一步建议 |
 
@@ -98,7 +99,7 @@
 | `auth` | 机构权限(EZProxy/LibKey)配置与认证状态自检 |
 | `export <file>` | 格式化输出(APA7 / 心理学报 / 心理科学) |
 | `figures` | 图表主题层 + FIG.honest 诚实性核查 + Okabe-Ito 调色板 |
-| `provenance <产物>` | 复现溯源:给生成脚本/图打包 代码+环境+说明+决策轨迹(`<产物>.provenance.json`);`--journal` 按数据可得性要求收紧 |
+| `provenance <产物>` | 复现溯源:给生成脚本/图打包 代码+环境+说明+决策轨迹(`<产物>.provenance.json`);`--journal` 按数据可得性要求收紧,`data_availability=required` 期刊强制 replication-package 声明(v0.12,声明文本可直接放进稿件) |
 
 ### REPL 交互命令(v0.11 新增,仅 `psyclaw repl` 内)
 | 命令 | 作用 |

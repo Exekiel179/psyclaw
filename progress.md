@@ -2,7 +2,31 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-09(v0.10→**v0.11.0 发布**:REPL 交互大修 + 错误自学习 + 图片渲染)
+**Last Updated:** 2026-07-11(v0.11→**v0.12.0 发布**:自学习进 agent + 闭环补完 + eval harness)
+
+## 本轮(32):v0.12.0 发布 ——feat-065~075 done(自学习进 agent 模式 + 数据→结果→稿件闭环 + 可评测)
+
+v0.12 候选清单(用户给定 5 项 + TODO §3 provenance 深化)全部完成,期间按用户三条实测反馈修 4 个交互问题:
+- feat-065 错误自学习+图片渲染进 agent 模式(toolloop 失败蒸馏教训当轮回灌+返回 lessons;
+  只看 ok=False 防误学;`render_images_in_text` 共用)。
+- feat-066 教训卡正向加固(同卡再现 active 强度+1/pending hits+1;注入按强度降序)。
+- feat-067/068/070/071 用户反馈修复:确认提示自解释措辞 · 选择器弃全屏改原地内联
+  (ANSI 重画,不清屏)· 「全部同意」按命令前缀限定(`cmd_approval_scope`,git status≠git push)
+  · 选择器高亮项 2 行详情区。
+- feat-069 @图片 引用内联渲染(上下文只注元信息,修二进制乱码灌上下文)。
+- feat-072 v0.10 遗留收尾:`pystat_meta`(DL 随机效应+Egger)· meta 直跑落盘 · 写作步注入
+  真跑结果(只引用真实数值)· `_real_result` 守卫(脚本骨架≠结果)· [stats] 数值实测
+  (合并效应 0.327 CI[0.200,0.455] I²=9.7%;ttest T=-7.11 p=.0004,脚本与 MCP 数值一致)。
+- feat-073 **eval harness**:`psyclaw eval` 确定性离线评测(6 用例 28 检查:编排/门禁/
+  自学习契约;不调 LLM/不联网/无统计库;报告落 `.psyclaw/eval_report.json`)。
+- feat-074 **provenance 深化**:required 期刊强制 replication-package 声明
+  (声明文本可直接放进稿件)+ 新门禁 `REPRO.replication_package`(非强制放行,只增不删)。
+- feat-075 发布收尾:版本 0.11.0→0.12.0 + CHANGELOG v0.12 + COMMANDS(46 条,+eval)。
+
+全量 **1460 passed**;`psyclaw gates` 22 条规则 ✓;`psyclaw eval` 28/28;`psyclaw version` → 0.12.0。
+75 个 feature 全 done。
+
+---
 
 ## 本轮(31):v0.11.0 发布 ——feat-055~062 done(REPL 交互体验大修 + 错误自学习闭环 + 图片内联)
 

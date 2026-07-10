@@ -751,6 +751,17 @@
       ],
       "status": "done",
       "evidence": "psyclaw/provenance.py(build_replication_declaration+build_provenance 附声明+_render_md 声明节);psyclaw/gates/rules.yaml(REPRO.replication_package);psyclaw/gates/checker.py(replication_package_declared 条件判据);psyclaw/cli.py(cmd_provenance 展示)。tests/test_provenance.py +8 例(完整声明含真指纹/required 缺数据不声明/encouraged 可选不拦/md 两态/门禁拦-放-旧契约/端到端 required 期刊真 sidecar 过门禁)。实测:psyclaw provenance <脚本> --journal psych-science --data data.csv → 声明生成 ✓溯源完整 exit=0;不带 --data → 列缺项 exit=1;psyclaw gates → 22 条规则 ✓;全量 pytest → 1460 passed;psyclaw eval → 28/28"
+    },
+    {
+      "id": "feat-075",
+      "name": "v0.12.0 发布收尾(版本 + CHANGELOG + COMMANDS + progress/handoff)",
+      "description": "版本 0.11.0→0.12.0(pyproject+__init__);CHANGELOG v0.12 段(主题:自学习进 agent 模式 + 数据→结果→稿件闭环补完 + 可评测;新增 feat-065/066/069/072/073/074,用户反馈修复 feat-067/068/070/071);docs/COMMANDS.md 命令总览 45→46 条(+eval,provenance 行补 replication-package 声明);progress.md 本轮(32)与 session-handoff.md 按 End-of-Session 契约更新。",
+      "dependencies": [
+        "feat-073",
+        "feat-074"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml/psyclaw/__init__.py(0.12.0);CHANGELOG.md(v0.12.0 段);docs/COMMANDS.md(46 条+eval 行);progress.md/session-handoff.md。终验:全量 pytest → 1460 passed;python -m psyclaw gates → 22 条规则 ✓;python -m psyclaw eval → 28/28 exit=0;python -m psyclaw version → 0.12.0"
     }
   ]
 }
