@@ -658,6 +658,17 @@
    ],
    "status": "done",
    "evidence": "psyclaw/toolloop.py(collect_env_lessons 纯函数 + run_tool_loop 回灌『# 环境教训』并返回 lessons,5 个返回路径全带);psyclaw/repl.py(_ingest_lessons 拆出、render_images_in_text 模块级、_run_agent 接入两者);psyclaw/cli.py(cmd_agent 落卡 + 渲染);tests/test_agent_learning.py +11 例(循环蒸馏/回灌/ok=True 不学/跨轮去重/无工具空 lessons/seen_keys/REPL 并入去重落卡/iterm2 渲染/none 协议/缺文件/limit);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1404 passed"
+  },
+  {
+   "id": "feat-066",
+   "name": "教训卡正向加固(再现即强度+1)",
+   "description": "memory 文档早已承诺「被再次印证则强度+1」但一直未实现——draft_lesson 遇同内容卡只是静默去重,教训再现的证据被丢弃。改为再现即加固:active 同卡 strength+1 并记 reinforced_ts(跨会话再踩同一坑=教训真实且仍成立);pending 同卡 hits+1(确认时用户可见「已再现 n 次」,证据更足);都没有才新建待确认卡。memory_prompt 注入按强度降序排(截断 [:10] 时优先保住最可靠的);CLI list 显示 pending 的再现次数。调用方(REPL/agent/critic)零改动自动受益。",
+   "dependencies": [
+    "feat-058",
+    "feat-065"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/memory.py(draft_lesson 再现分支 active strength+1 / pending hits+1;memory_prompt 按强度排序;memory_cli 显示 hits);tests/test_audit_memory.py TestLessonReinforcement +5 例(active 加固不建新卡/pending 计 hits/仅精确 trigger+lesson 对匹配/prompt 强度排序/CLI 显示再现次数);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1409 passed"
   }
  ]
 }

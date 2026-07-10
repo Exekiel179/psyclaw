@@ -288,3 +288,46 @@ class TestMemoryPrompt:
         confirm_lesson(0)
         result = memory_prompt()
         assert "先验功效分析要比较保守" in result
+class TestLessonReinforcement:
+    """feat-066 正向加固:同一教训再现 → active 强度+1 / pending hits+1,不重复建卡。"""
+    def test_redraft_active_bumps_strength(self, mem_dir):
+        from psyclaw.memory import _load
+        draft_lesson("mne", "缺 mne", "error", kind="module")
+        confirm_lesson(0)
+        draft_lesson("mne", "缺 mne", "error", kind="module")   # 再踩同一坑
+        data = _load("lessons")
+        assert not data.get("pending")                          # 不新建待确认卡
+        card = data["active"][0]
+        assert card["strength"] == 2
+        assert "reinforced_ts" in card
+    def test_redraft_pending_counts_hits(self, mem_dir):
+        from psyclaw.memory import _load
+        draft_lesson("python", "用 python3", "error", kind="cmd")
+        draft_lesson("python", "用 python3", "error", kind="cmd")
+        draft_lesson("python", "用 python3", "error", kind="cmd")
+        data = _load("lessons")
+        assert len(data["pending"]) == 1
+        assert data["pending"][0]["hits"] == 3
+    def test_reinforce_matches_exact_pair_only(self, mem_dir):
+        from psyclaw.memory import _load
+        draft_lesson("mne", "缺 mne", "error")
+        confirm_lesson(0)
+        draft_lesson("mne", "另一条 mne 教训", "error")          # 同触发词不同教训 → 新卡
+        data = _load("lessons")
+        assert data["active"][0].get("strength", 1) == 1
+        assert len(data["pending"]) == 1
+    def test_prompt_orders_by_strength(self, mem_dir):
+        from psyclaw.memory import memory_prompt
+        draft_lesson("weak", "弱教训", "user")
+        confirm_lesson(0)
+        draft_lesson("strong", "强教训", "user")
+        confirm_lesson(0)
+        draft_lesson("strong", "强教训", "user")                # 加固到强度 2
+        prompt = memory_prompt()
+        assert prompt.index("强教训") < prompt.index("弱教训")
+    def test_cli_shows_hits(self, mem_dir, capsys):
+        from psyclaw.memory import memory_cli
+        draft_lesson("python", "用 python3", "error")
+        draft_lesson("python", "用 python3", "error")
+        memory_cli(["list"])
+        assert "已再现 2 次" in capsys.readouterr().out

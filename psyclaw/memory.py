@@ -96,15 +96,27 @@ def suggest(topic: str) -> dict | None:
 # ---------------------------------------------------------------------------
 
 def draft_lesson(trigger: str, lesson: str, source: str, kind: str | None = None) -> None:
-    """写入待确认区(critic/用户纠正自动调用)。同内容去重,避免修复环刷屏。
+    """写入待确认区(critic/用户纠正自动调用)。同内容不重复建卡,但**再现即加固**:
+
+    - 已生效(active)的同卡:强度 +1、记 reinforced_ts——兑现「被再次印证则强度 +1」
+      (v0.12 feat-066)。同一坑跨会话再踩,说明教训真实且仍成立,注入排序更靠前。
+    - 待确认(pending)的同卡:hits +1——确认时用户可见「已再现 n 次」,证据更足。
+    - 都没有 → 新建待确认卡。
 
     kind(可选):环境教训的类别(cmd|module|attr),供「自动失效」再验证时选对探测方式。
     """
     data = _load("lessons")
-    existing = data.get("pending", []) + data.get("active", [])
-    if any(c.get("trigger") == trigger and c.get("lesson") == lesson
-           for c in existing):
-        return
+    for c in data.get("active", []):
+        if c.get("trigger") == trigger and c.get("lesson") == lesson:
+            c["strength"] = int(c.get("strength", 1)) + 1
+            c["reinforced_ts"] = int(time.time())
+            _save("lessons", data)
+            return
+    for c in data.get("pending", []):
+        if c.get("trigger") == trigger and c.get("lesson") == lesson:
+            c["hits"] = int(c.get("hits", 1)) + 1
+            _save("lessons", data)
+            return
     card = {"trigger": trigger, "lesson": lesson, "source": source,
             "ts": int(time.time())}
     if kind:
@@ -181,7 +193,8 @@ def memory_prompt() -> str:
                           f"(置信 {s['confidence']:.0%},可推翻)")
     if strong:
         parts.append("# 决策惯性(自动学习,呈现为默认而非强制)\n" + "\n".join(strong))
-    lessons = active_lessons()
+    # 强度高(被多次印证)的卡排前:[:10] 截断时优先保住最可靠的教训(feat-066)
+    lessons = sorted(active_lessons(), key=lambda c: -int(c.get("strength", 1)))
     if lessons:
         parts.append("# 教训卡(经用户确认的历史教训)\n"
                      + "\n".join(f"- [{c['trigger']}] {c['lesson']}" for c in lessons[:10]))
@@ -213,7 +226,9 @@ def memory_cli(argv: list) -> int:
             print("    (空。澄清卡与分析选择会自动累积)")
         print("  ── 教训卡 ──")
         for i, c in enumerate(data.get("pending", [])):
-            print(f"    [待确认 {i}] ({c['source']}) {c['lesson']}")
+            hits = int(c.get("hits", 1))
+            tag = f",已再现 {hits} 次" if hits > 1 else ""
+            print(f"    [待确认 {i}] ({c['source']}{tag}) {c['lesson']}")
         for c in data.get("active", []):
             print(f"    [生效] [{c['trigger']}] {c['lesson']} (强度 {c.get('strength', 1)})")
         arch = data.get("archived", [])
