@@ -700,6 +700,26 @@
    ],
    "status": "done",
    "evidence": "psyclaw/repl.py(_expand_files 图片分支:内联渲染+元信息注入,不再对图片跑 smart_excerpt);tests/test_agent_learning.py +3 例(渲染+元信息注入+二进制不进上下文/终端不支持时的提示/文本文件不回归);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1422 passed"
+  },
+  {
+   "id": "feat-070",
+   "name": "shell「全部同意」按命令前缀限定范围(用户反馈)",
+   "description": "用户实测:对 shell 命令说「全部同意(a)」会放行**所有**后续 shell 命令,范围太大。cmd_approval_scope 纯函数把命令归类:一般程序→程序名(pytest);子命令型/解释器型(git/uv/npm/pip/docker/python/bash…)→程序名+第二个词(git status ≠ git push,python3 analyze.py 按脚本);含管道/连接符的复合命令→整条原文不泛化;路径前缀剥掉取程序名。_confirm_cmd 的 label 由「执行 shell 命令」改为「执行 shell 命令(<范围>)」,_auto_approve_labels 天然按范围隔离。危险命令红线不变(永远逐条问)。",
+   "dependencies": [
+    "feat-064"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/repl.py(cmd_approval_scope + _SUBCMD_TOOLS;_confirm_cmd 用范围化 label);tests/test_repl_approval.py TestCmdApprovalScope +7 例(一般程序/子命令型/路径剥离/复合不泛化/空命令/label 集成/同意 git status 不放行 rm);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1431 passed"
+  },
+  {
+   "id": "feat-071",
+   "name": "选择器看得见方案详情(用户反馈)",
+   "description": "用户实测:选项框出来时看不见选项所说的方案。三管齐下:① 全屏对话框已弃(feat-068),正文说明留在屏上;② _pick_inline 按终端宽度截断,高亮项被截断时下方固定 2 行详情区(▏前缀,dim)给全文,重画几何稳定;③ _CHOICES_SYSTEM 约定模型先在正文写清各方案、选项文字自包含简短,不写「方案A」这种脱离正文看不懂的标签。",
+   "dependencies": [
+    "feat-068"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/choices.py(_pick_inline 宽度感知截断 + 2 行详情区);psyclaw/repl.py(_CHOICES_SYSTEM 补选项自包含约定);tests/test_choices_reads.py +2 例(超宽高亮项详情区给全文/短选项无详情区);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1431 passed"
   }
  ]
 }
