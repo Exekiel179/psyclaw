@@ -187,3 +187,26 @@ def test_inline_no_altscreen_escapes(capsys):
     out = capsys.readouterr().out
     assert "\x1b[?1049h" not in out and "\x1b[2J" not in out
     assert "选哪个?" in out and "1. 甲" in out
+def test_inline_detail_zone_shows_full_text_when_truncated(monkeypatch, capsys):
+    """feat-071:高亮项超宽被截断时,详情区给全文(用户反馈:看不见选项所说的方案)。"""
+    import os
+    import shutil
+    from psyclaw.choices import _pick_inline
+    monkeypatch.setattr(shutil, "get_terminal_size",
+                        lambda fallback=None: os.terminal_size((60, 24)))
+    long_opt = "方案B:" + "先做预注册再收数据," * 12
+    choice = {"question": "选方案", "multi": False, "options": ["方案A:简版", long_opt]}
+    chosen, _ = _pick_inline(choice, get_key=_feed(["DOWN", "ENTER"]))
+    out = capsys.readouterr().out
+    assert chosen == [long_opt]
+    assert "…" in out                              # 菜单行截断了……
+    assert "▏" in out                              # ……详情区补全文
+    assert "先做预注册再收数据" in out
+def test_inline_no_detail_zone_for_short_options(monkeypatch, capsys):
+    import os
+    import shutil
+    from psyclaw.choices import _pick_inline
+    monkeypatch.setattr(shutil, "get_terminal_size",
+                        lambda fallback=None: os.terminal_size((100, 24)))
+    _pick_inline(_single(), get_key=_feed(["ENTER"]))
+    assert "▏" not in capsys.readouterr().out      # 短选项无需详情区

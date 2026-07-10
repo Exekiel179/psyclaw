@@ -125,6 +125,7 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
     不进备用屏(prompt_toolkit 全屏对话框在 Windows 上是蓝色独立屏幕,弃用)。
     get_key / read_rest 可注入假键流与行读取,离线可单测。
     """
+    import shutil
     import sys
     from psyclaw import ui
     from psyclaw.ui_input import _get_key
@@ -139,17 +140,35 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
             else "↑↓ 移动 · 回车选定 · Esc 跳过 · 直接打字作答")
     out = sys.stdout
     out.write(ui.accent(f"  {choice['question']}") + ui.dim(f"  ({hint})") + "\n")
+    # 按终端宽度截断,高亮项被截断时在下方详情区给全文(feat-071,用户反馈:
+    # 选项框出来时看不见选项所说的方案)。详情区固定 2 行占位,重画几何稳定。
+    width = max(40, shutil.get_terminal_size((100, 24)).columns)
+    avail = width - 12
+    detail_rows = 2
 
     def _draw(first: bool = False) -> None:
         if not first:
-            out.write(f"\033[{n}A")            # 光标回菜单首行,原地重画
+            out.write(f"\033[{n + detail_rows}A")   # 光标回菜单首行,原地重画
         for i, o in enumerate(opts):
             box = ("[x] " if i in checked else "[ ] ") if multi else ""
-            line = f"{box}{i + 1}. {o[:86]}"
+            cut = o[:avail] + ("…" if len(o) > avail else "")
+            line = f"{box}{i + 1}. {cut}"
             if i == sel:
                 out.write("\033[K  " + ui.paint("▸ " + line, "brcyan", "bold") + "\n")
             else:
                 out.write("\033[K    " + line + "\n")
+        full = opts[sel]
+        detail: list[str] = []
+        if len(full) > avail:                       # 高亮项截断了 → 详情区给全文
+            body, w = full, max(20, width - 8)
+            while body and len(detail) < detail_rows:
+                detail.append(body[:w])
+                body = body[w:]
+            if body:
+                detail[-1] = detail[-1][:-1] + "…"
+        for r in range(detail_rows):
+            txt = detail[r] if r < len(detail) else ""
+            out.write("\033[K" + (ui.dim("    ▏" + txt) if txt else "") + "\n")
         out.flush()
 
     _draw(first=True)
