@@ -46,8 +46,16 @@ def _default_pystat_client():
     return None
 
 
+def _real_result(out: str | None) -> str | None:
+    """把「统计库未装时返回的脚本骨架」判为无结果——脚本不是数值,回填稿件会造成
+    『看着像跑过了』的假象(学术诚信:不假装算出结果)。"""
+    if not out or "统计库未安装" in out:
+        return None
+    return out
+
+
 def run_via_pystat(rec: dict, csv_path: str, client_factory=None) -> str | None:
-    """经 pystat MCP 跑推荐分析,返回结果文本;不可用/失败 → None(调用方 fail-safe)。"""
+    """经 pystat MCP 跑推荐分析,返回结果文本;不可用/失败/仅脚本骨架 → None(fail-safe)。"""
     call = rec_to_pystat_call(rec, csv_path)
     if not call:
         return None
@@ -58,6 +66,19 @@ def run_via_pystat(rec: dict, csv_path: str, client_factory=None) -> str | None:
     try:
         with client:
             out = client.call_tool(tool, args)
-        return out or None
+        return _real_result(out)
     except Exception:  # noqa: BLE001 — MCP 任何异常都不阻断,退回脚本兜底
+        return None
+
+
+def run_meta_via_pystat(csv_path: str, client_factory=None) -> str | None:
+    """经 pystat MCP 跑随机效应元分析(v0.12 feat-072);同样 fail-safe。"""
+    client = (client_factory or _default_pystat_client)()
+    if client is None:
+        return None
+    try:
+        with client:
+            out = client.call_tool("pystat_meta", {"csv_path": csv_path})
+        return _real_result(out)
+    except Exception:  # noqa: BLE001
         return None

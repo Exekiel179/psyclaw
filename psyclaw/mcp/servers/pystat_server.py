@@ -210,6 +210,69 @@ def pystat_regression(args: dict) -> str:
     return _run(_do)
 
 
+@srv.tool("pystat_meta", "随机效应元分析(DerSimonian-Laird),含合并效应+95%CI+I²/τ²/Q+Egger",
+          {"properties": {
+              "csv_path": {"type": "string",
+                           "description": "效应量表 CSV(effect/d/g/r… + variance/se/ci 列)"},
+          }, "required": ["csv_path"]})
+def pystat_meta(args: dict) -> str:
+    """元分析委托 statsmodels(v0.12 feat-072:meta workflow 闭环最后一公里)。
+
+    列定位与脚本生成复用 steps_meta(validate_effects/generate_meta_script,纯 stdlib);
+    statsmodels/pandas 未装 → 返回可运行脚本骨架,不假装算出结果。
+    """
+    csv_path = args["csv_path"]
+    from psyclaw.workflows.steps_meta import generate_meta_script, validate_effects
+    try:
+        info = validate_effects(csv_path)
+    except ValueError as exc:
+        return f"效应量表校验失败:{exc}"
+    script = generate_meta_script(csv_path, info)
+    try:
+        import numpy as np
+        import pandas as pd
+        import statsmodels.api as sm
+        from statsmodels.stats.meta_analysis import combine_effects
+    except Exception:  # noqa: BLE001
+        return ("统计库未安装(pip install 'psyclaw[stats]';需 statsmodels/pandas/numpy)。"
+                "脚本骨架(装好可直接运行):\n```python\n" + script + "\n```")
+    df = pd.read_csv(csv_path)
+    yi = df[info["effect_col"]].astype(float).to_numpy()
+    kind, vcols = info["variance_kind"], info["variance_cols"]
+    if kind == "variance":
+        vi = df[vcols[0]].astype(float).to_numpy()
+    elif kind == "se":
+        vi = df[vcols[0]].astype(float).to_numpy() ** 2
+    else:  # ci → se = (upper-lower)/(2*1.96)
+        se = (df[vcols[1]].astype(float) - df[vcols[0]].astype(float)) / (2 * 1.959963985)
+        vi = se.to_numpy() ** 2
+    labels = (df[info["study_col"]].astype(str).tolist() if info.get("study_col")
+              else [f"study{i + 1}" for i in range(len(df))])
+    res = combine_effects(yi, vi, method_re="dl", row_names=labels, use_t=False)
+    sf = res.summary_frame()
+    re_row = sf.loc["random effect"]
+    homog = res.test_homogeneity()
+    q, q_p = float(homog.statistic), float(homog.pvalue)
+    k = len(yi)
+    i2 = max(0.0, (q - (k - 1)) / q) if q > 0 else 0.0
+    se_all = np.sqrt(vi)
+    egger = sm.OLS(yi / se_all, sm.add_constant(1.0 / se_all)).fit()
+    out = {
+        "method": "random-effects (DerSimonian-Laird)",
+        "k": k,
+        "pooled_effect": float(re_row["eff"]),
+        "ci95": [float(re_row["ci_low"]), float(re_row["ci_upp"])],
+        "tau2": float(res.tau2),
+        "i2_percent": round(i2 * 100, 1),
+        "Q": round(q, 3), "Q_p": round(q_p, 4),
+        "egger_intercept": round(float(egger.params[0]), 3),
+        "egger_p": round(float(egger.pvalues[0]), 4),
+    }
+    note = ("严谨性:合并效应 + 95% CI 已给出;I²/τ² 大时勿只报合并值,做亚组/敏感性分析;"
+            "Egger p<.05 提示漏斗不对称(可能发表偏倚),报告须说明。")
+    return json.dumps(out, ensure_ascii=False, indent=2, default=str) + "\n\n" + note
+
+
 @srv.tool("pystat_guidance", "选检验/查前提指引(不算数,给方法学建议)",
           {"properties": {"question": {"type": "string"}}, "required": []})
 def pystat_guidance(args: dict) -> str:

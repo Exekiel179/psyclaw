@@ -720,6 +720,16 @@
    ],
    "status": "done",
    "evidence": "psyclaw/choices.py(_pick_inline 宽度感知截断 + 2 行详情区);psyclaw/repl.py(_CHOICES_SYSTEM 补选项自包含约定);tests/test_choices_reads.py +2 例(超宽高亮项详情区给全文/短选项无详情区);验证:uv run --python 3.12 --with pytest python -m pytest -q → 1431 passed"
+  },
+  {
+   "id": "feat-072",
+   "name": "v0.10 遗留收尾:写作回填真结果 + meta 接 pystat + [stats] 数值实测",
+   "description": "数据→结果→稿件闭环补完:① pystat MCP 新增 pystat_meta 工具(随机效应 DL 元分析:合并效应+95%CI+I²/τ²/Q+Egger,列定位/脚本骨架复用 steps_meta,statsmodels 未装返回可运行脚本不假装有结果);② pystat_bridge 加 run_meta_via_pystat + _real_result 守卫(「统计库未安装」的脚本骨架不算真结果,run_via_pystat 同样收紧——学术诚信:不制造『看着像跑过了』的假象);③ step_meta_script best-effort 直跑落 outputs/meta_result.txt;④ step_write_analysis/step_write_meta 把 pystat 真跑结果注入写作上下文(结果节只引用真实数值,效应量+CI 必报);⑤ [stats] 数值实测:statsmodels/pingouin 真装真跑。",
+   "dependencies": [
+    "feat-053"
+   ],
+   "status": "done",
+   "evidence": "psyclaw/mcp/servers/pystat_server.py(pystat_meta);psyclaw/workflows/pystat_bridge.py(run_meta_via_pystat/_real_result);psyclaw/workflows/steps_meta.py(step_meta_script 直跑+step_write_meta 注入);psyclaw/workflows/steps_analysis.py(step_write_analysis 注入);tests/test_pystat_bridge.py +11 例(守卫/骨架不算结果/meta 桥/步骤落盘/写作注入/离线返脚本/坏表 fail-closed);离线全量 1442 passed;数值实测(uv+清华镜像):pystat_meta→合并效应 0.327 CI[0.200,0.455] τ²=0.0021 I²=9.7% Q=4.43 Egger p=.0045,生成 meta 脚本执行数值一致;pystat_ttest→T=-7.11 p=.0004 d=5.03 CI95[-0.67,-0.33],生成 analysis 脚本(正态/方差齐/t 检验)端到端可跑"
   }
  ]
 }
