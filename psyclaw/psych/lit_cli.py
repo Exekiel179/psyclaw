@@ -56,7 +56,7 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
     print(ui.dim("取全文:psyclaw lit --fulltext <DOI>(走合法 OA);"
                  "付费墙的用 --zotero <DOI> 从你自己文库取。"))
 
-    # PRISMA 计数落盘(对接 LIT.prisma 门禁)
+    # PRISMA 计数落盘(对接 LIT.prisma 质量检查)
     notes = Path(project_dir) / "notes"
     notes.mkdir(parents=True, exist_ok=True)
     (notes / "prisma_search.md").write_text(

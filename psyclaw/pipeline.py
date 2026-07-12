@@ -2,7 +2,7 @@
 
 把研究编排串成**一条命令**(`psyclaw research <topic>` / REPL `/research`):
 
-  澄清门禁 → ① 文献 → ② 设计 → ③ 写作(APA-JARS)
+  研究准备检查 → ① 文献 → ② 设计 → ③ 写作(APA-JARS)
           → ④ 评审(peer-review panel) → ⑤ 总验收(澄清 + 评审 → 判决)
 
 统计已外移到成熟库/MCP——本编排不内置统计计算,只做研究流程编排。
@@ -17,7 +17,7 @@
 
 机器可判定控制点(纯函数,可单测,fail-closed):
   pipeline_verdict(clarify_resolved, stat_gate, review_summary) -> 总验收 dict
-  (stat_gate 现恒为 None——统计外移后无内置统计门禁)
+  (stat_gate 现恒为 None——统计外移后无内置统计质量检查)
 """
 
 from __future__ import annotations
@@ -40,12 +40,12 @@ def pipeline_verdict(clarify_resolved: bool, stat_gate: dict | None,
 
     判定(fail-closed,任一维度不达标即不过):
       - clarify_resolved 必须为 True(澄清未完成,流水线根本不应抵达交付)。
-      - 统计门禁:stat_gate 为 check_artifact 结果;None 表示无统计产出
-        (理论/综述型研究,统计门禁不适用 → 记 'n/a',不阻断)。有结果则
+      - 统计质量检查:stat_gate 为 check_artifact 结果;None 表示无统计产出
+        (理论/综述型研究,统计质量检查不适用 → 记 'n/a',不阻断)。有结果则
         必须 passed(无 blocking)。
       - 同行评审:review_summary 为 review.summarize 结果;None 表示未评审
         (视为未通过,不能把"没评审"当作通过)。通过需**零 BLOCKING 行动项**
-        且编辑决定 ∈ {ACCEPT, MINOR}(MAJOR/REJECT 不算过门禁)。
+        且编辑决定 ∈ {ACCEPT, MINOR}(MAJOR/REJECT 不算通过质量检查)。
 
     返回 {overall_passed, clarify_ok, gates_ok, gates_status, review_ok,
           review_decision, n_blocking, reasons:[...]}。
@@ -54,7 +54,7 @@ def pipeline_verdict(clarify_resolved: bool, stat_gate: dict | None,
 
     clarify_ok = bool(clarify_resolved)
     if not clarify_ok:
-        reasons.append("澄清卡未全部 resolved(CLARIFY.complete 未放行)")
+        reasons.append("研究准备项未全部完成(CLARIFY.complete 未通过)")
 
     if stat_gate is None:
         gates_ok, gates_status = True, "n/a"
@@ -63,7 +63,7 @@ def pipeline_verdict(clarify_resolved: bool, stat_gate: dict | None,
         gates_status = "passed" if gates_ok else "blocked"
         if not gates_ok:
             n_blk = len(stat_gate.get("blocking", []))
-            reasons.append(f"统计门禁阻断({n_blk} 项 blocking)")
+            reasons.append(f"统计质量检查未通过({n_blk} 项 blocking)")
 
     if review_summary is None:
         review_ok, review_decision, n_blocking = False, None, 0
@@ -162,8 +162,8 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     """跑端到端研究流水线。
 
     返回:
-      1 —— 硬阻断(澄清门禁未过 / 无研究目标 / 写作阶段未产出稿)。
-      0 —— 流水线完整跑通(产出稿 + 跑完门禁与评审,总验收写入 summary)。
+      1 —— 流程暂停(研究准备检查未通过 / 无研究目标 / 写作阶段未产出稿)。
+      0 —— 流水线完整跑通(产出稿 + 跑完质量检查与评审,总验收写入 summary)。
            总验收 PASS/BLOCK 见 notes/pipeline_summary.json 与终端报告;
            评审未达 ACCEPT/MINOR 不视为运行失败(交人工,符合 HITL 纪律)。
     """
@@ -190,16 +190,16 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
         "Research Pipeline — 一句话编排(文献→设计→写作→评审→总验收)",
         f"目标:{goal.splitlines()[0][:80]}"))
 
-    # —— 门禁 0:澄清(硬规则,不澄清完不开工)——
+    # —— 前置检查 0:研究准备(未完成前不开工)——
     card = check_card(project_dir)
     if card["unresolved"]:
-        print(ui.err(f"✗ CLARIFY.complete 拦截:澄清卡 {card['resolved']}/{card['total']},"
+        print(ui.err(f"✗ 前置检查 CLARIFY.complete 未通过：研究准备项 {card['resolved']}/{card['total']}，"
                      f"未解决 {len(card['unresolved'])} 项。"))
-        print("  先运行 psyclaw clarify —— 不澄清完,不开工。")
+        print("  先运行 psyclaw prepare —— 研究准备未完成前不启动正式流程。")
         _write_summary(project, goal, pipeline_verdict(False, None, None),
                        {}, stopped="clarify")
         return 1
-    print(ui.ok("✓ 澄清门禁通过"))
+    print(ui.ok("✓ 研究准备检查通过"))
 
     conf = cfg.load_config()
     provider = get_provider(conf)
@@ -218,7 +218,7 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     # —— ② 设计 ——
     print("\n" + ui.accent("② 设计(假设·变量·功效·样本量)"))
     design = _gen(provider, "planner", _design_task(goal),
-                  f"# 背景综述\n{lit}\n\n# 澄清卡\n{clar}")
+                  f"# 背景综述\n{lit}\n\n# 研究准备清单\n{clar}")
     (project / "notes" / "design.md").write_text(design, encoding="utf-8")
     artifacts["design"] = "notes/design.md"
     _log(project, "pipeline ② 设计 → notes/design.md")
@@ -274,11 +274,11 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     verdict["final_draft"] = final_draft
     _write_summary(project, goal, verdict, artifacts)
     _log(project, f"pipeline ⑥ 总验收:{'PASS' if verdict['overall_passed'] else 'BLOCK'} "
-                  f"(门禁{verdict['gates_status']} · 评审{verdict['review_decision']})")
+                  f"(质量检查{verdict['gates_status']} · 评审{verdict['review_decision']})")
 
     # —— 终态报告 ——
-    status = ui.ok("✓ 总验收 PASS — 一篇过门禁的稿") if verdict["overall_passed"] \
-        else ui.warn("△ 总验收 BLOCK — 尚未过门禁,交人工")
+    status = ui.ok("✓ 总验收 PASS — 稿件已通过质量检查") if verdict["overall_passed"] \
+        else ui.warn("△ 总验收 BLOCK — 质量检查尚未通过,请人工处理")
     print("\n" + status)
     if verdict["reasons"]:
         for r in verdict["reasons"]:

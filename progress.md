@@ -2,7 +2,48 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-11(v0.11→**v0.12.0 发布**:自学习进 agent + 闭环补完 + eval harness)
+**Last Updated:** 2026-07-11(feat-078:统一 run 执行契约与可恢复状态)
+
+## 本轮(35):feat-078 done —— 统一 run 运行行为
+
+- `run` 公开类型只保留 literature/analysis/meta/qualitative;research/task 与旧参数继续兼容但退出帮助。
+- 默认连续执行;公开参数统一为 `--confirm-each / --exploratory / --resume`。
+- workflow 每步原子写 `.psyclaw/workflows/<id>.json`;恢复校验步骤签名、目标、输入与已有产物。
+- `prepare` 成为研究准备公开命令,`clarify` 保留兼容。
+- auto 失败进入 `needs_attention`,同次运行不空转、下次可重试;迭代上限按每次运行计算。
+
+验证:定向 189 passed;全量 1483 passed / 12 个既有 Windows 图片/MCP 环境失败;
+gates 22 条;eval 28/28;harness 100/100;`git diff --check` 通过。
+
+---
+
+## 本轮(34):feat-077 done —— 用户术语统一
+
+- 用户界面、CLI 帮助、运行提示、研究准备清单、内置研究指令和当前文档统一使用三组直白术语:
+  `研究准备项`、`前置检查`、`质量检查`。
+- 工作流暂停提示改为说明“哪项检查未通过”和下一步操作;跳过检查仍保留留痕与探索性标注。
+- 保留 `gates` 命令、`gate_*` 函数、规则 ID、JSON 字段和旧澄清文档解析兼容。
+- 新增 `tests/test_terminology.py`,扫描当前用户界面与文档,防止旧直译词回流。
+
+验证:定向 203 passed;全量 1474 passed / 12 个既有 Windows 图片/MCP 环境失败;
+gates 22 条规则;eval 28/28;harness 100/100;`git diff --check` 通过。
+
+---
+
+## 本轮(33):feat-076 done —— chat / run / auto 三入口
+
+- 新增 `psyclaw/modes.py`:共享路由 `run analysis|meta|literature|qualitative|research|task`
+  到既有 workflow/pipeline/loop;`auto` 复用 autoloop,不复制执行逻辑。
+- CLI 新增 `chat / run / auto`;顶层帮助只突出三入口与基础命令;旧入口归入兼容/高级分类。
+- REPL 主命令改 `/run /auto /approval /access`;旧 `/agent /research-loop /yolo /safemode`
+  保持可调用但退出默认联想;slash 运行会记入对话,后续上下文可承接。
+- README/TUTORIAL/COMMANDS/ARCHITECTURE、启动横幅、status、path ingest、内置 workflow skills
+  全部切换到新词汇;历史 CHANGELOG 和内部 action key 保留原名。
+
+验证:定向 342 passed;全量 1473 passed / 12 个既有 Windows 图片/MCP 环境失败;
+gates 22 条 ✓;eval 28/28;harness 100/100。
+
+---
 
 ## 本轮(32):v0.12.0 发布 ——feat-065~075 done(自学习进 agent 模式 + 数据→结果→稿件闭环 + 可评测)
 

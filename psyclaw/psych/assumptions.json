@@ -1,5 +1,5 @@
 {
-  "_comment": "PsyClaw 前提假设注册表。每个检验族:假设→怎么检查→违反了怎么办。ARS-Stat 决策树与 STAT.assumptions 门禁的依据。",
+  "_comment": "PsyClaw 前提假设注册表。每个检验族:假设→怎么检查→违反了怎么办。ARS-Stat 决策树与 STAT.assumptions 质量检查的依据。",
   "tests": [
     {
       "id": "t-ind",
@@ -60,7 +60,7 @@
         {"name": "双变量正态", "check": "两变量各自正态 + 散点呈椭圆", "violated": "Spearman 或 bootstrap CI"},
         {"name": "无极端离群", "check": "散点图;单点可翻转结论", "violated": "稳健相关(skipped/winsorized)+ 敏感性分析"}
       ],
-      "modern_default": "r + 95% CI;n<100 时 CI 很宽,解释要克制;相关≠因果(门禁拦截因果表述)"
+      "modern_default": "r + 95% CI;n<100 时 CI 很宽,解释要克制;相关≠因果(质量检查会标记因果表述)"
     },
     {
       "id": "regression",

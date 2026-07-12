@@ -3,8 +3,8 @@
 运行:python -m pytest tests/ 或 python tests/test_pipeline.py
 原则:
   - 澄清未完成 → 流水线硬停(返回 1),不产出稿(CLARIFY.complete)。
-  - 总验收 fail-closed:未评审 / 评审非 ACCEPT|MINOR / 仍有 BLOCKING / 统计门禁
-    阻断 → 不算"过门禁的稿";不能把"没评审"当作通过。
+  - 总验收 fail-closed:未评审 / 评审非 ACCEPT|MINOR / 仍有 BLOCKING / 统计质量检查
+    未通过 → 不算"通过质量检查的稿";不能把"没评审"当作通过。
   - 端到端跑通(mock provider)应产出四象限产物 + 机器可读 notes/pipeline_summary.json。
 """
 
@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from psyclaw import pipeline  # noqa: E402
 from psyclaw.pipeline import pipeline_verdict, run_pipeline  # noqa: E402
 
-# 全部 17 槽位 resolved 的澄清卡(check_card 只数 `| <id> | resolved |` 行)。
+# 全部 17 个研究准备项 resolved 的清单(check_card 只数 `| <id> | resolved |` 行)。
 from psyclaw.psych.clarify import SLOTS  # noqa: E402
 
 PANEL_ACCEPT = """\
@@ -88,7 +88,7 @@ def test_verdict_pass_when_all_green():
 
 
 def test_verdict_minor_decision_passes():
-    # MINOR(小修)且零 BLOCKING 视为过门禁。
+    # MINOR(小修)且零 BLOCKING 视为通过质量检查。
     rev = {"decision": "MINOR", "n_blocking": 0}
     v = pipeline_verdict(True, None, rev)
     assert v["overall_passed"] is True
@@ -208,7 +208,7 @@ def test_pipeline_literature_grounded_from_lit_cache():
 
 
 def test_pipeline_failclosed_when_review_not_accept():
-    # mock 风格面板不含 RECOMMENDATION → 无同行推荐 → 决定 MAJOR → 不过门禁,
+    # mock 风格面板不含 RECOMMENDATION → 无同行推荐 → 决定 MAJOR → 质量检查未通过,
     # 但流水线仍跑通(返回 0,交人工),summary 记录 BLOCK。
     with tempfile.TemporaryDirectory() as d:
         proj = Path(d)

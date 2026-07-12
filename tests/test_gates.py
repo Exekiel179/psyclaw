@@ -1,4 +1,4 @@
-"""门禁红队测试 — 门禁是产品核心,这些 fixture 就是它的规格。
+"""质量检查红队测试 — 质量检查是产品核心,这些 fixture 就是它的规格。
 
 运行:python -m pytest tests/ 或 python tests/test_gates.py
 原则:违规产物必须被拦(block),缺失产物必须被拦(fail-closed),

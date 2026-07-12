@@ -2,9 +2,9 @@
 
 两档,差别只在「不展示的上下文」是否摊开:
 - render_conversation(messages): 只导出对话本身(user↔assistant 轮),即屏幕上看到的往来。
-- render_full(...): 完整上下文——额外摊开 system 提示、滚动决策备忘 memo、以及每轮
-  持续注入的约定片段(键盘选择器/文件读取/命令执行)。这些模型每轮都看得见、用户从不显示,
-  审计/复现/调试时需要一次性看全。
+- render_full(...): 完整上下文——额外摊开 system 提示、当前研究目标、滚动决策备忘 memo、
+  以及每轮持续注入的约定片段(键盘选择器/文件读取/命令执行)。这些模型每轮都看得见、
+  用户从不显示,审计/复现/调试时需要一次性看全。
 
 写盘的护栏(拒 data/raw 等)留在调用方(repl),本模块只负责把状态渲染成文本。
 """
@@ -61,8 +61,9 @@ def render_conversation(messages: list[dict], meta: dict | None = None) -> str:
 
 
 def render_full(messages: list[dict], system: str = "", memo: str = "",
-                conventions: str = "", meta: dict | None = None) -> str:
-    """导出完整对话,含平时不展示的上下文(system 提示 / 决策备忘 / 每轮约定片段)。
+                conventions: str = "", current_goal: str = "",
+                meta: dict | None = None) -> str:
+    """导出完整对话,含隐藏上下文(system / 当前目标 / 决策备忘 / 每轮约定)。
 
     注意:每轮**动态**注入的知识/历史召回随消息即时生成、不留存,无法在此忠实重建;
     故只导出可稳定重建的持续性隐藏上下文,并如实标注这一点。
@@ -80,6 +81,9 @@ def render_full(messages: list[dict], system: str = "", memo: str = "",
                  + (system.strip() if system and system.strip() else "_（空）_"))
     parts.append("### 滚动决策备忘（memo）\n\n"
                  + (memo.strip() if memo and memo.strip() else "_（空）_"))
+    parts.append("### 当前研究目标（notes/goal.md）\n\n"
+                 + (current_goal.strip() if current_goal and current_goal.strip()
+                    else "_（空）_"))
     if conventions and conventions.strip():
         parts.append("### 每轮持续注入的约定片段\n\n" + conventions.strip())
 

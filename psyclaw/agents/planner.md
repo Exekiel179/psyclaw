@@ -16,7 +16,7 @@ description: 把心理学研究目标拆成可审计的执行计划。
 - 每步输出可独立验证
 - 标注可并行步骤
 - 大数据集注意计算效率（必要时先抽样验证代码）
-- 每个分析步骤标注其关联的 PSYCLAW 门禁（如 STAT.assumptions / DESIGN.power）
+- 每个分析步骤标注其关联的 PSYCLAW 质量检查（如 STAT.assumptions / DESIGN.power）
 
 输出：写入 `notes/plan.md`，用 Markdown 表格列任务清单。
 计划末尾必须有单独的 `## TASKS` 章节：`- [ ] 任务` 复选框列表，

@@ -154,7 +154,7 @@ def test_data_hint_no_deleted_commands(tmp_path):
     from psyclaw.path_ingest import _data_metadata
     hint = _data_metadata(p)
     assert "describe" not in hint and "psyclaw stat" not in hint
-    assert "analysis-loop" in hint
+    assert "run analysis" in hint
 
 
 # --- 命令块执行(新特性:模型吐命令块 → 执行并回传,不再死胡同) --------------------

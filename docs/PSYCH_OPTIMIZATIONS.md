@@ -31,14 +31,14 @@
 - CLI:`psyclaw screen data.csv`(自动嗅探 tab/逗号分隔;默认匹配
   OpenPsychometrics 的 Q{N}A 列名,`--prefix/--suffix` 可调)
 - **原则:标记 ≠ 剔除**。剔除决定必须走 HITL 审批门(`decision_request.md`),
-  由新门禁 `DATA.careless` 强制
+  由新质量检查 `DATA.careless` 强制
 - 📋 M2 扩展:psychsyn/psychant(语义一致性)、Mahalanobis D、作答时间
   (利用 Q{N}E 列)、假词法(VCL6/9/12 类 infrequency items)
 
 ### 1.3 信度 ✅
 
 `psyclaw/psych/reliability.py`:Cronbach's α + 逐题删除 α + 解释规则
-(含「α>.95 提示冗余」)。新门禁 `MEASURE.reliability`:合成量表分前必报信度。
+(含「α>.95 提示冗余」)。新质量检查 `MEASURE.reliability`:合成量表分前必报信度。
 📋 M2 接 R 后默认双报 α + McDonald's ω,并跑 CFA 检验单维性假设。
 
 ### 1.4 测量不变性 📋
@@ -62,7 +62,7 @@ t 检验族 / ANOVA 族 / 相关回归 / 中介(Monte Carlo)/ SEM(MacCallum RMSE
 
 `/preregister` 生成 OSF / AsPredicted 双格式模板,自动从对话中抽取:
 假设(区分确证/探索)、IV/DV/协变量、剔除规则(引用 §1.2 的筛查标准)、
-样本量依据(引用 §2.1 的功效分析)、分析计划。对应门禁 `DESIGN.prereg`。
+样本量依据(引用 §2.1 的功效分析)、分析计划。对应质量检查 `DESIGN.prereg`。
 
 ### 2.3 伦理提示 📋
 
@@ -148,14 +148,14 @@ bilingual abstract 能力,M2 评估复用)。
 
 ---
 
-## 5. 门禁追加(M1 已落地 ✅)
+## 5. 质量检查追加(M1 已落地 ✅)
 
 | Gate | 触发 | 规则 |
 |------|------|------|
 | `DATA.careless` | 数据筛查 | 必须跑草率作答筛查;剔除须人工批准 |
 | `MEASURE.reliability` | 使用量表分 | 合成前必报信度 |
 
-加上原有 9 条,当前共 **11 条门禁**。
+加上原有 9 条,当前共 **11 条质量检查**。
 
 ---
 

@@ -22,8 +22,8 @@ PsyClaw 是**心理学研究全流程 Agent CLI**，Fork 自 AutoResearchClaw，
     `stats_core.py`（stdlib 统计）、`pingouin_backend.py` / `r_backend.py`、
     `assumptions.json` / `methods.json` / `designs.json` / `evidence.json` 知识库、
     `litsearch.py` / `zotero_client.py` / `institution.py` 文献层
-  - `gates/` — 学术门禁：`PSYCLAW.md` 规范、`rules.yaml` 规则、`checker.py` 执行器、
-    `figure_style.yaml` 图表规范、`rigor.md` 严谨性协议（当前 14 条门禁）
+  - `gates/` — 研究质量检查：`PSYCLAW.md` 规范、`rules.yaml` 规则、`checker.py` 执行器、
+    `figure_style.yaml` 图表规范、`rigor.md` 严谨性协议（当前 14 条质量检查）
   - `output/apa7.py` — APA7 零依赖 OOXML 输出
   - `skills/ars/SKILL.md` — ARS 端到端研究总编排
   - `agents/{planner,executor,critic,auditor}.md` — 多智能体 HITL 角色
@@ -39,11 +39,11 @@ PsyClaw 是**心理学研究全流程 Agent CLI**，Fork 自 AutoResearchClaw，
 1. **定位**：读 `TODO.md`，跑 `git log --oneline -15` 看已完成什么，**选一个**仍未完成、
    依赖已就绪的最高优先级任务（顺序：P0 → P1 → P2，同档内按 TODO 末尾"建议执行顺序"）。
 2. **理解再动手**：动代码前先读相关现有文件（别假设结构）。这是科研工具，**正确性 >
-   速度**；统计/门禁逻辑错误是不可接受的。
+   速度**；统计/质量检查逻辑错误是不可接受的。
 3. **实现**：写完整实现 + 完善错误处理。遵守项目铁律（见下）。
 4. **测试**：为新行为加/改 `tests/test_*.py`；跑 `python -m pytest -q`，全绿才算完成。
    涉及统计数值的，**对照 scipy/pingouin 校验**（项目惯例，误差容忍见现有测试）。
-5. **门禁自检**：若改了 `gates/` 或产出逻辑，跑 `python -m psyclaw gates` 确认无破坏。
+5. **质量检查自检**：若改了 `gates/` 或产出逻辑，跑 `python -m psyclaw gates` 确认无破坏。
 6. **更新计划**：把刚完成的任务在 `TODO.md` 里从 📋/🚧 标为 ✅（并补一句实现位置）。
 7. **提交**：`git add -A && git commit -m "<描述性消息>"`。消息说明"做了什么 + 在哪个文件"。
 
@@ -55,7 +55,7 @@ PsyClaw 是**心理学研究全流程 Agent CLI**，Fork 自 AutoResearchClaw，
   硬编码期望值。修根因。
 - **零依赖优先**：核心路径不得新增强依赖。需要重库（pingouin/R/matplotlib）时，必须
   保留 stdlib/降级回落分支（参考 `analyze.py` 如何在 pingouin 缺失时回落 `stats_core`）。
-- **不破坏既有契约**：`cli.py` 现有命令的行为不回归；门禁只增不偷偷删。
+- **不破坏既有契约**：`cli.py` 现有命令的行为不回归；质量检查只增不偷偷删。
 - **学术诚信不可妥协**：效应量+CI 必报、相关≠因果、区分探索/确证、不 p-hacking——
   这些是产品灵魂，任何统计/写作产出都要符合 `gates/PSYCLAW.md`。
 - **不碰真实数据/密钥**：不读写用户原始 `data/`，不在代码或提交里写入任何 API key。
@@ -83,7 +83,7 @@ PsyClaw 是**心理学研究全流程 Agent CLI**，Fork 自 AutoResearchClaw，
 - **`TODO.md` 全部 ✅、确实没有既有任务可做了** → 不要停。进入**自我扩展模式**：审视整个
   项目，找出最高价值的下一步改进，把它**追加进 `TODO.md`**（标 📋 并写清验收），然后立刻
   实现它。每轮至少净增一项有意义的能力或质量提升。自我扩展的优先级方向（从高到低）：
-  1. **正确性加固**：补统计/门禁的边界用例与对照校验，消除任何数值/逻辑隐患。
+  1. **正确性加固**：补统计/质量检查的边界用例与对照校验，消除任何数值/逻辑隐患。
   2. **测试覆盖**：为尚无测试的模块补 `tests/test_*.py`，提高回归防护。
   3. **真实缺口**：把 `docs/PSYCH_OPTIMIZATIONS.md` 里 📋 的纵深项做深做实。
   4. **新功能**：审稿模拟深化、更多量表/方法卡/设计卡、更多统计后端、可视化主题层落地。
@@ -100,7 +100,7 @@ PsyClaw 是**心理学研究全流程 Agent CLI**，Fork 自 AutoResearchClaw，
 - 选中的任务依赖未就绪 → 回 `TODO.md` 选另一个**无阻塞**的任务。
 - 同一任务连续两次迭代仍未通过测试 → 在 `notes/blocked.md` 写下：任务、卡点、已试方案、
   建议，提交后**跳过该任务**选下一个，把决策留给人。
-- 需要删数据/改测量口径/动门禁判据这类价值判断 → 不要自作主张，写 `notes/decision_request.md`
+- 需要删数据/改测量口径/改质量检查判据这类价值判断 → 不要自作主张，写 `notes/decision_request.md`
   说明理由/影响/替代方案，提交后选别的任务继续。
 
 ---

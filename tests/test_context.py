@@ -42,6 +42,12 @@ class TestLeanCore:
         assert "效应量" in s or "effect" in s.lower()
         assert "CI" in s or "置信区间" in s
 
+    def test_requires_plain_language_before_statistics(self):
+        s = lean_core()
+        assert "日常语言" in s
+        assert "为什么这样分析" in s
+        assert "术语/缩写" in s
+
     def test_contains_psyclaw_identity(self):
         assert "PsyClaw" in lean_core()
 

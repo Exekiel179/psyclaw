@@ -6,7 +6,7 @@
 每个产物旁落一份 ``<产物>.provenance.json``,含四要素——
 
   ① 确切代码(code + sha256)   ② 运行环境(python + 平台 + 统计库版本)
-  ③ 自然语言说明(这脚本做了什么)  ④ 决策轨迹(plan/design/澄清卡/workflow_summary 指针)
+  ③ 自然语言说明(这脚本做了什么)  ④ 决策轨迹(plan/design/研究准备清单/workflow_summary 指针)
 
 设计纪律(对齐项目铁律):
 - **不算统计**:只做元数据采集(sha256/版本号/路径),不 import 也不运行任何统计库。
@@ -14,7 +14,7 @@
   受保护的 ``data/raw`` 一律只记路径、不哈希。也可由调用方直接传入已算好的 ``data_fingerprint``。
 - **确定性、可单测**:纯 stdlib(hashlib / importlib.metadata / platform / sys)。
 
-对接门禁:``REPRO.provenance``(trigger ``provenance_check``)据 ``provenance_complete``
+对接质量检查:``REPRO.provenance``(trigger ``provenance_check``)据 ``provenance_complete``
 (代码 + 环境 + 说明齐备)把缺项的溯源包 block 掉。
 """
 
@@ -118,9 +118,9 @@ def build_replication_declaration(prov: dict) -> dict:
     「数据可得性声明」节的确定性文本。
 
     complete = 分析脚本 + 数据指纹都在(环境清单随溯源包必有)。
-    期刊画像 data_availability=required 时,门禁 REPRO.replication_package
+    期刊画像 data_availability=required 时,质量检查 REPRO.replication_package
     据 sidecar 的 ``replication_package_declared`` 强制这份声明;非强制期刊
-    也照常生成(作者仍可自愿附上),只是不作门禁判据。
+    也照常生成(作者仍可自愿附上),只是不作质量检查判据。
     """
     items: list[dict] = []
     missing: list[str] = []
@@ -184,7 +184,7 @@ def build_provenance(artifact_path: str, description: str = "",
         "created": created or _now(),
     }
 
-    # 门禁判据:确切代码 + 环境 + 自然语言说明三要素齐(决策轨迹尽力采集、不作硬判据)。
+    # 质量检查判据:确切代码 + 环境 + 自然语言说明三要素齐(决策轨迹尽力采集、不作硬判据)。
     complete = bool(code) and bool(env.get("python")) and bool(desc)
     data_required = False
     if journal:
@@ -196,7 +196,7 @@ def build_provenance(artifact_path: str, description: str = "",
     data_ok = (not data_required) or bool(data and data.get("sha256"))
     prov["data_availability_ok"] = data_ok
     # feat-074:replication-package 声明照常生成(非强制期刊也可自愿附);
-    # 但只有 data_availability=required 时才由门禁 REPRO.replication_package 强制。
+    # 但只有 data_availability=required 时才由质量检查 REPRO.replication_package 强制。
     decl = build_replication_declaration(prov)
     prov["replication_package"] = decl
     prov["replication_package_declared"] = decl["complete"]

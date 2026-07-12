@@ -4,8 +4,8 @@
 
     # ~/.psyclaw/aliases.yaml(全局)或 <项目>/.psyclaw/aliases.yaml(项目级,覆盖全局)
     qc: check --journal xinlixuebao
-    起跑: auto-loop --auto
-    综述: lit-loop --skip-gates
+    起跑: auto
+    综述: run literature --exploratory
 
 之后 ``psyclaw qc 稿件.md`` == ``psyclaw check --journal xinlixuebao 稿件.md``
 (别名展开后,余下参数原样追加)。
