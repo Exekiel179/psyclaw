@@ -158,12 +158,12 @@ def step_design(ctx) -> dict:
     from psyclaw.loop import _gen
     prof = ctx.data.get("profile", {})
     cols = ", ".join(f"{c['name']}({c['kind']})" for c in prof.get("columns", []))
-    task = ("据研究主题、澄清卡与数据列,写一份简洁的研究/分析设计备忘:"
+    task = ("据研究主题、研究准备清单与数据列,写一份简洁的研究/分析设计备忘:"
             "①研究假设(确证/探索区分)②变量角色(自变量/因变量/协变量)"
             "③设计类型(被试间/内/相关等)④分析计划(拟用的检验与理由,效应量+CI 必报)。"
             "只依据给定信息,不杜撰数据或结果。")
     memo = _gen(ctx.provider, "planner", task,
-                f"# 主题\n{ctx.topic}\n\n# 数据列\n{cols}\n\n# 澄清卡\n{ctx.clar}")
+                f"# 主题\n{ctx.topic}\n\n# 数据列\n{cols}\n\n# 研究准备清单\n{ctx.clar}")
     (ctx.project / "notes" / "design.md").write_text(memo or "(设计备忘待补)",
                                                      encoding="utf-8")
     ctx.artifacts["design"] = "notes/design.md"
@@ -220,7 +220,7 @@ def step_write_analysis(ctx) -> dict:
         f"# 分析计划\n推荐分析:{rec.get('analysis')} —— {rec.get('rationale')}。"
         "统计由 outputs/analysis.py 在外部 pingouin/scipy 环境运行,"
         "结果回填本稿(只引用脚本实际产出,不杜撰数值;效应量+CI 必报)。\n\n"
-        f"# 澄清卡\n{ctx.clar}")
+        f"# 研究准备清单\n{ctx.clar}")
     # v0.12 feat-072:pystat 真跑出的结果注入写作上下文——结果节引用真实数值,不再是空骨架
     result = ctx.data.get("analysis_result")
     if result:

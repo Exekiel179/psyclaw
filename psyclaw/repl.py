@@ -26,22 +26,27 @@ from psyclaw import ui
 from psyclaw.ui_input import read_line
 
 MAX_FILE_CHARS = 30_000
+_MAX_GOAL_CONTEXT_CHARS = 8_000
+_MAX_EMPTY_REPLY_RETRIES = 2
+_EMPTY_REPLY_NUDGE = (
+    "上一轮模型回复为空,但前一条工具或命令结果仍待处理。请直接检查上一条结果:"
+    "若失败,说明原因并修正后继续;若成功,解释结果并推进剩余任务。不要等待用户再说『继续』。"
+)
 PROMPT = ui.paint("psyclaw", "brcyan", "bold") + ui.dim(" ❯ ")
 
 # slash 命令注册表(联想弹出用:命令 → 一句话描述)
 COMMANDS = {
     "/help": "命令总览",
-    "/plan": "规划模式开关(只规划不执行;/plan <目标> 设目标并开启;off 退出)",
-    "/goal": "查看/设定研究目标(notes/goal.md)",
+    "/goal": "查看研究目标;带文本时写入 notes/goal.md 并立即开始执行",
+    "/run": "运行明确流程:analysis|meta|literature|qualitative",
+    "/auto": "按项目状态自主推进;强制检查和不可逆决策仍会暂停",
+    "/approval": "审批策略:ask(默认)|auto;危险操作始终确认",
+    "/access": "文件访问策略:open(默认)|safe",
     "/tasks": "任务看板(自动从计划抽取;start/done/add/sync)",
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
-    "/audit": "逐轮审计开关(on/off;每轮多一次 LLM 调用)",
-    "/agent": "agent 模式开关(模型自主多步调用工具:search/read_file/save_file/kg_query/recall)",
-    "/safemode": "文件读取权限:safe=一切读取须 @ 引用;open(默认)=模型可请求自动读取",
-    "/yolo": "审批模式:on=命令/覆盖/工具副作用自动放行(仅危险命令仍问);off 逐条确认",
     "/plugins": "已加载插件(用户 项目/全局;可注册工具/命令/system 片段)",
-    "/clarify": "研究澄清(grill-me 式,不澄清完不开工)",
-    "/preregister": "预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取)",
+    "/prepare": "完成研究准备清单(17 个研究准备项)",
+    "/preregister": "预注册模板(OSF/AsPredicted 双格式;据研究准备清单抽取)",
     "/scale": "量表库(DASS/PHQ-9/GAD-7/TIPI…)",
     "/assume": "前提假设知识库(16 检验族)",
     "/method": "复杂方法目录(SEM/MLM/LPA/网络…)",
@@ -49,7 +54,7 @@ COMMANDS = {
     "/cite": "方法学背书库(决策→文献)",
     "/export": "APA7 输出(Word docx + Markdown)",
     "/memory": "三层记忆(画像/惯性/教训卡);/memory verify 再验证环境教训、已恢复的自动失效",
-    "/gates": "学术门禁自检(13 条)",
+    "/gates": "研究质量检查",
     "/skills": "已注册 skills",
     "/mcp": "MCP 目录与启用状态",
     "/model": "查看/切换模型",
@@ -58,8 +63,6 @@ COMMANDS = {
     "/clear": "清空上下文",
     "/compact": "压缩上下文",
     "/config": "配置向导",
-    "/research": "一句话研究编排:文献→设计→写作→评审→总验收(受澄清门禁约束)",
-    "/research-loop": "通用 HITL 回路(planner→executor→critic)",
     "/review": "审稿模拟(EIC+3审稿人+DA;--revise 回灌修复环)",
     "/lit": "文献检索(M2+)",
     "/sessions": "列出历史会话(跨会话持久化)",
@@ -96,7 +99,7 @@ _CHOICES_SYSTEM = (
 _RUN_SYSTEM = (
     "\n# 直接运行命令(会真的执行)\n要跑 PsyClaw 子命令或系统命令时,输出块(每行一条),"
     "PsyClaw 会执行并把输出回传给你,你据此继续:\n"
-    "```psyclaw\nanalysis-loop data/clean/x.csv --auto\n```\n"
+    "```psyclaw\nrun analysis data/clean/x.csv\n```\n"
     "```shell\npython outputs/analysis.py\n```\n"
     "注意:**没有** describe/stat 等内置统计命令(统计已外移)——统计请生成脚本再用 shell 跑。"
     "不要输出命令块之后就当作已完成;结果会回传,等结果再下结论。")
@@ -558,7 +561,7 @@ def _build_system_prompt() -> str:
     from psyclaw.context import lean_core
     parts = [lean_core()]
     parts.append(
-        "\n# 强制澄清规则\n任何研究开工前必须完成澄清卡(17 槽位,/clarify)。"
+        "\n# 研究准备规则\n正式研究开始前必须完成研究准备清单(17 个研究准备项,/prepare)。"
         "用户提出研究想法时,你的第一动作是 grill-me 式逐项澄清(一次一个问题,"
         "带推荐答案),而不是直接给方案。设计决策必须给文献背书(/cite 查背书库)。")
     parts.append(_SAVE_SYSTEM)
@@ -569,8 +572,26 @@ def _build_system_prompt() -> str:
     return "\n".join(parts)
 
 
+def _goal_context(goal: str) -> str:
+    """把持久化目标变成每轮可见的有界上下文,避免用户只说『继续』时丢任务。"""
+    text = (goal or "").strip()
+    if not text:
+        return ""
+    if len(text) > _MAX_GOAL_CONTEXT_CHARS:
+        text = text[:_MAX_GOAL_CONTEXT_CHARS] + "\n...(目标过长,已截断)"
+    return "# 当前研究目标(notes/goal.md)\n" + text
+
+
+def _goal_execution_prompt(goal: str) -> str:
+    """`/goal <文本>` 写盘后发送给模型的顶层任务。"""
+    return (_goal_context(goal)
+            + "\n\n目标已由用户明确设定。请保留其中全部约束并立即开始执行;"
+              "信息确实不足时再提出最少量澄清,不要只复述目标或等待用户说『开始/继续』。")
+
+
 class ReplSession:
-    def __init__(self, resume_id: str | None = None) -> None:
+    def __init__(self, resume_id: str | None = None,
+                 approval: str | None = None) -> None:
         self.conf = cfg.load_config()
         self.provider = get_provider(self.conf)
         self.system = _build_system_prompt()
@@ -586,6 +607,8 @@ class ReplSession:
         # 可自定义:config 里 approval=yolo|default 或 yolo=true。
         self.yolo = (str(self.conf.get("approval", "")).lower() in ("yolo", "auto")
                      or bool(self.conf.get("yolo", False)))
+        if approval:
+            self.yolo = approval.lower() == "auto"  # suggest 是 ask 的兼容名
         # 自动跟进停机靠 no-progress 检测;深度只是高位安全兜底(可 config 调,合法任务碰不到)
         try:
             self.max_auto_depth = int(self.conf.get("max_auto_depth", _MAX_AUTO_DEPTH))
@@ -593,6 +616,7 @@ class ReplSession:
             self.max_auto_depth = _MAX_AUTO_DEPTH
         self._followup_prev_sig = None   # 上一轮命令/读取请求签名(no-progress 判重)
         self._followup_repeat = 0        # 连续重复次数
+        self._empty_reply_streak = 0     # 命令结果后 provider 空回复的有限自动恢复
         # 错误学习:本会话从命令失败蒸馏的环境教训(每轮注入,当场止损);跨会话见 memory 待确认卡
         self.session_lessons: list[dict] = []
         self._session_lesson_keys: set = set()
@@ -679,6 +703,7 @@ class ReplSession:
             # 新的顶层轮次:重置 no-progress 判重(上一轮的重复计数不跨用户消息累加)
             self._followup_prev_sig = None
             self._followup_repeat = 0
+            self._empty_reply_streak = 0
             # 路径自动检测:只对**用户输入**做——自动回传消息(读取结果/命令输出)里的
             # 碎片会被误当路径,打出「未找到文件 乱码」噪音(用户实测修复)。
             from psyclaw.path_ingest import process_message
@@ -695,6 +720,14 @@ class ReplSession:
                                                    provider=self.provider)
         # 动态系统提示:瘦核心 + 决策备忘 + 按需知识
         system = self.system
+        # `/goal` 是持久状态,不是只写盘的旁路。每轮都注入,让“继续”也能承接完整任务。
+        try:
+            from psyclaw.tasks import get_goal
+            goal_part = _goal_context(get_goal())
+            if goal_part:
+                system += "\n\n" + goal_part
+        except Exception:  # noqa: BLE001  # 目标读取失败不阻断对话
+            pass
         memo_part = render_memo(self.memo)
         if memo_part:
             system += "\n\n" + memo_part
@@ -717,7 +750,7 @@ class ReplSession:
         if self.plan_mode:
             from psyclaw.tasks import PLAN_MODE_SYSTEM
             system += "\n\n" + PLAN_MODE_SYSTEM
-        # 键盘选择器约定 + 文件读取权限(随 /safemode 动态切换)+ 直接跑命令
+        # 键盘选择器约定 + 文件读取权限(随 /access 动态切换)+ 直接跑命令
         system += "\n" + _CHOICES_SYSTEM
         system += "\n" + (_READ_SAFE_SYSTEM if self.file_access == "safe"
                           else _READ_OPEN_SYSTEM)
@@ -778,7 +811,7 @@ class ReplSession:
             result = run_audit(self.provider, text, reply)
             print(render_verdict(result))
         # 自动跟进:模型请求读文件(开放模式自动读)/ 给出选项(弹键盘选择器)→ 回传续聊
-        follow = self._auto_followup(reply)
+        follow = self._recover_empty_reply(reply, internal, self._auto_followup(reply))
         if follow:
             self._auto_depth += 1
             try:
@@ -809,7 +842,7 @@ class ReplSession:
         ans = _hitl_confirm_all(f"  确认{label}?")
         if ans == "all":
             self._auto_approve_labels.add(label)
-            print(ui.ok(f"    ✓ 本会话起「{label}」不再逐条确认(/yolo 一次全放行;重开会话复位)"))
+            print(ui.ok(f"    ✓ 本会话起「{label}」不再逐条确认(/approval auto 可统一放行)"))
             return True
         return ans == "yes"
 
@@ -940,6 +973,22 @@ class ReplSession:
             return True
         return False
 
+    def _recover_empty_reply(self, reply: str, internal: bool,
+                             follow: str | None) -> str | None:
+        """命令/读取回传后模型空回复时有限自愈,保留现有 follow 的优先级。"""
+        if reply.strip():
+            self._empty_reply_streak = 0
+            return follow
+        if not internal or follow is not None:
+            return follow
+        self._empty_reply_streak += 1
+        if self._empty_reply_streak <= _MAX_EMPTY_REPLY_RETRIES:
+            print(ui.warn(f"  (模型回复为空,自动恢复 "
+                          f"{self._empty_reply_streak}/{_MAX_EMPTY_REPLY_RETRIES})"))
+            return _EMPTY_REPLY_NUDGE
+        print(ui.warn("  (模型连续空回复,已停止自动恢复;上下文仍保留,可继续对话)"))
+        return None
+
     def _auto_followup(self, reply: str) -> str | None:
         """命令执行 / 读取请求 / 选项选择 → 需要自动回传给模型的消息(无则 None)。
 
@@ -969,8 +1018,8 @@ class ReplSession:
         # ① 命令块(psyclaw/shell):执行并回传输出——命令块吐了没人跑=死胡同(用户实测)
         if runs:
             if self.file_access == "safe":
-                print(ui.warn(f"  [安全模式] 模型给出 {len(runs)} 条命令,未自动执行;"
-                              "请手动复制运行,或 /safemode off 放开。"))
+                print(ui.warn(f"  [访问:safe] 模型给出 {len(runs)} 条命令,未自动执行;"
+                              "请手动复制运行,或 /access open 放开。"))
             else:
                 msg, notes = run_commands(runs, confirm=self._confirm_cmd)
                 for n in notes:
@@ -982,8 +1031,8 @@ class ReplSession:
 
         if reads:
             if self.file_access == "safe":
-                print(ui.warn(f"  [安全模式] 模型请求读取 {len(reads)} 个文件已被拒;"
-                              "用 @<路径> 显式引用,或 /safemode off 放开。"))
+                print(ui.warn(f"  [访问:safe] 模型请求读取 {len(reads)} 个文件已被拒;"
+                              "用 @<路径> 显式引用,或 /access open 放开。"))
             else:
                 msg, notes = gather_read_results(reads)
                 for n in notes:
@@ -1123,7 +1172,7 @@ class ReplSession:
         elif cmd == "/design":
             from psyclaw.psych.knowledge import print_design
             print_design(arg or None)
-        elif cmd == "/clarify":
+        elif cmd in ("/prepare", "/clarify"):
             from psyclaw.psych.clarify import print_clarify_status, run_clarify_interactive
             if arg == "status":
                 print_clarify_status()
@@ -1170,7 +1219,8 @@ class ReplSession:
             from psyclaw.tasks import get_goal, set_goal
             if arg:
                 set_goal(arg)
-                print(ui.ok("  ✓ 研究目标已写 notes/goal.md"))
+                print(ui.ok("  ✓ 研究目标已写 notes/goal.md,并发送给模型开始执行"))
+                self.ask(_goal_execution_prompt(arg))
             else:
                 g = get_goal()
                 print(f"  目标:{g}" if g else
@@ -1217,21 +1267,14 @@ class ReplSession:
             print(f"  [逐轮审计 {'开' if self.audit_mode else '关'}]"
                   + (" 每轮回答后 auditor 评分,SCORE<80 草拟教训卡;"
                      "注意每轮多一次 LLM 调用。" if self.audit_mode else ""))
-        elif cmd == "/safemode":
-            low = arg.lower()
-            if low in ("on", "safe"):
-                self.file_access = "safe"
-            elif low in ("off", "open"):
-                self.file_access = "open"
-            else:
-                self.file_access = "open" if self.file_access == "safe" else "safe"
-            if self.file_access == "safe":
-                print(ui.warn("  [安全模式 开] 一切文件读取须用 @<路径> 显式引用。"))
-            else:
-                print(ui.ok("  [开放模式] 模型可请求读取本地文件(```read 块自动读;"
-                            "data/raw 恒受保护)。"))
+        elif cmd == "/access":
+            self._cmd_access(arg, toggle=False)
+        elif cmd == "/safemode":             # 兼容别名;不再进入主帮助/联想
+            self._cmd_access(arg, toggle=True)
+        elif cmd == "/approval":
+            self._cmd_approval(arg, toggle=False)
         elif cmd == "/yolo":
-            self._cmd_yolo(arg)
+            self._cmd_approval(arg, toggle=True)  # 兼容别名
         elif cmd == "/agent":
             low = arg.lower()
             self.agent_mode = (low == "on") if low in ("on", "off") \
@@ -1266,7 +1309,12 @@ class ReplSession:
             pipeline_cli(arg.split() if arg else [])
         elif cmd == "/research-loop":
             from psyclaw.loop import run_loop
+            print(ui.dim("  [兼容别名] 通用任务请直接在 Chat 中说明"))
             run_loop(topic=arg or None)
+        elif cmd == "/run":
+            self._cmd_run_mode(arg)
+        elif cmd == "/auto":
+            self._cmd_auto_mode(arg)
         elif cmd == "/lit":
             from psyclaw.psych.lit_cli import lit_cli_argv
             lit_cli_argv(arg.split() if arg else [])
@@ -1351,20 +1399,108 @@ class ReplSession:
             snippet = h["user_text"][:60].replace("\n", " ")
             print(f"    [{h['session']}] {snippet}")
 
-    def _cmd_yolo(self, arg: str) -> None:
-        """/yolo [on|off]:切换审批模式。on=非危险副作用自动放行(不再问 y)。
-
-        停机与深度无关:自动跟进靠 no-progress 检测停(原地打转即停),深度只是高位兜底。
-        """
-        low = arg.lower()
-        self.yolo = (low == "on") if low in ("on", "off") else not self.yolo
+    def _cmd_approval(self, arg: str, *, toggle: bool = False) -> None:
+        """审批策略:ask|auto。旧 `/yolo` 用 toggle=True 保留原切换语义。"""
+        low = arg.strip().lower()
+        if low in ("auto", "on", "yolo"):
+            self.yolo = True
+        elif low in ("ask", "off", "default", "suggest"):
+            self.yolo = False
+        elif toggle:
+            self.yolo = not self.yolo
+        elif not low:
+            print(f"  approval:{'auto' if self.yolo else 'ask'}"
+                  "  (/approval ask|auto)")
+            return
+        else:
+            print(ui.warn("  用法:/approval ask|auto"))
+            return
         if self.yolo:
-            print(ui.err("  [YOLO 模式 开] 命令 / 文件覆盖 / 工具副作用自动放行——"
+            print(ui.err("  [审批:auto] 命令 / 文件覆盖 / 工具副作用自动放行——"
                          "只有命中红线的危险命令(rm -rf、push --force、DROP TABLE…)仍会问你。"))
             print(ui.dim("    多步分析一口气跑完(靠 no-progress 检测停,不再中途卡深度上限)。"
-                         "受保护的 data/raw 与密钥文件始终硬拒,YOLO 也绕不过。/yolo off 退出。"))
+                         "受保护的 data/raw 与密钥始终硬拒。/approval ask 恢复逐条确认。"))
         else:
-            print(ui.ok("  [YOLO 模式 关] 恢复:shell / 危险命令逐条人工确认。"))
+            print(ui.ok("  [审批:ask] shell / 覆盖 / 工具副作用逐条人工确认。"))
+
+    def _cmd_yolo(self, arg: str) -> None:
+        """旧内部调用兼容层;新界面使用 `/approval ask|auto`。"""
+        self._cmd_approval(arg, toggle=True)
+
+    def _cmd_access(self, arg: str, *, toggle: bool = False) -> None:
+        """文件访问策略:open|safe。旧 `/safemode` 保留切换语义。"""
+        low = arg.strip().lower()
+        if low in ("safe", "on"):
+            self.file_access = "safe"
+        elif low in ("open", "off"):
+            self.file_access = "open"
+        elif toggle:
+            self.file_access = "open" if self.file_access == "safe" else "safe"
+        elif not low:
+            print(f"  access:{self.file_access}  (/access open|safe)")
+            return
+        else:
+            print(ui.warn("  用法:/access open|safe"))
+            return
+        if self.file_access == "safe":
+            print(ui.warn("  [访问:safe] 一切文件读取须用 @<路径> 显式引用。"))
+        else:
+            print(ui.ok("  [访问:open] 模型可请求读取本地文件;data/raw 恒受保护。"))
+
+    def _record_mode_run(self, command: str, rc: int) -> None:
+        """把 slash 模式运行记进对话,使后续自然语言能承接发生过的操作。"""
+        self.messages.append({"role": "user", "content": f"[运行命令] {command}"})
+        self.messages.append({"role": "assistant", "content":
+                              f"[运行完成] 退出码 {rc};产物见 notes/ 与 outputs/。"})
+
+    def _cmd_run_mode(self, arg: str) -> None:
+        """/run <类型> <目标>:聊天内调用与 CLI 相同的共享模式路由。"""
+        import shlex
+        from psyclaw.modes import RUN_TYPES, run_mode
+        try:
+            toks = shlex.split(arg)
+        except ValueError as exc:
+            print(ui.warn(f"  参数解析失败:{exc}"))
+            return
+        if not toks:
+            print("  用法:/run <类型> <路径或主题>  类型:" + "|".join(RUN_TYPES))
+            return
+        kind, rest = toks[0], toks[1:]
+        confirm_each = "--confirm-each" in rest
+        exploratory = "--exploratory" in rest or "--skip-gates" in rest
+        resume = "--resume" in rest
+        flags = {"--confirm-each", "--exploratory", "--resume", "--yes", "--skip-gates"}
+        rest = [x for x in rest if x not in flags]
+        target = " ".join(rest).strip() or None
+        try:
+            rc = run_mode(kind, target, confirm_each=confirm_each,
+                          exploratory=exploratory, resume=resume)
+        except ValueError as exc:
+            print(ui.warn(f"  {exc}"))
+            return
+        self._record_mode_run(f"/run {arg}", rc)
+
+    def _cmd_auto_mode(self, arg: str) -> None:
+        """/auto:聊天内启动自主项目推进。"""
+        import shlex
+        from psyclaw.modes import run_auto
+        try:
+            toks = shlex.split(arg)
+        except ValueError as exc:
+            print(ui.warn(f"  参数解析失败:{exc}"))
+            return
+        confirm = "--confirm-each" in toks
+        exploratory = "--exploratory" in toks or "--skip-gates" in toks
+        max_iters = 6
+        if "--max-iters" in toks:
+            try:
+                max_iters = int(toks[toks.index("--max-iters") + 1])
+            except (ValueError, IndexError):
+                print(ui.warn("  --max-iters 需要整数"))
+                return
+        rc = run_auto(max_iters=max_iters, confirm_each=confirm,
+                      exploratory=exploratory)
+        self._record_mode_run(f"/auto {arg}".rstrip(), rc)
 
     # -- 导出对话(feat:导出当前对话 / 完整含隐藏上下文)---------------------
     def _standing_conventions(self) -> str:
@@ -1405,9 +1541,11 @@ class ReplSession:
             "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
         if full:
+            from psyclaw.tasks import get_goal
             text = transcript.render_full(
                 self.messages, system=self.system, memo=render_memo(self.memo),
-                conventions=self._standing_conventions(), meta=meta)
+                conventions=self._standing_conventions(), current_goal=get_goal(),
+                meta=meta)
         else:
             text = transcript.render_conversation(self.messages, meta=meta)
         target = rest[0] if rest else transcript.default_path(self.session_id, full)
@@ -1450,9 +1588,9 @@ class ReplSession:
             if self.session_name:
                 base += ui.dim(f"·{self.session_name[:12]}")
             modes = ("" if not self.plan_mode else ui.warn(" plan")) \
-                + ("" if not self.agent_mode else ui.accent(" agent")) \
-                + ("" if self.file_access != "safe" else ui.warn(" safe")) \
-                + ("" if not self.yolo else ui.err(" yolo"))
+                + ("" if not self.agent_mode else ui.accent(" advanced")) \
+                + ("" if self.file_access != "safe" else ui.warn(" access:safe")) \
+                + ("" if not self.yolo else ui.err(" approval:auto"))
             prompt = base + modes + ui.dim(" ❯ ")
             cmds = dict(COMMANDS)
             if self.plugins:
@@ -1477,39 +1615,33 @@ class ReplSession:
 
 
 HELP_TEXT = """\
-  对话        直接输入问题(流式回复,PSYCLAW 学术规范已注入)
+  三种工作方式
+  对话         直接输入问题;工具按需使用,关键操作按 approval 策略确认
+  /run TYPE X  执行明确流程:analysis|meta|literature|qualitative
+               默认连续执行;可加 --confirm-each / --exploratory / --resume
+  /auto         据项目状态持续推进(--confirm-each 可逐任务确认)
+
+  当前任务
   @<file>     在消息中引用文件内容(如:帮我看看 @data.csv 的结构)
-  /plan [g]   规划模式(只规划不执行;带文本=设目标并开启;off 退出)
-  /goal [g]   查看/设定研究目标(notes/goal.md)
+  /goal [g]   查看目标;带文本时写 notes/goal.md 并立即发送模型执行
+  /prepare    完成研究准备清单       /clarify 是兼容别名
   /tasks      任务看板(list|add|start|done|block|sync;计划自动抽取)
   /recall [q] 历史上下文召回(全量存库+关键词索引,相关度≥80%才注入)
-  /audit      逐轮审计开关(auditor 评分;on/off/log)
-  /agent      agent 模式(模型自主多步调工具:search/read_file/save_file/kg_query/recall)
-  /safemode   文件读取权限(safe=一切读取须 @ 引用;默认 open=模型可请求自动读取)
-  /yolo [on|off] 审批模式(on=命令/覆盖/工具副作用自动放行,仅危险命令仍问)
+
+  安全策略
+  /approval ask|auto  ask=副作用逐条确认;auto=自动放行非危险操作
+  /access open|safe   open=模型可请求读文件;safe=只能用 @ 显式引用
+
+  会话与输出
   /model [m]  查看/切换模型      /provider [p]  查看/切换 provider
-  /skills     列出 skills        /mcp           MCP 目录与启用状态
-  /gates      门禁自检           /cost          本会话成本粗估
-  /scale [s]  量表库查询(如 /scale dass-42)
-  /assume [t] 前提假设知识库(如 /assume anova-rm)
-  /method [m] 复杂方法目录(如 /method clpm)
-  /design [d] 实验设计目录(如 /design esm-diary)
-  /clarify    研究澄清(grill-me 式;不澄清完 /research 不放行)
-  /preregister 预注册模板(OSF/AsPredicted;据澄清卡抽取)
-  /cite [t]   方法学背书库(每个设计决策的文献支撑)
-  /export f   APA7 输出(Word + Markdown,确定性模板)
-  /review f   审稿模拟(EIC+3审稿人+DA;--revise 闭合写作→评审→修复)
-  /memory     三层记忆(画像/决策惯性/教训卡);/memory verify 再验证环境教训、已恢复的自动失效
   /sessions   历史会话列表       /resume <id>   续接历史会话
   /rename <名> 命名当前会话       /search <词>   跨会话全文检索
   /dump [--full] [路径]  导出当前对话为 Markdown(--full 含 system/备忘等隐藏上下文)
-  /img <路径>  终端内联渲染图片(iTerm2/WezTerm/VSCode/Warp/kitty;命令出图会自动显示)
-  /clear      清空上下文         /compact       压缩上下文
-  /config     配置向导           /exit          退出
-  /research [t]    一句话研究编排:文献→设计→写作→评审→总验收(--revise 闭环)
-  /research-loop   通用 HITL 回路(planner→executor→critic→修复→交付)
-  /lit [q] [-s]    文献检索(合法 OA;-s 据真实命中一键合成结构化综述)"""
+  /clear      清空上下文           /compact       压缩上下文
+  /exit       退出
+
+  其他能力仍可直接调用;输入 / 后看联想。旧 /agent /research-loop /yolo /safemode 保持兼容。"""
 
 
-def run_repl(resume_id: str | None = None) -> int:
-    return ReplSession(resume_id=resume_id).run()
+def run_repl(resume_id: str | None = None, approval: str | None = None) -> int:
+    return ReplSession(resume_id=resume_id, approval=approval).run()

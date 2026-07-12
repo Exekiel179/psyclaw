@@ -17,7 +17,7 @@ import subprocess
 import sys
 
 # 功能组 → (说明, [pip 包名(import 名)])
-# stats 组为**核心默认**:pingouin 一次给出统计量+效应量+CI+功效+BF,满足 PSYCLAW 门禁。
+# stats 组为**核心默认**:pingouin 一次给出统计量+效应量+CI+功效+BF,满足 PSYCLAW 质量检查。
 DEP_GROUPS: dict = {
     "stats": ("【核心·默认装】统计主路径:pingouin(心理学一次出全)+ scipy/statsmodels",
               [("pingouin", "pingouin"), ("pandas", "pandas"), ("numpy", "numpy"),

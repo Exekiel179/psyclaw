@@ -6,14 +6,14 @@
    领域/语言/软件栈/统计立场。注入每次对话的 system 提示。
 
 2. 决策惯性(habits)— 隐式、自动学习、带半衰期
-   每次澄清卡/分析选择都计数:{"two_groups_test": {"welch": 5, "classic": 0}}。
+   每次研究准备/分析选择都计数:{"two_groups_test": {"welch": 5, "classic": 0}}。
    下次同类决策出现时,惯性作为**预填默认**呈现(置信度 = n/(n+2)),
    但永远显示来源、永远可推翻 — 惯性是省力,不是枷锁。
    90 天半衰期衰减:很久不用的偏好自动降权,避免过时立场固化。
 
 3. 教训卡(lessons)— 半自动、HITL 确认
    critic 的 blocking issue 和用户的纠正先进"待确认区",
-   用户 /memory confirm 后才生效 — 记忆的写入也过人工门禁。
+   用户 /memory confirm 后才生效 — 记忆写入也需要人工确认。
    每张卡:{触发情境, 教训, 来源, 强度}。被再次印证则强度+1,被推翻则归档。
 
 隐私红线:只存方法学偏好,绝不存数据值/被试信息。
@@ -223,7 +223,7 @@ def memory_cli(argv: list) -> int:
                 if s:
                     print(f"    {topic}: {s['choice']}(置信 {s['confidence']:.0%},累计 {s['raw_count']} 次)")
         else:
-            print("    (空。澄清卡与分析选择会自动累积)")
+            print("    (空。研究准备与分析选择会自动累积)")
         print("  ── 教训卡 ──")
         for i, c in enumerate(data.get("pending", [])):
             hits = int(c.get("hits", 1))

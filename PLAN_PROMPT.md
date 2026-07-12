@@ -7,7 +7,7 @@
 
 PsyClaw 是心理学研究全流程 Agent CLI，纯 Python、**stdlib 零依赖优先**。
 架构见 `DESIGN.md`，心理学优化见 `docs/PSYCH_OPTIMIZATIONS.md`，**计划真源是 `TODO.md`**。
-四象限（文献·设计·统计·写作）主干已打通，门禁已 20 项；编码由 Sonnet 在 `nostop.ps1` 里推进。
+四象限（文献·设计·统计·写作）主干已打通，质量检查已 20 项；编码由 Sonnet 在 `nostop.ps1` 里推进。
 
 ## 本轮要做的事
 

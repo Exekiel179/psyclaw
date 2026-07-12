@@ -1,4 +1,4 @@
-"""复现溯源包测试 — 环境采集 / 构造 / 落盘 / data-raw 边界 / 门禁对接。"""
+"""复现溯源包测试 — 环境采集 / 构造 / 落盘 / data-raw 边界 / 质量检查对接。"""
 
 from __future__ import annotations
 
@@ -121,7 +121,7 @@ def test_write_provenance_creates_sidecars(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 门禁对接:REPRO.provenance (trigger provenance_check, kind "provenance")
+# 质量检查对接:REPRO.provenance (trigger provenance_check, kind "provenance")
 # ---------------------------------------------------------------------------
 
 def test_gate_blocks_incomplete_provenance(tmp_path):
@@ -216,7 +216,7 @@ class TestReplicationGate:
         res = check_artifact(str(sc), "provenance")
         assert res["passed"] is True
     def test_end_to_end_required_journal(self, tmp_path):
-        """write_provenance(required 期刊+数据) → 真 sidecar 过全部 provenance 门禁。"""
+        """write_provenance(required 期刊+数据) → 真 sidecar 通过全部 provenance 质量检查。"""
         from psyclaw.gates.checker import check_artifact
         art, data = _script_and_data(tmp_path)
         prov = P.write_provenance(str(art), project_dir=str(tmp_path),

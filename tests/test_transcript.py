@@ -40,11 +40,13 @@ def test_conversation_empty():
 def test_full_includes_system_memo_and_conventions():
     out = render_full(MSGS, system="你是心理学研究编排助手",
                       memo="决策:采用被试内设计",
-                      conventions="# 键盘选择器约定…")
+                      conventions="# 键盘选择器约定…",
+                      current_goal="比较三组压力")
     assert "隐藏上下文" in out
     assert "你是心理学研究编排助手" in out
     assert "决策:采用被试内设计" in out
     assert "键盘选择器约定" in out
+    assert "当前研究目标" in out and "比较三组压力" in out
     # 对话本体仍在
     assert "帮我设计一个实验" in out
 
@@ -108,7 +110,10 @@ def test_cmd_dump_conversation(tmp_path):
     assert "隐藏上下文" not in text          # 非 --full 不含隐藏上下文
 
 
-def test_cmd_dump_full_includes_system(tmp_path):
+def test_cmd_dump_full_includes_system_and_current_goal(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from psyclaw.tasks import set_goal
+    set_goal("分析三组干预效果")
     s = _make_session()
     out = tmp_path / "chat.full.md"
     s._cmd_dump(f"--full {out}")
@@ -116,6 +121,7 @@ def test_cmd_dump_full_includes_system(tmp_path):
     assert "隐藏上下文" in text
     assert "你是心理学研究编排助手" in text   # system 提示摊开
     assert "键盘选择器" in text              # 每轮约定片段(_CHOICES_SYSTEM)
+    assert "当前研究目标" in text and "分析三组干预效果" in text
 
 
 def test_cmd_dump_refuses_protected_raw(tmp_path, capsys):

@@ -2,14 +2,14 @@
 
 定位:`loop` 是「一个任务」的通用 HITL 编排器,`<type>-loop` 是「一类研究」的预置流程;
 **`auto-loop` 是其上的自驱动元回路**——自己发现要做什么、派发给对应流程、独立验收、
-记状态、决定下一步,直到无事可做 / 被门禁挡住 / 到达迭代上限。
+记状态、决定下一步,直到无事可做 / 前置检查未通过 / 到达迭代上限。
 
 每一轮(iteration)严格走五步,正是「自循环系统」的五个职责:
   ① 感知/发现需求(sense)   discover_backlog —— 从仓库状态重新推导待办(模型会忘,仓库不会)
   ② 派发任务(dispatch)      select_next + _dispatch —— 路由到对应 workflow(实现 sub-agent)
   ③ 检查成果(verify)        verify_result —— 读落盘的总验收 + 产物,**独立于执行**(验收 sub-agent)
   ④ 记录状态(record)        record_iteration + save_state —— 写 notes/autoloop_state.json(外部记忆)
-  ⑤ 决定下一步(decide)       decide —— 停止条件:backlog 空 / 门禁 blocker / 迭代上限 / 已跳过
+  ⑤ 决定下一步(decide)       decide —— 停止条件:backlog 空 / 前置检查 blocker / 迭代上限 / 已跳过
 
 设计纪律:
 - **状态在仓库,不在模型**:每轮都 discover_backlog(重新从磁盘推导),不依赖上一轮的记忆;
@@ -143,7 +143,7 @@ def discover_backlog(project_dir: str = ".",
 
     返回 backlog(list[dict]),每项:{id, action, title, priority, reason, seed, blocker}。
     收敛规则:① done_actions(loop 已完成/已跳过)里的行动剔除;② 标志产物已在磁盘 → 视为已做剔除。
-    澄清门禁:若有任何研究流程可做但澄清卡未完 → 短路返回单个 clarify **blocker**
+    澄清前置检查:若有任何研究流程可做但研究准备清单未完成 → 短路返回单个 clarify **blocker**
     (不澄清完不开工,所有流程都被它拦着)。无任何可发现的研究输入 → 返回 []。
     """
     project = Path(project_dir)
@@ -158,21 +158,21 @@ def discover_backlog(project_dir: str = ".",
     cand: list[dict] = []
     if goal:
         cand.append({"id": "lit", "action": "lit-loop", "priority": 1,
-                     "title": "文献综述(lit-loop)",
+                     "title": "文献综述(run literature)",
                      "reason": "已设研究目标但尚无 notes/lit_review.md", "seed": None})
     if effects:
         cand.append({"id": "meta", "action": "meta-loop", "priority": 2,
-                     "title": f"元分析(meta-loop · {Path(effects[0]).name})",
+                     "title": f"元分析(run meta · {Path(effects[0]).name})",
                      "reason": f"发现效应量表 {Path(effects[0]).name}",
                      "seed": {"effects_csv": effects[0]}})
     if datas:
         cand.append({"id": "analysis", "action": "analysis-loop", "priority": 2,
-                     "title": f"实证分析(analysis-loop · {Path(datas[0]).name})",
+                     "title": f"实证分析(run analysis · {Path(datas[0]).name})",
                      "reason": f"发现数据表 {Path(datas[0]).name}",
                      "seed": {"data_csv": datas[0]}})
     if transcripts:
         cand.append({"id": "qual", "action": "qual-loop", "priority": 2,
-                     "title": f"质性研究(qual-loop · {transcripts.name}/)",
+                     "title": f"质性研究(run qualitative · {transcripts.name}/)",
                      "reason": f"发现转录稿目录 {transcripts.name}/",
                      "seed": {"transcripts": str(transcripts)}})
 
@@ -185,14 +185,14 @@ def discover_backlog(project_dir: str = ".",
     if not backlog:
         return []
 
-    # 澄清门禁:有事可做却没澄清完 → 全被 clarify blocker 拦着
+    # 澄清前置检查:有事可做却没完成研究准备 → 返回 clarify blocker
     # (skip_clarify=用户显式要求跳过 → 不出 blocker;跳过留痕在派发的 workflow 层做)
     if not skip_clarify and _clarify_incomplete(project):
         card = _clarify_card(project)
         return [{
             "id": "clarify", "action": "clarify", "priority": 0, "seed": None,
-            "blocker": True, "title": "完成研究澄清(clarify)",
-            "reason": (f"澄清卡 {card['resolved']}/{card['total']},"
+            "blocker": True, "title": "完成研究准备(prepare)",
+            "reason": (f"研究准备项 {card['resolved']}/{card['total']},"
                        f"未解决 {len(card['unresolved'])} 项 —— 不澄清完不开工"),
         }]
 
@@ -206,7 +206,7 @@ def _clarify_card(project: Path) -> dict:
     from psyclaw.psych.clarify import check_card
     try:
         return check_card(str(project))
-    except Exception:  # noqa: BLE001  硬门禁 fail-closed:澄清卡损坏/不可读 → 当作未完成,宁可拦也不放行
+    except Exception:  # noqa: BLE001  强制检查 fail-closed:研究准备清单损坏/不可读 → 当作未完成
         return {"unresolved": ["<card-unreadable>"], "resolved": 0, "total": 0}
 
 
@@ -272,7 +272,7 @@ def decide(state: dict, backlog: list[dict], max_iters: int) -> tuple[str, str]:
         return "stop", "backlog 已空——所有可发现的研究阶段都已完成或跳过"
     top = backlog[0]
     if top.get("blocker"):
-        return "stop", f"被门禁拦截:{top['reason']}"
+        return "stop", f"前置检查未通过:{top['reason']}"
     return "continue", top["title"]
 
 
@@ -286,7 +286,8 @@ def state_path(project_dir: str = ".") -> Path:
 
 def _fresh_state() -> dict:
     return {"iteration": 0, "started": _now(), "updated": _now(),
-            "completed_actions": [], "skipped": [], "history": []}
+            "completed_actions": [], "skipped": [], "needs_attention": [],
+            "history": []}
 
 
 def load_state(project_dir: str = ".") -> dict:
@@ -296,6 +297,10 @@ def load_state(project_dir: str = ".") -> dict:
             st = json.loads(p.read_text(encoding="utf-8"))
             for k, v in _fresh_state().items():
                 st.setdefault(k, v)
+            # 旧版本把验收失败永久记为 skipped;迁移为可在下次运行重试的 needs_attention。
+            if st.get("skipped") and not st.get("needs_attention"):
+                st["needs_attention"] = list(st["skipped"])
+                st["skipped"] = []
             return st
         except (json.JSONDecodeError, OSError):
             pass
@@ -311,15 +316,20 @@ def save_state(state: dict, project_dir: str = ".") -> Path:
 
 
 def record_iteration(state: dict, item: dict, verdict: dict) -> dict:
-    """把一轮结果写进状态:history 追加,passed→completed_actions,否则→skipped。"""
+    """把一轮结果写进状态:通过即完成;失败进入 needs_attention,下次运行可重试。"""
     status = "done" if verdict["passed"] else "failed"
     state["history"].append({
         "iter": state.get("iteration", 0) + 1, "action": item["action"],
         "title": item["title"], "status": status, "verdict": verdict, "ts": _now(),
     })
-    bucket = "completed_actions" if verdict["passed"] else "skipped"
-    if item["action"] not in state[bucket]:
-        state[bucket].append(item["action"])
+    action = item["action"]
+    if verdict["passed"]:
+        if action not in state["completed_actions"]:
+            state["completed_actions"].append(action)
+        state["needs_attention"] = [a for a in state.get("needs_attention", [])
+                                    if a != action]
+    elif action not in state["needs_attention"]:
+        state["needs_attention"].append(action)
     state["iteration"] = state.get("iteration", 0) + 1
     return state
 
@@ -342,7 +352,7 @@ def _derive_topic(item: dict) -> str | None:
 
 def _dispatch(item: dict, project_dir: str, skip_gates: bool = False) -> int:
     """把任务派发给对应 workflow。被派发的流程内部恒 auto=True 跑到底
-    (任务级批准在 auto-loop 层已做;澄清等硬门禁仍在 workflow 内生效,不被绕过)。
+    (任务级批准在 auto-loop 层已做;澄清等强制检查仍在 workflow 内生效,不被绕过)。
 
     主题:已有 goal.md 优先;否则据输入文件名派生(数据驱动流程不因缺目标而硬停)。
     派生标签**不固化**成研究目标:引擎会据 topic 写 goal.md,但若本来没有人工目标,
@@ -376,17 +386,17 @@ def _dispatch(item: dict, project_dir: str, skip_gates: bool = False) -> int:
 # ---------------------------------------------------------------------------
 
 def _write_decision_request(project: Path, item: dict) -> None:
-    body = ("# 决策请求 — auto-loop 被门禁拦截\n\n"
-            f"- 时间:{_now()}\n- 拦截项:{item['title']}\n- 原因:{item['reason']}\n\n"
-            "auto-loop 不能替你跨过这道门禁。请人工处理后重跑 `psyclaw auto-loop`:\n"
-            "- 澄清未完 → 先 `psyclaw clarify`(把 17 槽位补全)。\n")
+    body = ("# 决策请求 — auto 因前置检查未通过而暂停\n\n"
+            f"- 时间:{_now()}\n- 待处理项:{item['title']}\n- 原因:{item['reason']}\n\n"
+            "auto 不能替你填写缺失的研究信息。请处理后重跑 `psyclaw auto`:\n"
+            "- 研究准备未完成 → 先运行 `psyclaw prepare`，补全 17 个研究准备项。\n")
     (project / "notes" / "decision_request.md").write_text(body, encoding="utf-8")
 
 
 def _write_blocked(project: Path, item: dict, verdict: dict) -> None:
     p = project / "notes" / "blocked.md"
     p.parent.mkdir(parents=True, exist_ok=True)
-    entry = (f"\n## {_now()} — {item['title']} 验收未过(已跳过,换下一个任务)\n"
+    entry = (f"\n## {_now()} — {item['title']} 验收未过(需要处理;本轮继续其他任务)\n"
              f"- 行动:{item['action']}\n"
              f"- 原因:{'; '.join(verdict.get('reasons') or ['未知']) }\n")
     with p.open("a", encoding="utf-8") as f:
@@ -413,7 +423,9 @@ def _print_sense(backlog: list[dict], state: dict, project_dir: str = ".") -> No
     from psyclaw import ui
     done = state.get("completed_actions", [])
     skip = state.get("skipped", [])
-    line = f"已完成 {len(done)} · 已跳过 {len(skip)} · 迭代 {state.get('iteration', 0)}"
+    attention = state.get("needs_attention", [])
+    line = (f"已完成 {len(done)} · 需要处理 {len(attention)} · "
+            f"已跳过 {len(skip)} · 迭代 {state.get('iteration', 0)}")
     if not backlog:
         print(ui.dim(f"  ① 感知:无待办({line})"))
         return
@@ -440,8 +452,8 @@ def run_autoloop(project_dir: str = ".", max_iters: int = 6,
     """跑自主科研回路。
 
     非 auto:每轮在**任务级**征求确认(派发哪条流程),确认后该流程跑到底;
-    auto:全程无人值守。返回 0=正常收敛/到上限;1=被门禁硬停(需人工)。
-    skip_gates:用户显式要求跳过门禁(澄清 blocker 不再拦;派发的 workflow 跳过时留痕
+    auto:全程无人值守。返回 0=正常收敛/到上限;1=因强制检查暂停(需人工)。
+    skip_gates:用户显式要求跳过前置检查(澄清 blocker 不再暂停;派发的 workflow 跳过时留痕
     notes/gate_skips.md,产出按探索性对待)。默认 False,fail-closed 行为不变。
     """
     from psyclaw import ui
@@ -452,28 +464,32 @@ def run_autoloop(project_dir: str = ".", max_iters: int = 6,
         (project / sub).mkdir(parents=True, exist_ok=True)
 
     print(ui.panel(
-        "Auto-Loop — 自主科研回路(Ralph 式)",
+        "Auto — 自主科研回路(Ralph 式)",
         "每轮:① 感知发现 → ② 派发流程 → ③ 独立验收 → ④ 记状态 → ⑤ 决定下一步\n"
         f"迭代上限 {max_iters} · 模式 {'自动(无人值守)' if auto else 'HITL(任务级确认)'}"))
     state = load_state(project_dir)
+    attempted_this_run: set[str] = set()
+    run_iterations = 0
     _log(project, f"auto-loop start · max_iters={max_iters} · auto={auto}")
 
     rc = 0
     while True:
-        done_actions = frozenset(state["completed_actions"]) | frozenset(state["skipped"])
+        done_actions = (frozenset(state["completed_actions"])
+                        | frozenset(state["skipped"])
+                        | frozenset(attempted_this_run))
         backlog = discover_backlog(project_dir, done_actions, skip_clarify=skip_gates)
         print()
         _print_sense(backlog, state, project_dir)
 
-        decision, reason = decide(state, backlog, max_iters)
+        decision, reason = decide({"iteration": run_iterations}, backlog, max_iters)
         if decision == "stop":
             # 仅当确实「因 blocker 而停」(未先撞迭代上限)才写决策请求 + rc=1;
             # decide 优先判 max_iters,故撞上限时即便 backlog 顶是 blocker 也按普通停止收尾。
             if (backlog and backlog[0].get("blocker")
-                    and state.get("iteration", 0) < max_iters):
+                    and run_iterations < max_iters):
                 _write_decision_request(project, backlog[0])
                 print(ui.err(f"  ⑤ 停止:{reason}"))
-                print(ui.dim("     已写 notes/decision_request.md;处理后重跑 psyclaw auto-loop。"))
+                print(ui.dim("     已写 notes/decision_request.md;处理后重跑 psyclaw auto。"))
                 _log(project, f"auto-loop blocked: {reason}")
                 rc = 1
             else:
@@ -484,7 +500,7 @@ def run_autoloop(project_dir: str = ".", max_iters: int = 6,
         item = select_next(backlog)
         print(ui.accent(f"  ② 派发 — {item['title']}"))
         if not auto and not _ask_yn(f"派发「{item['title']}」并跑到底?"):
-            print(ui.dim("  已在派发前暂停。状态已保存,下次 psyclaw auto-loop 从此处续。"))
+            print(ui.dim("  已在派发前暂停。状态已保存,下次 psyclaw auto 从此处续。"))
             break
 
         _log(project, f"auto-loop dispatch · {item['action']} · {item['title']}")
@@ -503,9 +519,12 @@ def run_autoloop(project_dir: str = ".", max_iters: int = 6,
             _write_blocked(project, item, verdict)
 
         record_iteration(state, item, verdict)
+        attempted_this_run.add(item["action"])
+        run_iterations += 1
         save_state(state, project_dir)
         print(ui.dim(f"  ④ 记状态 → {state_path(project_dir)}"
-                     f"(完成 {len(state['completed_actions'])} · 跳过 {len(state['skipped'])})"))
+                     f"(完成 {len(state['completed_actions'])} · "
+                     f"需要处理 {len(state['needs_attention'])})"))
 
     _print_final(state, project)
     return rc
@@ -516,7 +535,11 @@ def _print_final(state: dict, project: Path) -> None:
     print("\n" + ui.accent("Auto-Loop 收尾"))
     done = state.get("completed_actions", [])
     skip = state.get("skipped", [])
+    attention = state.get("needs_attention", [])
     print(f"  完成 {len(done)}:{', '.join(done) or '—'}")
+    if attention:
+        print(ui.warn(f"  需要处理 {len(attention)}:{', '.join(attention)}"
+                      "(修正后再次运行 psyclaw auto 会重试)"))
     if skip:
         print(ui.warn(f"  跳过 {len(skip)}:{', '.join(skip)}(详见 notes/blocked.md)"))
     print(ui.dim(f"  状态真源:{state_path(str(project))}  ·  迭代 {state.get('iteration', 0)}"))

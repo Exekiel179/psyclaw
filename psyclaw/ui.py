@@ -199,8 +199,8 @@ def _startup_status_lines(status: dict | None, provider: str | None = None) -> l
         else:
             clarify = warn(f"{c.get('resolved', 0)}/{c.get('total', 0)} resolved")
     else:
-        clarify = dim("not started · psyclaw clarify")
-    lines.append(kv("Clarify", clarify))
+        clarify = dim("not started · psyclaw prepare")
+    lines.append(kv("Preparation", clarify))
 
     nxt = status.get("next")
     if nxt:
@@ -217,7 +217,7 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     inner = w - 4
     brand = paint(">_", "brgreen", "bold") + " " \
         + paint("PsyClaw", "bold", "brcyan") + dim(f" v{version}")
-    mode = paint("research agent", "bold", "white") + dim("  psychology workflow harness")
+    mode = paint("chat · run · auto", "bold", "white") + dim("  psychology workflow harness")
     status_lines = _startup_status_lines(status, provider)
     title = "─ " + brand + " "
 
@@ -233,10 +233,10 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     lines.append(paint("├" + "─" * max(0, w - 2) + "┤", "brcyan"))
 
     launch = [
-        _button("/status", "state", "brcyan"),
-        _button("/auto-loop", "next", "brmagenta"),
-        _button("/clarify", "slots", "bryellow"),
-        _button("/commands", "map", "brgreen"),
+        _button("/goal", "current", "brcyan"),
+        _button("/run", "workflow", "brmagenta"),
+        _button("/auto", "next", "bryellow"),
+        _button("/help", "map", "brgreen"),
     ]
     lines.append(_agent_row("try", "   ".join(launch[:2]), w))
     lines.append(_agent_row("", "   ".join(launch[2:]), w))

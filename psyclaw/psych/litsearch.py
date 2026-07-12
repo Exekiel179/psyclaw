@@ -8,7 +8,7 @@
   已购 PDF(见 zotero_client)。
 - 所有请求带 User-Agent + mailto(OpenAlex/Crossref 礼貌池要求)。
 
-PRISMA:检索→去重→筛选的计数贯穿,对接 LIT.prisma 门禁。
+PRISMA:检索→去重→筛选的计数贯穿,对接 LIT.prisma 质量检查。
 """
 
 from __future__ import annotations

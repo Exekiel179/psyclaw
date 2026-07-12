@@ -1,11 +1,11 @@
-"""研究澄清协议(grill-me 式)— 强制澄清门禁的实现。
+"""研究澄清协议(grill-me 式)— 正式研究前置检查的实现。
 
 原则:**不澄清完,不开工**。
-- 17 个槽位覆盖:研究问题/变量/抽样/设计/假设与分析/伦理与开放科学
+- 17 个研究准备项覆盖:研究问题/变量/抽样/设计/假设与分析/伦理与开放科学
 - 交互模式逐题问询(一次一题,带"为什么重要"和推荐默认),REPL 中由 LLM 自然追问
-- 产出 notes/clarification.md(澄清卡):机器可校验,任何槽位 unresolved
-  → 门禁 CLARIFY.complete 不放行,/research 拒绝启动
-- 完成的澄清卡同时喂给记忆系统(决策惯性学习)
+- 产出 notes/clarification.md(研究准备清单):机器可校验,任何研究准备项 unresolved
+  → 前置检查 CLARIFY.complete 未通过,/research 暂不启动
+- 完成的研究准备清单同时喂给记忆系统(决策惯性学习)
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ SLOTS: list = [
      "凭感觉猜'中等效应'是功效分析失败的头号原因;文献效应量还普遍被发表偏倚高估",
      "心理学现实先验:r≈.20/d≈.40(Richard et al., 2003);引用 psyclaw cite power_priors"),
     ("power", "E.假设与分析", "功效分析结果:多大 N?按哪个效应算的(交互要按交互算)?",
-     "样本量没有先验依据→DESIGN.power 门禁不放行",
+     "样本量没有先验依据→DESIGN.power 质量检查未通过",
      "写明:检验类型/α/功效/效应量/所得N/流失余量"),
     ("analysis_plan", "E.假设与分析", "每条假设对应什么检验?前提假设违反时的预案是什么?",
      "分析计划先于数据=确证;数据到手再选=探索",
@@ -74,7 +74,7 @@ CARD_NAME = "clarification.md"
 
 # ---------------------------------------------------------------------------
 # CLAR-1：LLM 驱动追问 —— 对空泛回答评估并生成针对性追问
-#   评估标准取自各槽位的 `why`（重要性）。无 provider / mock / 异常 → fail-safe
+#   评估标准取自各研究准备项的 `why`（重要性）。无 provider / mock / 异常 → fail-safe
 #   降级为「照单收集」（视为 PASS，绝不卡住用户）。
 # ---------------------------------------------------------------------------
 
@@ -102,7 +102,7 @@ def _build_eval_prompt(slot, answer: str) -> str:
 
 
 def _ask_provider(provider, task: str) -> str:
-    """调 provider 取整段文本；任何异常 fail-safe 视为放行（PASS）。"""
+    """调 provider 取整段文本；任何异常 fail-safe 视为通过（PASS）。"""
     sysmsg = "你是严格的研究方法学审稿人，只按要求的标记行输出。"
     try:
         return "".join(provider.chat([{"role": "user", "content": task}], system=sysmsg))
@@ -132,7 +132,7 @@ def evaluate_answer(provider, slot, answer: str) -> dict:
 
 def clarify_one(provider, slot, ask, max_probes: int = 2,
                 out=print, probing: bool = True) -> dict:
-    """澄清单个槽位（含 `?` 看缘由 / `skip` 跳过 / LLM 追问环）。
+    """澄清单个研究准备项（含 `?` 看缘由 / `skip` 跳过 / LLM 追问环）。
 
     ask(prompt)->str 为输入回调（便于测试/非 TTY 注入）。
     返回 {answer, rounds, resolved}。probing=False 时退化为一问一答（不追问）。
@@ -208,15 +208,15 @@ def run_clarify_interactive(project_dir: str | Path = ".", provider=None,
 
     path = write_card(answers, project_dir)
     unresolved = [sid for sid, *_ in SLOTS if not answers.get(sid)]
-    print(f"\n澄清卡已写入 {path}")
+    print(f"\n研究准备清单已写入 {path}")
     probed = sum(1 for v in probe_rounds.values() if v)
     if probing and probed:
-        print(f"  （LLM 追问触发 {probed} 个槽位以提高可检验性）")
+        print(f"  （LLM 对 {probed} 个研究准备项进行了追问，以提高可检验性）")
     if unresolved:
-        print(f"⚠ 未解决槽位 {len(unresolved)} 个：{', '.join(unresolved)}")
-        print("  门禁 CLARIFY.complete 不会放行 /research。继续澄清：psyclaw clarify")
+        print(f"⚠ 未完成的研究准备项有 {len(unresolved)} 个：{', '.join(unresolved)}")
+        print("  前置检查 CLARIFY.complete 未通过，正式研究流程暂不启动。继续填写：psyclaw prepare")
         return 1
-    print("✓ 全部澄清完毕，CLARIFY.complete 放行，可以开工。")
+    print("✓ 全部研究准备项已完成，可以开始正式研究流程。")
     return 0
 
 
@@ -225,23 +225,23 @@ def write_card(answers: dict, project_dir: str | Path = ".") -> Path:
     notes.mkdir(parents=True, exist_ok=True)
     path = notes / CARD_NAME
     lines = [
-        "# 研究澄清卡(Clarification Card)",
+        "# 研究准备清单(Research Preparation Checklist)",
         f"date: {date.today().isoformat()}",
         "",
-        "| 槽位 | 状态 | 内容 |",
+        "| 研究准备项 | 状态 | 内容 |",
         "|------|------|------|",
     ]
     for sid, group, q, _why, _hint in SLOTS:
         val = (answers.get(sid) or "").replace("|", "\\|").replace("\n", " ")
         status = "resolved" if val else "UNRESOLVED"
         lines.append(f"| {sid} | {status} | {val} |")
-    lines += ["", "> 规则:任何 UNRESOLVED 槽位存在时,门禁 CLARIFY.complete 阻断 /research。"]
+    lines += ["", "> 规则:存在 UNRESOLVED 研究准备项时，前置检查 CLARIFY.complete 未通过，/research 暂不启动。"]
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
 
 
 def check_card(project_dir: str | Path = ".") -> dict:
-    """供门禁调用:返回 {exists, total, resolved, unresolved:[...]}"""
+    """供前置检查调用:返回 {exists, total, resolved, unresolved:[...]}"""
     path = Path(project_dir) / "notes" / CARD_NAME
     if not path.exists():
         return {"exists": False, "total": len(SLOTS), "resolved": 0,
@@ -261,12 +261,12 @@ def check_card(project_dir: str | Path = ".") -> dict:
 def print_clarify_status(project_dir: str | Path = ".") -> int:
     r = check_card(project_dir)
     if not r["exists"]:
-        print("  尚无澄清卡。运行 psyclaw clarify 开始(notes/clarification.md)。")
+        print("  尚无研究准备清单。运行 psyclaw prepare 开始(notes/clarification.md)。")
         return 1
     print(f"  澄清进度:{r['resolved']}/{r['total']}")
     if r["unresolved"]:
         print(f"  未解决:{', '.join(r['unresolved'])}")
         print("  → CLARIFY.complete 阻断中")
         return 1
-    print("  ✓ 全部澄清,CLARIFY.complete 放行")
+    print("  ✓ 全部研究准备项已完成")
     return 0

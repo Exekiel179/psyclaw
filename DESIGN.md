@@ -10,7 +10,7 @@
 > 架构层次、HITL 回路、Gates、图表规范、项目布局等**非统计**设计仍大体有效。
 > **当前真源**：状态 = `feature_list.json`；人读快照 = `progress.md`；计划 = `TODO.md`；命令集 = `docs/COMMANDS.md`。
 
-> **一句话定位（原）**：把 AutoResearchClaw 的自主研究流水线，特化成一个**心理学研究专用、可复现优先、规范门禁内置**的交互式命令行智能体。
+> **一句话定位（原）**：把 AutoResearchClaw 的自主研究流水线，特化成一个**心理学研究专用、可复现优先、质量检查内置**的交互式命令行智能体。
 >
 > Chat an idea → 文献调研 · 实验设计 · 统计分析 · 论文写作，全程受 `PSYCLAW.md` 学术规范约束。
 > （注：「统计分析」现指**编排 + 生成可复现脚本**，不在本仓内计算。）
@@ -27,7 +27,7 @@
 | 2 | ARS 的含义 | **Academic Research Skill** = 端到端学术研究 skill（文献→设计→统计→写作总编排） | 不是单纯统计，也不是整条 pipeline，而是可被 REPL 调用的研究总管 |
 | 3 | 统计后端 | **R/Python 主路径，SPSS/Mplus/Stata 为可选插件** | 开源栈保证人人可复现；商业软件检测到本地安装才启用 |
 | 4 | 交互骨架 | **REPL 对话为主 + pipeline 作为 `/research` 命令** | 既能 claude-code 式对话，又能一键跑完整研究 |
-| 5 | 学术规范 | **`PSYCLAW.md` 规范 + 机器可校验门禁（gates）** | 规范不只是文档，是能拦住违规输出的 lint/gate |
+| 5 | 学术规范 | **`PSYCLAW.md` 规范 + 机器可执行的质量检查（gates）** | 规范不只是文档，也能自动标记不合规输出 |
 | 6 | 本轮交付 | **设计文档 + 可运行最小骨架** | 先验证骨架，再填实现 |
 
 ---
@@ -39,10 +39,10 @@
 | **Claude Code**（TS/Bun/Ink 快照） | REPL 架构、slash 命令、Tool/Skill 抽象、`@文件` 引用、流式输出、`/init` 引导、hooks | 不用 TS/Bun —— 心理学统计生态在 Python/R，跨语言桥接成本太高 |
 | **Codex CLI** | 非交互 `exec` 模式、审批策略（auto/suggest）、沙箱执行 | 不做代码托管侧的全自动提交 |
 | **OpenClaw / OpenCode** | provider 抽象、`opencode` 后端复用（ARS 已集成）、本地优先 | —— |
-| **AutoResearchClaw** | 23 阶段 pipeline、skills 加载器、MCP registry、HITL gate、config.yaml | 通用科研 → 收窄为心理学；学术规范从「建议」升级为「门禁」 |
+| **AutoResearchClaw** | 23 阶段 pipeline、skills 加载器、MCP registry、HITL gate、config.yaml | 通用科研 → 收窄为心理学；学术规范从「建议」升级为「自动质量检查」 |
 | **Hermes（函数调用/工具规范）** | 统一的工具调用协议、结构化 schema | —— |
 
-**核心差异化**：通用科研 Agent 给你「一篇能跑的论文」；PsyClaw 给你「一篇**过得了心理学审稿人**的论文」—— 预注册、效应量、可复现脚本、APA7、不 p-hacking，全部是机器门禁，不达标不放行。
+**核心差异化**：通用科研 Agent 给你「一篇能跑的论文」；PsyClaw 给你「一篇**经得起心理学审稿**的论文」—— 预注册、效应量、可复现脚本、APA7、不 p-hacking，全部纳入机器质量检查，不达标就明确报告。
 
 ---
 
@@ -63,7 +63,7 @@
 │     │          │           │           │           │             │
 │  ┌──▼───┐ ┌────▼────┐ ┌────▼─────┐ ┌───▼────┐ ┌────▼──────┐      │
 │  │Skills│ │  MCP    │ │ Gates    │ │ Config │ │ Providers │      │
-│  │ 层   │ │ 层      │ │ 门禁层   │ │ 向导   │ │ (LLM)     │      │
+│  │ 层   │ │ 层      │ │ 质检层   │ │ 向导   │ │ (LLM)     │      │
 │  └──┬───┘ └────┬────┘ └──────────┘ └────────┘ └───────────┘      │
 │     │          │                                                 │
 │  ┌──▼──────────▼─────────────────────────────────────────────┐  │
@@ -97,8 +97,8 @@ psyclaw/
 │   └── manager.py       # 启用/禁用/健康检查/能力探测
 ├── gates/
 │   ├── PSYCLAW.md       # ★ 统一学术智能体规范（人读 + 机器读）
-│   ├── rules.yaml       # 门禁规则（结构化，机器校验）
-│   └── checker.py       # 门禁执行器（lint 产出、阻断违规）
+│   ├── rules.yaml       # 质量规则（结构化，机器校验）
+│   └── checker.py       # 质量检查执行器（lint 产出、标记违规）
 └── commands/            # slash 命令实现（/research /stat /lit /design /write /init …）
 ```
 
@@ -159,7 +159,7 @@ ARS (Academic Research Skill)
 > ⚠️ **本节已作废（统计外移）**：PsyClaw **不在仓内跑分析**。下述「跑分析（pingouin/statsmodels/
 > lavaan/lme4）」的决策流仅存为历史设计;现状是 analysis/meta 流程**只生成**委托这些外部库的
 > **可复现脚本**（交 `[stats]` 环境或 MCP 运行、结果回填），本仓零统计库依赖。假设诊断/效应量+CI/
-> 复现脚本等**规范门禁仍在**（供写作产出与外部统计结果对照）。
+> 复现脚本等**规范质量检查仍在**（供写作产出与外部统计结果对照）。
 
 输入：数据集 + 研究假设。输出：APA7 结果段 + 图 + **可独立运行的复现脚本**（`.R` / `.py`）。
 
@@ -171,7 +171,7 @@ ARS (Academic Research Skill)
   → 自动建议检验族（t / ANOVA / 回归 / 混合模型 / SEM / 中介调节）
   → [GATE] 假设检查未过 → 提示稳健替代（Welch / 非参 / bootstrap），不静默套用
   → 跑分析（主路径 Python pingouin/statsmodels + R lavaan/lme4）
-  → 必跑效应量 + 置信区间（Cohen's d / η² / r / OR …）  ← 机器门禁强制
+  → 必跑效应量 + 置信区间（Cohen's d / η² / r / OR …）  ← 机器质量检查强制
   → APA7 格式化结果 + 图（matplotlib/seaborn 或 ggplot）
   → 输出复现脚本 + 数据指纹（hash），供 /reproduce 核验
 ```
@@ -225,14 +225,14 @@ LLM Provider [openclaw/anthropic/openai/custom]: anthropic
 
 ---
 
-## 6. PSYCLAW.md — 统一学术智能体规范 + 机器门禁
+## 6. PSYCLAW.md — 统一学术智能体规范 + 机器质量检查
 
 两层结构：
 
 1. **`gates/PSYCLAW.md`** —— 人读规范 + 注入 agent 的 system 约束（研究诚信原则）。
 2. **`gates/rules.yaml`** —— 机器可校验规则；`gates/checker.py` 在每个产出点执行，不达标**阻断**并给修复建议。
 
-门禁示例（详见骨架文件）：
+质量检查示例（详见骨架文件）：
 
 | Gate ID | 触发点 | 规则 | 不过怎么办 |
 |---------|--------|------|-----------|
@@ -245,7 +245,7 @@ LLM Provider [openclaw/anthropic/openai/custom]: anthropic
 | `LIT.prisma` | 文献综述 | 检索/筛选符合 PRISMA 流程图 | 提示补全流程 |
 | `REPRO.script` | 任何统计结论 | 附可独立运行的复现脚本 + 数据指纹 | 阻断 |
 
-`psyclaw gates check <artifact>` 可单独跑门禁；CI 中作为质量闸。
+`psyclaw gates check <artifact>` 可单独运行质量检查；CI 中作为质量检查步骤。
 
 ---
 
@@ -322,7 +322,7 @@ my-study/
 |------|------|
 | **期刊风格** | 默认 APA7 figure 风格：无顶/右边框、无背景网格阴影、Sans-serif（Arial/Helvetica）、字号≥8pt |
 | **配色** | 色盲友好（Okabe-Ito / viridis）；灰度可辨；不用红绿对比承载唯一信息 |
-| **诚实性门禁** | y 轴默认从 0 起；截断必须显式标注；误差棒注明含义（SD/SE/95%CI）；不选择性裁剪 |
+| **诚实性检查** | y 轴默认从 0 起；截断必须显式标注；误差棒注明含义（SD/SE/95%CI）；不选择性裁剪 |
 | **分辨率/格式** | 矢量优先（PDF/SVG）；位图 ≥300 DPI；论文图导出 TIFF/PDF |
 | **可复现** | 每张图附生成脚本 + 数据源；图注含 N、统计量、显著性标注规则 |
 | **风格切换** | `nature` / `apa7` / `frontiers` / `minimal` 预设；项目内可锁定统一风格 |
@@ -340,7 +340,7 @@ my-study/
 | **M2** | ARS-Stat 主路径（pystat/R），`/stat @data.csv` 出 APA7 + 复现脚本 | 一份样例数据端到端 |
 | **M3** | Gates 全量上线，PSYCLAW.md 注入 + checker 阻断 | 违规输出被拦 |
 | **M4** | MCP 全接（Zotero/文献/Mplus），`config` 向导完善 | `doctor` 全绿 |
-| **M5** | `/research` 全流水线打通，审稿模拟 | 跑出一篇过门禁的心理学稿 |
+| **M5** | `/research` 全流水线打通，审稿模拟 | 跑出一篇通过质量检查的心理学稿 |
 
 ---
 

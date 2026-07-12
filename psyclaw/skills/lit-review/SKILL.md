@@ -12,7 +12,7 @@ sources.
 ## Workflow
 
 1. Clarify scope, population, intervention/exposure, outcome, and review type.
-2. Search with `psyclaw lit <query>` or run `psyclaw lit-loop <topic>`.
+2. Search with `psyclaw lit <query>` or run `psyclaw run literature <topic>`.
 3. Record PRISMA counts and screening reasons.
 4. Synthesize around constructs, methods, converging findings, contradictions,
    and gaps.
@@ -24,4 +24,3 @@ sources.
 - Separate peer-reviewed evidence, preprints, and gray literature.
 - Report contradictions instead of smoothing them away.
 - Make every major claim traceable to a retrieved source.
-

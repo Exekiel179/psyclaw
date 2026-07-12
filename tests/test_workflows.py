@@ -1,6 +1,6 @@
 """Workflow 引擎 + 步骤 + 注册表 测试。
 
-引擎用 mock 步骤端到端验证(门禁 fail-closed / 步骤跑 / artifact 记录 / 总验收 /
+引擎用 mock 步骤端到端验证(前置检查 fail-closed / 步骤跑 / artifact 记录 / 总验收 /
 可选步骤出错跳过);screen_papers 子功能与 workflow_verdict 纯函数单测。
 不触网络/真实 provider(auto 模式 + mock 步骤)。
 """
@@ -16,7 +16,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from psyclaw.workflows.engine import (  # noqa: E402
-    Step, run_workflow, workflow_verdict,
+    Step, checkpoint_path, run_workflow, workflow_verdict,
 )
 from psyclaw.workflows.registry import (  # noqa: E402
     WORKFLOWS, COMMAND_TO_WORKFLOW, get_workflow,
@@ -118,13 +118,13 @@ def test_engine_gate_blocks_fail_closed(tmp_path):
         "id": "blocked", "name": "Blocked", "research_type": "test",
         "steps": [
             Step("gated", "Gated", run=_writing_step("gated", "g.md"),
-                 gate=lambda ctx: (False, "门禁未过")),
+                 gate=lambda ctx: (False, "前置检查未通过")),
             Step("after", "After", run=_writing_step("after", "a.md")),
         ],
     }
     rc = run_workflow(wf, topic="x", project_dir=str(tmp_path), auto=True)
     assert rc == 1
-    assert not (tmp_path / "notes" / "g.md").exists()   # 被门禁拦下,没跑
+    assert not (tmp_path / "notes" / "g.md").exists()   # 前置检查未通过,没跑
     assert not (tmp_path / "notes" / "a.md").exists()   # 后续步骤也不跑
     summary = json.loads((tmp_path / "notes" / "workflow_summary.json").read_text(encoding="utf-8"))
     assert summary["verdict"]["overall_passed"] is False
@@ -151,6 +151,65 @@ def test_engine_no_topic_no_goal_fails(tmp_path):
     wf = {"id": "m", "name": "M", "steps": [Step("a", "A", run=lambda c: {})]}
     rc = run_workflow(wf, topic=None, project_dir=str(tmp_path), auto=True)
     assert rc == 1                                       # 无主题无 goal → fail-closed
+
+
+def test_engine_defaults_to_continuous_execution(tmp_path, monkeypatch):
+    wf = _wf([Step("a", "A", run=_writing_step("a", "a.md")),
+              Step("b", "B", run=_writing_step("b", "b.md"))])
+    def no_prompt(ctx, step):
+        assert ctx.auto is True
+        return True
+
+    monkeypatch.setattr("psyclaw.workflows.engine._ask_continue", no_prompt)
+    assert run_workflow(wf, topic="x", project_dir=str(tmp_path)) == 0
+
+
+def test_engine_resume_continues_after_last_successful_step(tmp_path, monkeypatch):
+    calls = []
+
+    def tracked(step_id, fname):
+        def run(ctx):
+            calls.append(step_id)
+            return _writing_step(step_id, fname)(ctx)
+        return run
+
+    wf = _wf([Step("a", "A", run=tracked("a", "a.md")),
+              Step("b", "B", run=tracked("b", "b.md"))])
+    monkeypatch.setattr("psyclaw.workflows.engine._ask_continue",
+                        lambda ctx, step: False)
+    assert run_workflow(wf, topic="x", project_dir=str(tmp_path), auto=False) == 1
+    assert calls == ["a"]
+    assert checkpoint_path(tmp_path, "t").exists()
+
+    assert run_workflow(wf, topic="x", project_dir=str(tmp_path), resume=True) == 0
+    assert calls == ["a", "b"]
+
+
+def test_engine_resume_rejects_changed_input(tmp_path, monkeypatch):
+    wf = _wf([Step("a", "A", run=_writing_step("a", "a.md")),
+              Step("b", "B", run=_writing_step("b", "b.md"))])
+    monkeypatch.setattr("psyclaw.workflows.engine._ask_continue",
+                        lambda ctx, step: False)
+    assert run_workflow(wf, topic="x", project_dir=str(tmp_path), auto=False,
+                        seed={"data_csv": "first.csv"}) == 1
+    assert run_workflow(wf, topic="x", project_dir=str(tmp_path), resume=True,
+                        seed={"data_csv": "other.csv"}) == 1
+
+
+def test_engine_resume_requires_checkpoint(tmp_path):
+    wf = _wf([Step("a", "A", run=lambda ctx: {})])
+    assert run_workflow(wf, topic="x", project_dir=str(tmp_path), resume=True) == 1
+
+
+def test_engine_resume_rejects_changed_workflow_definition(tmp_path, monkeypatch):
+    original = _wf([Step("a", "A", run=_writing_step("a", "a.md")),
+                    Step("b", "B", run=_writing_step("b", "b.md"))])
+    monkeypatch.setattr("psyclaw.workflows.engine._ask_continue",
+                        lambda ctx, step: False)
+    assert run_workflow(original, topic="x", project_dir=str(tmp_path), auto=False) == 1
+    changed = _wf([Step("a", "A", run=_writing_step("a", "a.md")),
+                   Step("c", "C", run=_writing_step("c", "c.md"))])
+    assert run_workflow(changed, topic="x", project_dir=str(tmp_path), resume=True) == 1
 
 
 # --- 注册表 ----------------------------------------------------------------

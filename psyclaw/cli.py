@@ -29,7 +29,54 @@ def _banner() -> str:
 
 def cmd_repl(args: argparse.Namespace) -> int:
     from psyclaw.repl import run_repl
-    return run_repl()
+    return run_repl(approval=getattr(args, "approval", None))
+
+
+def cmd_chat(args: argparse.Namespace) -> int:
+    """公开对话入口;不带参数开新会话,`--resume` 续接指定或最近会话。"""
+    sid = getattr(args, "resume", None)
+    if sid == "__latest__":
+        from psyclaw.recall import ContextArchive
+        rows = ContextArchive(".").list_sessions()
+        sid = rows[0]["id"] if rows else None
+    from psyclaw.repl import run_repl
+    return run_repl(resume_id=sid, approval=getattr(args, "approval", None))
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """公开运行入口:`run <类型>`,复用既有 workflow/pipeline/loop。"""
+    from psyclaw import ui
+    from psyclaw.modes import run_mode
+    target = " ".join(getattr(args, "target", [])).strip() or None
+    try:
+        return run_mode(
+            args.kind, target, topic=getattr(args, "topic", None),
+            confirm_each=getattr(args, "confirm_each", False),
+            exploratory=(getattr(args, "exploratory", False)
+                         or getattr(args, "skip_gates", False)),
+            resume=getattr(args, "resume", False),
+            revise=getattr(args, "revise", False),
+            rounds=getattr(args, "rounds", 3),
+        )
+    except ValueError as exc:
+        print(ui.err(str(exc)))
+        return 2
+    except KeyboardInterrupt:
+        print("\n运行已中断。已落盘的产物保留在 notes/ outputs/。")
+        return 0
+
+
+def cmd_auto(args: argparse.Namespace) -> int:
+    """公开自主入口;默认持续推进,前置检查和不可逆决策仍 fail-closed。"""
+    from psyclaw.modes import run_auto
+    try:
+        return run_auto(max_iters=getattr(args, "max_iters", 6),
+                        confirm_each=getattr(args, "confirm_each", False),
+                        exploratory=(getattr(args, "exploratory", False)
+                                     or getattr(args, "skip_gates", False)))
+    except KeyboardInterrupt:
+        print("\n自主运行已中断。状态已保存,下次 `psyclaw auto` 继续。")
+        return 0
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -140,7 +187,7 @@ def cmd_resume(args: argparse.Namespace) -> int:
         sid = rows[0]["id"]
         print(ui.dim(f"未指定会话,续接最近一次:{sid}"))
     print(_banner())
-    return run_repl(resume_id=sid)
+    return run_repl(resume_id=sid, approval=getattr(args, "approval", None))
 
 
 def cmd_session(args: argparse.Namespace) -> int:
@@ -281,7 +328,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 mark = ui.ok("✓")
             else:
                 mark = ui.err("✗")
-                if not opt:  # 可选商业软件未安装不计入强制门禁
+                if not opt:  # 可选商业软件未安装不计入强制检查
                     mcp_failures.append(m["name"])
         else:
             mark = ui.dim("·")
@@ -295,7 +342,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print("\n" + ui.accent("能力探测（已启用且健康）:"))
         for cap, servers in sorted(caps.items()):
             print(f"  • {cap:<28} " + ui.dim(" + ".join(servers)))
-    print("\n" + ui.accent("Gates 自检:"))
+    print("\n" + ui.accent("质量检查自检:"))
     ok = run_gates_selfcheck()
     print("\n" + ui.accent("能力矩阵:"))
     try:
@@ -373,14 +420,14 @@ def cmd_setup(args: argparse.Namespace) -> int:
     print(ui.title("PsyClaw setup — 项目脚手架 + 能力选装"))
     print(ui.rule())
 
-    # ① 目录结构  ② 据澄清卡生成概览  ③ 项目记忆(均幂等)
+    # ① 目录结构  ② 据研究准备清单生成概览  ③ 项目记忆(均幂等)
     res = scaffold_project(".")
     cd = res["created_dirs"]
     print(ui.ok("① 目录结构就绪") + ui.dim(f"（新建 {len(cd)}：{', '.join(cd)}）" if cd else "（已存在）"))
     if res["overview"]:
         print(ui.ok("② 项目概览 → ") + ui.dim(str(res["overview"])))
     else:
-        print(ui.dim("② 未找到澄清卡;先 `psyclaw clarify` 再重跑 setup 即据此生成项目概览"))
+        print(ui.dim("② 未找到研究准备清单;先 `psyclaw prepare` 再重跑 setup 即可生成项目概览"))
     print(ui.ok("③ 项目记忆 → ") + ui.dim(str(res["memory"])))
 
     # ④ 能力依赖(联网安装 opt-in:--online 自动装缺失;交互则 run_setup 内询问;否则只显示矩阵)
@@ -402,7 +449,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
     print(ui.accent("\n⑤ MCP / Skill"))
     _setup_print_mcp_skill()
 
-    print(ui.ok("\n✓ setup 完成。下一步:psyclaw clarify(没澄清过)或选一条 loop 起跑(psyclaw guide)。"))
+    print(ui.ok("\n✓ setup 完成。下一步:psyclaw prepare，或用 psyclaw guide 选择工作方式。"))
     return 0
 
 
@@ -507,13 +554,13 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 
 
 def cmd_gates(args: argparse.Namespace) -> int:
-    print("PsyClaw Gates — 学术规范门禁自检\n" + "-" * 32)
+    print("PsyClaw Gates — 研究质量检查\n" + "-" * 32)
     ok = run_gates_selfcheck(verbose=True)
     return 0 if ok else 1
 
 
 def cmd_eval(args: argparse.Namespace) -> int:
-    """确定性离线评测(feat-073):编排/门禁/自学习契约的端到端 scorecard。"""
+    """确定性离线评测(feat-073):编排/质量检查/自学习契约的端到端 scorecard。"""
     import json
     from pathlib import Path
 
@@ -1016,25 +1063,23 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 常用命令集——`--help` 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅供 `guide`/`commands`
 # 标注 ★ 常用,帮助新用户聚焦上手路径。改这个集合只影响 ★ 标注,不影响命令可见性/可用性。
 CORE_COMMANDS = {
-    "guide", "status", "auto-loop", "loop", "lit-loop", "meta-loop", "analysis-loop", "qual-loop",
-    "research", "review", "clarify", "lit", "export",
-    "score", "scale", "jars", "cite-check", "check", "preregister", "declare-test",
-    "plan", "goal", "tasks", "memory",
-    "gates", "config", "setup", "doctor", "repl", "resume", "commands",
+    "chat", "run", "auto", "guide", "status", "prepare", "check",
+    "config", "setup", "doctor", "resume", "commands",
 }
 
 # 职能分类(每个命令恰好出现一次;`psyclaw commands` 按此展示)。统计方法已外移到
 # 成熟库/MCP——本 CLI 只保留研究编排 + 知识参考 + 文献/写作 harness。
 COMMAND_CATEGORIES = [
-    ("环境 / 系统", ["guide", "status", "repl", "version", "doctor", "config", "setup",
+    ("三种交互入口", ["chat", "run", "auto"]),
+    ("环境 / 系统", ["guide", "status", "version", "doctor", "config", "setup",
                   "skills", "mcp", "plugins", "gates", "eval", "commands"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score"]),
-    ("研究前规划 / 预注册", ["clarify", "declare-test", "preregister", "jars", "cite-check",
+    ("研究前规划 / 预注册", ["prepare", "clarify", "declare-test", "preregister", "jars", "cite-check",
                        "check"]),
-    ("研究流程 / 编排回路", ["agent", "auto-loop", "loop", "lit-loop", "meta-loop",
-                        "analysis-loop", "qual-loop", "research"]),
+    ("兼容 / 高级编排", ["repl", "agent", "auto-loop", "loop", "lit-loop", "meta-loop",
+                      "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("检索 / 知识图谱", ["search", "kg", "lit"]),
     ("记忆 / 消息 / IO", ["memory", "session", "resume", "serve", "notify", "auth",
@@ -1043,23 +1088,22 @@ COMMAND_CATEGORIES = [
 
 
 def cmd_guide(args: argparse.Namespace) -> int:
-    """首次使用上手:一条默认路径 + 决策树(不再把 8 个入口的选择题抛给用户)。"""
+    """首次使用上手:三种稳定入口,执行引擎细节不暴露给普通用户。"""
     from psyclaw import __version__, ui
     print(ui.startup(__version__))
-    print(ui.panel("Default Path",
+    print(ui.panel("Three Ways to Work",
                    "\n".join([
-                       ui.ok("1. psyclaw status") + ui.dim("      看项目态势:进度/阻塞/下一步"),
-                       ui.ok("2. psyclaw auto-loop") + ui.dim("   自动发现待办 -> 派发流程 -> 独立验收"),
-                       ui.ok("3. psyclaw check 稿件.md") + ui.dim(" 投稿前质检:JARS/引用/复现/溯源"),
+                       ui.ok("1. psyclaw") + ui.dim("                    对话:边讨论边做,关键操作确认"),
+                       ui.ok("2. psyclaw run analysis data.csv") + ui.dim(" 运行:明确、可复现的单次流程"),
+                       ui.ok("3. psyclaw auto") + ui.dim("               自动:据项目状态持续推进"),
                    ]),
                    color="brmagenta"))
-    print(ui.panel("Manual Routes",
+    print(ui.panel("Run Types",
                    "\n".join([
-                       "search \"问题\"      " + ui.dim("学术库/本地会话自动路由"),
-                       "lit-loop <主题>     " + ui.dim("文献综述 / 系统综述"),
-                       "analysis-loop data  " + ui.dim("实证分析规划 + 外部统计脚本"),
-                       "meta-loop effects   " + ui.dim("元分析脚本 + 报告"),
-                       "qual-loop transcripts " + ui.dim("质性主题分析 + COREQ"),
+                       "run literature <主题>      " + ui.dim("文献综述 / 系统综述"),
+                       "run analysis <data.csv>    " + ui.dim("实证分析 + 外部统计"),
+                       "run meta <effects.csv>     " + ui.dim("元分析 + 报告"),
+                       "run qualitative <目录>     " + ui.dim("主题分析 + COREQ"),
                    ]),
                    color="brcyan"))
     print(ui.dim("配置: psyclaw config   自检: psyclaw doctor   全部命令: psyclaw commands"))
@@ -1093,7 +1137,7 @@ def cmd_commands(args: argparse.Namespace) -> int:
             print()
     except Exception:  # noqa: BLE001
         pass
-    print(ui.dim("第一次用?运行 `psyclaw guide`。任意命令加 -h 看参数,如 `psyclaw lit-loop -h`。"))
+    print(ui.dim("第一次用?运行 `psyclaw guide`。明确任务用 `psyclaw run -h`;旧 *-loop 仍兼容。"))
     print(ui.dim("自定义别名:~/.psyclaw/aliases.yaml 或 <项目>/.psyclaw/aliases.yaml,"
                  "一行一条 `名字: 命令 参数`。"))
     return 0
@@ -1102,19 +1146,52 @@ def cmd_commands(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="psyclaw",
-        description="心理学研究编排工作台（澄清·文献·设计·写作·评审·门禁）",
+        description="心理学研究编排工作台（澄清·文献·设计·写作·评审·质量检查）",
         epilog="第一次用?运行  psyclaw guide （上手介绍）。分类清单  psyclaw commands ；任意命令加 -h 看参数。",
     )
     p.add_argument("-v", "--version", action="store_true", help="打印版本")
-    p.add_argument("--approval", choices=["suggest", "auto"], default="suggest",
-                   help="工具执行审批策略（对齐 codex）")
+    p.add_argument("--approval", choices=["ask", "auto", "suggest"], default=None,
+                   help="副作用审批:ask(默认)|auto;suggest 为 ask 的兼容名")
     sub = p.add_subparsers(dest="command")
+
+    pchat = sub.add_parser("chat", help="对话模式:边讨论边推进,工具按需使用并保留审批")
+    pchat.add_argument("--resume", nargs="?", const="__latest__", default=None,
+                       help="续接指定会话 ID;不带 ID 续接最近会话")
+    pchat.set_defaults(func=cmd_chat)
+
+    prun = sub.add_parser("run", help="运行模式:执行明确、可复现的一次研究流程")
+    prun.add_argument("kind", help="流程类型:analysis|meta|literature|qualitative")
+    prun.add_argument("target", nargs="*", help="数据路径、转录目录或综述主题")
+    prun.add_argument("--topic", default=None, help="为数据型流程另设研究主题")
+    prun.add_argument("--confirm-each", action="store_true",
+                      help="每个步骤完成后确认;默认连续执行")
+    prun.add_argument("--exploratory", action="store_true",
+                      help="允许跳过未完成的前置检查并留痕;产出明确标为探索性")
+    prun.add_argument("--resume", action="store_true",
+                      help="从该流程最后一个成功步骤继续;目标和输入必须一致")
+    prun.add_argument("--yes", action="store_true", help=argparse.SUPPRESS)
+    prun.add_argument("--skip-gates", dest="skip_gates", action="store_true",
+                      help=argparse.SUPPRESS)
+    prun.add_argument("--revise", action="store_true", help=argparse.SUPPRESS)
+    prun.add_argument("--rounds", type=int, default=3, help=argparse.SUPPRESS)
+    prun.set_defaults(func=cmd_run)
+
+    pauto = sub.add_parser("auto", help="自动模式:据项目状态持续派发流程、验收并记录状态")
+    pauto.add_argument("--max-iters", dest="max_iters", type=int, default=6,
+                       help="迭代上限(默认 6)")
+    pauto.add_argument("--confirm-each", action="store_true",
+                       help="每次派发前确认;默认自动派发,强制检查仍会暂停")
+    pauto.add_argument("--exploratory", action="store_true",
+                       help="允许跳过未完成的前置检查并留痕;产出明确标为探索性")
+    pauto.add_argument("--skip-gates", dest="skip_gates", action="store_true",
+                       help=argparse.SUPPRESS)
+    pauto.set_defaults(func=cmd_auto)
 
     sub.add_parser("repl", help="进入交互式 REPL（默认）").set_defaults(func=cmd_repl)
 
     sub.add_parser(
         "status",
-        help="一屏项目态势:目标/澄清/回路/等人决策(直接打印)/最近产物/下一步建议",
+        help="一屏项目态势:目标/研究准备/自动推进/待处理项/最近产物/下一步建议",
     ).set_defaults(func=cmd_status)
 
     sub.add_parser(
@@ -1179,14 +1256,14 @@ def build_parser() -> argparse.ArgumentParser:
     pkg.set_defaults(func=cmd_kg)
 
     sub.add_parser("version", help="打印版本").set_defaults(func=cmd_version)
-    sub.add_parser("doctor", help="环境自检（配置/MCP/Gates）").set_defaults(func=cmd_doctor)
+    sub.add_parser("doctor", help="环境自检（配置/MCP/质量检查）").set_defaults(func=cmd_doctor)
 
     pc = sub.add_parser("config", help="交互式配置/环境变量向导")
     pc.add_argument("--non-interactive", action="store_true", help="只写默认配置不提问")
     pc.set_defaults(func=cmd_config)
 
     pst = sub.add_parser("setup",
-                         help="项目脚手架+能力选装:目录/据clarify生成概览/项目记忆/能力依赖/MCP·skill")
+                         help="项目脚手架+能力选装:目录/据研究准备清单生成概览/项目记忆/能力依赖/MCP·skill")
     pst.add_argument("--env", action="store_true",
                      help="一键配置缺失的基础环境(检查 provider/key + stats/full 组;--online 实装)")
     pst.add_argument("--groups", default=None, help="直接装指定组(逗号分隔:stats,viz,eeg,full)")
@@ -1209,10 +1286,10 @@ def build_parser() -> argparse.ArgumentParser:
                       choices=["mne", "spss", "mplus", "stata"], default=None,
                       help="作为 stdio MCP 服务器运行(mne/spss/mplus/stata)")
     pmcp.set_defaults(func=cmd_mcp)
-    sub.add_parser("gates", help="跑学术规范门禁自检").set_defaults(func=cmd_gates)
+    sub.add_parser("gates", help="质量规则系统自检(check 才检查实际稿件)").set_defaults(func=cmd_gates)
 
     pev = sub.add_parser(
-        "eval", help="确定性离线评测(编排/门禁/自学习契约,不调 LLM/不联网)")
+        "eval", help="确定性离线评测(编排/质量检查/自学习契约,不调 LLM/不联网)")
     pev.add_argument("--case", action="append",
                      help="只跑指定用例(可重复给多个);缺省跑全部")
     pev.add_argument("--json", action="store_true", help="输出机器可读 JSON")
@@ -1242,7 +1319,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pdt = sub.add_parser(
         "declare-test",
-        help="预注册一个计划分析（A-2 研究者自由度门禁；确证性假设须先声明）")
+        help="预注册一个计划分析（A-2 研究者自由度检查；确证性假设须先声明）")
     pdt.add_argument("--dv", required=True, help="因变量列名")
     pdt.add_argument("--test", required=True,
                      choices=["ttest", "anova", "correlation", "paired",
@@ -1274,14 +1351,18 @@ def build_parser() -> argparse.ArgumentParser:
     pj.set_defaults(func=cmd_journal)
 
     ppr = sub.add_parser("preregister",
-                         help="预注册模板(OSF/AsPredicted 双格式;据澄清卡抽取)")
+                         help="预注册模板(OSF/AsPredicted 双格式;据研究准备清单抽取)")
     ppr.add_argument("--osf", action="store_true", help="只出 OSF 格式")
     ppr.add_argument("--aspredicted", action="store_true", help="只出 AsPredicted 格式")
     ppr.add_argument("--both", action="store_true", help="两种格式(默认)")
     ppr.set_defaults(func=cmd_preregister)
 
-    pcl = sub.add_parser("clarify", help="研究澄清(grill-me 式,17 槽位,不澄清完不开工)")
-    pcl.add_argument("--status", action="store_true", help="只看澄清进度")
+    pprep = sub.add_parser("prepare", help="完成研究准备清单(17 个研究准备项)")
+    pprep.add_argument("--status", action="store_true", help="只看研究准备进度")
+    pprep.set_defaults(func=cmd_clarify)
+
+    pcl = sub.add_parser("clarify", help="prepare 的兼容别名")
+    pcl.add_argument("--status", action="store_true", help="只看研究准备进度")
     pcl.set_defaults(func=cmd_clarify)
 
     pci = sub.add_parser("cite", help="方法学背书库(每个设计决策的文献支撑)")
@@ -1391,17 +1472,17 @@ def build_parser() -> argparse.ArgumentParser:
     pal.add_argument("--auto", action="store_true",
                      help="全程无人值守(默认在每个任务派发前征求确认)")
     pal.add_argument("--skip-gates", dest="skip_gates", action="store_true",
-                     help="按你的要求跳过门禁(澄清等不再拦;留痕 notes/gate_skips.md,产出按探索性对待)")
+                     help="按你的要求跳过前置检查(澄清等不再暂停流程;留痕 notes/gate_skips.md,产出按探索性对待)")
     pal.set_defaults(func=cmd_autoloop)
 
     # <type>-loop → 按研究类型预置的具体流程(走 workflow 引擎)
     # lit-loop → 文献综述
     prl = sub.add_parser("lit-loop",
-                         help="文献综述流程:澄清→检索→筛选(PRISMA)→合成综述→评审")
+                         help="文献综述流程:研究准备→检索→筛选(PRISMA)→合成综述→评审")
     prl.add_argument("topic", nargs="?", default=None, help="综述主题(可空,读 notes/goal.md)")
     prl.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     prl.add_argument("--skip-gates", dest="skip_gates", action="store_true",
-                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
+                     help="按你的要求跳过前置检查(留痕 notes/gate_skips.md,产出按探索性对待)")
     prl.set_defaults(func=cmd_review_lit)
 
     # meta-loop → 元分析(输入效应量表;统计由生成的脚本在外部 statsmodels 跑)
@@ -1411,7 +1492,7 @@ def build_parser() -> argparse.ArgumentParser:
     pma.add_argument("--topic", default=None, help="元分析主题(可空,默认据文件名)")
     pma.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     pma.add_argument("--skip-gates", dest="skip_gates", action="store_true",
-                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
+                     help="按你的要求跳过前置检查(留痕 notes/gate_skips.md,产出按探索性对待)")
     pma.set_defaults(func=cmd_meta)
 
     # analysis-loop → 实证分析(输入数据表;统计由生成的脚本在外部 pingouin/scipy 跑)
@@ -1421,7 +1502,7 @@ def build_parser() -> argparse.ArgumentParser:
     pan.add_argument("--topic", default=None, help="研究主题(可空,默认据文件名)")
     pan.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     pan.add_argument("--skip-gates", dest="skip_gates", action="store_true",
-                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
+                     help="按你的要求跳过前置检查(留痕 notes/gate_skips.md,产出按探索性对待)")
     pan.set_defaults(func=cmd_analysis)
 
     # qual-loop → 质性研究(输入转录稿;LLM 辅助编码/主题分析,研究者复核)
@@ -1431,7 +1512,7 @@ def build_parser() -> argparse.ArgumentParser:
     pq.add_argument("--topic", default=None, help="研究主题(可空,默认据文件名)")
     pq.add_argument("--auto", action="store_true", help="跳过步间人工确认(CI 用)")
     pq.add_argument("--skip-gates", dest="skip_gates", action="store_true",
-                     help="按你的要求跳过门禁(留痕 notes/gate_skips.md,产出按探索性对待)")
+                     help="按你的要求跳过前置检查(留痕 notes/gate_skips.md,产出按探索性对待)")
     pq.set_defaults(func=cmd_qualitative)
 
     prv = sub.add_parser("review", help="审稿模拟(EIC+3审稿人+Devil's Advocate,产可解析意见)")
@@ -1473,7 +1554,7 @@ def build_parser() -> argparse.ArgumentParser:
     plit.set_defaults(func=cmd_lit)
 
     sub.add_parser(
-        "guide", help="首次使用上手介绍(是什么 + 每类研究一条 loop + 60 秒上手)"
+        "guide", help="首次使用上手介绍(chat / run / auto 三种工作方式)"
     ).set_defaults(func=cmd_guide)
     sub.add_parser(
         "commands", help="按职能分类列出全部命令（★=常用）"
@@ -1489,6 +1570,7 @@ def build_parser() -> argparse.ArgumentParser:
             n_all = len(action.choices)
             action._choices_actions = [
                 ca for ca in action._choices_actions if ca.dest in CORE_COMMANDS]
+            action.metavar = "{chat,run,auto,...}"
             p.epilog = (f"--help 只列 {len(action._choices_actions)} 条常用命令;"
                         f"全部 {n_all} 条(均可直接用)见 `psyclaw commands`。"
                         "第一次用?`psyclaw guide`;手把手教程 docs/TUTORIAL.md。")

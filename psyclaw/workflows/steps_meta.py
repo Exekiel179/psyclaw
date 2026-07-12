@@ -222,7 +222,7 @@ def step_write_meta(ctx) -> dict:
         "# 分析计划\n随机效应模型(DerSimonian-Laird),报告合并效应+95% CI、"
         "I²/τ²/Q 异质性、Egger 发表偏倚检验。统计由 outputs/meta_analysis.py "
         "在外部 statsmodels 环境运行,结果回填本稿(只引用脚本实际产出,不杜撰数值)。\n"
-        f"\n# 澄清卡\n{ctx.clar}")
+        f"\n# 研究准备清单\n{ctx.clar}")
     # v0.12 feat-072:pystat 真跑出的结果注入写作上下文——结果节引用真实数值,不再是空骨架
     result = ctx.data.get("meta_result")
     if result:

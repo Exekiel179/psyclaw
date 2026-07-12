@@ -134,6 +134,22 @@ def test_cmd_yolo_bare_toggle():
     assert s.yolo is False
 
 
+def test_approval_is_public_name_and_yolo_remains_alias(capsys):
+    s = _sess(yolo=False)
+    s._cmd_approval("auto")
+    assert s.yolo is True
+    s._cmd_approval("ask")
+    assert s.yolo is False
+    s._cmd_yolo("")                  # 旧名仍按原语义切换
+    assert s.yolo is True
+    assert "审批" in capsys.readouterr().out
+
+
+def test_primary_repl_commands_hide_legacy_modes():
+    assert {"/run", "/auto", "/approval", "/access"} <= set(repl.COMMANDS)
+    assert {"/agent", "/research-loop", "/yolo", "/safemode"}.isdisjoint(repl.COMMANDS)
+
+
 def test_depth_is_high_safety_backstop_not_functional_limit():
     # 回归:旧上限是 3,多步分析会「停等人继续」。现深度只是高位安全兜底,停机靠 no-progress。
     assert repl._MAX_AUTO_DEPTH >= 50
