@@ -1,5 +1,5 @@
 {
-  "_comment": "PsyClaw 方法学背书库。每个设计/分析决策的经典文献支撑。psyclaw cite <topic> 查询;DESIGN.evidence 门禁要求决策台账每条决策引用本库或自补文献。",
+  "_comment": "PsyClaw 方法学背书库。每个设计/分析决策的经典文献支撑。psyclaw cite <topic> 查询;DESIGN.evidence 质量检查要求决策台账每条决策引用本库或自补文献。",
   "topics": [
     {"id": "welch_default", "decision": "两组比较默认用 Welch 而非 Student t",
      "citation": "Delacre, M., Lakens, D., & Leys, C. (2017). Why psychologists should by default use Welch's t-test instead of Student's t-test. International Review of Social Psychology, 30(1), 92-101.",

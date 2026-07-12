@@ -14,7 +14,7 @@ from psyclaw.evalharness import CASES, format_report, run_evals
 
 class TestRunEvals:
     def test_all_builtin_cases_green(self):
-        """核心契约:内置评测全绿——编排/门禁/自学习链路端到端仍守约。"""
+        """核心契约:内置评测全绿——编排/质量检查/自学习链路端到端仍守约。"""
         report = run_evals()
         failed = [c["name"] for case in report["cases"].values()
                   for c in case["checks"] if not c["passed"]]

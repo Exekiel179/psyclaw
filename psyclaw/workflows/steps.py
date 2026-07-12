@@ -1,4 +1,4 @@
-"""可复用 Step 与门禁 — 文献综述流程用。
+"""可复用 Step 与前置检查 — 文献综述流程用。
 
 每个 step.run(ctx) 干活并把产物路径写进 ctx.artifacts[step.id];
 每个 gate(ctx) 返回 (ok, reason)。这些都是薄壳——复用既有命令/模块
@@ -16,17 +16,17 @@ from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# 门禁(harness 前置约束)
+# 前置检查(harness 前置约束)
 # ---------------------------------------------------------------------------
 
 
 def gate_clarify_complete(ctx) -> tuple[bool, str]:
-    """澄清门禁:澄清卡未全部 resolved → fail-closed(不澄清完不开工)。"""
+    """澄清前置检查:研究准备清单未全部 resolved → fail-closed(未完成前不开工)。"""
     from psyclaw.psych.clarify import check_card
     card = check_card(str(ctx.project))
     if card["unresolved"]:
-        return False, (f"澄清卡 {card['resolved']}/{card['total']},"
-                       f"未解决 {len(card['unresolved'])} 项 —— 先跑 `psyclaw clarify`。")
+        return False, (f"研究准备项 {card['resolved']}/{card['total']},"
+                       f"未完成 {len(card['unresolved'])} 项 —— 先跑 `psyclaw prepare`。")
     return True, "澄清完成"
 
 

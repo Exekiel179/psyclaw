@@ -105,7 +105,7 @@
       "name": "元分析",
       "use_when": "RQ 是'文献整体效应多大、为何异质'",
       "min_n": "k≥10 个研究做调节分析才稳",
-      "software": "R metafor;PRISMA 流程(对接 LIT.prisma 门禁)",
+      "software": "R metafor;PRISMA 流程(对接 LIT.prisma 质量检查)",
       "report": "随机效应模型、I²/τ²、森林图、漏斗图+Egger、敏感性(留一法)、发表偏倚校正(trim-fill/PET-PEESE)",
       "pitfalls": "把高度异质的研究硬合成一个均值;漏检灰色文献"
     },

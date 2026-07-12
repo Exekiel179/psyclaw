@@ -1,6 +1,6 @@
 ---
 name: research-workflow
-description: PsyClaw research workflow coordinator. Use when choosing or running lit-loop, meta-loop, analysis-loop, qual-loop, research, or auto-loop; when enforcing clarify-first workflow, artifact evidence, HITL review, and workflow summary discipline.
+description: PsyClaw research workflow coordinator. Use when choosing chat, run (literature/meta/analysis/qualitative), or auto; when enforcing prepare-first workflow, artifact evidence, review, checkpoints, and workflow summary discipline.
 category: workflow
 ---
 
@@ -12,19 +12,20 @@ explicit loops.
 
 ## Route
 
-- Literature or theory synthesis: `psyclaw lit-loop <topic>`.
-- Meta-analysis from an effect table: `psyclaw meta-loop <effects.csv>`.
-- Empirical data analysis planning: `psyclaw analysis-loop <data.csv>`.
-- Interview/transcript work: `psyclaw qual-loop <path>`.
+- Literature or theory synthesis: `psyclaw run literature <topic>`.
+- Meta-analysis from an effect table: `psyclaw run meta <effects.csv>`.
+- Empirical data analysis planning: `psyclaw run analysis <data.csv>`.
+- Interview/transcript work: `psyclaw run qualitative <path>`.
 - General paper pipeline: `psyclaw research <topic>`.
-- Repository-level autonomous progress: `psyclaw auto-loop`.
+- Repository-level autonomous progress: `psyclaw auto`.
 
 ## Rules
 
-1. Run `psyclaw clarify` or check clarify status before substantive work.
+1. Run `psyclaw prepare` or check research preparation status before substantive work.
 2. Treat workflow summaries and produced files as evidence; do not rely on chat
    memory as proof of completion.
 3. Keep statistics delegated to generated scripts, MCP backends, or mature
    external libraries.
-4. End with review or gates when the output is paper-facing.
-
+4. A run defaults to continuous execution; use `--confirm-each`, `--exploratory`, or
+   `--resume` only for their explicit workflow semantics.
+5. End with review or quality checks when the output is paper-facing.

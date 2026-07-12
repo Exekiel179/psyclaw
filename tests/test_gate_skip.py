@@ -1,4 +1,4 @@
-"""门禁用户跳过测试 —— engine skip_gates(留痕+探索性标注)+ auto-loop skip_clarify。"""
+"""前置检查跳过测试 —— engine skip_gates(留痕+探索性标注)+ auto-loop skip_clarify。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def _wf():
     return {
         "id": "t-wf", "name": "测试流程", "research_type": "test",
         "steps": [
-            Step(id="s1", title="被门禁拦的步骤",
+            Step(id="s1", title="前置检查未通过的步骤",
                  run=lambda ctx: {"ok": True},
                  gate=lambda ctx: (False, "澄清未完成")),
             Step(id="s2", title="普通步骤", run=lambda ctx: {}),
@@ -22,7 +22,7 @@ def _wf():
 
 def test_default_still_fail_closed(tmp_path):
     rc = run_workflow(_wf(), topic="t", project_dir=str(tmp_path), auto=True)
-    assert rc == 1                                   # 默认行为不变:门禁拦截
+    assert rc == 1                                   # 默认行为不变:流程暂停
     summary = json.loads((tmp_path / "notes" / "workflow_summary.json")
                          .read_text(encoding="utf-8"))
     assert summary["verdict"]["overall_passed"] is False
@@ -44,7 +44,7 @@ def test_skip_gates_runs_and_leaves_trail(tmp_path):
 
 def test_skip_gates_passing_gate_no_trail(tmp_path):
     wf = _wf()
-    wf["steps"][0] = Step(id="s1", title="门禁过的步骤",
+    wf["steps"][0] = Step(id="s1", title="前置检查通过的步骤",
                           run=lambda ctx: {}, gate=lambda ctx: (True, "ok"))
     run_workflow(wf, topic="t", project_dir=str(tmp_path), auto=True, skip_gates=True)
     assert not (tmp_path / "notes" / "gate_skips.md").exists()   # 没跳过就不留痕

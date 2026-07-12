@@ -1,4 +1,4 @@
-"""E-1 图表主题层测试 — figures.py / FIG.honest 门禁 / CLI。"""
+"""E-1 图表主题层测试 — figures.py / FIG.honest 质量检查 / CLI。"""
 
 from __future__ import annotations
 
@@ -271,7 +271,7 @@ class TestWriteFigureSidecar:
 
 
 # ---------------------------------------------------------------------------
-# FIG.honest 门禁 — checker.py 集成
+# FIG.honest 质量检查 — checker.py 集成
 # ---------------------------------------------------------------------------
 
 class TestFigHonestGate:

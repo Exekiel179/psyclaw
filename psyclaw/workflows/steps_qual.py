@@ -72,12 +72,12 @@ def step_qual_design(ctx) -> dict:
     """生成质性研究设计备忘(取样·访谈提纲·方法论·反身性)。委托 provider(LLM)。"""
     from psyclaw import ui
     from psyclaw.loop import _gen
-    task = ("据研究主题与澄清卡,写一份简洁的**质性**研究设计备忘:"
+    task = ("据研究主题与研究准备清单,写一份简洁的**质性**研究设计备忘:"
             "①研究取向(主题分析/扎根理论/IPA/现象学等,给理由)②取样策略与目标样本"
             "③访谈/观察提纲要点④反身性(researcher positionality)⑤资料可信性策略"
             "(三角验证/成员检验/审计轨迹)。只依据给定信息,不杜撰资料或发现。")
     memo = _gen(ctx.provider, "planner", task,
-                f"# 主题\n{ctx.topic}\n\n# 澄清卡\n{ctx.clar}")
+                f"# 主题\n{ctx.topic}\n\n# 研究准备清单\n{ctx.clar}")
     (ctx.project / "notes" / "qual_design.md").write_text(
         memo or "(质性设计备忘待补)", encoding="utf-8")
     ctx.artifacts["design"] = "notes/qual_design.md"
@@ -136,7 +136,7 @@ def step_write_qual(ctx) -> dict:
         f"{themes.read_text(encoding='utf-8') if themes.exists() else ''}\n\n"
         "# 写作要求\n按 COREQ/质性 JARS 组织(研究团队与反身性、设计、分析、发现);"
         "只引用 thematic_analysis.md 中的真实引文与主题,不杜撰;明确质性研究不作因果/可推广宣称。\n\n"
-        f"# 澄清卡\n{ctx.clar}")
+        f"# 研究准备清单\n{ctx.clar}")
     draft, _meta = write_paper(ctx.topic, context, ctx.provider, ctx.project)
     if not draft.strip():
         raise ValueError("写作阶段未产出稿(provider 返回空)")

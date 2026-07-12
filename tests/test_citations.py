@@ -1,4 +1,4 @@
-"""引用保真核查测试 — extract / audit 纯函数 + load_allowed + run + 门禁对接。"""
+"""引用保真核查测试 — extract / audit 纯函数 + load_allowed + run + 质量检查对接。"""
 
 from __future__ import annotations
 
@@ -207,7 +207,7 @@ def test_run_citation_audit_clean_passes(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 门禁对接:WRITE.citations (trigger citation_check, kind "citation")
+# 质量检查对接:WRITE.citations (trigger citation_check, kind "citation")
 # ---------------------------------------------------------------------------
 
 def test_gate_blocks_on_orphan(tmp_path):

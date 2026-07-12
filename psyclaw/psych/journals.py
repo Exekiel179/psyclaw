@@ -2,11 +2,11 @@
 
 每本期刊固化其**引用风格 / 摘要与字数 / 版块 / 报告标准 / 数据可得性 / 退稿红线**
 (数据在 journals.json)。AJS 的核心主张是「一套泛泛的学术写作助手学不会期刊间差异」——
-本模块把这些差异做成可查、可被门禁取用的结构化画像。纯知识数据,不含任何统计。
+本模块把这些差异做成可查、可被质量检查取用的结构化画像。纯知识数据,不含任何统计。
 
 用法:
   - 只读浏览:``print_journal([id])``(对齐 knowledge.py 的 method/design 目录风格)。
-  - 供门禁取判据:``get_journal(id)`` → 画像 dict;``requires_data_availability`` /
+  - 供质量检查取判据:``get_journal(id)`` → 画像 dict;``requires_data_availability`` /
     ``expected_citation_format`` 给 provenance / cite-check 定制判据。
 """
 

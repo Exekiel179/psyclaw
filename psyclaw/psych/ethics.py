@@ -1,4 +1,4 @@
-"""伦理门控 — D-3: 量表 notes 驱动的 IRB/危机转介提示(软门禁, warn)。
+"""伦理检查 — D-3: 量表 notes 驱动的 IRB/危机转介提示(提醒级, warn)。
 
 敏感量表的 notes 字段是触发源；数据感知检查在 score_datafile 中调用。
 所有逻辑纯 stdlib，无外部依赖。
@@ -123,7 +123,7 @@ def check_item_level_ethics(participants: list, scale: dict) -> list[str]:
 
 
 def ethics_summary(scale: dict, participants: list | None = None) -> dict:
-    """生成综合伦理摘要，可写入 sidecar JSON 供门禁系统查验。
+    """生成综合伦理摘要，可写入 sidecar JSON 供质量检查系统查验。
 
     返回 {ethics_prompted, ethics_warnings, ethics_level}
     ethics_level: "required" | "advisory" | "none"

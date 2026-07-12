@@ -1,4 +1,4 @@
-# PsyClaw 门禁规则（机器可校验）。checker.py 在每个产出点执行。
+# PsyClaw 质量规则（机器可校验）。checker.py 在每个产出点执行。
 # action: block（阻断并要求修复） | warn（警告并记审计日志）
 gates:
   - id: STAT.effect_size
@@ -64,7 +64,7 @@ gates:
     trigger: research_start
     requires: [clarification_card_all_resolved]
     action: block
-    fix: 运行 psyclaw clarify 完成全部 17 个槽位;notes/clarification.md 无 UNRESOLVED
+    fix: 运行 psyclaw clarify 完成全部 17 个研究准备项;notes/clarification.md 无 UNRESOLVED
 
   - id: DESIGN.evidence
     trigger: design_decision
@@ -101,7 +101,7 @@ gates:
     trigger: provenance_check
     requires: [replication_package_declared]
     action: block
-    fix: 该期刊 data_availability=required，须附 replication-package 声明；跑 psyclaw provenance <产物> --journal <期刊> --data <数据文件> 生成(非强制期刊自动放行)
+    fix: 该期刊 data_availability=required，须附 replication-package 声明；跑 psyclaw provenance <产物> --journal <期刊> --data <数据文件> 生成(非强制期刊不要求此项)
 
   - id: MEASURE.ethics
     trigger: scale_score_used

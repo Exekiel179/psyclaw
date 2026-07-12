@@ -14,7 +14,7 @@ description: 实现脚本并运行可复现的分析步骤。
 - 统计主路径用 Python（pingouin/statsmodels）+ R（lavaan/lme4）；
   检测到 Mplus/SPSS/Stata 时按项目配置可走商业软件
 - 所有图经 psyclaw.figures 统一主题（图片风格规范）
-- 每个统计结论必须产出可独立重跑的脚本 + 数据指纹（REPRO.script 门禁）
+- 每个统计结论必须产出可独立重跑的脚本 + 数据指纹（REPRO.script 质量检查）
 
 任何需要数据排除/重编码：先写 `notes/decision_request.md` 并停止，等人工批准。
 

@@ -104,19 +104,21 @@ def test_status_aggregates(tmp_path):
     assert "需要你确认" in st["decision_request"]
     assert st["last_blocked"].startswith("## t2")         # 只留最后一条
     assert st["loop"]["iteration"] == 2
+    assert st["loop"]["skipped"] == []
+    assert st["loop"]["needs_attention"] == ["meta-loop"]
     assert "✓ 通过" in st["workflow_verdict"]
     assert "goal.md" in " ".join(st["recent_artifacts"])
 
 
 def test_status_next_suggestion(tmp_path):
-    # 数据表 + 完整澄清卡 → next 应指向 analysis-loop
+    # 数据表 + 完整澄清卡 → next 应指向公开的 run analysis
     from psyclaw.psych.clarify import SLOTS
     notes = tmp_path / "notes"
     notes.mkdir()
-    lines = ["| 槽位 | 状态 | 内容 |", "|---|---|---|"] + \
+    lines = ["| 研究准备项 | 状态 | 内容 |", "|---|---|---|"] + \
             [f"| {s[0]} | resolved | x |" for s in SLOTS]
     (notes / "clarification.md").write_text("\n".join(lines), encoding="utf-8")
     (tmp_path / "scores.csv").write_text("g,y\na,1\nb,2\n", encoding="utf-8")
     st = collect_status(str(tmp_path))
-    assert st["next"] and "analysis-loop" in st["next"]["title"]
+    assert st["next"] and "run analysis" in st["next"]["title"]
     assert st["next"]["blocker"] is False

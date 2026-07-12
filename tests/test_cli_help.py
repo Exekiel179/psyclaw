@@ -48,6 +48,7 @@ def test_has_subparsers():
     # 至少应包含若干核心命令（统计命令已外移到成熟库/MCP）
     assert "repl" in names
     assert "research" in names
+    assert {"chat", "run", "auto"} <= set(names)
     assert "clarify" in names
     assert len(names) > 20
 
@@ -109,7 +110,12 @@ def test_help_compact_but_all_callable():
     assert "psyclaw commands" in (p.epilog or "")    # epilog 指路完整清单
 
 
-# --- 编排命令:loop(通用)+ <type>-loop(研究流程)+ research(固定全流程)----------
+# --- 公开模式:chat/run/auto;旧编排命令保留兼容 -------------------------------
+
+def test_three_public_modes_are_the_primary_mental_model():
+    from psyclaw.cli import CORE_COMMANDS
+    assert {"chat", "run", "auto"} <= CORE_COMMANDS
+    assert {"agent", "loop", "auto-loop", "analysis-loop"}.isdisjoint(CORE_COMMANDS)
 
 def test_loop_is_generic_orchestrator():
     """`loop` = 通用编排回路(run_loop);research 只做固定全流程,不再有 --freeform。"""

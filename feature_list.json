@@ -762,6 +762,36 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml/psyclaw/__init__.py(0.12.0);CHANGELOG.md(v0.12.0 段);docs/COMMANDS.md(46 条+eval 行);progress.md/session-handoff.md。终验:全量 pytest → 1460 passed;python -m psyclaw gates → 22 条规则 ✓;python -m psyclaw eval → 28/28 exit=0;python -m psyclaw version → 0.12.0"
+    },
+    {
+      "id": "feat-076",
+      "name": "交互心智模型收敛为 chat / run / auto",
+      "description": "公开入口从 agent/loop/research/*-loop/auto-loop 收敛为三种稳定用户意图:chat 自然语言协作、run 执行明确可复现流程、auto 据项目状态持续推进。新增 modes.py 只做共享路由,复用既有 workflow/pipeline/loop/autoloop;CLI/REPL/启动首屏/status/path ingest/README/TUTORIAL/COMMANDS/ARCHITECTURE/内置 skills 全部同步。旧 CLI 和 slash 命令保留兼容但退出主帮助;审批与访问明确为独立安全策略 approval/access,不再冒充交互模式。",
+      "dependencies": [
+        "feat-075"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/modes.py(run_mode/run_auto/normalize_run_type);psyclaw/cli.py(chat/run/auto parser+guide+compact help);psyclaw/repl.py(/run /auto /approval /access + legacy aliases);ui.py/status.py/path_ingest.py/autoloop.py;README.md/docs/{TUTORIAL,COMMANDS,ARCHITECTURE}.md;tests/test_modes.py + test_cli_help/test_repl_approval/status/path_ingest 回归。定向 342 passed;全量 1473 passed/12 个既有 Windows 图片与 MCP 环境失败;gates 22 条 ✓;eval 28/28;harness 100/100。"
+    },
+    {
+      "id": "feat-077",
+      "name": "用户术语统一为研究准备项 / 前置检查 / 质量检查",
+      "description": "清理用户界面、CLI 帮助、运行提示、研究准备清单、内置研究指令与当前文档中的生硬直译词。17 项澄清内容统一称研究准备项;正式流程启动条件称前置检查;产出规范校验称质量检查。保留 gates 命令、gate_* 函数、规则 ID、JSON 字段和旧澄清文档解析兼容。",
+      "dependencies": [
+        "feat-076"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/psych/{clarify,preregister}.py;psyclaw/workflows/{engine,steps,registry}.py;psyclaw/{cli,repl,status,autoloop,pipeline,loop,modes}.py;psyclaw/gates/*;内置 skills/agents;README/docs/DESIGN/AGENTS/CLAUDE;tests/test_terminology.py 术语回归。定向测试:C:/Python314/python -m pytest ... → 203 passed。全量:uv run --python 3.12 --with pytest python -m pytest -q → 1474 passed/12 个既有 Windows 图片与 MCP 环境失败。python -m psyclaw gates → 22 条规则;python -m psyclaw eval → 28/28;harness → 100/100;git diff --check 通过。"
+    },
+    {
+      "id": "feat-078",
+      "name": "统一 run 执行契约与可恢复状态",
+      "description": "公开 run 只展示 literature/analysis/meta/qualitative 四条稳定 workflow;默认连续执行,通过 --confirm-each 逐步确认、--exploratory 探索性运行、--resume 从最后成功步骤继续。每步原子写 .psyclaw/workflows/<id>.json,恢复时校验流程定义、目标、输入和产物。prepare 成为研究准备公开命令,clarify 保留兼容。auto 验收失败改记 needs_attention,本轮不空转、下次可重试;迭代上限改为每次运行而非项目累计。旧 --yes/--skip-gates 与 research/task 路由继续兼容但退出公开帮助。",
+      "dependencies": [
+        "feat-077"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/modes.py/cli.py/repl.py(统一参数与公开类型);workflows/engine.py(逐步原子检查点/checkpoint_value/安全恢复);autoloop.py/status.py(needs_attention+单次运行迭代上限);README/docs/内置 skills 同步;tests/test_modes.py/test_workflows.py/test_autoloop.py/test_status_sense.py 新增默认连续、无目标恢复输入、暂停续跑、输入/流程漂移拒绝、旧状态迁移测试。定向 189 passed;全量 uv run --python 3.12 --with pytest python -m pytest -q → 1483 passed/12 个既有 Windows 图片与 MCP 环境失败;gates 22 条;eval 28/28;harness 100/100;git diff --check 通过。"
     }
   ]
 }

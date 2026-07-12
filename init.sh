@@ -23,8 +23,8 @@ fi
 echo "--- pytest ---"
 "$PY" -m pytest -q -p no:cacheprovider
 
-# 4. 学术规范门禁自检
-echo "--- gates 门禁 ---"
+# 4. 研究质量检查
+echo "--- gates 质量检查 ---"
 "$PY" -m psyclaw gates || true
 
 echo "=== Verification Complete (clean state) ==="

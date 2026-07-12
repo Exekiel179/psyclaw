@@ -3,11 +3,11 @@
 每个 workflow 是纯数据(id/name/research_type/command/steps),steps 是 Step 列表。
 高级用户可在此自由拼装/拆解步骤,或新建研究类型流程——这是"可组合"的落点。
 
-四条研究流程(顶层命令 <type>-loop;通用编排回路是 `loop`):
-  lit-review   → lit-loop       文献综述/系统综述
-  meta         → meta-loop      元分析(统计委托 statsmodels 脚本)
-  analysis     → analysis-loop  实证分析(统计委托 pingouin/scipy 脚本)
-  qualitative  → qual-loop      质性研究(LLM 辅助编码,研究者复核)
+四条研究流程由 `run <类型>` 公开路由;`*-loop` command 字段仅保留兼容映射:
+  lit-review   → run literature
+  meta         → run meta
+  analysis     → run analysis
+  qualitative  → run qualitative
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ LIT_REVIEW = {
     "research_type": "文献综述 / 系统综述",
     "command": "lit-loop",
     "steps": [
-        Step("clarify", "澄清门禁", run=lambda ctx: {},
+        Step("clarify", "研究准备检查", run=lambda ctx: {},
              gate=gate_clarify_complete),
         Step("lit_search", "文献检索(PRISMA 识别)", run=step_lit_search),
         Step("screen", "筛选(PRISMA)", run=step_screen),
@@ -61,7 +61,7 @@ META = {
     "research_type": "元分析 (meta-analysis)",
     "command": "meta-loop",
     "steps": [
-        Step("clarify", "澄清门禁", run=lambda ctx: {},
+        Step("clarify", "研究准备检查", run=lambda ctx: {},
              gate=gate_clarify_complete),
         Step("load_effects", "载入并校验效应量表", run=step_load_effects),
         Step("meta_script", "生成可复现元分析脚本(委托 statsmodels)",
@@ -78,7 +78,7 @@ ANALYSIS = {
     "research_type": "实证研究 / 数据分析 (统计委托外部 pingouin/scipy)",
     "command": "analysis-loop",
     "steps": [
-        Step("clarify", "澄清门禁", run=lambda ctx: {},
+        Step("clarify", "研究准备检查", run=lambda ctx: {},
              gate=gate_clarify_complete),
         Step("inspect_data", "画像数据", run=step_inspect_data),
         Step("design", "研究/分析设计", run=step_design),
@@ -96,7 +96,7 @@ QUALITATIVE = {
     "research_type": "质性研究 (主题分析/扎根理论;LLM 辅助编码,研究者复核)",
     "command": "qual-loop",
     "steps": [
-        Step("clarify", "澄清门禁", run=lambda ctx: {},
+        Step("clarify", "研究准备检查", run=lambda ctx: {},
              gate=gate_clarify_complete),
         Step("load_transcripts", "载入转录稿", run=step_load_transcripts),
         Step("design", "质性研究设计", run=step_qual_design),

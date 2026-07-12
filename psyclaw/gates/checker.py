@@ -1,10 +1,10 @@
-"""门禁执行器 — 真实校验实现(stdlib only,v0.2)。
+"""质量检查执行器 — 真实校验实现(stdlib only,v0.2)。
 
 机制原则:
 1. **产出方不自证** —— analyze/loop 产出结构化 sidecar JSON(机器读),
-   由本模块独立校验;APA 文本只给人读,门禁不解析散文。
-2. **fail-closed** —— sidecar 缺失或不可解析,一律 blocking,不放行。
-3. **规则驱动** —— 门禁定义解析自 rules.yaml(最小行解析器,不依赖 pyyaml);
+   由本模块独立校验;APA 文本只给人读,质量检查不解析散文。
+2. **fail-closed** —— sidecar 缺失或不可解析,一律 blocking,质量检查不通过。
+3. **规则驱动** —— 质量规则解析自 rules.yaml(最小行解析器,不依赖 pyyaml);
    gate 的 trigger 与产出物 kind 匹配才执行;requirement 有已注册的
    校验函数则机器判定,没有则降级为"需人工核"warning(显式、不静默)。
 
@@ -173,30 +173,30 @@ REQUIREMENT_CHECKS = {
     # W-1 JARS gate — artifact 即 notes/jars_check.json(由 psyclaw jars 生成)
     "jars_missing_data": lambda d, base: bool(d.get("jars_missing_data_ok")),
     "jars_exclusions": lambda d, base: bool(d.get("jars_exclusions_ok")),
-    # D-3 伦理门控 — ethics_prompted 键由 psyclaw score 写入 sidecar
+    # D-3 伦理检查 — ethics_prompted 键由 psyclaw score 写入 sidecar
     # 键存在(True 或 False)表明伦理检查已运行；键缺失则视为未经伦理核查。
     "ethics_reviewed": lambda d, base: "ethics_prompted" in d,
-    # M-3 测量不变性门控 — sidecar 由 psyclaw invariance 生成
+    # M-3 测量不变性检查 — sidecar 由 psyclaw invariance 生成
     "invariance_tested": lambda d, base: d.get("invariance_tested") is True,
     "scalar_invariance_met": lambda d, base: d.get("scalar_invariance") is True,
-    # P3-1 元分析门控 — sidecar 由 psyclaw meta 生成
+    # P3-1 元分析检查 — sidecar 由 psyclaw meta 生成
     "meta_heterogeneity_reported": lambda d, base: d.get("meta_heterogeneity_reported") is True,
     "meta_effect_ci_reported": lambda d, base: d.get("meta_effect_ci_reported") is True,
-    # P4-1 等价检验门控 — sidecar 由 psyclaw tost 生成
+    # P4-1 等价检验检查 — sidecar 由 psyclaw tost 生成
     "equivalence_tested": lambda d, base: d.get("equivalence_tested") is True,
-    # W-2 引用保真门控 — sidecar 由 psyclaw cite-check 生成(notes/citation_audit.json)
+    # W-2 引用保真检查 — sidecar 由 psyclaw cite-check 生成(notes/citation_audit.json)
     # 只对**检出的**孤儿引用 fail-closed;无语料/无引用时 audit 另置 manual_review 供人工核。
     "no_fabricated_citations": lambda d, base: d.get("no_fabricated_citations") is True,
-    # R-2 复现溯源门控 — sidecar 由 psyclaw provenance 生成(<产物>.provenance.json)
+    # R-2 复现溯源检查 — sidecar 由 psyclaw provenance 生成(<产物>.provenance.json)
     # 完整=确切代码 + 环境 + 自然语言说明三要素齐(决策轨迹尽力采集,不作硬判据)。
     "provenance_complete": lambda d, base: d.get("provenance_complete") is True,
     # R-2 深化(feat-074)— 期刊画像 data_availability=required 才强制
-    # replication-package 声明;非强制期刊放行(条件式,同 axis_from_zero_or_flagged)。
+    # replication-package 声明;非强制期刊不要求此项(条件式,同 axis_from_zero_or_flagged)。
     "replication_package_declared": lambda d, base: (
         not d.get("data_availability_required")
         or d.get("replication_package_declared") is True
     ),
-    # FIG.honest 门控 — figure sidecar (by psyclaw figures --check)
+    # FIG.honest 检查 — figure sidecar (by psyclaw figures --check)
     "axis_from_zero_or_flagged": lambda d, base: (
         d.get("axis_from_zero", True) is not False
         or bool(d.get("truncation_flagged"))
@@ -204,7 +204,7 @@ REQUIREMENT_CHECKS = {
     "error_bar_meaning": lambda d, base: bool(str(d.get("error_bar_label", "")).strip()),
     "colorblind_safe": lambda d, base: d.get("colorblind_safe") is True,
     # 其余 requirement(apa7_*、prisma_flow、harking 等)暂无自动校验
-    # → check_artifact 会显式输出"需人工核"warning,绝不静默放行。
+    # → check_artifact 会显式输出"需人工核"warning,绝不静默判定为通过。
 }
 
 
@@ -213,7 +213,7 @@ REQUIREMENT_CHECKS = {
 # ---------------------------------------------------------------------------
 
 def check_artifact(artifact_path: str, kind: str) -> dict:
-    """对结构化产出物(sidecar JSON)跑与 kind 匹配的全部门禁。
+    """对结构化产出物(sidecar JSON)运行与 kind 匹配的全部质量检查。
 
     fail-closed:文件缺失/不可解析 → blocking。
     返回 {passed, blocking: [{gate, requirement, msg, fix}], warnings: [...]}。
@@ -225,7 +225,7 @@ def check_artifact(artifact_path: str, kind: str) -> dict:
     if not p.exists():
         return {"passed": False, "warnings": [],
                 "blocking": [{"gate": "GATE.artifact", "requirement": "sidecar_json",
-                              "msg": f"产出物缺失:{artifact_path}(fail-closed,不放行)",
+                              "msg": f"产出物缺失:{artifact_path}(fail-closed,质量检查未通过)",
                               "fix": "产出方必须落结构化 sidecar JSON"}]}
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
@@ -233,7 +233,7 @@ def check_artifact(artifact_path: str, kind: str) -> dict:
     except Exception as exc:  # noqa: BLE001
         return {"passed": False, "warnings": [],
                 "blocking": [{"gate": "GATE.artifact", "requirement": "sidecar_json",
-                              "msg": f"产出物不可解析:{exc}(fail-closed,不放行)",
+                              "msg": f"产出物不可解析:{exc}(fail-closed,质量检查未通过)",
                               "fix": "检查 JSON 格式"}]}
 
     base = p.parent
@@ -286,7 +286,7 @@ def check_artifact(artifact_path: str, kind: str) -> dict:
 
 def format_report(result: dict) -> str:
     lines = []
-    status = "✓ 门禁通过" if result["passed"] else "✗ 门禁阻断"
+    status = "✓ 质量检查通过" if result["passed"] else "✗ 质量检查未通过"
     lines.append(f"{status}(blocking {len(result['blocking'])} · "
                  f"warning {len(result['warnings'])})")
     for b in result["blocking"]:
@@ -309,7 +309,7 @@ def run_gates_selfcheck(verbose: bool = False) -> bool:
                  if r in REQUIREMENT_CHECKS)
 
     print(f"  PSYCLAW.md 规范        : {'存在 ✓' if spec_ok else '缺失 ✗'}")
-    print(f"  rules.yaml 门禁规则     : {len(rules)} 条已解析"
+    print(f"  rules.yaml 质量规则     : {len(rules)} 条已解析"
           + (" ✓" if rules else " ✗"))
     print(f"  figure_style.yaml      : {'存在 ✓' if fig_ok else '缺失 ✗'}")
     print(f"  requirement 自动校验   : {n_impl} 项已实现(未实现项显式标'人工核')")
@@ -317,7 +317,7 @@ def run_gates_selfcheck(verbose: bool = False) -> bool:
     ok = spec_ok and bool(rules) and fig_ok
 
     if verbose and ok:
-        print("\n  已注册门禁:")
+        print("\n  已注册质量检查:")
         for g in rules:
             reqs = g.get("requires") or g.get("requires_one_of") or g.get("forbids") or []
             auto = all(r in REQUIREMENT_CHECKS for r in reqs) if reqs else False

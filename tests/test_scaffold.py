@@ -15,7 +15,7 @@ from psyclaw.scaffold import (  # noqa: E402
     scaffold_project,
 )
 
-_CARD = """| 槽位 | 状态 | 内容 |
+_CARD = """| 研究准备项 | 状态 | 内容 |
 |---|---|---|
 | research_question | resolved | 正念干预能否降低大学生焦虑 |
 | design_type | resolved | 被试间随机对照 |
@@ -58,7 +58,7 @@ def test_overview_from_card(tmp_path):
     assert "**研究问题**：正念干预能否降低大学生焦虑" in text
     assert "**设计类型**：被试间随机对照" in text
     assert "## A.问题与理论" in text          # 按澄清卡类别组织
-    assert "已澄清 3/17 槽位" in text          # 只数 resolved
+    assert "已完成 3/17 个研究准备项" in text  # 只数 resolved
     assert "增量贡献" not in text              # unresolved 不进概览
 
 

@@ -15,8 +15,8 @@
 比对粒度 = **(首位作者姓氏, 4 位年份)**。文内引用与 ``citation_key`` 都只暴露首作者,粒度天然
 对齐;这也是查杜撰的行业标准粒度(能可靠抓出凭空捏造的作者/年份)。
 
-对接门禁:``run_citation_audit`` 落 ``notes/citation_audit.json`` sidecar(``no_fabricated_citations``
-布尔),``WRITE.citations`` 门禁(trigger ``citation_check``)据此 block 掉含孤儿引用的稿件。
+对接质量检查:``run_citation_audit`` 落 ``notes/citation_audit.json`` sidecar(``no_fabricated_citations``
+布尔),``WRITE.citations`` 质量检查(trigger ``citation_check``)据此标记含孤儿引用的稿件。
 """
 
 from __future__ import annotations
@@ -144,8 +144,8 @@ def audit_citations(text: str, allowed_keys: list[str]) -> dict:
                    for c in orphan],
         "orphan_n": len(orphan),
         "manual_review": manual,
-        # 门禁判据:孤儿数为 0 = 未检出杜撰。语料/引用缺失时另由 manual_review 显式提示人工核,
-        # 门禁只对**检出的**孤儿引用 fail-closed(不过度拦无引用的稿件)。
+        # 质量检查判据:孤儿数为 0 = 未检出杜撰。语料/引用缺失时另由 manual_review 显式提示人工核,
+        # 质量检查只对**检出的**孤儿引用 fail-closed(不过度限制无引用的稿件)。
         "no_fabricated_citations": len(orphan) == 0,
         "method": method,
     }
@@ -271,7 +271,7 @@ def run_citation_audit(manuscript_path: str, project_dir: str = ".",
     """跑引用保真核查并落 sidecar + 人读报告。返回 audit dict。
 
     ``journal`` 给定时附该期刊的引用**风格**核对与退稿红线提示(软提示;
-    孤儿引用仍是唯一的硬门禁判据)。
+    孤儿引用仍是唯一的强制质量检查判据)。
     """
     project = Path(project_dir)
     notes = project / "notes"

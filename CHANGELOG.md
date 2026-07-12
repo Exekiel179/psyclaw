@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### 改进
+- **运行行为统一**(feat-078):`run` 公开收敛到 literature/analysis/meta/qualitative 四条稳定
+  workflow,默认连续执行;新增 `--confirm-each`、`--exploratory`、`--resume`。每步写原子检查点,
+  恢复时校验流程定义、目标、输入和产物。`prepare` 成为研究准备公开命令。`auto` 验收失败改记
+  “需要处理”,本轮避免空转、下次可重试;迭代上限按单次运行计算。旧参数和旧入口继续兼容。
+- **用户术语统一**(feat-077):用户界面、CLI 帮助、研究准备清单、内置研究指令与当前文档
+  不再使用生硬的直译词。研究开始前统一称“前置检查”，产出规范校验统一称“质量检查”，
+  原有 17 项澄清内容统一称“研究准备项”。`gates` 命令、规则 ID 和内部字段保持兼容。
+- **交互心智模型收敛**(feat-076):公开入口统一为 `chat / run / auto`。缺省 `psyclaw`
+  进入 Chat;`run analysis|meta|literature|qualitative|research|task` 路由到既有 workflow/
+  pipeline/loop;`auto` 复用自主回路。旧 `agent/loop/*-loop/auto-loop/research/repl` 保持
+  兼容,退出默认帮助与主文档。REPL 同步提供 `/run`、`/auto`、`/approval ask|auto`、
+  `/access open|safe`,旧 `/agent /research-loop /yolo /safemode` 仍可调用。
+- README、教程、命令地图、架构文档、启动横幅、状态建议、文件分析提示和内置研究 skill
+  已统一到三入口模型;新增共享路由 `psyclaw/modes.py`,不复制现有执行逻辑或放松质量检查。
+
 ## v0.12.0(2026-07-11)
 
 > 主题:**自学习进 agent 模式 + 数据→结果→稿件闭环补完 + 可评测(eval harness)**。

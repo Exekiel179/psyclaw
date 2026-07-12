@@ -1,6 +1,6 @@
 """预注册模板生成(D-2)—— OSF / AsPredicted 双格式。
 
-把研究澄清卡(``notes/clarification.md``,17 槽位,见 ``clarify.py``)抽取为两份
+把研究准备清单(``notes/clarification.md``,17 个研究准备项,见 ``clarify.py``)抽取为两份
 **可直接粘贴提交**的预注册文稿:
 
   - **OSF Preregistration**(6 节标准模板:研究信息 / 设计计划 / 抽样计划 /
@@ -14,7 +14,7 @@
     并在告警里点名,提示补标。
   - 样本量依据可**复用 D-1 功效分析**(``power.compute``):给定检验类型+效应量即在
     预注册里嵌入确定性的功效/N 计算,并保留"发表偏倚高估"告警。
-  - 缺失的关键槽位渲染为 ``[待补充：…]`` 占位并汇总告警,绝不替用户编造内容。
+  - 缺失的关键研究准备项渲染为 ``[待补充：…]`` 占位并汇总告警,绝不替用户编造内容。
 
 纯函数(可单测,无 IO/网络/LLM):
   ``parse_clarification`` / ``split_hypotheses`` / ``build_prereg`` /
@@ -29,10 +29,10 @@ from pathlib import Path
 
 from psyclaw.psych.clarify import CARD_NAME, SLOTS
 
-# 合法槽位 id 集合(单一真源:与 clarify 的 17 槽位一致)。
+# 合法研究准备项 id 集合(单一真源:与 clarify 的 17 个研究准备项一致)。
 _VALID_SIDS = {s[0] for s in SLOTS}
 
-# 预注册的关键槽位:缺失即 fail-closed 告警(数据收集前必须补齐)。
+# 预注册的关键研究准备项:缺失即 fail-closed 告警(数据收集前必须补齐)。
 _CRITICAL = [
     ("research_question", "一句可检验的研究问题"),
     ("hypotheses", "逐条假设,每条标 [确证]/[探索]"),
@@ -57,11 +57,11 @@ _HYP_TAG_RE = re.compile(
 
 
 # ---------------------------------------------------------------------------
-# 一、澄清卡解析(纯函数)
+# 一、研究准备清单解析(纯函数)
 # ---------------------------------------------------------------------------
 
 def parse_clarification(text: str) -> dict:
-    """把澄清卡 markdown 表格解析为 ``{sid: 内容}``(仅含已 resolved 的非空值)。
+    """把研究准备清单 markdown 表格解析为 ``{sid: 内容}``(仅含已 resolved 的非空值)。
 
     只保留合法 sid 的行,自然滤掉表头 / 分隔行;还原被转义的 ``\\|``。
     """
@@ -98,9 +98,9 @@ def _detect_kind(frag: str) -> tuple[str, bool]:
 
 
 def split_hypotheses(text: str) -> list[dict]:
-    """把 hypotheses 槽位文本切分为 ``[{label, text, kind, tagged}]``。
+    """把 hypotheses 研究准备项文本切分为 ``[{label, text, kind, tagged}]``。
 
-    支持 ``H1[确证]:…;H2[探索]:…;RQ1:…`` 这类一行多假设(换行已被澄清卡压成空格)。
+    支持 ``H1[确证]:…;H2[探索]:…;RQ1:…`` 这类一行多假设(换行已被清单压成空格)。
     """
     text = (text or "").strip()
     if not text:
@@ -168,7 +168,7 @@ def power_justification_md(res: dict | None) -> str | None:
 # ---------------------------------------------------------------------------
 
 def build_prereg(answers: dict, power_res: dict | None = None) -> dict:
-    """据澄清卡答案 + 可选功效结果,组装结构化预注册数据 + 告警。"""
+    """据研究准备清单答案 + 可选功效结果,组装结构化预注册数据 + 告警。"""
     hyps = split_hypotheses(answers.get("hypotheses", ""))
     confirmatory = [h for h in hyps if h["kind"] == "confirmatory"]
     exploratory = [h for h in hyps if h["kind"] == "exploratory"]
@@ -178,7 +178,7 @@ def build_prereg(answers: dict, power_res: dict | None = None) -> dict:
 
     warnings: list[str] = []
     for sid, hint in missing:
-        warnings.append(f"关键槽位「{sid}」缺失：{hint}（数据收集前必须补齐）。")
+        warnings.append(f"关键研究准备项「{sid}」缺失：{hint}（数据收集前必须补齐）。")
     if hyps and not confirmatory:
         warnings.append("无确证性假设：所有结论将只能作探索性陈述（不可声称验证）。")
     if untagged:
@@ -186,7 +186,7 @@ def build_prereg(answers: dict, power_res: dict | None = None) -> dict:
         warnings.append(f"{len(untagged)} 条假设未标 [确证]/[探索]，已 fail-closed "
                         f"按探索性处理：{labs}。如属确证须显式补标后重生成。")
     if not hyps:
-        warnings.append("未解析到任何假设：请在澄清卡 hypotheses 槽位逐条列出并标注类型。")
+        warnings.append("未解析到任何假设：请在研究准备清单的 hypotheses 项逐条列出并标注类型。")
 
     rq = (answers.get("research_question") or "").strip()
     title = rq if rq else ""
@@ -234,7 +234,7 @@ def render_osf(prereg: dict) -> str:
     a = prereg["answers"]
     title = prereg["title"] or _placeholder("研究标题（可由研究问题概括）")
     conf_md = _render_hyp_list(
-        prereg["confirmatory"], "_（无确证性假设；如有请在澄清卡补标 [确证]）_")
+        prereg["confirmatory"], "_（无确证性假设；如有请在研究准备清单补标 [确证]）_")
     exp_md = _render_hyp_list(
         prereg["exploratory"], "_（无探索性假设/研究问题）_")
     power_block = prereg.get("power_md") or _slot(
@@ -243,7 +243,7 @@ def render_osf(prereg: dict) -> str:
 
     return f"""# 预注册（OSF Preregistration）
 
-> 自动据研究澄清卡（notes/{CARD_NAME}）生成 · date: {date.today().isoformat()}
+> 自动据研究准备清单（notes/{CARD_NAME}）生成 · date: {date.today().isoformat()}
 > 平台：OSF（https://osf.io/prereg） · **数据收集前**注册；提交前请人工逐节核校。
 
 ## 1. 研究信息（Study Information）
@@ -337,7 +337,7 @@ def render_aspredicted(prereg: dict) -> str:
 
     return f"""# 预注册（AsPredicted · 标准 8 问 + 题名/类型）
 
-> 自动据研究澄清卡（notes/{CARD_NAME}）生成 · date: {date.today().isoformat()}
+> 自动据研究准备清单（notes/{CARD_NAME}）生成 · date: {date.today().isoformat()}
 > 平台：AsPredicted（https://aspredicted.org） · **数据收集前**注册；提交前人工核校。
 
 **题名（Name）**：{title}
@@ -387,15 +387,15 @@ ASPREDICTED_NAME = "preregistration_aspredicted.md"
 
 
 def run_preregister(project_dir: str | Path = ".", fmt: str = "both") -> int:
-    """读澄清卡 → 生成预注册文稿。
+    """读研究准备清单 → 生成预注册文稿。
 
-    fmt: osf | aspredicted | both(默认)。样本量依据取自澄清卡 power 槽位文本
-    (功效/统计计算已外移到成熟库/MCP)。返回 0;澄清卡缺失返回 1(fail-closed)。
+    fmt: osf | aspredicted | both(默认)。样本量依据取自研究准备清单的 power 项文本
+    (功效/统计计算已外移到成熟库/MCP)。返回 0;研究准备清单缺失返回 1(fail-closed)。
     """
     project = Path(project_dir)
     card = project / "notes" / CARD_NAME
     if not card.exists():
-        print("找不到研究澄清卡：先跑 `psyclaw clarify` 完成 17 槽位澄清，"
+        print("找不到研究准备清单：先跑 `psyclaw prepare` 完成 17 个研究准备项，"
               f"再生成预注册（应在 {card}）。")
         return 1
 
@@ -415,7 +415,7 @@ def run_preregister(project_dir: str | Path = ".", fmt: str = "both") -> int:
         written.append(p)
 
     from psyclaw import ui
-    body = [f"槽位已解析：{len(answers)}/{len(_VALID_SIDS)}",
+    body = [f"研究准备项已解析：{len(answers)}/{len(_VALID_SIDS)}",
             f"假设：确证 {len(prereg['confirmatory'])} · "
             f"探索 {len(prereg['exploratory'])}"]
     print(ui.panel("Preregister — 预注册模板", "\n".join(body)))
@@ -426,7 +426,7 @@ def run_preregister(project_dir: str | Path = ".", fmt: str = "both") -> int:
         for w in prereg["warnings"]:
             print(ui.dim(f"    · {w}"))
     else:
-        print(ui.ok("\n  ✓ 关键槽位齐备，假设均已标注确证/探索。"))
+        print(ui.ok("\n  ✓ 关键研究准备项齐备，假设均已标注确证/探索。"))
     return 0
 
 

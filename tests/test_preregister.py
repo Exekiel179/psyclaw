@@ -4,7 +4,7 @@
   - 澄清卡解析是**纯函数**:与 clarify.write_card 的表格格式严格往返,还原转义。
   - 学术诚信:假设按确证/探索归类;未标注 → fail-closed 探索性 + 告警。
   - 样本量依据可复用 D-1 功效分析(power.compute),并保留发表偏倚告警。
-  - 缺失关键槽位 → [待补充] 占位 + 告警,绝不替用户编造。
+  - 缺失关键研究准备项 → [待补充] 占位 + 告警,绝不替用户编造。
   - 澄清卡缺失 → run_preregister fail-closed 返回 1。
 """
 
@@ -23,7 +23,7 @@ from psyclaw.psych.preregister import (  # noqa: E402
     split_hypotheses,
 )
 
-# 一份较完整的澄清答案(覆盖关键槽位 + 含管道符的内容做转义测试)。
+# 一份较完整的澄清答案(覆盖关键研究准备项 + 含管道符的内容做转义测试)。
 ANSWERS = {
     "research_question": "正念干预能否降低大学生 4 周后的焦虑?",
     "theory_base": "注意控制理论 vs 情绪调节理论",
@@ -70,7 +70,7 @@ def test_parse_clarification_skips_unresolved(tmp_path):
 
 
 def test_parse_clarification_ignores_header_rows():
-    parsed = parse_clarification("| 槽位 | 状态 | 内容 |\n|---|---|---|\n"
+    parsed = parse_clarification("| 研究准备项 | 状态 | 内容 |\n|---|---|---|\n"
                                  "| research_question | resolved | abc |")
     assert parsed == {"research_question": "abc"}
 
@@ -121,14 +121,14 @@ def test_build_prereg_counts_and_no_warnings_when_complete():
     assert len(prereg["confirmatory"]) == 1
     assert len(prereg["exploratory"]) == 2
     assert prereg["missing"] == []
-    # 关键槽位齐备 + 所有假设已标注 → 无告警。
+    # 关键研究准备项齐备 + 所有假设已标注 → 无告警。
     assert prereg["warnings"] == []
     assert prereg["title"] == ANSWERS["research_question"]
 
 
 def test_build_prereg_warns_on_missing_and_untagged():
     partial = {"research_question": "RQ",
-               "hypotheses": "干预有效"}      # 未标注 + 缺一堆关键槽位
+               "hypotheses": "干预有效"}      # 未标注 + 缺一堆关键研究准备项
     prereg = build_prereg(partial)
     assert "dv" in prereg["missing"]
     assert "analysis_plan" in prereg["missing"]
@@ -165,7 +165,7 @@ def test_render_osf_has_all_sections_and_hyps():
 def test_render_osf_placeholders_for_missing():
     prereg = build_prereg({"research_question": "只填了问题"})
     md = render_osf(prereg)
-    assert "[待补充：" in md                    # 缺失槽位用占位,不编造
+    assert "[待补充：" in md                    # 缺失研究准备项用占位,不编造
     assert "盲法" in md                         # 模板结构完整
 
 

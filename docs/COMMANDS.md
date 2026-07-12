@@ -4,27 +4,30 @@
 > PsyClaw 现为**纯研究编排 harness**——统计计算已外移到成熟库/MCP,本 CLI 不含统计命令。
 
 > 第一次用?运行 **`psyclaw guide`**(决策树上手),手把手教程见 **`docs/TUTORIAL.md`**。
-> `psyclaw --help` 暴露**全部**顶层命令;**`psyclaw commands`** 按职能分类列出(★ 标上手常用)。
+> `psyclaw --help` 只显示常用入口;**`psyclaw commands`** 按职能列出全部兼容/高级命令。
 
 ---
 
-## 命令总览(46 条)
+## 命令总览(56 条;默认帮助只突出 3 种交互入口与基础命令)
 
-> 默认路径:`psyclaw status`(看态势)→ `psyclaw auto-loop`(一键推进;门禁拦你可 `--skip-gates`
-> 显式跳过,留痕 + 产出标探索性)→ `psyclaw check 稿件.md`(投稿前一键质检)。
+> 三种工作方式:`psyclaw`(chat 对话)· `psyclaw run <类型>`(明确流程)·
+> `psyclaw auto`(持续推进)。旧 `agent/loop/*-loop/auto-loop` 保持兼容,不再是主入口。
 
 ### 环境 / 系统
 | 命令 | 作用 |
 |---|---|
-| `repl` | 交互式 REPL(缺省命令) |
-| `version` / `doctor` | 版本 / 环境自检(配置·MCP·Gates) |
+| `chat` / 缺省 `psyclaw` | 对话模式:边讨论边推进,工具按需使用并保留审批 |
+| `run <类型> <目标>` | 运行模式:`analysis/meta/literature/qualitative`;默认连续执行 |
+| `auto` | 自动模式:感知项目状态→派发流程→验收→记录→继续;强制检查未通过时暂停 |
+| `repl` | `chat` 的兼容别名 |
+| `version` / `doctor` | 版本 / 环境自检(配置·MCP·质量检查) |
 | `config` | 配置向导(API key/模型/环境变量) |
-| `setup` | 项目脚手架+能力选装:建目录 + 据 clarify 生成概览/项目记忆 + 装能力依赖(`--online`)+ 列 MCP/skill |
+| `setup` | 项目脚手架+能力选装:建目录 + 据研究准备清单生成概览/项目记忆 + 装能力依赖(`--online`)+ 列 MCP/skill |
 | `setup --env` | **一键配置基础环境**(v0.9):诊断配置文件/LLM key/stats/full 组,每项给 ✓✗+修法;`--online` 自动 pip 装可修的缺失组 |
 | `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH`;`--for <研究类型>` 按类型推荐)/ MCP 目录(内置 registry + 用户 `.psyclaw/mcp.yaml` 项目/全局)——**均标注 内置/用户·项目/用户·全局** |
 | `plugins` | 列出插件(用户 项目 `.psyclaw/plugins/` / 全局 `~/.psyclaw/plugins/`;`register(api)` 注册 agent 工具 / REPL 命令 / system 片段) |
-| `gates` | 学术规范门禁自检 |
-| `eval` | **确定性离线评测**(v0.12):编排/门禁/自学习契约的端到端 scorecard(6 用例 28 检查,不调 LLM/不联网/无统计库);`--case` 选用例、`--json` 机器可读;报告落 `.psyclaw/eval_report.json`,有失败退出码 1 |
+| `gates` | 质量规则系统自检(高级兼容命令;实际稿件用 `check`) |
+| `eval` | **确定性离线评测**(v0.12):编排/质量检查/自学习契约的端到端 scorecard(6 用例 28 检查,不调 LLM/不联网/无统计库);`--case` 选用例、`--json` 机器可读;报告落 `.psyclaw/eval_report.json`,有失败退出码 1 |
 | `commands` | 按职能分类列出全部命令 |
 | `status` | **一屏项目态势**:目标/澄清/回路/等人决策(直接打印内容)/最近产物/下一步建议 |
 
@@ -51,27 +54,27 @@
 ### 研究前规划 / 预注册
 | 命令 | 作用 |
 |---|---|
-| `clarify` | grill-me 式研究澄清,17 槽位,不澄清完不开工(`--status` 看进度) |
-| `declare-test --dv --test` | 预注册单个计划分析;研究者自由度门禁 |
-| `preregister` | OSF/AsPredicted 双格式预注册模板(据澄清卡抽取;样本量依据填澄清卡 power 槽位) |
+| `prepare` | 完成 17 个研究准备项,完成后再启动正式流程(`--status` 看进度) |
+| `clarify` | `prepare` 的兼容别名 |
+| `declare-test --dv --test` | 预注册单个计划分析;研究者自由度检查 |
+| `preregister` | OSF/AsPredicted 双格式预注册模板(据研究准备清单抽取;样本量依据取 power 项) |
 | `jars <draft>` | APA 2018 JARS 检查清单(quant/qual/mixed) |
 | `check [稿件.md] [--journal]` | **投稿前一键质检**:JARS + 引用保真(+期刊风格)+ 复现溯源 + KG 溯源,一屏汇总 ✓/✗/⚠ |
 | `cite-check <稿件.md>` | 引用保真核查:文内引用逐条溯源到检索命中,孤儿引用=疑似杜撰(反杜撰);`--journal` 附引用风格核对 + 退稿红线 |
 
-### 研究流程 / 编排回路
+### Run 类型
 | 命令 | 作用 |
 |---|---|
-| `agent <task> [--auto] [--max-iters 24] [--history [n]]` | 纯工具层循环:模型**自主多步调用工具**(search/read_file/save_file/kg_query/recall);文本约定协议、provider 无关保底;副作用工具需批准(REPL 内 `/agent` 开关)。v0.3+:截断防护(未闭合 tool 块自动续写,`PSYCLAW_MAX_TOKENS` 可配)+ 旧轮次结果滚动压缩;`save_file` 只能写项目根内(拒软链/凭据路径)。v0.4+:运行痕迹自动落 `.psyclaw/agent_runs.jsonl`,`--history [n]` 回看最近 n 次 |
-| `auto-loop` | 自主科研回路(Ralph 式自循环):每轮自动发现待办→派发对应 `<type>-loop`→**独立验收**(只读落盘产物)→记 `notes/autoloop_state.json`→决定下一步(`--max-iters` / `--auto` / `--skip-gates` 用户显式跳过门禁,留痕+产出标探索性;各 `<type>-loop` 同) |
-| `loop [主题]` | 通用流程编排回路(类 Claude Code 的 agentic loop:planner→执行→critic→修复),不绑研究类型 |
-| `lit-loop <主题>` | 文献综述:澄清→检索→筛选(PRISMA)→合成综述→评审 |
-| `meta-loop <effects.csv>` | 元分析:校验效应量表→生成可复现脚本(委托 statsmodels)→写→评审 |
-| `analysis-loop <data.csv>` | 实证分析:画像数据→设计→推荐分析+生成可复现脚本(委托 pingouin/scipy)→写→评审 |
-| `qual-loop <转录稿>` | 质性研究:载入转录稿→设计→主题分析(LLM 辅助,研究者复核)→写 COREQ 报告→评审 |
-| `research [topic]` | 不分类型的固定全流程:文献→设计→写作→评审→总验收 |
+| `run literature <主题>` | 文献综述:澄清→检索→筛选(PRISMA)→合成综述→评审 |
+| `run meta <effects.csv>` | 元分析:校验效应量表→外部 statsmodels→写作→评审 |
+| `run analysis <data.csv>` | 实证分析:画像→设计→外部 pingouin/MCP→写作→评审 |
+| `run qualitative <转录稿>` | 质性分析:载入→设计→主题分析→COREQ→评审 |
 
-> 见 `docs/ARCHITECTURE.md`。命名约定:**每个流程都是一个 "loop"**——`loop` 是通用编排器,
-> `<type>-loop` 是预置的具体研究流程;子功能可单用/可拼装。
+统一参数:`--confirm-each` 每步确认;`--exploratory` 跳过未完成的前置检查并标记探索性;
+`--resume` 从 `.psyclaw/workflows/<流程>.json` 的最后成功步骤继续。恢复时目标、输入和已有产物必须一致。
+
+兼容命令:`agent`、`loop`、`research`、`lit-loop`、`meta-loop`、`analysis-loop`、
+`qual-loop`、`auto-loop`。它们继续可调用,但新脚本与文档应使用 `run` / `auto`。
 
 ### 工作流 / 编排
 | 命令 | 作用 |
@@ -101,11 +104,15 @@
 | `figures` | 图表主题层 + FIG.honest 诚实性核查 + Okabe-Ito 调色板 |
 | `provenance <产物>` | 复现溯源:给生成脚本/图打包 代码+环境+说明+决策轨迹(`<产物>.provenance.json`);`--journal` 按数据可得性要求收紧,`data_availability=required` 期刊强制 replication-package 声明(v0.12,声明文本可直接放进稿件) |
 
-### REPL 交互命令(v0.11 新增,仅 `psyclaw repl` 内)
+### Chat 斜杠命令(缺省 `psyclaw` / `psyclaw chat` 内)
 | 命令 | 作用 |
 |---|---|
-| `/dump [--full] [路径]` | 导出当前对话为 Markdown;`--full` 连同不展示的隐藏上下文(system/决策备忘/约定片段)一并导出;拒写 `data/raw` |
-| `/yolo [on\|off]` | 审批模式:开=命令/文件覆盖/工具副作用自动放行,仅红线危险命令仍问;`config approval=yolo` 设默认。停机靠 no-progress 检测,不再卡低深度上限 |
+| `/run <类型> <目标>` | 在对话中调用与 CLI 相同的共享流程路由 |
+| `/auto` | 在对话中启动自主项目推进 |
+| `/goal [文本]` | 查看目标;带文本时写入 `notes/goal.md`,同时作为当前对话任务立即开始执行;目标会持续注入后续轮次,输入“继续”也不丢上下文 |
+| `/dump [--full] [路径]` | 导出当前对话为 Markdown;`--full` 连同不展示的隐藏上下文(system/当前目标/决策备忘/约定片段)一并导出;拒写 `data/raw` |
+| `/approval ask\|auto` | 副作用逐条确认或自动放行非危险操作;危险操作始终确认 |
+| `/access open\|safe` | 模型可请求读文件,或仅允许用户用 `@路径` 显式引用 |
 | `/img <路径>`（`/show`） | 终端内联渲染图片(iTerm2/WezTerm/VSCode/Warp/kitty;命令出图会自动显示);`config image_protocol` 可强制 iterm2\|kitty\|none |
 | `/memory verify` | 再验证环境教训卡:环境已恢复(装上库/命令有了)的自动失效归档,别再用过时的坑误导模型 |
 
@@ -124,7 +131,7 @@
    **pystat**(v0.8,pingouin/pandas:t 检验/相关/方差/回归/描述)默认启用。
    v0.5 起 **agent 会直接调用**这些 MCP:`agent`/REPL 的工具集自动并入已启用+健康的 MCP
    服务器工具(名字带 `mcp__<server>__` 前缀,属副作用工具需批准);`PSYCLAW_MCP_TOOLS=0` 可关。
-3. **REPL 自然语言**:在 `psyclaw repl` 里直接用自然语言提统计需求,ARS 规范已注入上下文。
+3. **Chat 自然语言**:直接运行 `psyclaw`,用自然语言提统计需求,ARS 规范已注入上下文。
 
-PsyClaw 负责把研究流程编排起来(澄清→文献→设计→写作→评审→门禁),
+PsyClaw 负责把研究流程编排起来(澄清→文献→设计→写作→评审→质量检查),
 统计这一环交给上面三者——这是本次重构后的明确分工(见 `CLAUDE.md` 铁律)。

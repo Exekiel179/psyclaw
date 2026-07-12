@@ -1,4 +1,4 @@
-"""D-3 伦理提示测试 — 量表 notes 关键词触发 / 数据感知条目检查 / 软门禁。"""
+"""D-3 伦理提示测试 — 量表 notes 关键词触发 / 数据感知条目检查 / 提醒级检查。"""
 
 from __future__ import annotations
 
@@ -280,11 +280,11 @@ def test_score_datafile_tipi_no_ethics_warn(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 门禁: MEASURE.ethics 在 rules.yaml 中存在且为 warn 级别
+# 质量检查: MEASURE.ethics 在 rules.yaml 中存在且为 warn 级别
 # ---------------------------------------------------------------------------
 
 def test_measure_ethics_gate_exists():
-    """MEASURE.ethics 门禁应在 rules.yaml 中注册。"""
+    """MEASURE.ethics 质量检查应在 rules.yaml 中注册。"""
     rules = load_rules()
     ids = {g["id"] for g in rules}
     assert "MEASURE.ethics" in ids
@@ -303,12 +303,12 @@ def test_measure_ethics_gate_trigger():
 
 
 def test_scale_artifact_with_ethics_prompted_passes_gate(tmp_path):
-    """sidecar JSON 含 ethics_prompted 键 → MEASURE.ethics 门禁通过（warn 中无该条）。"""
+    """sidecar JSON 含 ethics_prompted 键 → MEASURE.ethics 质量检查通过（warn 中无该条）。"""
     sidecar = {"ethics_prompted": True, "reliability_reported": True}
     p = tmp_path / "scale_result.json"
     p.write_text(json.dumps(sidecar), encoding="utf-8")
     result = check_artifact(str(p), "scale")
-    # warn 级别门禁不计入 blocking；ethics_reviewed 应通过（key 存在）
+    # warn 级别检查不计入 blocking；ethics_reviewed 应通过（key 存在）
     warn_gates = {w["gate"] for w in result["warnings"]}
     assert "MEASURE.ethics" not in warn_gates
 
@@ -324,7 +324,7 @@ def test_scale_artifact_without_ethics_key_warns(tmp_path):
 
 
 def test_measure_ethics_gate_does_not_block(tmp_path):
-    """MEASURE.ethics 是软门禁，不应出现在 blocking 列表。"""
+    """MEASURE.ethics 是提醒级检查，不应出现在 blocking 列表。"""
     sidecar = {}  # 无任何键
     p = tmp_path / "scale_result.json"
     p.write_text(json.dumps(sidecar), encoding="utf-8")

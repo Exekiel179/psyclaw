@@ -31,7 +31,7 @@ SERVER_NOTES: dict[str, str] = {
     "osf-mcp": "OSF 开放科学（预注册/数据托管）",
 }
 
-# origin=optional/user 的商业软件 MCP 不纳入 doctor 强制健康门禁（可选，非核心路径）
+# origin=optional/user 的商业软件 MCP 不纳入 doctor 强制健康检查（可选，非核心路径）
 OPTIONAL_ORIGINS = frozenset({"optional", "user"})
 
 
@@ -58,7 +58,7 @@ def _parse_registry(path: Path) -> list:
 
 
 def is_optional(entry: dict) -> bool:
-    """返回 True 表示该 MCP 为可选集成（commercial/user-built，不纳入强制健康门禁）。"""
+    """返回 True 表示该 MCP 为可选集成（commercial/user-built，不纳入强制健康检查）。"""
     return entry.get("origin", "builtin") in OPTIONAL_ORIGINS
 
 

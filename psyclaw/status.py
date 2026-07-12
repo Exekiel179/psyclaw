@@ -32,7 +32,7 @@ def collect_status(project_dir: str = ".") -> dict:
     except Exception:  # noqa: BLE001
         st["goal"] = ""
 
-    # 澄清进度
+    # 研究准备进度
     try:
         from psyclaw.psych.clarify import check_card
         card = check_card(project_dir)
@@ -49,9 +49,11 @@ def collect_status(project_dir: str = ".") -> dict:
         s = load_state(project_dir)
         st["loop"] = {"iteration": s.get("iteration", 0),
                       "completed": list(s.get("completed_actions", [])),
-                      "skipped": list(s.get("skipped", []))}
+                      "skipped": list(s.get("skipped", [])),
+                      "needs_attention": list(s.get("needs_attention", []))}
     except Exception:  # noqa: BLE001
-        st["loop"] = {"iteration": 0, "completed": [], "skipped": []}
+        st["loop"] = {"iteration": 0, "completed": [], "skipped": [],
+                      "needs_attention": []}
 
     # 等人决策(内容直接带出)/ 被阻塞
     notes = project / "notes"
@@ -126,13 +128,15 @@ def print_status(st: dict) -> None:
     c = st["clarify"]
     if c["exists"]:
         mark = "✓" if c["unresolved"] == 0 else f"{c['resolved']}/{c['total']}(未解决 {c['unresolved']})"
-        print(f"  澄清      : {mark}")
+        print(f"  研究准备  : {mark}")
     else:
-        print(ui.dim("  澄清      : 未开始(psyclaw clarify;或各 loop 加 --skip-gates 显式跳过)"))
+        print(ui.dim("  研究准备  : 未开始(psyclaw prepare;探索性运行可加 --exploratory)"))
 
     lp = st["loop"]
-    if lp["iteration"] or lp["completed"] or lp["skipped"]:
+    if lp["iteration"] or lp["completed"] or lp["skipped"] or lp["needs_attention"]:
         print(f"  回路      : 迭代 {lp['iteration']} · 完成 {', '.join(lp['completed']) or '—'}"
+              + (f" · 需要处理 {', '.join(lp['needs_attention'])}"
+                 if lp["needs_attention"] else "")
               + (f" · 跳过 {', '.join(lp['skipped'])}" if lp["skipped"] else ""))
     if st.get("workflow_verdict"):
         print(f"  总验收    : {st['workflow_verdict']}")
@@ -151,9 +155,9 @@ def print_status(st: dict) -> None:
 
     nxt = st.get("next")
     if nxt:
-        tag = "⚠ 被门禁拦" if nxt["blocker"] else "→ 建议下一步"
+        tag = "⚠ 前置检查未通过" if nxt["blocker"] else "→ 建议下一步"
         print(ui.accent(f"\n  {tag}:{nxt['title']}") + ui.dim(f" — {nxt['reason']}"))
-        print(ui.dim("    psyclaw auto-loop 一键推进" +
-                     ("(或对应命令处理门禁)" if nxt["blocker"] else "")))
+        print(ui.dim("    psyclaw auto 一键推进" +
+                     ("(或按提示完成前置检查)" if nxt["blocker"] else "")))
     else:
         print(ui.ok("\n  ✓ 无待办 — 所有可发现的研究阶段已完成或无输入(psyclaw guide 看上手)"))

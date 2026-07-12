@@ -29,8 +29,8 @@ def _notes(tmp_path: Path) -> Path:
 
 
 def _complete_card(tmp_path: Path) -> None:
-    """写一张 17 槽位全 resolved 的澄清卡(过澄清门禁)。"""
-    lines = ["| 槽位 | 状态 | 内容 |", "|---|---|---|"]
+    """写一张 17 个研究准备项全 resolved 的清单(通过研究准备检查)。"""
+    lines = ["| 研究准备项 | 状态 | 内容 |", "|---|---|---|"]
     for sid, *_ in SLOTS:
         lines.append(f"| {sid} | resolved | 测试内容 |")
     (_notes(tmp_path) / "clarification.md").write_text(
@@ -244,11 +244,11 @@ def test_decide_empty_backlog():
 
 def test_decide_blocker_stops():
     d, why = decide({"iteration": 0}, [{"blocker": True, "reason": "x"}], max_iters=6)
-    assert d == "stop" and "门禁" in why
+    assert d == "stop" and "前置检查" in why
 
 
 def test_decide_max_iters_precedes_blocker():
-    # 同时撞上限且 backlog 顶是 blocker → 按 max_iters 停(理由是上限,不是门禁)
+    # 同时撞上限且 backlog 顶是 blocker → 按 max_iters 停(理由是上限,不是前置检查)
     d, why = decide({"iteration": 6}, [{"blocker": True, "reason": "x"}], max_iters=6)
     assert d == "stop" and "上限" in why
 
@@ -258,7 +258,7 @@ def test_decide_continue():
     assert d == "continue"
 
 
-# --- 硬门禁 fail-closed / 派发副作用 -----------------------------------------
+# --- 强制检查 fail-closed / 派发副作用 ---------------------------------------
 
 def test_clarify_card_fails_closed_on_exception(tmp_path, monkeypatch):
     # 澄清卡损坏/不可读 → 当作未完成(fail-closed),而非放行
@@ -321,18 +321,33 @@ def test_state_roundtrip_and_record(tmp_path):
     record_iteration(st, {"action": "meta-loop", "title": "元分析"},
                      {"passed": False, "reasons": ["数据不足"]})
     assert st["iteration"] == 2
-    assert "meta-loop" in st["skipped"]
+    assert "meta-loop" in st["needs_attention"]
+    assert "meta-loop" not in st["skipped"]
     assert len(st["history"]) == 2
 
     save_state(st, str(tmp_path))
     st2 = load_state(str(tmp_path))
     assert st2["iteration"] == 2
     assert st2["completed_actions"] == ["lit-loop"]
-    assert st2["skipped"] == ["meta-loop"]
+    assert st2["skipped"] == []
+    assert st2["needs_attention"] == ["meta-loop"]
 
 
 def test_state_path_under_notes(tmp_path):
     assert autoloop.state_path(str(tmp_path)).name == "autoloop_state.json"
+
+
+def test_old_failed_skips_migrate_to_retryable_attention(tmp_path):
+    notes = _notes(tmp_path)
+    (notes / "autoloop_state.json").write_text(json.dumps({
+        "iteration": 3,
+        "completed_actions": [],
+        "skipped": ["analysis-loop"],
+        "history": [],
+    }), encoding="utf-8")
+    state = load_state(str(tmp_path))
+    assert state["skipped"] == []
+    assert state["needs_attention"] == ["analysis-loop"]
 
 
 # --- feat-020:感知阶段挂 skill 推荐 ----------------------------------------

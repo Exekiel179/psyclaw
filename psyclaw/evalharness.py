@@ -1,6 +1,6 @@
 """确定性离线评测框架(eval harness,feat-073)。
 
-评的是 psyclaw 自身的**编排 / 门禁 / 自学习契约**是否仍然成立——不调 LLM、
+评的是 psyclaw 自身的**编排 / 质量检查 / 自学习契约**是否仍然成立——不调 LLM、
 不联网、不依赖统计库(统计外移铁律),全部用例离线秒级可复跑,结果确定。
 pytest 保证"函数各自正确",eval harness 保证"关键链路端到端仍守约",
 且产出结构化 scorecard 供发布评估 / 回归对比。
@@ -164,7 +164,7 @@ def case_lit_screen(tmp: Path) -> list[dict]:  # noqa: ARG001
 
 
 # ---------------------------------------------------------------------------
-# 用例 4:门禁执行 —— 合规 sidecar 放行;缺效应量阻断;文件缺失 fail-closed
+# 用例 4:质量检查 —— 合规 sidecar 通过;缺效应量未通过;文件缺失 fail-closed
 # ---------------------------------------------------------------------------
 
 def case_gates_enforcement(tmp: Path) -> list[dict]:
@@ -182,7 +182,7 @@ def case_gates_enforcement(tmp: Path) -> list[dict]:
     gp = tmp / "stat_ok.json"
     gp.write_text(json.dumps(good), encoding="utf-8")
     res = check_artifact(str(gp), "stat")
-    checks.append(_check("门禁:合规统计产出放行(无 blocking)",
+    checks.append(_check("质量检查:合规统计产出通过(无 blocking)",
                          res["passed"] and not res["blocking"],
                          json.dumps(res["blocking"], ensure_ascii=False)[:300]))
 
@@ -193,17 +193,17 @@ def case_gates_enforcement(tmp: Path) -> list[dict]:
     res2 = check_artifact(str(bp), "stat")
     hit = [b for b in res2["blocking"] if b["requirement"] in
            ("effect_size", "confidence_interval")]
-    checks.append(_check("门禁:缺效应量+CI 被阻断(学术诚信铁律)",
+    checks.append(_check("质量检查:缺效应量+CI 未通过(学术诚信铁律)",
                          not res2["passed"] and bool(hit),
                          json.dumps(res2["blocking"], ensure_ascii=False)[:300]))
 
     res3 = check_artifact(str(tmp / "missing.json"), "stat")
-    checks.append(_check("门禁:产出物缺失 fail-closed 不放行",
+    checks.append(_check("质量检查:产出物缺失时 fail-closed",
                          not res3["passed"] and res3["blocking"]))
 
     (tmp / "broken.json").write_text("{not json", encoding="utf-8")
     res4 = check_artifact(str(tmp / "broken.json"), "stat")
-    checks.append(_check("门禁:产出物不可解析 fail-closed 不放行",
+    checks.append(_check("质量检查:产出物不可解析时 fail-closed",
                          not res4["passed"] and res4["blocking"]))
     return checks
 
@@ -328,7 +328,7 @@ CASES: dict = {
     "lit_screen": (case_lit_screen,
                    "文献初筛:计数自洽;零重叠诚实降级"),
     "gates_enforcement": (case_gates_enforcement,
-                          "门禁:合规放行/违规阻断/缺失 fail-closed"),
+                          "质量检查:合规通过/违规不通过/缺失 fail-closed"),
     "error_learning": (case_error_learning,
                        "错误自学习:三类蒸馏;ok 输出不误学;去重"),
     "toolloop_discipline": (case_toolloop_discipline,

@@ -1,7 +1,7 @@
 """psyclaw.figures — 统一图表主题层 (E-1)
 
 所有子技能出图走同一入口，实施 figure_style.yaml 的 APA7/nature/frontiers 预设
-与诚实性门禁（y 轴归零、误差棒标注、色盲友好调色板）。
+与诚实性质量检查（y 轴归零、误差棒标注、色盲友好调色板）。
 
 公开接口:
   apply_style(name)          contextmanager — 应用 matplotlib rcParams
@@ -246,7 +246,7 @@ def apply_style(name: str | None = None) -> Iterator[None]:
 
 
 # ---------------------------------------------------------------------------
-# honesty_check — 图表诚实性核查（对应 FIG.honest 门禁）
+# honesty_check — 图表诚实性核查（对应 FIG.honest 质量检查）
 # ---------------------------------------------------------------------------
 
 def honesty_check(spec: dict[str, Any]) -> dict[str, Any]:
@@ -315,7 +315,7 @@ def write_figure_sidecar(
     dual_axis_flagged: bool = False,
     extra: dict[str, Any] | None = None,
 ) -> Path:
-    """写入图表诚实性 sidecar JSON，供 FIG.honest 门禁机器校验。
+    """写入图表诚实性 sidecar JSON，供 FIG.honest 质量检查机器校验。
 
     返回写入的路径。
     """
