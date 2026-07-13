@@ -852,6 +852,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/cli.py(_print_encoding_safe+cmd_eval 落盘先行/stderr);psyclaw/evalharness.py(ids 去重)。tests/test_evalharness.py TestEvalOutputRobustness +4 例(GBK stdout 不崩且中文保留/打印崩报告仍在/--json stdout 纯净/重复用例合计=分项)。全量 pytest → 1540 passed"
+    },
+    {
+      "id": "feat-085",
+      "name": "选择器 CJK 显示宽度几何(v0.12 评审修复:中文选项物理换行致原地重画花屏)",
+      "description": "评审 finding 6:_pick_inline 按 len() 码点数截断,CJK 每字符占 2 列——60 个中文字符在 100 列终端 len=60≤avail 不触发截断,实际渲染 ~120 列物理换行成 2 行,固定行数的 \\033[nA 光标上移随即错位,每次按键重画叠加花屏(本产品 UI 主语言就是中文,常态触发)。修复:_draw 改用 ui 的 CJK 感知工具(_clip 显示宽度截断/display_width 判断/wrap_display 详情区折行),前缀预算按多选框+编号位数动态算并留 1 列安全边距;parse_choices 在解析源头把选项内嵌 \\n 单行化(多物理行同样破坏几何);ui._ANSI_RE 从仅 SGR(m)扩到全部 CSI 序列(\\x1b[K 清行等不再被计为 3 列假宽度)。",
+      "dependencies": [
+        "feat-071"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/choices.py(_draw 显示宽度几何+parse_choices 单行化);psyclaw/ui.py(_ANSI_RE 全 CSI)。tests/test_choices_reads.py +3 例(60 CJK 字符选项任何输出行显示宽度≤终端列宽/CJK 截断详情区给全文且不超宽/JSON 选项内嵌换行单行化)。全量 pytest → 1543 passed"
     }
   ]
 }

@@ -39,7 +39,10 @@ def parse_choices(reply: str, heuristic: bool = True) -> dict | None:
     if m:
         try:
             obj = json.loads(m.group("body").strip())
-            opts = [str(o).strip() for o in obj.get("options", []) if str(o).strip()]
+            # 压平空白(feat-085):选项含内嵌 \n 会让内联菜单多占物理行,
+            # 固定行数的原地重画错位——单行化在解析源头一次做掉。
+            opts = [" ".join(str(o).split()) for o in obj.get("options", [])
+                    if str(o).strip()]
             if len(opts) >= 2:
                 return {"question": str(obj.get("question", "")).strip() or "请选择",
                         "multi": bool(obj.get("multi", True)),
@@ -140,10 +143,14 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
             else "↑↓ 移动 · 回车/空格选定 · Esc 跳过 · 直接打字作答")
     out = sys.stdout
     out.write(ui.accent(f"  {choice['question']}") + ui.dim(f"  ({hint})") + "\n")
-    # 按终端宽度截断,高亮项被截断时在下方详情区给全文(feat-071,用户反馈:
-    # 选项框出来时看不见选项所说的方案)。详情区固定 2 行占位,重画几何稳定。
+    # 按终端**显示宽度**截断(feat-085 评审修复:此前按 len() 码点数截断,
+    # CJK 每字符占 2 列——60 个中文字符在 100 列终端不触发截断却物理换行,
+    # 固定行数的光标上移原地重画随即错位花屏;改用 ui 的 CJK 感知宽度工具)。
+    # 高亮项被截断时在下方详情区给全文(feat-071);详情区固定 2 行,几何稳定。
     width = max(40, shutil.get_terminal_size((100, 24)).columns)
-    avail = width - 12
+    # 前缀最大占用:4 缩进 + 勾选框(多选 4)+ 编号("NN. ")+ 1 列安全边距
+    prefix_cols = 4 + (4 if multi else 0) + len(str(n)) + 2 + 1
+    avail = max(10, width - prefix_cols)
     detail_rows = 2
 
     def _draw(first: bool = False) -> None:
@@ -151,7 +158,7 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
             out.write(f"\033[{n + detail_rows}A")   # 光标回菜单首行,原地重画
         for i, o in enumerate(opts):
             box = ("[x] " if i in checked else "[ ] ") if multi else ""
-            cut = o[:avail] + ("…" if len(o) > avail else "")
+            cut = ui._clip(o, avail)                # 显示宽度截断(CJK=2 列)
             line = f"{box}{i + 1}. {cut}"
             if i == sel:
                 out.write("\033[K  " + ui.paint("▸ " + line, "brcyan", "bold") + "\n")
@@ -159,13 +166,11 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
                 out.write("\033[K    " + line + "\n")
         full = opts[sel]
         detail: list[str] = []
-        if len(full) > avail:                       # 高亮项截断了 → 详情区给全文
-            body, w = full, max(20, width - 8)
-            while body and len(detail) < detail_rows:
-                detail.append(body[:w])
-                body = body[w:]
-            if body:
-                detail[-1] = detail[-1][:-1] + "…"
+        if ui.display_width(full) > avail:          # 高亮项截断了 → 详情区给全文
+            segs = ui.wrap_display(full, max(20, width - 8))
+            detail = segs[:detail_rows]
+            if len(segs) > detail_rows:
+                detail[-1] = ui._clip(detail[-1], max(19, width - 9))
         for r in range(detail_rows):
             txt = detail[r] if r < len(detail) else ""
             out.write("\033[K" + (ui.dim("    ▏" + txt) if txt else "") + "\n")
