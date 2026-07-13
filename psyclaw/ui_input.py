@@ -159,6 +159,149 @@ else:
 
 
 # ---------------------------------------------------------------------------
+# 生成期 ESC 监听(feat-090)
+# ---------------------------------------------------------------------------
+
+
+class EscapeWatch:
+    """生成期 ESC 监听:LLM 流式输出时按 ESC 取消本轮(feat-090,用户实测反馈)。
+
+    进入时把 stdin 置 cbreak(逐键可读——canonical 模式下孤立 ESC 停在行编辑
+    缓冲,select 根本看不见);``pressed()`` 零超时轮询:
+    - 孤立 ESC(30ms 内无后续字节)→ True,调用方取消本轮生成;
+    - 其他按键暂存,退出时尝试 TIOCSTI 回注终端输入队列(老 Linux 可保
+      type-ahead);现代 macOS(EPERM)/Linux≥6.2 内核禁 TIOCSTI → 丢弃并
+      **明示提示**——诚实降级,绝不静默吞键;
+    - 非 TTY / 不可用平台 → 全程 no-op,``pressed()`` 恒 False(管道/CI 零影响)。
+    """
+
+    def __init__(self) -> None:
+        self._active = False
+        self._win = False
+        self._fd: int | None = None
+        self._saved = None
+        self._stash = bytearray()
+
+    def __enter__(self) -> "EscapeWatch":
+        try:
+            if os.name == "nt":
+                import msvcrt  # noqa: F401
+                self._win = True
+                self._active = True
+                return self
+            if not sys.stdin.isatty():
+                return self
+            import termios
+            import tty
+            self._fd = sys.stdin.fileno()
+            self._saved = termios.tcgetattr(self._fd)
+            tty.setcbreak(self._fd, termios.TCSADRAIN)
+            self._active = True
+        except Exception:  # noqa: BLE001  # 监听装不上就装不上,绝不影响生成
+            self._active = False
+        return self
+
+    def pressed(self) -> bool:
+        """零阻塞轮询:检测到孤立 ESC 返回 True;其余键入暂存待回注。"""
+        if not self._active:
+            return False
+        try:
+            if self._win:
+                import msvcrt
+                hit = False
+                while msvcrt.kbhit():
+                    ch = msvcrt.getwch()
+                    if ch == "\x1b":
+                        hit = True
+                    else:
+                        self._stash.extend(ch.encode("utf-8", "ignore"))
+                return hit
+            import select
+            while select.select([self._fd], [], [], 0)[0]:
+                b = os.read(self._fd, 1)
+                if not b:
+                    return False
+                if b == b"\x1b":
+                    # 方向键/Alt 组合的 ESC 后 30ms 内有后续字节;孤立 ESC = 用户中断
+                    if not select.select([self._fd], [], [], 0.03)[0]:
+                        return True
+                    self._stash.extend(b)          # 序列开头照常暂存
+                else:
+                    self._stash.extend(b)
+            return False
+        except Exception:  # noqa: BLE001
+            return False
+
+    def __exit__(self, *exc) -> bool:
+        if not self._active:
+            return False
+        self._active = False
+        try:
+            if not self._win and self._saved is not None:
+                import termios
+                termios.tcsetattr(self._fd, termios.TCSADRAIN, self._saved)
+            if self._stash:
+                self._replay_stash()
+        except Exception:  # noqa: BLE001
+            pass
+        return False
+
+    def _replay_stash(self) -> None:
+        """把生成期误读的按键回注终端输入队列(TIOCSTI),type-ahead 不丢。"""
+        try:
+            if self._win:
+                raise OSError("windows 无 TIOCSTI")
+            import fcntl
+            import termios
+            for i in range(len(self._stash)):
+                fcntl.ioctl(self._fd, termios.TIOCSTI, bytes(self._stash[i:i + 1]))
+        except Exception:  # noqa: BLE001  # 回注失败诚实提示,不静默吞键
+            try:
+                sys.stdout.write("\n  (生成期间的键入无法保留,已丢弃,请重新输入)\n")
+                sys.stdout.flush()
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def stream_interruptible(gen, esc: "EscapeWatch"):
+    """把流式生成器包成可中断迭代:等首 token / chunk 间隙也响应 ESC(feat-090)。
+
+    直接在 for 循环里查 ``esc.pressed()`` 是 chunk 粒度——provider 首 token
+    未到时循环体一次都不跑,ESC 石沉大海(活体实测)。这里把消费挪到后台
+    daemon 线程,主线程 0.1s 轮询队列 + ESC,任何等待期都能即时取消;
+    中断后线程随生成器自然耗尽(daemon,不阻塞退出)。
+    """
+    import queue
+    import threading
+    q: "queue.Queue" = queue.Queue()
+    done = object()
+
+    def _worker():
+        try:
+            for ch in gen:
+                q.put(ch)
+            q.put(done)
+        except BaseException as exc:  # noqa: BLE001  # 异常原样转主线程抛
+            q.put(exc)
+
+    threading.Thread(target=_worker, daemon=True).start()
+    while True:
+        try:
+            item = q.get(timeout=0.1)
+        except queue.Empty:
+            if esc.pressed():
+                raise KeyboardInterrupt("用户 ESC 中断生成")
+            continue
+        if item is done:
+            return
+        if isinstance(item, BaseException):
+            raise item
+        yield item
+        if esc.pressed():
+            raise KeyboardInterrupt("用户 ESC 中断生成")
+
+
+# ---------------------------------------------------------------------------
 # 渲染
 # ---------------------------------------------------------------------------
 

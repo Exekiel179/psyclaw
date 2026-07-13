@@ -601,6 +601,14 @@ def apply_save_block(blk: dict, confirm=None) -> dict:
         return {"status": "error", "path": str(p), "error": str(exc)}
 
 
+def _is_exit_word(line: str) -> bool:
+    """裸退出词:quit / exit(不带斜杠也认,feat-090 用户实测反馈)。纯函数可单测。
+
+    只认整行精确词(小写归一)——「exit code 怎么看」这类正常提问不受影响。
+    """
+    return (line or "").strip().lower() in ("quit", "exit")
+
+
 def _build_system_prompt() -> str:
     """瘦核心系统提示(长上下文优化:知识库改为按消息动态注入)。"""
     from psyclaw.context import lean_core
@@ -826,11 +834,14 @@ class ReplSession:
             blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
             reply_parts: list[str] = []
             try:
-                for chunk in self.provider.chat(self.messages, system=system):
-                    blk.write(chunk)
-                    reply_parts.append(chunk)
-            except KeyboardInterrupt:          # Ctrl+C = 取消本轮,不炸 REPL(评审修复)
-                blk.write("\n[已中断本轮生成]")
+                from psyclaw.ui_input import EscapeWatch, stream_interruptible
+                with EscapeWatch() as esc:     # feat-090:生成中按 ESC 也能取消本轮
+                    for chunk in stream_interruptible(
+                            self.provider.chat(self.messages, system=system), esc):
+                        blk.write(chunk)
+                        reply_parts.append(chunk)
+            except KeyboardInterrupt:          # Ctrl+C / ESC = 取消本轮,不炸 REPL
+                blk.write("\n[已中断本轮生成(ESC/Ctrl+C)]")
                 blk.close()
                 self.messages.pop()
                 return
@@ -1116,6 +1127,9 @@ class ReplSession:
             res = run_tool_loop(
                 self.provider, system, self.messages, project_dir=".",
                 approve=_approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
+        except KeyboardInterrupt:              # feat-090:ESC/Ctrl+C 取消本轮,不炸 REPL
+            print(ui.warn("  [已中断本轮生成(ESC/Ctrl+C)]"))
+            return None
         except Exception as exc:  # noqa: BLE001
             print(ui.err(f"  [provider 错误] {exc}"))
             return None
@@ -1647,6 +1661,8 @@ class ReplSession:
                 break
             if not line:
                 continue
+            if _is_exit_word(line):        # feat-090:裸 quit/exit 也认(用户实测反馈)
+                break
             try:
                 if line.startswith("/"):
                     if not self.handle_command(line):
