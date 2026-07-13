@@ -159,7 +159,7 @@ def write_abstract(draft: str, provider, bilingual: bool = True) -> dict:
 
     try:
         from psyclaw.loop import _gen
-        raw = _gen(provider, "executor", _ABSTRACT_TASK,
+        raw = _gen(provider, "writer", _ABSTRACT_TASK,   # feat-095:摘要同属写作
                    f"# 论文草稿\n{draft[:8000]}")
     except Exception as exc:  # noqa: BLE001
         raw = f"[abstract 生成失败] {exc}"
@@ -252,7 +252,9 @@ def write_paper(
     from psyclaw.loop import _gen
 
     task = get_write_task(backend, goal)
-    draft = _gen(provider, "executor", task, context)
+    # feat-095:写作用 writer 角色——此前借用 executor(「你可以写脚本、运行命令」),
+    # 模型把稿件写成执行独白 + 另写带错脚本(对抗评估实测,评审面板直接 REJECT)。
+    draft = _gen(provider, "writer", task, context)
 
     meta: dict = {"backend": backend, "jars": None, "abstract": None}
 

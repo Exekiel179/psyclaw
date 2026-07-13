@@ -368,6 +368,32 @@ def test_write_paper_builtin_creates_report(tmp_path):
     assert meta["backend"] == BACKEND_BUILTIN
 
 
+def test_writer_agent_definition_exists():
+    """feat-095:写作角色定义——输出即稿件正文,不写执行独白/不贴执行代码块。"""
+    from pathlib import Path
+    import psyclaw
+    p = Path(psyclaw.__file__).parent / "agents" / "writer.md"
+    s = p.read_text(encoding="utf-8")
+    assert "稿件正文" in s
+    assert "执行计划" in s and "过程叙述" in s
+    assert "待统计脚本运行后回填" in s          # 缺数值占位而非编造
+
+
+def test_write_paper_uses_writer_role(tmp_path, monkeypatch):
+    """feat-095:写作步用 writer 角色——此前借 executor(可写脚本跑命令),
+    对抗评估实测 report.md 产出为执行独白+带错脚本,评审面板 REJECT。"""
+    from psyclaw import loop as L
+    seen = {}
+    def _fake_gen(provider, role, task, context=""):
+        seen.setdefault("roles", []).append(role)
+        return "# 稿件"
+    monkeypatch.setattr(L, "_gen", _fake_gen)
+    proj = _make_project()
+    write_paper("目标", "上下文", _MockProvider("x"), proj,
+                backend=BACKEND_BUILTIN, run_jars=False)
+    assert seen["roles"] == ["writer"]
+
+
 def test_write_paper_ars_creates_report_and_abstract(tmp_path):
     proj = _make_project()
     provider = _MockProvider(MOCK_ABSTRACT_OUTPUT)

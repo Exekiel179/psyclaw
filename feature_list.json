@@ -953,6 +953,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_context.py +1(反杜撰三断言)。全量 pytest → 1576 passed。活体重测:同一话术再喂 chat——明确拒绝并引用新规则原文(「任何凭记忆给出的文献条目都必须标注⚠未核实」),主动尝试 lit 检索、自写 CrossRef API 脚本验证存在性,声明「在确认文献存在之前不会给出条目」。残余:所举替代文献(恰为真实经典)仍未带 ⚠ 标——已再拧一扣加「哪怕确信存在也必须带标」;稿件层兜底由 feat-097 零语料一致性把关。"
+    },
+    {
+      "id": "feat-095",
+      "name": "写作步 writer 角色——稿件不再写成执行独白",
+      "description": "对抗评估实测:meta 流程 report.md 产出是模型执行独白(「我将先列出目录结构…现在开始执行」+ 一段另写的带错脚本),评审面板 REJECT。根因:write_paper/write_abstract 借用 executor 角色定义(「你可以写脚本、运行命令」)。新增 agents/writer.md(输出即稿件正文;绝不过程叙述/贴执行代码块;缺数值写「待统计脚本运行后回填」占位不编造;清洗明细必须如实写进方法结果),write_paper 与摘要生成改用 writer 角色。executor 在 review 修复环/qual/合成的借用记为后续观察项。",
+      "dependencies": [
+        "feat-094"
+      ],
+      "status": "done",
+      "evidence": "tests +2(writer.md 契约断言 + write_paper 角色捕获)。全量 pytest → 1578 passed。活体重跑 run meta --exploratory(deepseek):report.md 为完整 APA 稿件——摘要/引言/方法/结果/讨论,引用 pystat 真实数值(合并 -0.78, 95% CI [-2.60, 1.03], I²=99.6%),方法节逐条报告 4 项剔除理由与 k=8,通篇探索性标注,执行独白 0 处;CLI 步骤 2 同步呈报「原始 12 行 · 可用 8 项 · ✂ 逐行点名」(feat-094 联动验证)。"
     }
   ]
 }
