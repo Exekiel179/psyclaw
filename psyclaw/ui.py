@@ -177,10 +177,18 @@ def kv(label: str, value: str, width: int = 10) -> str:
     return dim(f"{label:<{width}}") + value
 
 
-def _startup_status_lines(status: dict | None, provider: str | None = None) -> list[str]:
+def _startup_status_lines(status: dict | None, provider: str | None = None,
+                          approval: str | None = None) -> list[str]:
     lines: list[str] = []
     if provider:
         lines.append(kv("Provider", _clip(provider, 48)))
+    if approval:                     # feat-091:审批模式常显——用户须知道自己在哪种模式
+        if approval == "auto":
+            lines.append(kv("Approval", err("auto")
+                            + dim("  非危险副作用自动放行 · /approval 切换")))
+        else:
+            lines.append(kv("Approval", ok("default")
+                            + dim("  副作用逐条确认 · /approval 切换")))
     if not status:
         return lines
 
@@ -211,14 +219,15 @@ def _startup_status_lines(status: dict | None, provider: str | None = None) -> l
     return lines
 
 
-def startup(version: str, status: dict | None = None, provider: str | None = None) -> str:
+def startup(version: str, status: dict | None = None, provider: str | None = None,
+            approval: str | None = None) -> str:
     """Startup workbench screen for CLI/REPL entry."""
     w = max(68, min(term_width(), 92))
     inner = w - 4
     brand = paint(">_", "brgreen", "bold") + " " \
         + paint("PsyClaw", "bold", "brcyan") + dim(f" v{version}")
     mode = paint("chat · run · auto", "bold", "white") + dim("  psychology workflow harness")
-    status_lines = _startup_status_lines(status, provider)
+    status_lines = _startup_status_lines(status, provider, approval)
     title = "─ " + brand + " "
 
     lines = [

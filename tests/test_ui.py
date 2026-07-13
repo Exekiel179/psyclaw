@@ -189,3 +189,14 @@ class TestBanner:
 
     def test_returns_str(self):
         assert isinstance(ui.banner("0.1"), str)
+
+class TestStartupApproval:
+    """feat-091:审批模式在首屏常显——用户须一眼知道自己处于哪种审批模式。"""
+    def test_shows_auto(self):
+        s = _strip(ui.startup("0.13.0", approval="auto"))
+        assert "Approval" in s and "auto" in s
+    def test_shows_default(self):
+        s = _strip(ui.startup("0.13.0", approval="default"))
+        assert "Approval" in s and "default" in s and "/approval" in s
+    def test_hidden_when_unknown(self):
+        assert "Approval" not in _strip(ui.startup("0.13.0"))
