@@ -125,6 +125,24 @@ def draft_lesson(trigger: str, lesson: str, source: str, kind: str | None = None
     _save("lessons", data)
 
 
+def draft_lessons(lessons: list) -> int:
+    """批量落待确认教训卡,返回**实际落卡数**(feat-087,评审修复)。
+
+    单卡失败跳过继续,不中断批次——此前 CLI agent 路径首卡失败即 break,
+    剩余教训全部静默丢失,还按全量报数「N 条已落卡」。REPL 与 CLI 共用本函数,
+    落卡语义不再分叉。
+    """
+    ok = 0
+    for le in lessons or []:
+        try:
+            draft_lesson(le["trigger"], le["lesson"], source="error",
+                         kind=le.get("kind"))
+            ok += 1
+        except Exception:  # noqa: BLE001 — 单卡失败不拖垮批次
+            continue
+    return ok
+
+
 def archive_lesson(trigger: str, lesson: str, reason: str = "") -> bool:
     """把一张生效卡归档(active → archived,不删除,可审计/可复原)。
 

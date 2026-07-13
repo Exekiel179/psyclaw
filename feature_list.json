@@ -872,6 +872,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/repl.py(render_image_file+_expand_files 直渲);psyclaw/imgview.py(supports_inline isatty 先行)。tests/test_agent_learning.py TestRenderImageDirect +4 例(括号文件名/+%文件名直渲/force 非 TTY 不写管道/force 在 TTY 生效);tests/test_imgview.py 按新契约补 tty_stdout 桩 +1 非 TTY 回归例。全量 pytest → 1548 passed"
+    },
+    {
+      "id": "feat-087",
+      "name": "教训落卡诚实计数 + REPL/CLI 共用(v0.12 评审修复:cmd_agent 首卡失败丢批次还虚报)",
+      "description": "评审 finding 14:cmd_agent 的落卡循环 except 后 break——首卡失败(记忆库不可写等)剩余教训全部静默丢失,随后仍无条件打印「蒸馏环境教训 N 条(confirm 后跨会话生效)」,声称未发生的持久化(与 _real_result 同类的诚实性问题);且与 repl._ingest_lessons(pass 继续+会话去重)语义分叉,同一 feature 两个入口行为不一致。修复:memory.draft_lessons(lessons)->int 批量落卡,单卡失败跳过不中断、返回实际落卡数;cmd_agent 按 saved/total 三态如实报(全部落卡/部分成功/全部失败未持久化);repl._ingest_lessons 的持久化段改用同一函数,语义收敛。",
+      "dependencies": [
+        "feat-065"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/memory.py(draft_lessons);psyclaw/cli.py(cmd_agent 三态如实报);psyclaw/repl.py(_ingest_lessons 复用)。tests/test_agent_learning.py TestDraftLessonsBatch +3 例(首卡失败后两张仍落且逐张尝试/全失败返 0/CLI 全失败时明说「未持久化」)。全量 pytest → 1551 passed"
     }
   ]
 }

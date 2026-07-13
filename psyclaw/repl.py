@@ -919,12 +919,9 @@ class ReplSession:
             self._session_lesson_keys.add(key)
             self.session_lessons.append(les)
             print(ui.accent(f"  📎 记下环境教训:{les['lesson'][:72]}"))
-            try:                                  # 落持久待确认卡(best-effort,失败不阻塞)
-                from psyclaw.memory import draft_lesson
-                draft_lesson(les["trigger"], les["lesson"], source="error",
-                             kind=les.get("kind"))
-            except Exception:  # noqa: BLE001
-                pass
+            # 落持久待确认卡(best-effort,失败不阻塞;feat-087 与 CLI 共用)
+            from psyclaw.memory import draft_lessons
+            draft_lessons([les])
 
     # -- 图片内联渲染(终端支持时把分析出的图显示在对话里)---------------------
     def _cmd_img(self, arg: str) -> None:
