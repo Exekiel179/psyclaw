@@ -923,6 +923,16 @@
       ],
       "status": "done",
       "evidence": "tests +12(阻断升级/因果拦截/随机化不误伤/事后剔除邻近窗口/HARKing/否定校正/边缘显著/qual 不适用/报告渲染/run_jars_check 回归)。全量 pytest → 1570 passed;gates 通过;eval 28/28。实测埋雷 draft.md:B1 因果✗block·B2 事后剔除⚠·B3 HARKing✗block·B4 CI✗block·B5 边缘显著⚠ 全部有痕,效应量正确识别为已报。"
+    },
+    {
+      "id": "feat-097",
+      "name": "cite-check 零语料一致性:文内引用 ↔ 参考文献表双向核对",
+      "description": "对抗评估实测:正文引 Smith & Johnson (2024) 而文献表没有(疑似杜撰)、文献表 Davis (2015) 从未被引用,此前全靠「无语料需人工核」放过——而这两个方向的核对不需要任何检索语料。新增 extract_reference_entries(参考文献区逐行解析)+ consistency_check(双向比对):文内不在文献表=硬判据(no_fabricated_citations 翻 False,gate 可拦,CLI exit 1);文献表未被引用=软警告;无文献表区不判不误伤。CLI/checkup/md 报告三处呈现。",
+      "dependencies": [
+        "feat-015"
+      ],
+      "status": "done",
+      "evidence": "tests +4(条目解析含中文/缺失+未引用双向/无文献表中性/全匹配干净)。全量 pytest → 1574 passed;gates 通过;eval 28/28。实测埋雷 draft.md:cite-check 零语料下报「文内引用不在参考文献表 1 条:(Smith & Johnson, 2024)」+「Davis (2015) 未被引用」,exit=1。"
     }
   ]
 }

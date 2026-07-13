@@ -816,14 +816,31 @@ def cmd_cite_check(args: argparse.Namespace) -> int:
                      f"/ 实测 {a.get('citation_format_detected')} — ") + mark)
     elif a.get("journal_note"):
         print(ui.warn(f"  {a['journal_note']}"))
+    fail = False
     if a["orphan_n"]:
+        fail = True
         print(ui.err(f"  ✗ 孤儿引用 {a['orphan_n']} 条(疑似杜撰):"))
         for o in a["orphan"]:
             print(ui.warn(f"     · {o['raw']}"))
+    cons = a.get("consistency") or {}          # feat-097:零语料本地一致性
+    if cons.get("has_reference_list"):
+        if cons["missing_in_reflist_n"]:
+            fail = True
+            print(ui.err(f"  ✗ 文内引用不在参考文献表 {cons['missing_in_reflist_n']} 条"
+                         "(疑似杜撰,零语料核查):"))
+            for c in cons["missing_in_reflist"]:
+                print(ui.warn(f"     · {c['raw']}"))
+        else:
+            print(ui.ok(f"  ✓ 文内引用均见于参考文献表(共 {cons['refs_n']} 条)"))
+        if cons["uncited_n"]:
+            print(ui.warn(f"  ⚠ 文献表条目未被正文引用 {cons['uncited_n']} 条(整理问题):"))
+            for r in cons["uncited_references"]:
+                print(ui.dim(f"     · {r}"))
+    if fail:
         print(ui.dim("  详见 notes/citation_audit.md;删除或补检索后复核。"))
         return 1
     if a["manual_review"]:
-        print(ui.warn("  ⚠ 未能自动核验(见上),需人工核;详见 notes/citation_audit.md"))
+        print(ui.warn("  ⚠ 检索语料核验未完成,需人工核;详见 notes/citation_audit.md"))
         return 0
     print(ui.ok(f"  ✓ 全部 {a['cited_n']} 条文内引用均可溯源到检索命中"))
     return 0
