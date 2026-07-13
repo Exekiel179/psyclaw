@@ -1055,6 +1055,17 @@
       ],
       "status": "done",
       "evidence": "tests/test_litmatrix.py 6 例(MD 表解析含占位/CSV 兜底/导入去重与 PRISMA 留痕/矩阵字段与诚实约定/cite-check load_allowed 读到导入键/无语料 fail-closed)。全量 pytest → 1631 passed;gates 通过;eval 28/28。活体端到端:模拟桥接结果表 → --import(新增 2 去重 0)→ --matrix(键=陈晓 & 刘芳 (2022) 式 citation key,evidence_map 落盘)→ 路线 A 直检 OpenAlex/EuropePMC 真实命中 10 条。"
+    },
+    {
+      "id": "feat-107",
+      "name": "浏览器 MCP 接入——psyclaw 亲自驱动浏览器执行路线 B(网页桥)",
+      "description": "用户目标「使用网页桥接入 psyclaw」:与统计同一铁律,浏览器能力外移到标准 MCP(chrome-devtools-mcp,npx 拉起),仓内零浏览器代码。①registry.yaml 新增 browser 条目(category literature,enable_when detect:npx,惰性起进程+进程级缓存,健康检查零开销);②agent 循环经既有 merge_mcp_tools 自动并入 29 个浏览器工具(mcp__browser__navigate_page/click/fill/take_snapshot/evaluate_script…),side_effect=True 逐动作审批;③Chromium 自动适配:无 Chrome 时检测 Edge/Arc/Brave/Chromium 补 --executablePath(与 python→sys.executable 同一先例;用户 .psyclaw/mcp.yaml 自定义不动,找不到留原样报清晰错);④检索计划路线 B 文案改为 psyclaw 亲自执行首选(/agent on + 按 search_plan 执行),外部 agent 为无 npx 时的备选。登录环节始终由用户在浏览器窗口人工完成,凭据不经 psyclaw。",
+      "dependencies": [
+        "feat-103",
+        "feat-040"
+      ],
+      "status": "done",
+      "evidence": "tests/test_browser_mcp.py 6 例(registry 条目/npx 健康/假客户端合并前缀与审批位/适配追加/用户自定义与缺浏览器不动/计划文案)。全量 pytest → 1637 passed;gates 通过;eval 28/28。活体端到端:psyclaw 自身 MCP 客户端 npx 拉起 chrome-devtools-mcp 列出 29 工具;agent 真实合并路径(catalog→健康→merge→run)自动适配本机 Edge,new_page 打开 example.com、take_snapshot 读到页面内容。"
     }
   ]
 }

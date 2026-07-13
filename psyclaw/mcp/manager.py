@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import sys
 from pathlib import Path
 
 REGISTRY = Path(__file__).with_name("registry.yaml")
@@ -69,12 +70,61 @@ def user_registries(project_dir: str = ".") -> list[tuple[Path, str]]:
     return [(p, scope) for p, scope in cands if p.is_file()]
 
 
+# feat-107:浏览器 MCP 的执行文件适配——chrome-devtools-mcp 默认只找 Chrome stable,
+# 本机没装 Chrome 但有其他 Chromium 系(Edge/Arc/Brave/Chromium)时自动补
+# --executablePath。与 client.resolve_command 把 python→sys.executable 同一先例:
+# 环境适配,不是浏览器逻辑(仓内零浏览器代码铁律不破)。
+_CHROMIUM_MAC = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    "/Applications/Arc.app/Contents/MacOS/Arc",
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+]
+_CHROMIUM_WIN = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+]
+_CHROMIUM_BINS = ["google-chrome", "google-chrome-stable", "chromium",
+                  "chromium-browser", "microsoft-edge", "brave-browser"]
+
+
+def detect_chromium_executable() -> str | None:
+    """找一个本机可用的 Chromium 系浏览器执行文件;没有返回 None。"""
+    plats = _CHROMIUM_MAC if sys.platform == "darwin" else (
+        _CHROMIUM_WIN if os.name == "nt" else [])
+    for p in plats:
+        if Path(p).exists():
+            return p
+    for b in _CHROMIUM_BINS:
+        w = shutil.which(b)
+        if w:
+            return w
+    return None
+
+
+def _adapt_browser_command(entry: dict) -> None:
+    """browser 条目补 --executablePath(用户已自定义则不动;找不到浏览器留原样,
+    调用时服务器会给出清晰报错)。"""
+    if entry.get("name") != "browser":
+        return
+    cmd = entry.get("command", "")
+    if not cmd or "--executablePath" in cmd:
+        return
+    exe = detect_chromium_executable()
+    if exe:
+        entry["command"] = f'{cmd} --executablePath "{exe}"'
+
+
 def _all_entries(project_dir: str = ".") -> list:
     """内置 registry + 用户目录合并(带 _scope;同名内置优先,用户重复项忽略)。"""
     entries: list = []
     seen: set[str] = set()
     for s in _parse_registry(REGISTRY):
         s["_scope"] = "builtin"
+        _adapt_browser_command(s)
         seen.add(s.get("name", "?"))
         entries.append(s)
     for path, scope in user_registries(project_dir):
