@@ -44,8 +44,13 @@ def run_check(draft: str | None = None, journal: str | None = None,
                                    f"{r['n_present']}/{r['n_total']} 项已报告,无阻断缺失"))
             else:
                 miss = "; ".join(b["label"] for b in r["blocking"][:3])
+                blocks = [f["label"] for f in r.get("integrity") or []
+                          if f["severity"] == "block"]
+                if blocks:              # feat-096:诚信启发式阻断一并点名
+                    miss = "; ".join(filter(None, [miss, *blocks[:2]]))
+                n_block = r["n_blocking"] + r.get("n_integrity_block", 0)
                 items.append(_item("JARS 检查单", "fail",
-                                   f"阻断缺失 {r['n_blocking']} 项:{miss}",
+                                   f"阻断缺失 {n_block} 项:{miss}",
                                    f"psyclaw jars \"{draft_p}\" 看修复建议"))
         except Exception as exc:  # noqa: BLE001
             items.append(_item("JARS 检查单", "manual", f"检查失败:{exc}"))
