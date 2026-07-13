@@ -398,6 +398,80 @@ def test_profile_data_kinds(tmp_path):
     assert prof["categorical"] == ["grp"]
 
 
+_TRAP_DATA = [
+    {"subject": "S01", "group": "训练组", "pre_score": "42", "post_score": "55", "age": "14"},
+    {"subject": "S02", "group": "训练组", "pre_score": "38", "post_score": "49", "age": "13"},
+    {"subject": "S01", "group": "训练组", "pre_score": "42", "post_score": "55", "age": "14"},
+    {"subject": "S04", "group": "训练组", "pre_score": "40", "post_score": "51", "age": "15"},
+    {"subject": "S05", "group": "训练组", "pre_score": "36", "post_score": "44", "age": "13"},
+    {"subject": "S06", "group": "对照组", "pre_score": "43", "post_score": "45", "age": "14"},
+    {"subject": "S07", "group": "对照组", "pre_score": "38", "post_score": "99", "age": "13"},
+    {"subject": "S08", "group": "对照组", "pre_score": "41", "post_score": "-999", "age": "14"},
+    {"subject": "S09", "group": "对照组", "pre_score": "40", "post_score": "", "age": "15"},
+    {"subject": "S10", "group": "对照组", "pre_score": "37", "post_score": "39", "age": "13"},
+    {"subject": "S11", "group": "等待组", "pre_score": "41", "post_score": "43", "age": "14"},
+    {"subject": "S12", "group": "等待组", "pre_score": "38", "post_score": "41", "age": "13"},
+]
+_TRAP_HEADER = ["subject", "group", "pre_score", "post_score", "age"]
+
+
+def test_pick_dv_prefers_outcome_over_baseline():
+    """feat-100:结局语义优先——不再拿基线 pre_score 当因变量(第二轮实测缺陷)。"""
+    from psyclaw.workflows.steps_analysis import _pick_dv
+    assert _pick_dv(["pre_score", "post_score", "age"]) == "post_score"
+    assert _pick_dv(["score"]) == "score"
+    assert _pick_dv(["pre_a", "age"]) == "pre_a"       # 全被排除时兜底首列
+
+
+def test_recommend_anova_picks_outcome_dv(tmp_path):
+    from psyclaw.workflows.steps_analysis import profile_data, recommend_analysis
+    p = _eff_csv(tmp_path, "trap.csv", _TRAP_DATA, _TRAP_HEADER)
+    rec = recommend_analysis(profile_data(p))
+    assert rec["analysis"] == "anova" and rec["dv"] == "post_score"
+
+
+def test_data_quality_flags_three_kinds(tmp_path):
+    """feat-100:重复被试 id / 疑似缺失码 / 微型组——第二轮实测三类零检测。"""
+    from psyclaw.workflows.steps_analysis import data_quality_flags, profile_data
+    p = _eff_csv(tmp_path, "trap.csv", _TRAP_DATA, _TRAP_HEADER)
+    flags = {f["kind"]: f for f in data_quality_flags(p, profile_data(p))}
+    assert "S01" in flags["duplicate_id"]["detail"]
+    assert flags["missing_code"]["column"] == "post_score"
+    assert "-999" in flags["missing_code"]["detail"]
+    assert "等待组" in flags["tiny_group"]["detail"]
+
+
+def test_data_quality_clean_data_no_flags(tmp_path):
+    from psyclaw.workflows.steps_analysis import data_quality_flags, profile_data
+    rows = [{"subject": f"S{i:02d}", "group": "A" if i % 2 else "B",
+             "post_score": str(40 + i)} for i in range(1, 13)]
+    p = _eff_csv(tmp_path, "clean.csv", rows, ["subject", "group", "post_score"])
+    assert data_quality_flags(p, profile_data(p)) == []
+
+
+def test_generated_analysis_script_cleans_and_reports(tmp_path):
+    """feat-100:脚本内嵌 coerce 清洗/剔除呈报/缺失码与微型组警示(对齐 feat-094)。"""
+    from psyclaw.workflows.steps_analysis import (
+        generate_analysis_script, profile_data, recommend_analysis)
+    p = _eff_csv(tmp_path, "trap.csv", _TRAP_DATA, _TRAP_HEADER)
+    rec = recommend_analysis(profile_data(p))
+    script = generate_analysis_script(p, rec)
+    assert 'errors="coerce"' in script
+    assert "剔除" in script and "微型组" in script and "缺失码" in script
+    compile(script, "analysis.py", "exec")
+
+
+def test_step_inspect_data_prints_quality_flags(tmp_path, capsys):
+    import types
+    from psyclaw.workflows.steps_analysis import step_inspect_data
+    p = _eff_csv(tmp_path, "trap.csv", _TRAP_DATA, _TRAP_HEADER)
+    ctx = types.SimpleNamespace(data={"data_csv": p}, artifacts={}, project=tmp_path)
+    out = step_inspect_data(ctx)
+    assert out["quality_flags"] == 3
+    text = capsys.readouterr().out
+    assert "重复值" in text and "缺失码" in text and "微型组" in text
+
+
 def test_recommend_ttest():
     prof = {"numeric": ["score"], "columns": [
         {"name": "grp", "kind": "categorical", "n_levels": 2},

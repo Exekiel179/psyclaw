@@ -10,6 +10,7 @@ PsyClaw 只做:画像数据 → 生成设计/分析计划 → 推荐分析 + 出
 from __future__ import annotations
 
 import csv
+import re
 from pathlib import Path
 
 
@@ -19,6 +20,91 @@ def _is_float(v: str) -> bool:
         return True
     except (TypeError, ValueError):
         return False
+
+
+# 因变量语义选择(feat-100):结局语义优先,基线/人口学列绝不当 DV——
+# 第二轮对抗评估实测「拿第一个数值列」把基线 pre_score 当结局变量,静默产出无意义统计。
+_DV_PREFER = re.compile(r"post|后测|outcome|结局|follow|final|t2\b", re.IGNORECASE)
+_DV_AVOID = re.compile(r"pre|baseline|前测|基线|age|年龄|gender|性别|sex"
+                       r"|id$|编号|序号|时间戳", re.IGNORECASE)
+
+
+def _pick_dv(numeric: list[str]) -> str:
+    """从数值列挑因变量:post/outcome 语义 > 非基线非人口学 > 兜底第一列。"""
+    prefer = [c for c in numeric if _DV_PREFER.search(c)]
+    if prefer:
+        return prefer[0]
+    neutral = [c for c in numeric if not _DV_AVOID.search(c)]
+    if neutral:
+        return neutral[0]
+    return numeric[0]
+
+
+# 常见缺失码(feat-100):99/-999 等混进数值列会静默污染统计
+_MISSING_CODES = (99.0, -99.0, 999.0, -999.0, 9999.0, -9999.0)
+_ID_COL = re.compile(r"subject|participant|被试|编号|受试|^id$|_id$", re.IGNORECASE)
+
+
+def data_quality_flags(csv_path: str, profile: dict) -> list[dict]:
+    """三类数据质量信号(纯函数,feat-100):重复被试 id / 疑似缺失码 / 微型组。
+
+    第二轮对抗评估实测三类全部零检测:S01 整行重复、99/-999 混入 post_score、
+    等待组 n=2 均被静默送进 ANOVA。只警示不修数据——处理决策留给研究者,
+    但绝不静默。返回 [{kind, column, detail}]。
+    """
+    p = Path(csv_path)
+    with p.open(encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    flags: list[dict] = []
+
+    for col in profile.get("categorical", []):
+        if not _ID_COL.search(col):
+            continue
+        vals = [(r.get(col) or "").strip() for r in rows if (r.get(col) or "").strip()]
+        dups = sorted({v for v in vals if vals.count(v) > 1})
+        if dups:
+            flags.append({"kind": "duplicate_id", "column": col,
+                          "detail": f"被试标识列 {col} 存在重复值(非独立观测风险):"
+                                    f"{', '.join(dups[:5])}"})
+
+    for col in profile.get("numeric", []):
+        nums = []
+        for r in rows:
+            v = (r.get(col) or "").strip()
+            if v and _is_float(v):
+                nums.append(float(v))
+        codes = sorted({v for v in nums if v in _MISSING_CODES})
+        others = [v for v in nums if v not in _MISSING_CODES]
+        if not codes or not others:
+            continue
+        mean = sum(others) / len(others)
+        sd = (sum((x - mean) ** 2 for x in others) / len(others)) ** 0.5
+        suspicious = [c for c in codes
+                      if (sd and abs(c - mean) > 3 * sd)
+                      or (not sd and c != mean)
+                      or (c < 0 and min(others) >= 0)]
+        if suspicious:
+            flags.append({"kind": "missing_code", "column": col,
+                          "detail": f"数值列 {col} 出现疑似缺失码取值 "
+                                    f"{', '.join(f'{c:g}' for c in suspicious)}"
+                                    "(远离其余分布)——请核对编码表,勿当真实分数混入"})
+
+    for c in profile.get("columns", []):
+        if c["kind"] != "categorical" or not (2 <= c.get("n_levels", 0) <= 12) \
+                or _ID_COL.search(c["name"]):
+            continue
+        counts: dict[str, int] = {}
+        for r in rows:
+            v = (r.get(c["name"]) or "").strip()
+            if v:
+                counts[v] = counts.get(v, 0) + 1
+        tiny = {k: n for k, n in counts.items() if n < 5}
+        if tiny:
+            flags.append({"kind": "tiny_group", "column": c["name"],
+                          "detail": f"分组列 {c['name']} 存在微型组(n<5):"
+                                    + ", ".join(f"{k}(n={n})" for k, n in tiny.items())
+                                    + "——组间比较对其极不稳定"})
+    return flags
 
 
 def profile_data(csv_path: str) -> dict:
@@ -56,15 +142,18 @@ def recommend_analysis(profile: dict) -> dict:
     two = [c for c in cats if c["n_levels"] == 2]
     multi = [c for c in cats if 3 <= c["n_levels"] <= 12]
 
+    dv = _pick_dv(numeric) if numeric else None    # feat-100:结局语义优先,不拿基线当 DV
     if two and numeric:
-        return {"analysis": "ttest", "group": two[0]["name"], "dv": numeric[0],
-                "rationale": f"二分类 {two[0]['name']} + 连续因变量 {numeric[0]} → 独立样本 t 检验"}
+        return {"analysis": "ttest", "group": two[0]["name"], "dv": dv,
+                "rationale": f"二分类 {two[0]['name']} + 连续因变量 {dv} → 独立样本 t 检验"}
     if multi and numeric:
-        return {"analysis": "anova", "group": multi[0]["name"], "dv": numeric[0],
-                "rationale": f"{multi[0]['n_levels']} 组的分类 {multi[0]['name']} + 连续因变量 → 单因素 ANOVA"}
+        return {"analysis": "anova", "group": multi[0]["name"], "dv": dv,
+                "rationale": f"{multi[0]['n_levels']} 组的分类 {multi[0]['name']} + "
+                             f"连续因变量 {dv} → 单因素 ANOVA"}
     if len(numeric) >= 3:
-        return {"analysis": "regression", "dv": numeric[0], "iv": numeric[1:],
-                "rationale": f"多个连续变量 → 以 {numeric[0]} 为因变量的多元回归"}
+        ivs = [c for c in numeric if c != dv]
+        return {"analysis": "regression", "dv": dv, "iv": ivs,
+                "rationale": f"多个连续变量 → 以 {dv} 为因变量的多元回归"}
     if len(numeric) >= 2:
         return {"analysis": "correlation", "x": numeric[0], "y": numeric[1],
                 "rationale": f"两个连续变量 {numeric[0]}、{numeric[1]} → Pearson 相关"}
@@ -86,6 +175,33 @@ df = pd.read_csv(r"{csv}")
 '''
 
 
+def _clean_prelude(dv: str, group: str | None) -> str:
+    """脚本内嵌行清洗段(feat-100,与 meta 的 feat-094 同口径):
+    因变量 coerce 解析、剔除逐行呈报、疑似缺失码警示、微型组警示。"""
+    lines = [
+        f'dv_s = pd.to_numeric(df["{dv}"], errors="coerce")',
+        'ok = dv_s.notna()',
+        'dropped = df.loc[~ok]',
+        'if len(dropped):',
+        '    print(f"⚠ 剔除 {len(dropped)} 行(因变量缺失/不可解析)——稿件方法须如实报告:")',
+        '    for _i in dropped.index:',
+        f'        print(f"  ✂ 行 {{_i + 2}}: {dv}={{df.loc[_i, \'{dv}\']!r}}")',
+        f'df = df.loc[ok].assign(**{{"{dv}": dv_s[ok]}})',
+        'codes = df.loc[df["%s"].isin([99, -99, 999, -999, 9999, -9999])]' % dv,
+        'if len(codes):',
+        '    print(f"⚠ 因变量存在疑似缺失码取值(99/-999 等)共 {len(codes)} 行——'
+        '请核对编码表,勿当真实分数混入")',
+    ]
+    if group:
+        lines += [
+            f'sizes = df.groupby("{group}")["{dv}"].size()',
+            'print("组样本量:", dict(sizes))',
+            'if (sizes < 5).any():',
+            '    print("⚠ 存在 n<5 的微型组,组间比较对其极不稳定——考虑合并/剔除并如实报告")',
+        ]
+    return "\n".join(lines) + "\n"
+
+
 def generate_analysis_script(csv_path: str, rec: dict) -> str:
     """据推荐分析生成委托 pingouin 的可复现脚本(本函数不算任何统计)。"""
     head = _HEADER.format(csv=csv_path, analysis=rec["analysis"],
@@ -93,7 +209,7 @@ def generate_analysis_script(csv_path: str, rec: dict) -> str:
     a = rec["analysis"]
     if a == "ttest":
         g, dv = rec["group"], rec["dv"]
-        body = f'''g, dv = "{g}", "{dv}"
+        body = _clean_prelude(dv, g) + f'''g, dv = "{g}", "{dv}"
 levels = list(pd.Series(df[g]).dropna().unique())[:2]
 a = df[df[g] == levels[0]][dv].dropna()
 b = df[df[g] == levels[1]][dv].dropna()
@@ -104,7 +220,7 @@ print(pg.ttest(a, b))   # T / dof / p_val / CI95 / cohen_d
 '''
     elif a == "anova":
         g, dv = rec["group"], rec["dv"]
-        body = f'''g, dv = "{g}", "{dv}"
+        body = _clean_prelude(dv, g) + f'''g, dv = "{g}", "{dv}"
 print("正态性:"); print(pg.normality(df, dv=dv, group=g))
 print("\\n方差齐性:"); print(pg.homoscedasticity(df, dv=dv, group=g))
 print("\\n单因素 ANOVA:")
@@ -115,15 +231,20 @@ print(pg.pairwise_tukey(data=df, dv=dv, between=g))
     elif a == "regression":
         dv, iv = rec["dv"], rec["iv"]
         ivs = ", ".join(f'"{c}"' for c in iv)
-        body = f'''dv, iv = "{dv}", [{ivs}]
-sub = df[[dv] + iv].dropna()
+        body = _clean_prelude(dv, None) + f'''dv, iv = "{dv}", [{ivs}]
+sub = df[[dv] + iv].apply(pd.to_numeric, errors="coerce").dropna()
+if len(sub) < len(df):
+    print(f"⚠ 回归剔除 {{len(df) - len(sub)}} 行(自变量缺失/不可解析)——须如实报告")
 print("多元 OLS 回归:")
 print(pg.linear_regression(sub[iv], sub[dv]))   # coef / se / T / pval / r2 / CI
 '''
     elif a == "correlation":
         x, y = rec["x"], rec["y"]
-        body = f'''print("Pearson 相关:")
-print(pg.corr(df["{x}"].astype(float), df["{y}"].astype(float)))   # r / CI95 / p_val
+        body = f'''sub = df[["{x}", "{y}"]].apply(pd.to_numeric, errors="coerce").dropna()
+if len(sub) < len(df):
+    print(f"⚠ 剔除 {{len(df) - len(sub)}} 行(缺失/不可解析)——须如实报告")
+print("Pearson 相关:")
+print(pg.corr(sub["{x}"], sub["{y}"]))   # r / CI95 / p_val
 '''
     else:  # descriptives
         body = '''num = df.select_dtypes("number")
@@ -149,7 +270,14 @@ def step_inspect_data(ctx) -> dict:
     ctx.artifacts["inspect_data"] = csv_path
     print(ui.dim(f"  {prof['n']} 行 · 数值列 {len(prof['numeric'])} · "
                  f"分类列 {len(prof['categorical'])}"))
-    return {"n": prof["n"], "numeric": prof["numeric"], "categorical": prof["categorical"]}
+    flags = data_quality_flags(csv_path, prof)     # feat-100:画像即体检,不静默
+    ctx.data["quality_flags"] = flags
+    for fl in flags:
+        print(ui.warn(f"  ⚠ {fl['detail']}"))
+    if flags:
+        print(ui.dim("    (数据质量警示须在稿件方法部分如实处理与报告)"))
+    return {"n": prof["n"], "numeric": prof["numeric"],
+            "categorical": prof["categorical"], "quality_flags": len(flags)}
 
 
 def step_design(ctx) -> dict:
@@ -221,6 +349,10 @@ def step_write_analysis(ctx) -> dict:
         "统计由 outputs/analysis.py 在外部 pingouin/scipy 环境运行,"
         "结果回填本稿(只引用脚本实际产出,不杜撰数值;效应量+CI 必报)。\n\n"
         f"# 研究准备清单\n{ctx.clar}")
+    q = ctx.data.get("quality_flags") or []
+    if q:                                  # feat-100:数据质量警示进稿件上下文,如实报告
+        context += ("\n\n# 数据质量警示(方法/结果部分**必须如实处理并报告**,不得静默)\n"
+                    + "\n".join(f"- {fl['detail']}" for fl in q))
     # v0.12 feat-072:pystat 真跑出的结果注入写作上下文——结果节引用真实数值,不再是空骨架
     result = ctx.data.get("analysis_result")
     if result:
