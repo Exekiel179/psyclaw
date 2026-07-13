@@ -117,11 +117,91 @@ _RUN_TIMEOUT = 180
 _MAX_RUN_CMDS = 6
 
 
+_HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?")
+_CONTINUATION_ENDS = ("\\", "&&", "||", "|")
+
+
+def _quotes_balanced(s: str) -> bool:
+    """简易 shell 引号状态机:单/双引号是否全部闭合(双引号内 \\ 转义生效)。"""
+    in_s = in_d = esc = False
+    for ch in s:
+        if esc:
+            esc = False
+            continue
+        if ch == "\\" and not in_s:      # 单引号内反斜杠是字面量
+            esc = True
+            continue
+        if in_s:
+            in_s = ch != "'"
+        elif in_d:
+            in_d = ch != '"'
+        elif ch == "'":
+            in_s = True
+        elif ch == '"':
+            in_d = True
+    return not (in_s or in_d)
+
+
+def group_shell_commands(body: str) -> list[str]:
+    """把 shell 块正文分组成**完整命令**(feat-101)。纯函数。
+
+    第三轮评估实测:模型发多行 `python3 -c "…"`,旧实现逐行拆成 5 条"命令"
+    分别审批/执行(`import pandas as pd` 单独一条、结尾 `\"` 也算一条),
+    逐行执行必然全废。延续条件:引号未闭合 / 行尾 \\ && || | / heredoc 未终结。
+    局限:引号**内**的 `<< WORD` 字面量会被误判为 heredoc(罕见,宁并不拆)。
+    """
+    cmds: list[str] = []
+    cur: list[str] = []
+    heredoc: str | None = None
+    for raw in (body or "").splitlines():
+        line = raw.rstrip()
+        if heredoc is not None:
+            cur.append(raw)
+            if line.strip() == heredoc:
+                heredoc = None
+                cmds.append("\n".join(cur).strip())
+                cur = []
+            continue
+        if not cur and (not line.strip() or line.strip().startswith("#")):
+            continue
+        cur.append(raw)
+        joined = "\n".join(cur)
+        if not _quotes_balanced(joined):
+            continue
+        if line.endswith(_CONTINUATION_ENDS):
+            continue
+        hm = _HEREDOC_RE.search(joined)
+        if hm:
+            heredoc = hm.group(1)
+            continue
+        cmds.append(joined.strip())
+        cur = []
+    if cur:                    # 引号/heredoc 未闭合的残尾也如实交出,不静默丢
+        cmds.append("\n".join(cur).strip())
+    return cmds
+
+
+def cmd_display(cmd: str) -> str:
+    """多行命令的单行显示形态:首行 + (+N 行)。纯函数(feat-101)。"""
+    lines = (cmd or "").splitlines() or [""]
+    if len(lines) == 1:
+        return lines[0]
+    return f"{lines[0]}  (+{len(lines) - 1} 行)"
+
+
 def parse_run_requests(reply: str) -> list[dict]:
-    """从回复解析 psyclaw/shell 命令块 → [{kind, cmd}](kind ∈ psyclaw|shell)。纯函数。"""
+    """从回复解析 psyclaw/shell 命令块 → [{kind, cmd}](kind ∈ psyclaw|shell)。纯函数。
+
+    shell 块按 `group_shell_commands` 分组(多行引号/续行/heredoc 是一条命令,
+    feat-101);psyclaw 子命令天然单行,保持逐行。
+    """
     out: list[dict] = []
     for m in _RUN_RE.finditer(reply or ""):
         kind = "psyclaw" if m.group("kind") == "psyclaw" else "shell"
+        if kind == "shell":
+            for cmd in group_shell_commands(m.group("body")):
+                out.append({"kind": kind, "cmd": cmd})
+            continue
         for line in m.group("body").splitlines():
             cmd = line.strip()
             if cmd and not cmd.startswith("#"):
@@ -186,13 +266,14 @@ def run_commands(reqs: list[dict], confirm=None,
     for r in reqs[:limit]:
         cmd = r["cmd"]
         danger = bool(_DANGEROUS_RE.search(cmd))
+        shown = cmd_display(cmd)               # feat-101:多行命令单行化显示
         if r["kind"] != "psyclaw" or danger:
             if not (confirm and confirm(cmd)):
                 tag = "危险命令" if danger else "shell 命令"
                 parts.append(f"$ {cmd}\n[已拒绝:{tag}未获人工确认]")
-                notes.append(f"  ✗ 拒执行({tag}):{cmd[:50]}")
+                notes.append(f"  ✗ 拒执行({tag}):{shown[:50]}")
                 continue
-        notes.append(f"  ⚙ 执行:{cmd[:70]}")
+        notes.append(f"  ⚙ 执行:{shown[:70]}")
         out = _run_psyclaw_cmd(cmd) if r["kind"] == "psyclaw" else _run_shell_cmd(cmd)
         parts.append(out[:6000])
     if len(reqs) > limit:
@@ -910,6 +991,16 @@ class ReplSession:
         「全部同意(a)」的范围按 cmd_approval_scope 限定到命令前缀(feat-070,
         用户反馈:放行所有 shell 命令范围太大)——同意 `git status` 不放行 `rm`。
         """
+        if "\n" in cmd:                # feat-101:多行命令整体展示后确认(引号块=一条命令)
+            lines = cmd.splitlines()
+            print(ui.dim("  ┆ 多行命令内容:"))
+            for ln in lines[:20]:
+                print(ui.dim(f"  ┆   {ln[:120]}"))
+            if len(lines) > 20:
+                print(ui.dim(f"  ┆   …(共 {len(lines)} 行)"))
+            return self._side_effect_ok(
+                cmd_display(cmd), dangerous=bool(_DANGEROUS_RE.search(cmd)),
+                label=f"执行 shell 命令(多行:{cmd_display(cmd)[:60]})")
         return self._side_effect_ok(cmd, dangerous=bool(_DANGEROUS_RE.search(cmd)),
                                     label=f"执行 shell 命令({cmd_approval_scope(cmd)})")
 
