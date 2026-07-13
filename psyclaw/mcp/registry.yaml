@@ -54,6 +54,18 @@ servers:
     enable_when: always
     provides: [pubmed, psycinfo, semantic_scholar, openalex, arxiv]
 
+  # 浏览器 MCP(feat-107)——机构库检索路线 B 的执行引擎:psyclaw 亲自驱动浏览器
+  # 进知网/万方/WoS(登录由用户在浏览器窗口人工完成,凭据不经 psyclaw)。
+  # 与统计同一铁律:能力外移到 MCP,仓内零浏览器代码。用法:psyclaw chat 高级
+  # 模式(/agent on)说「按 notes/search_plan.md 路线 B 执行」,工具名
+  # mcp__browser__navigate_page / take_snapshot / click / fill / evaluate_script 等。
+  - name: browser
+    category: literature
+    origin: optional                 # 需要 node/npx;npx 首次运行会下载包
+    enable_when: detect:npx
+    command: npx -y chrome-devtools-mcp@latest
+    provides: [navigate_page, new_page, take_snapshot, click, fill, evaluate_script]
+
   - name: osf-mcp
     category: open-science
     enable_when: env:OSF_TOKEN
