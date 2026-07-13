@@ -812,6 +812,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/ui_input.py(POSIX _get_key 重写);psyclaw/choices.py(_pick_inline 循环加固+单选提示语)。tests/test_ui_input_keys.py 新文件 5 例(pty 真子进程喂原始字节:↓↑回车/裸 ESC/未知转义不泄漏/中文整读/EOF 不忙等——补上真实读取器零覆盖盲区);tests/test_choices_reads.py +5 例(单选空格选定/多选空格仍勾选/空键流有界跳过/偶发空键忽略/上标数字走自由作答)。全量 pytest → 1520 passed;eval 28/28"
+    },
+    {
+      "id": "feat-081",
+      "name": "批准范围加固(v0.12 评审修复:圈不住行为的命令一律不泛化)",
+      "description": "评审实证的四类越权:① python -c/bash -c/python -m/uv run 等「解释器直跑代码」形态被泛化成一个桶——同意 python -c \"print(1)\" 会放行任意 python -c;② Windows 的 git.exe 因 .exe 后缀绕过 _SUBCMD_TOOLS,status 的同意放行 push(主平台上 feat-070 承诺不成立);③ sudo/env 前缀/FOO=1 赋值被当程序名,一次同意放行任意后续;④ 复合命令 raw[:80] 截断致 >80 字前缀碰撞,孤立 & 后台符不算复合。修复:_WRAPPER_TOOLS(sudo/env/nohup/uvx/npx…)与环境变量赋值前缀一律不泛化;子命令为 flag(-c/-m/-e…)不泛化;_NO_GENERALIZE_PAIRS(uv run/npm exec/pnpm dlx…)不泛化;.exe/.bat/.cmd 后缀剥除后照常子命令区分;复合命令(含孤立 &)范围=整条原文不截断。方向只紧不松:同意范围只可能变小,不破坏「普通程序/真子命令照旧泛化」的既有行为。",
+      "dependencies": [
+        "feat-070"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(cmd_approval_scope 重写 + _WRAPPER_TOOLS/_NO_GENERALIZE_PAIRS)。tests/test_repl_approval.py TestApprovalScopeHardening +9 例(解释器 flag/uv run/git.exe 子命令区分/env 前缀/包装程序/80 字碰撞/后台 &/py 启动器/不误伤回归);旧 bash -c 泛化断言按新契约移除。全量 pytest → 1529 passed"
     }
   ]
 }
