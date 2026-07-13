@@ -1617,7 +1617,8 @@ class ReplSession:
             status = collect_status(".")
         except Exception:  # noqa: BLE001
             status = None
-        print(ui.startup(__version__, status=status, provider=self.provider.describe()))
+        print(ui.startup(__version__, status=status, provider=self.provider.describe(),
+                         approval="auto" if self.yolo else "default"))
         # 自动失效(轻量):启动时秒验证 cmd 类环境教训——上次说「没有 python」但现在装上了,
         # 就自动归档,别再用过时的坑误导模型。只 shutil.which、零子进程、无卡则零成本;
         # 模块/属性类较慢,留给 /memory verify 手动跑。config verify_env_lessons=false 可关。

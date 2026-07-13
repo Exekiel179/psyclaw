@@ -963,6 +963,16 @@
       ],
       "status": "done",
       "evidence": "tests +2(writer.md 契约断言 + write_paper 角色捕获)。全量 pytest → 1578 passed。活体重跑 run meta --exploratory(deepseek):report.md 为完整 APA 稿件——摘要/引言/方法/结果/讨论,引用 pystat 真实数值(合并 -0.78, 95% CI [-2.60, 1.03], I²=99.6%),方法节逐条报告 4 项剔除理由与 k=8,通篇探索性标注,执行独白 0 处;CLI 步骤 2 同步呈报「原始 12 行 · 可用 8 项 · ✂ 逐行点名」(feat-094 联动验证)。"
+    },
+    {
+      "id": "feat-091",
+      "name": "审批模式首屏常显(Approval 行)",
+      "description": "用户实测反馈:YOLO 生效但界面零提示,不知道自己处于哪种审批模式(提示符 approval:auto 标只在 yolo 开启时出现,default 模式无任何显示,首屏 banner 两种模式都不显示)。修复:ui.startup 增 approval 参数,banner 常显 Approval 行——auto(红,非危险副作用自动放行)/default(绿,逐条确认),均附「/approval 切换」指引;repl.run 按 self.yolo 传入。",
+      "dependencies": [
+        "feat-056"
+      ],
+      "status": "done",
+      "evidence": "tests/test_ui.py TestStartupApproval +3(auto/default/未知隐藏)。全量 pytest → 1581 passed。"
     }
   ]
 }
