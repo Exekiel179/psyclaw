@@ -2,7 +2,7 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-13(feat-076..078 合并 + v0.12 code-review 15 项缺陷全部修复)
+**Last Updated:** 2026-07-13(**v0.13.0 发布**:交互三入口收敛 + code-review 15 项缺陷清零)
 
 ## 本轮(36):code-review 修复收官 ——feat-079~088 done(15 项确认缺陷清零)
 
