@@ -1003,6 +1003,17 @@
       ],
       "status": "done",
       "evidence": "tests +4(纵向因果阻断/纵向 RCT 不误伤/选择性报告警告/完整报告不误伤)。全量 pytest → 1602 passed。活体:draft2.md 重跑 jars → 六条诚信信号全亮(I.causal ✗·I.p_overstate ✗·posthoc/effect/selective/reliability ⚠),八颗雷零漏网。"
+    },
+    {
+      "id": "feat-100",
+      "name": "analysis 路径对齐 feat-094:DV 语义选择 + 数据质量三警示 + 脚本内嵌清洗",
+      "description": "第二轮对抗评估实测:recommend_analysis 拿第一个数值列当因变量,把基线 pre_score 当结局变量做了整套 ANOVA+Tukey(貌似合理实则无意义);重复被试 id/缺失码 99·-999/微型组 n=2 三类数据质量陷阱零检测;生成脚本裸读 CSV。修复:①_pick_dv 结局语义优先(post/outcome/后测>非基线非人口学>兜底),ttest/anova/regression 三路复用;②data_quality_flags 纯函数(重复 id·疑似缺失码[远离分布 3σ 或异号]·微型组 n<5),step_inspect_data 画像即体检逐条警示,并注入写作上下文要求如实报告;③生成脚本内嵌 _clean_prelude(coerce 解析·剔除逐行呈报·缺失码警示·组样本量+微型组警示),regression/correlation 一并 coerce;警示不擅改数据,处理决策留研究者。",
+      "dependencies": [
+        "feat-094",
+        "feat-053"
+      ],
+      "status": "done",
+      "evidence": "tests +6(_pick_dv 语义/anova 选 post_score/三类质量信号/干净数据零警示/脚本清洗要素+可编译/画像步打印)。全量 pytest → 1608 passed;gates 通过;eval 28/28。活体:埋雷 data.csv 重新画像 → 三警示齐亮(S01 重复·99/-999 缺失码·等待组 n=2);DV=post_score;生成脚本 pingouin 实跑 → 剔除呈报+缺失码警示+组样本量+微型组警示全部输出。"
     }
   ]
 }
