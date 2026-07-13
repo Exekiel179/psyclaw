@@ -298,8 +298,12 @@ _CAUSAL_CLAIM_PAT = [
     r"\b(?:reduc|improv|decreas|increas)(?:es?|ed)\b[^.\n]{0,30}"
     r"\b(?:depression|anxiety|symptom|level)s?\b",
 ]
+# 非实验(观察性)设计信号——横断面/相关之外,纵向/追踪/队列同样不支持因果结论
+# (feat-099:第二轮实测「观察性两波追踪」稿绕开了只认横断面的旧口径)
 _CROSS_DESIGN_PAT = [r"横断面", r"cross.?sectional", r"相关(?:设计|研究|数据|调查)",
-                     r"correlational"]
+                     r"correlational", r"纵向(?:设计|研究|追踪|调查)?", r"追踪(?:设计|研究|调查)",
+                     r"[两二三多]波", r"观察性(?:设计|研究|追踪)?", r"队列(?:设计|研究)",
+                     r"longitudinal", r"observational", r"two.?wave", r"cohort stud"]
 _RANDOMIZED_PAT = [r"随机分配", r"随机对照", r"随机分组", r"随机化",
                    r"randomi[sz]ed\s+(?:controlled|assignment|allocation)", r"\bRCT\b"]
 
@@ -341,6 +345,11 @@ _ALPHA_VALUE_RE = re.compile(r"(?:Cronbach\s*)?(?:α|alpha)\s*=\s*(0?\.\d+)",
                              re.IGNORECASE)
 _RELIABLE_CLAIM_PAT = [r"信度(?:良好|较好|可靠|理想)", r"内部一致性(?:良好|较好|高)",
                        r"good reliability", r"acceptable reliability"]
+# 选择性结果报告信号(feat-099):「限于篇幅仅报告达到显著的」= outcome reporting bias
+_SELECTIVE_PAT = [r"(?:限于|囿于|由于)篇幅[^。\n]{0,15}(?:仅|只)报告",
+                  r"(?:仅|只)报告[^。\n]{0,12}(?:达到)?显著",
+                  r"only\s+significant\s+(?:results?|outcomes?|effects?)\s+"
+                  r"(?:are|were)\s+reported"]
 
 
 def _hit(text: str, pats: list[str]) -> str | None:
@@ -366,10 +375,11 @@ def integrity_flags(text: str) -> list[dict]:
     if causal and cross and not randomized:
         flags.append({
             "id": "I.causal_language_design", "severity": "block",
-            "label": "因果结论越界:横断面/相关设计使用因果表述",
+            "label": "因果结论越界:非实验设计(横断面/相关/纵向观察)使用因果表述",
             "evidence": causal,
-            "fix": "横断面/相关设计不支持因果结论:把「导致/降低/证明有效」改为"
-                   "「相关/预测/与…有关」,或补充随机分配等因果识别设计并如实描述。"})
+            "fix": "无随机分配的观察性设计(含纵向追踪)不支持因果结论:把"
+                   "「导致/降低/提升了/证明有效」改为「相关/预测/与…有关」,"
+                   "或补充随机分配等因果识别策略并如实描述。"})
 
     # 剔除声明的预先标准按 ±200 字符**邻近窗口**找:引言里一句「已预注册」
     # 不能给结果节的事后剔除背书(对抗评估实测:假预注册声明吸收了全局信号)
@@ -437,6 +447,16 @@ def integrity_flags(text: str) -> list[dict]:
                 "fix": "按 Cohen 基准 d<0.2 连小效应都不到:删除夸大措辞,"
                        "讨论实际意义时以效应量与 CI 为准,不以 p 值背书重要性。"})
             break
+
+    selective = _hit(text, _SELECTIVE_PAT)
+    if selective:
+        flags.append({
+            "id": "I.selective_reporting", "severity": "warn",
+            "label": "选择性结果报告信号(仅报告显著结果)",
+            "evidence": selective,
+            "fix": "全部预设结果变量必须完整报告(显著与否):正文放主要结果,"
+                   "其余进补充材料,绝不以「篇幅」为由只报显著——这是 outcome "
+                   "reporting bias 的典型形态。"})
 
     for m in _ALPHA_VALUE_RE.finditer(text):
         try:
