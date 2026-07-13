@@ -238,3 +238,89 @@ def test_pystat_meta_invalid_csv_fails_closed(tmp_path):
     csv.write_text("a,b\n1,2\n", encoding="utf-8")
     out = pystat_meta({"csv_path": str(csv)})
     assert "校验失败" in out
+class _StatusClient(_FakeClient):
+    """带结构化 call_tool_status 的假客户端(模拟真 MCPClient)。"""
+    def __init__(self, result="结果文本", ok=True):
+        super().__init__(result=result)
+        self._ok = ok
+    def call_tool_status(self, name, args):
+        self.calls.append((name, args))
+        return {"ok": self._ok, "text": self._result}
+class TestRealResultGuardV2:
+    def test_transport_error_rejected_structurally(self):
+        """isError/超时/启动失败 → ok=False → 无结果(不再靠嗅探措辞)。"""
+        out = PB.run_via_pystat(
+            {"analysis": "ttest", "dv": "y", "group": "g"}, "d.csv",
+            client_factory=lambda: _StatusClient(
+                result="MCP 工具报错:工具执行失败: ValueError…", ok=False))
+        assert out is None
+    def test_error_payload_rejected(self):
+        assert PB._real_result('{"error": "分组列 cond 需恰好 2 组,得到 3"}') is None
+    def test_validation_failure_payload_rejected(self):
+        assert PB._real_result('{"error": "效应量表校验失败:找不到效应量列"}') is None
+    def test_nan_payload_rejected(self):
+        assert PB._real_result('{"pooled_effect": NaN, "k": 4}\n\n严谨性:…') is None
+    def test_inf_payload_rejected(self):
+        assert PB._real_result('{"i2_percent": Infinity}') is None
+    def test_good_json_passes(self):
+        good = '{"pooled_effect": 0.327, "ci95": [0.2, 0.455], "k": 5}\n\n严谨性:…'
+        assert PB._real_result(good) == good
+    def test_non_json_text_passes(self):
+        assert PB._real_result("描述统计:\nmean=3.2 sd=0.4") is not None
+    def test_ok_false_overrides_good_text(self):
+        assert PB._real_result('{"T": 3.2}', ok=False) is None
+    def test_skeleton_mark_single_source(self):
+        """哨兵串单一来源:bridge 用的就是 server 定义的常量(防措辞漂移击穿守卫)。"""
+        from psyclaw.mcp.servers.pystat_server import SKELETON_MARK, _script_reply
+        assert PB._skeleton_mark() == SKELETON_MARK
+        import psyclaw.mcp.servers.pystat_server as srv_mod
+        if not srv_mod._has_pingouin():
+            assert SKELETON_MARK in _script_reply("print(1)")
+    def test_old_style_fake_client_still_works(self):
+        """仅有 call_tool 的旧式注入客户端按 ok=True 兼容,契约不破坏。"""
+        out = PB.run_via_pystat(
+            {"analysis": "ttest", "dv": "y", "group": "g"}, "d.csv",
+            client_factory=lambda: _FakeClient(result='{"T": 3.2, "d": 0.8}'))
+        assert out is not None
+class TestExtractMetaRows:
+    def _info(self, csv_path):
+        from psyclaw.workflows.steps_meta import validate_effects
+        return validate_effects(csv_path)
+    def test_clean_rows_all_kept(self, tmp_path):
+        from psyclaw.workflows.steps_meta import extract_meta_rows
+        p = tmp_path / "e.csv"
+        p.write_text("study,yi,vi\nA,0.42,0.0225\nB,0.31,0.0144\nC,0.55,0.04\n",
+                     encoding="utf-8")
+        rows = extract_meta_rows(str(p), self._info(str(p)))
+        assert rows["labels"] == ["A", "B", "C"] and not rows["dropped"]
+    def test_bad_cells_dropped_not_poisoning(self, tmp_path):
+        """NA/垃圾单元被剔除并呈报,而非产出 NaN 合并效应(评审 finding 5)。"""
+        from psyclaw.workflows.steps_meta import extract_meta_rows
+        p = tmp_path / "e.csv"
+        p.write_text("study,yi,vi\nA,0.42,0.0225\nB,n.s.,0.01\nC,0.55,\nD,0.18,0.01\n",
+                     encoding="utf-8")
+        rows = extract_meta_rows(str(p), self._info(str(p)))
+        assert rows["labels"] == ["A", "D"]
+        assert len(rows["dropped"]) == 2
+    def test_zero_variance_dropped(self, tmp_path):
+        from psyclaw.workflows.steps_meta import extract_meta_rows
+        p = tmp_path / "e.csv"
+        p.write_text("study,yi,vi\nA,0.42,0.0225\nB,0.31,0\nC,0.55,0.04\n",
+                     encoding="utf-8")
+        rows = extract_meta_rows(str(p), self._info(str(p)))
+        assert rows["labels"] == ["A", "C"]
+        assert rows["dropped"][0]["reason"].startswith("方差非有限正数")
+    def test_too_few_usable_rows_fail_closed(self, tmp_path):
+        import pytest
+        from psyclaw.workflows.steps_meta import extract_meta_rows
+        p = tmp_path / "e.csv"
+        p.write_text("study,yi,vi\nA,0.42,0.0225\nB,bad,0.01\nC,0.55,0\n",
+                     encoding="utf-8")
+        with pytest.raises(ValueError, match="可用研究数 < 2"):
+            extract_meta_rows(str(p), self._info(str(p)))
+    def test_se_and_ci_kinds_converted_to_variance(self, tmp_path):
+        from psyclaw.workflows.steps_meta import extract_meta_rows
+        p = tmp_path / "se.csv"
+        p.write_text("study,yi,se\nA,0.4,0.15\nB,0.3,0.12\n", encoding="utf-8")
+        rows = extract_meta_rows(str(p), self._info(str(p)))
+        assert abs(rows["vi"][0] - 0.15 ** 2) < 1e-12

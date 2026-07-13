@@ -177,17 +177,29 @@ class MCPClient:
 
     def call_tool(self, name: str, arguments: dict) -> str:
         """调用工具,返回文本结果(错误也归一为可读串,不抛)。"""
+        return self.call_tool_status(name, arguments)["text"]
+
+    def call_tool_status(self, name: str, arguments: dict) -> dict:
+        """调用工具,返回结构化结果 {ok, text}(feat-079)。
+
+        ok=False 覆盖:启动失败 / 传输错误 / isError 工具报错 / 空结果。
+        文本仍归一为可读串,不抛——但调用方(如 pystat_bridge 的真结果守卫)
+        可据 ok 结构化判定,而不必嗅探错误串措辞。
+        """
         if not self._initialized:
             err = self.start()
             if err is not None:
-                return err
+                return {"ok": False, "text": err}
         resp = self._request("tools/call", {"name": name, "arguments": arguments or {}})
         if "error" in resp:
-            return f"MCP 调用失败:{resp['error'].get('message', resp['error'])}"
+            return {"ok": False,
+                    "text": f"MCP 调用失败:{resp['error'].get('message', resp['error'])}"}
         result = resp.get("result") or {}
         parts = [c.get("text", "") for c in result.get("content", [])
                  if c.get("type") == "text"]
-        text = "\n".join(p for p in parts if p) or "(空结果)"
+        text = "\n".join(p for p in parts if p)
+        if not text:
+            return {"ok": False, "text": "(空结果)"}
         if result.get("isError"):
-            return f"MCP 工具报错:{text}"
-        return text
+            return {"ok": False, "text": f"MCP 工具报错:{text}"}
+        return {"ok": True, "text": text}

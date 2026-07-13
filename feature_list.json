@@ -792,6 +792,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/modes.py/cli.py/repl.py(统一参数与公开类型);workflows/engine.py(逐步原子检查点/checkpoint_value/安全恢复);autoloop.py/status.py(needs_attention+单次运行迭代上限);README/docs/内置 skills 同步;tests/test_modes.py/test_workflows.py/test_autoloop.py/test_status_sense.py 新增默认连续、无目标恢复输入、暂停续跑、输入/流程漂移拒绝、旧状态迁移测试。定向 189 passed;全量 uv run --python 3.12 --with pytest python -m pytest -q → 1483 passed/12 个既有 Windows 图片与 MCP 环境失败;gates 22 条;eval 28/28;harness 100/100;git diff --check 通过。"
+    },
+    {
+      "id": "feat-079",
+      "name": "真结果守卫结构化判定(v0.12 code-review 修复:错误串/坏数值不再冒充统计结果)",
+      "description": "评审确认:MCPClient.call_tool 把一切错误归一为字符串且不抛,_real_result 只嗅探「统计库未安装」,导致 MCP 传输错误/isError 工具报错/{\"error\"} 载荷/NaN 数值全部穿透守卫、被写进 outputs/*_result.txt 并以「只引用以下真实数值」注入稿件写作上下文。修复(结构化,不打补丁):① MCPClient 新增 call_tool_status → {ok,text}(启动失败/传输错误/isError/空结果均 ok=False),call_tool 保持原契约委托之;② 骨架哨兵 SKELETON_MARK 收敛为 pystat_server 单一常量,bridge 引用同源(防措辞漂移击穿守卫);③ _real_result(out, ok) 四重拒绝:ok=False / 哨兵 / {\"error\"} 结构化错误载荷 / NaN·inf 退化数值(递归查);旧式仅 call_tool 的注入客户端按 ok=True 兼容,契约不破坏;④ steps_meta.extract_meta_rows 纯 stdlib 行过滤(与 n_studies 口径一致,坏单元/vi≤0 剔除并记 dropped 呈报),pystat_meta 改用之——一个坏单元不再毒化整表;k<3 不算 Egger(2 参数拟合 2 点必得 NaN)改出 egger_note,数值层异常返回结构化 {\"error\"} 不裸抛。",
+      "dependencies": [
+        "feat-072"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/mcp/client.py(call_tool_status);psyclaw/mcp/servers/pystat_server.py(SKELETON_MARK+pystat_meta 硬化);psyclaw/workflows/pystat_bridge.py(_real_result v2/_call_tool_status);psyclaw/workflows/steps_meta.py(extract_meta_rows)。tests/test_pystat_bridge.py +16 例。数值实测(uv+清华镜像真装 statsmodels):clean k=5 → 合并效应 0.327 CI[0.200,0.455] I²=9.7% Egger p=.0045 与 feat-072 基线逐位一致;dirty(2 坏行)→ 同数值+dropped_rows 呈报(修复前为 NaN 合并效应);k=2 → egger_note 不出 NaN;三例守卫均 PASS。全量 pytest → 1510 passed"
     }
   ]
 }

@@ -97,6 +97,52 @@ def validate_effects(csv_path: str) -> dict:
     }
 
 
+def extract_meta_rows(csv_path: str, info: dict) -> dict:
+    """按 validate_effects 的列定位提取**可用行**(纯 stdlib,feat-079)。
+
+    只保留效应量与方差来源都可解析、且换算出的方差 vi 为有限正数的行——与
+    n_studies 的计数口径对齐;不可解析/退化(vi≤0、非有限)的行记入 dropped
+    诚实呈报,绝不静默混入计算(此前 pystat_meta 对整表 astype,一个坏单元就
+    产出 NaN 合并效应或崩溃)。可用行 < 2 抛 ValueError(fail-closed)。
+    返回 {labels, yi, vi, dropped}(vi 统一为方差)。这里只做数据清点与
+    平方/区间换算,不算任何统计量(统计仍外移 statsmodels)。
+    """
+    import math
+    p = Path(csv_path)
+    with p.open(encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    kind, vcols = info["variance_kind"], info["variance_cols"]
+    effect_col, study_col = info["effect_col"], info.get("study_col")
+    labels: list[str] = []
+    yi: list[float] = []
+    vi: list[float] = []
+    dropped: list[dict] = []
+    for i, r in enumerate(rows):
+        label = (str(r.get(study_col, "")).strip() or f"study{i + 1}") if study_col \
+            else f"study{i + 1}"
+        try:
+            y = float(r[effect_col])
+            if kind == "variance":
+                v = float(r[vcols[0]])
+            elif kind == "se":
+                v = float(r[vcols[0]]) ** 2
+            else:  # ci → se = (upper-lower)/(2*1.96)
+                v = ((float(r[vcols[1]]) - float(r[vcols[0]])) / (2 * 1.959963985)) ** 2
+        except (ValueError, TypeError, KeyError):
+            dropped.append({"study": label, "reason": "效应量或方差来源不可解析"})
+            continue
+        if not (math.isfinite(y) and math.isfinite(v)) or v <= 0:
+            dropped.append({"study": label, "reason": "方差非有限正数(vi≤0/NaN/inf)"})
+            continue
+        labels.append(label)
+        yi.append(y)
+        vi.append(v)
+    if len(yi) < 2:
+        raise ValueError(f"可用研究数 < 2(仅 {len(yi)},剔除 {len(dropped)} 行);"
+                         "元分析至少需 2 项可解析研究")
+    return {"labels": labels, "yi": yi, "vi": vi, "dropped": dropped}
+
+
 def generate_meta_script(csv_path: str, info: dict) -> str:
     """生成委托 statsmodels 的可复现随机效应元分析脚本(DerSimonian-Laird + I²/τ²/Q + Egger)。
 

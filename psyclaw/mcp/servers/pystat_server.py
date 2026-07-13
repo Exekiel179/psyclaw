@@ -30,10 +30,14 @@ def _has_pingouin() -> bool:
 
 _INSTALL = "pip install 'psyclaw[stats]'(pingouin/pandas/scipy)"
 
+# 「结果只是脚本骨架、不是真跑出来的数值」的哨兵串(feat-079:单一来源)。
+# pystat_bridge._real_result 据此拒绝把骨架当真结果回填稿件——改措辞只能改这里。
+SKELETON_MARK = "统计库未安装"
+
 
 def _script_reply(script: str, note: str = "") -> str:
     head = ("pingouin 已就绪,以下脚本可直接运行:\n" if _has_pingouin()
-            else f"统计库未安装({_INSTALL})。脚本骨架(装好可直接运行):\n")
+            else f"{SKELETON_MARK}({_INSTALL})。脚本骨架(装好可直接运行):\n")
     return head + "```python\n" + script + "\n```" + (("\n\n" + note) if note else "")
 
 
@@ -222,54 +226,67 @@ def pystat_meta(args: dict) -> str:
     statsmodels/pandas 未装 → 返回可运行脚本骨架,不假装算出结果。
     """
     csv_path = args["csv_path"]
-    from psyclaw.workflows.steps_meta import generate_meta_script, validate_effects
+    from psyclaw.workflows.steps_meta import (extract_meta_rows,
+                                              generate_meta_script,
+                                              validate_effects)
     try:
         info = validate_effects(csv_path)
+        rows = extract_meta_rows(csv_path, info)   # feat-079:只算可解析的行
     except ValueError as exc:
-        return f"效应量表校验失败:{exc}"
+        return json.dumps({"error": f"效应量表校验失败:{exc}"}, ensure_ascii=False)
     script = generate_meta_script(csv_path, info)
     try:
+        import math
+
         import numpy as np
-        import pandas as pd
         import statsmodels.api as sm
         from statsmodels.stats.meta_analysis import combine_effects
     except Exception:  # noqa: BLE001
-        return ("统计库未安装(pip install 'psyclaw[stats]';需 statsmodels/pandas/numpy)。"
+        return (f"{SKELETON_MARK}(pip install 'psyclaw[stats]';需 statsmodels/numpy)。"
                 "脚本骨架(装好可直接运行):\n```python\n" + script + "\n```")
-    df = pd.read_csv(csv_path)
-    yi = df[info["effect_col"]].astype(float).to_numpy()
-    kind, vcols = info["variance_kind"], info["variance_cols"]
-    if kind == "variance":
-        vi = df[vcols[0]].astype(float).to_numpy()
-    elif kind == "se":
-        vi = df[vcols[0]].astype(float).to_numpy() ** 2
-    else:  # ci → se = (upper-lower)/(2*1.96)
-        se = (df[vcols[1]].astype(float) - df[vcols[0]].astype(float)) / (2 * 1.959963985)
-        vi = se.to_numpy() ** 2
-    labels = (df[info["study_col"]].astype(str).tolist() if info.get("study_col")
-              else [f"study{i + 1}" for i in range(len(df))])
-    res = combine_effects(yi, vi, method_re="dl", row_names=labels, use_t=False)
-    sf = res.summary_frame()
-    re_row = sf.loc["random effect"]
-    homog = res.test_homogeneity()
-    q, q_p = float(homog.statistic), float(homog.pvalue)
-    k = len(yi)
-    i2 = max(0.0, (q - (k - 1)) / q) if q > 0 else 0.0
-    se_all = np.sqrt(vi)
-    egger = sm.OLS(yi / se_all, sm.add_constant(1.0 / se_all)).fit()
-    out = {
-        "method": "random-effects (DerSimonian-Laird)",
-        "k": k,
-        "pooled_effect": float(re_row["eff"]),
-        "ci95": [float(re_row["ci_low"]), float(re_row["ci_upp"])],
-        "tau2": float(res.tau2),
-        "i2_percent": round(i2 * 100, 1),
-        "Q": round(q, 3), "Q_p": round(q_p, 4),
-        "egger_intercept": round(float(egger.params[0]), 3),
-        "egger_p": round(float(egger.pvalues[0]), 4),
-    }
+    try:
+        yi = np.asarray(rows["yi"], dtype=float)
+        vi = np.asarray(rows["vi"], dtype=float)
+        k = len(yi)
+        res = combine_effects(yi, vi, method_re="dl",
+                              row_names=rows["labels"], use_t=False)
+        sf = res.summary_frame()
+        re_row = sf.loc["random effect"]
+        homog = res.test_homogeneity()
+        q, q_p = float(homog.statistic), float(homog.pvalue)
+        i2 = max(0.0, (q - (k - 1)) / q) if q > 0 else 0.0
+        pooled = float(re_row["eff"])
+        ci95 = [float(re_row["ci_low"]), float(re_row["ci_upp"])]
+        if not all(math.isfinite(v) for v in (pooled, *ci95)):
+            return json.dumps({"error": "合并效应不可计算(数据退化,如效应量全同或方差异常)"},
+                              ensure_ascii=False)
+        out = {
+            "method": "random-effects (DerSimonian-Laird)",
+            "k": k,
+            "pooled_effect": pooled,
+            "ci95": ci95,
+            "tau2": float(res.tau2),
+            "i2_percent": round(i2 * 100, 1),
+            "Q": round(q, 3), "Q_p": round(q_p, 4),
+        }
+        # Egger 需 k≥3(2 参数拟合 2 点必得 NaN p 值);不够就诚实置空,不出 NaN
+        if k >= 3:
+            se_all = np.sqrt(vi)
+            egger = sm.OLS(yi / se_all, sm.add_constant(1.0 / se_all)).fit()
+            e_int, e_p = float(egger.params[0]), float(egger.pvalues[0])
+            if math.isfinite(e_int) and math.isfinite(e_p):
+                out["egger_intercept"] = round(e_int, 3)
+                out["egger_p"] = round(e_p, 4)
+        if "egger_p" not in out:
+            out["egger_note"] = "k<3 或退化,Egger 检验不适用(未计算,不出 NaN)"
+        if rows["dropped"]:
+            out["dropped_rows"] = rows["dropped"]
+    except Exception as exc:  # noqa: BLE001  # 数值层异常 → 结构化错误,不裸抛
+        return json.dumps({"error": f"元分析计算失败:{exc}"}, ensure_ascii=False)
     note = ("严谨性:合并效应 + 95% CI 已给出;I²/τ² 大时勿只报合并值,做亚组/敏感性分析;"
             "Egger p<.05 提示漏斗不对称(可能发表偏倚),报告须说明。")
+    if rows["dropped"]:
+        note += f"\n注意:{len(rows['dropped'])} 行因不可解析/方差退化被剔除(见 dropped_rows),k 以可用行计。"
     return json.dumps(out, ensure_ascii=False, indent=2, default=str) + "\n\n" + note
 
 
