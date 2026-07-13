@@ -191,6 +191,11 @@ def build_provenance(artifact_path: str, description: str = "",
         from psyclaw.psych.journals import get_journal, requires_data_availability
         profile = get_journal(journal)
         prov["journal"] = profile["name"] if profile else None
+        if profile is None:
+            # feat-082(评审修复):期刊名不识别绝不静默——此前拼错 --journal 会
+            # 无声退化成「无期刊定制」,required 期刊的 replication 质量检查被解除
+            # 而用户毫不知情。记入 sidecar 供 CLI/渲染醒目告警(fail-closed 呈报)。
+            prov["journal_unmatched"] = str(journal)
         data_required = requires_data_availability(profile)
     prov["data_availability_required"] = data_required
     data_ok = (not data_required) or bool(data and data.get("sha256"))
@@ -222,6 +227,10 @@ def _render_md(prov: dict) -> str:
     if prov.get("journal"):
         req = "要求(必须带数据指纹)" if prov.get("data_availability_required") else "非强制"
         lines.append(f"- 期刊定制:{prov['journal']} · 数据可得性 {req}")
+    elif prov.get("journal_unmatched"):
+        lines.append(f"- ⚠ 期刊「{prov['journal_unmatched']}」未识别:期刊定制**未生效**"
+                     "(数据可得性/replication 判据按无期刊处理)——核对拼写或用"
+                     " `psyclaw journal` 查可用 id")
     decl = prov.get("replication_package") or {}
     if decl.get("complete"):
         lines += ["", "## Replication package 声明(可直接放进稿件数据可得性节)", "",

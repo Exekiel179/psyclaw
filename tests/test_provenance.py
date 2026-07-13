@@ -223,3 +223,29 @@ class TestReplicationGate:
                                   data_path=str(data), journal="psych-science")
         res = check_artifact(prov["_sidecar"], "provenance")
         assert res["passed"] is True, res["blocking"]
+class TestJournalUnmatched:
+    def test_unmatched_journal_recorded_not_silent(self, tmp_path):
+        art, _ = _script_and_data(tmp_path)
+        prov = P.build_provenance(str(art), project_dir=str(tmp_path),
+                                  journal="physc-science-typo")
+        assert prov["journal"] is None
+        assert prov["journal_unmatched"] == "physc-science-typo"
+        assert prov["data_availability_required"] is False   # 判据按无期刊,但有痕
+    def test_matched_journal_has_no_unmatched_key(self, tmp_path):
+        art, data = _script_and_data(tmp_path)
+        prov = P.build_provenance(str(art), project_dir=str(tmp_path),
+                                  data_path=str(data), journal="psych-science")
+        assert "journal_unmatched" not in prov
+    def test_md_warns_on_unmatched(self, tmp_path):
+        art, _ = _script_and_data(tmp_path)
+        P.write_provenance(str(art), project_dir=str(tmp_path),
+                           journal="physc-science-typo")
+        md = art.with_suffix(".py.provenance.md").read_text(encoding="utf-8")
+        assert "未识别" in md and "未生效" in md
+    def test_cli_exits_nonzero_on_unmatched(self, tmp_path, monkeypatch, capsys):
+        from psyclaw import cli
+        art, _ = _script_and_data(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        rc = cli.main(["provenance", str(art), "--journal", "physc-science-typo"])
+        assert rc == 1
+        assert "未识别" in capsys.readouterr().out

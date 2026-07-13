@@ -826,6 +826,13 @@ def cmd_provenance(args: argparse.Namespace) -> int:
     if prov.get("journal"):
         req = "要求(须带数据指纹)" if prov.get("data_availability_required") else "非强制"
         print(ui.dim(f"  期刊:{prov['journal']} · 数据可得性 {req}"))
+    elif prov.get("journal_unmatched"):
+        # feat-082:期刊名不识别 fail-closed 醒目告警+退出码 1——此前静默按
+        # 「无期刊」处理,required 期刊的 replication 质量检查被无声解除。
+        from psyclaw.psych.journals import list_journal_ids
+        print(ui.err(f"  ✗ 期刊「{prov['journal_unmatched']}」未识别,期刊定制未生效"
+                     f"(可用:{', '.join(list_journal_ids())})"))
+        return 1
     decl = prov.get("replication_package") or {}
     if decl.get("complete"):
         print(ui.dim("  Replication package 声明已生成(见 .provenance.md,可直接放进稿件)"))
