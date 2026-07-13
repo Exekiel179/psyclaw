@@ -156,7 +156,13 @@ def confirm_lesson(index: int) -> bool:
     if not (0 <= index < len(pending)):
         return False
     card = pending.pop(index)
-    card["strength"] = 1
+    # feat-083(评审修复):确认前累计的再现次数(hits)转为初始强度——
+    # 此前无条件置 1,再现 5 次的教训确认后反而排在偶发教训后面,
+    # 与 feat-066「被再次印证则强度+1」的意图相反。
+    try:
+        card["strength"] = max(1, int(card.pop("hits", 1)))
+    except (TypeError, ValueError):
+        card["strength"] = 1
     data.setdefault("active", []).append(card)
     _save("lessons", data)
     return True
