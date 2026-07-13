@@ -331,3 +331,30 @@ class TestLessonReinforcement:
         draft_lesson("python", "用 python3", "error")
         memory_cli(["list"])
         assert "已再现 2 次" in capsys.readouterr().out
+class TestConfirmCarriesHits:
+    """feat-083(评审修复):确认时 pending 的 hits 转为初始强度,不再归 1。"""
+    def test_hits_become_strength_on_confirm(self, mem_dir):
+        from psyclaw import memory as M
+        M.draft_lesson("rscript", "本机没有 rscript", source="error", kind="cmd")
+        for _ in range(4):                       # 确认前再现 4 次 → hits=5
+            M.draft_lesson("rscript", "本机没有 rscript", source="error", kind="cmd")
+        assert M.confirm_lesson(0) is True
+        card = M.active_lessons()[0]
+        assert card["strength"] == 5
+        assert "hits" not in card                # hits 已并入 strength,不留双账
+    def test_fresh_card_confirms_to_strength_one(self, mem_dir):
+        from psyclaw import memory as M
+        M.draft_lesson("nope", "本机没有 nope", source="error", kind="cmd")
+        M.confirm_lesson(0)
+        assert M.active_lessons()[0]["strength"] == 1
+    def test_ranking_prefers_much_reproduced_lesson(self, mem_dir):
+        from psyclaw import memory as M
+        M.draft_lesson("often", "常踩的坑", source="error", kind="cmd")
+        for _ in range(6):
+            M.draft_lesson("often", "常踩的坑", source="error", kind="cmd")
+        M.draft_lesson("rare", "偶发的坑", source="error", kind="cmd")
+        M.confirm_lesson(0)                      # often(hits=7)
+        M.confirm_lesson(0)                      # rare(hits=1)
+        M.draft_lesson("rare", "偶发的坑", source="error", kind="cmd")  # rare 强度 2
+        prompt = M.memory_prompt()
+        assert prompt.index("常踩的坑") < prompt.index("偶发的坑")

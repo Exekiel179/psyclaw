@@ -832,6 +832,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/provenance.py(journal_unmatched+md 警告);psyclaw/cli.py(cmd_provenance ✗ 告警+exit 1+可用 id 列表)。tests/test_provenance.py TestJournalUnmatched +4 例(记录不静默/正常匹配无键/md 警告/CLI 退出码)。全量 pytest → 1533 passed"
+    },
+    {
+      "id": "feat-083",
+      "name": "确认教训卡继承再现证据(v0.12 评审修复:confirm 丢弃 hits 致排序倒挂)",
+      "description": "评审 finding 11:confirm_lesson 无条件 strength=1,把 feat-066 在 pending 卡上累计的 hits(确认前的再现次数)全部丢弃——再现 5 次的教训确认后反而排在只偶发 1 次的教训后面;活跃卡 >10 时 memory_prompt 的 [:10] 截断先丢掉再现最多的教训,与「被再次印证则强度+1」意图相反。修复:confirm 时 strength = max(1, hits)(hits 并入 strength 不留双账,坏值兜底 1)。",
+      "dependencies": [
+        "feat-066"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/memory.py(confirm_lesson)。tests/test_audit_memory.py TestConfirmCarriesHits +3 例(hits=5 确认后 strength=5 且 hits 键并账/新卡确认 strength=1/多次再现的教训在 memory_prompt 排序先于偶发教训)。全量 pytest → 1536 passed"
     }
   ]
 }
