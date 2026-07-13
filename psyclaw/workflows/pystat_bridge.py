@@ -46,12 +46,58 @@ def _default_pystat_client():
     return None
 
 
-def _real_result(out: str | None) -> str | None:
-    """把「统计库未装时返回的脚本骨架」判为无结果——脚本不是数值,回填稿件会造成
-    『看着像跑过了』的假象(学术诚信:不假装算出结果)。"""
-    if not out or "统计库未安装" in out:
+def _skeleton_mark() -> str:
+    """脚本骨架哨兵串,单一来源于产生它的 pystat_server(feat-079,防措辞漂移击穿守卫)。"""
+    try:
+        from psyclaw.mcp.servers.pystat_server import SKELETON_MARK
+        return SKELETON_MARK
+    except Exception:  # noqa: BLE001 — 极端导入失败也不放松守卫,退回历史措辞
+        return "统计库未安装"
+
+
+def _has_nonfinite(obj) -> bool:
+    """递归查 JSON 载荷里的 NaN/inf——不可发表的数值绝不当真结果。"""
+    import math
+    if isinstance(obj, float):
+        return not math.isfinite(obj)
+    if isinstance(obj, dict):
+        return any(_has_nonfinite(v) for v in obj.values())
+    if isinstance(obj, list):
+        return any(_has_nonfinite(v) for v in obj)
+    return False
+
+
+def _real_result(out: str | None, ok: bool = True) -> str | None:
+    """真结果守卫(feat-079 收紧为结构化判定):以下一律判为无结果 → None——
+
+    ① 传输/工具层失败(call_tool_status 的 ok=False:启动失败/超时/isError/空);
+    ② 脚本骨架(统计库未装,SKELETON_MARK 哨兵);
+    ③ 工具返回的结构化错误载荷({"error": …},如列不匹配/校验失败);
+    ④ 载荷含 NaN/inf 的退化数值。
+    否则原样返回。学术诚信:错误串/骨架/坏数值回填稿件都会造成
+    『看着像跑过了』的假象,fail-closed 宁缺毋滥。
+    """
+    if not ok or not out or _skeleton_mark() in out:
         return None
+    import json
+    head = out.split("\n\n", 1)[0].strip()
+    if head.startswith("{"):
+        try:
+            payload = json.loads(head)
+        except ValueError:
+            return out          # 非 JSON 文本结果(如描述统计表)照常放行
+        if isinstance(payload, dict) and "error" in payload:
+            return None
+        if _has_nonfinite(payload):
+            return None
     return out
+
+
+def _call_tool_status(client, tool: str, args: dict) -> dict:
+    """统一走结构化调用;注入的旧式假客户端(仅有 call_tool)按 ok=True 兼容。"""
+    if hasattr(client, "call_tool_status"):
+        return client.call_tool_status(tool, args)
+    return {"ok": True, "text": client.call_tool(tool, args)}
 
 
 def run_via_pystat(rec: dict, csv_path: str, client_factory=None) -> str | None:
@@ -65,8 +111,8 @@ def run_via_pystat(rec: dict, csv_path: str, client_factory=None) -> str | None:
         return None
     try:
         with client:
-            out = client.call_tool(tool, args)
-        return _real_result(out)
+            res = _call_tool_status(client, tool, args)
+        return _real_result(res["text"], ok=res["ok"])
     except Exception:  # noqa: BLE001 — MCP 任何异常都不阻断,退回脚本兜底
         return None
 
@@ -78,7 +124,7 @@ def run_meta_via_pystat(csv_path: str, client_factory=None) -> str | None:
         return None
     try:
         with client:
-            out = client.call_tool("pystat_meta", {"csv_path": csv_path})
-        return _real_result(out)
+            res = _call_tool_status(client, "pystat_meta", {"csv_path": csv_path})
+        return _real_result(res["text"], ok=res["ok"])
     except Exception:  # noqa: BLE001
         return None
