@@ -168,6 +168,52 @@ def test_parse_run_requests_kinds():
                     {"kind": "shell", "cmd": "python -V"}]
 
 
+def test_shell_block_multiline_quoted_is_one_command():
+    """feat-101:多行 `python3 -c "…"` 是一条命令——第三轮评估实测被逐行拆成
+    5 条分别审批/执行(`import csv` 单独一条、结尾引号也算一条),全废。"""
+    reply = ('```shell\npython3 -c "\nimport csv\nfrom collections import Counter\n'
+             'print(Counter([1, 2]))\n"\n```')
+    reqs = R.parse_run_requests(reply)
+    assert len(reqs) == 1
+    assert reqs[0]["cmd"].startswith('python3 -c "') and 'import csv' in reqs[0]["cmd"]
+
+
+def test_shell_block_continuation_and_multiple_commands():
+    reply = ("```shell\npip install pandas -q && \\\npython x.py\necho done\n```")
+    reqs = R.parse_run_requests(reply)
+    assert [r["cmd"] for r in reqs] == ["pip install pandas -q && \\\npython x.py",
+                                        "echo done"]
+
+
+def test_shell_block_trailing_and_groups_next_line():
+    reply = ("```shell\npip install pandas -q &&\npython -c \"print(1)\"\n```")
+    reqs = R.parse_run_requests(reply)
+    assert len(reqs) == 1 and reqs[0]["cmd"].endswith('python -c "print(1)"')
+
+
+def test_shell_block_heredoc_is_one_command():
+    reply = ("```shell\npython3 - << 'EOF'\nprint('hi')\nEOF\n```")
+    reqs = R.parse_run_requests(reply)
+    assert len(reqs) == 1
+    assert reqs[0]["cmd"].startswith("python3 - << 'EOF'")
+    assert reqs[0]["cmd"].endswith("EOF")
+
+
+def test_shell_block_unclosed_quote_residual_not_silently_dropped():
+    reply = ('```shell\necho "未闭合\n```')
+    reqs = R.parse_run_requests(reply)
+    assert len(reqs) == 1 and reqs[0]["cmd"] == 'echo "未闭合'
+
+
+def test_group_shell_plain_lines_unchanged():
+    assert R.group_shell_commands("echo a\n# 注释\n\necho b\n") == ["echo a", "echo b"]
+
+
+def test_cmd_display_multiline():
+    assert R.cmd_display("echo a") == "echo a"
+    assert R.cmd_display('python3 -c "\nimport csv\n"') == 'python3 -c "  (+2 行)'
+
+
 def test_run_commands_dangerous_denied_without_confirm():
     msg, notes = R.run_commands([{"kind": "shell", "cmd": "git push --force origin x"}],
                                 confirm=None)

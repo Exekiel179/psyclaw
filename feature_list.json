@@ -1014,6 +1014,16 @@
       ],
       "status": "done",
       "evidence": "tests +6(_pick_dv 语义/anova 选 post_score/三类质量信号/干净数据零警示/脚本清洗要素+可编译/画像步打印)。全量 pytest → 1608 passed;gates 通过;eval 28/28。活体:埋雷 data.csv 重新画像 → 三警示齐亮(S01 重复·99/-999 缺失码·等待组 n=2);DV=post_score;生成脚本 pingouin 实跑 → 剔除呈报+缺失码警示+组样本量+微型组警示全部输出。"
+    },
+    {
+      "id": "feat-101",
+      "name": "shell 块多行命令分组——引号/续行/heredoc 不再逐行拆碎",
+      "description": "第三轮评估(多轮交互+工具调用)实测:模型发多行 python3 -c \"…\" 或 pip install && python -c \"…\" 跨行命令,parse_run_requests 按行拆成 5 条独立\"命令\"分别审批/执行(import csv 单独一条、结尾引号也算一条),逐行执行必然全废,审批风暴还把后续用户输入吞成审批答复。新增 group_shell_commands 纯函数:引号未闭合(状态机,双引号内转义生效)/行尾 \\\\ && || | /heredoc 未终结 → 续行合并;未闭合残尾如实交出不静默丢。多行命令确认框整体展示(≤20 行)+ cmd_display 单行化标签('a' 范围按显示形态,不过度泛化);psyclaw 子命令保持逐行。",
+      "dependencies": [
+        "feat-081"
+      ],
+      "status": "done",
+      "evidence": "tests +7(多行引号一条/续行合并/尾接续/heredoc/未闭合残尾不丢/纯单行不变/显示形态)。全量 pytest → 1615 passed;gates 通过;eval 28/28。缺陷现场:evalcase3 转录 transcript3.raw/3b/3c 三次复现逐行拆碎。"
     }
   ]
 }
