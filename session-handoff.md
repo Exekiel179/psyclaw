@@ -4,9 +4,9 @@
 
 ## Current Objective
 
-- Goal: 修复对抗评估(埋雷研究包,31/100)立案的全部 8 项缺陷(用户 /goal)
-- Current status: **全部修复并活体复测**——feat-090~097 done;97 个 feature 全 done
-- Branch / commit: master(领先 origin/master 8 个提交,**待用户推送**:`! git push origin master`)
+- Goal: 两轮对抗评估立案缺陷全部修复(第一轮 8 项 feat-090~097 + 第二轮 3 项 feat-098~100)
+- Current status: **11 项全部修复并活体复测**——100 个 feature 全 done
+- Branch / commit: master(领先 origin/master 多个提交,**待用户推送**:`! git push origin master`)
 
 ## Completed This Session
 - [x] 快进合并 feat/interaction-model-run-contracts(feat-076..078)进 master(先测后并:1495 绿)
