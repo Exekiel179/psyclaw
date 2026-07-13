@@ -212,3 +212,43 @@ class TestRenderImageDirect:
         monkeypatch.setattr(_sys, "stdout", _Tty())
         assert imgview.supports_inline("iterm2") == "iterm2"
         assert imgview.supports_inline("none") is None
+class TestDraftLessonsBatch:
+    """feat-087(评审修复):批量落卡单卡失败不中断,CLI 按实际落卡数如实报。"""
+    def test_returns_actual_saved_count(self, monkeypatch):
+        from psyclaw import memory as M
+        calls = {"n": 0}
+        def flaky(trigger, lesson, source, kind=None):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise OSError("记忆库不可写")
+        monkeypatch.setattr(M, "draft_lesson", flaky)
+        lessons = [{"trigger": "a", "lesson": "坑A"},
+                   {"trigger": "b", "lesson": "坑B"},
+                   {"trigger": "c", "lesson": "坑C"}]
+        assert M.draft_lessons(lessons) == 2       # 首卡失败,后两张仍落
+        assert calls["n"] == 3                     # 不 break,逐张尝试
+    def test_all_fail_returns_zero(self, monkeypatch):
+        from psyclaw import memory as M
+        monkeypatch.setattr(M, "draft_lesson",
+                            lambda *a, **k: (_ for _ in ()).throw(OSError()))
+        assert M.draft_lessons([{"trigger": "a", "lesson": "x"}]) == 0
+    def test_cmd_agent_reports_honest_count(self, monkeypatch, capsys):
+        """落卡全失败时 CLI 明说「未持久化」,不再谎报 N 条已落卡。"""
+        from psyclaw import cli
+        from psyclaw import memory as M
+        monkeypatch.setattr(M, "draft_lesson",
+                            lambda *a, **k: (_ for _ in ()).throw(OSError()))
+        monkeypatch.setattr(cli.cfg, "load_config", lambda: {"provider": "mock"})
+        fake_res = {"final": "done", "iters": 1, "stopped": "answered",
+                    "trace": [], "lessons": [{"trigger": "t", "lesson": "坑"}]}
+        import psyclaw.toolloop as TL2
+        monkeypatch.setattr(TL2, "run_tool_loop",
+                            lambda *a, **k: fake_res)
+        monkeypatch.setattr(TL2, "log_agent_run", lambda *a, **k: None)
+        import argparse
+        ns = argparse.Namespace(task=["测试"], auto=False, max_iters=4,
+                                history=None)
+        rc = cli.cmd_agent(ns)
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "落卡全部失败" in out and "未持久化" in out

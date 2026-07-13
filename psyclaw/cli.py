@@ -154,16 +154,21 @@ def cmd_agent(args: argparse.Namespace) -> int:
     print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
     print(res["final"])
     # feat-065:循环内蒸馏的环境教训落跨会话待确认卡(HITL:psyclaw memory confirm 才生效)
+    # feat-087(评审修复):与 REPL 共用 draft_lessons,单卡失败不再 break 丢掉
+    # 剩余教训;计数按**实际落卡数**如实报,不再声称未发生的持久化。
     if res.get("lessons"):
-        from psyclaw.memory import draft_lesson
-        for le in res["lessons"]:
-            try:
-                draft_lesson(le["trigger"], le["lesson"], source="error",
-                             kind=le.get("kind"))
-            except Exception:  # noqa: BLE001  # 落卡失败不影响任务结果
-                break
-        print(ui.dim(f"  📎 蒸馏环境教训 {len(res['lessons'])} 条"
-                     "(psyclaw memory 查看,confirm 后跨会话生效)"))
+        from psyclaw.memory import draft_lessons
+        saved = draft_lessons(res["lessons"])
+        total = len(res["lessons"])
+        if saved == total:
+            print(ui.dim(f"  📎 蒸馏环境教训 {total} 条,已全部落卡"
+                         "(psyclaw memory 查看,confirm 后跨会话生效)"))
+        elif saved:
+            print(ui.warn(f"  📎 蒸馏环境教训 {total} 条,仅 {saved} 条落卡成功"
+                          "(记忆库写入部分失败,psyclaw memory 查看)"))
+        else:
+            print(ui.warn(f"  📎 蒸馏环境教训 {total} 条,但落卡全部失败"
+                          "(记忆库不可写?本次教训未持久化)"))
     # feat-065:结果里提到的图片,终端支持时内联渲染
     from psyclaw.repl import render_images_in_text
     render_images_in_text("\n".join(
