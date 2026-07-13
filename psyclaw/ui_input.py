@@ -116,14 +116,33 @@ else:
         fd = sys.stdin.fileno()
         old = termios.tcgetattr(fd)
         try:
-            tty.setraw(fd)
-            ch = sys.stdin.read(1)
-            if ch == "\x1b":                  # ESC 或方向键序列
+            # TCSADRAIN:切 raw 时不丢弃已到达的 type-ahead 输入(setraw 默认
+            # TCSAFLUSH 会把两次按键读取间隙里敲的键静默冲掉;feat-080)。
+            tty.setraw(fd, termios.TCSADRAIN)
+            # feat-080:fd 级读取(os.read),不走 sys.stdin 的 TextIOWrapper——
+            # 此前 sys.stdin.read(1) 一次把 \x1b[A 三字节吸进 Python 缓冲,
+            # select 看内核队列为空 → 方向键被误判成 ESC 整题取消,且 '[A' 泄漏
+            # 为后续假按键(macOS/Linux 真终端可复现;测试注入 get_key 测不到)。
+            data = os.read(fd, 1)
+            if not data:                       # 真 EOF(pty 关闭/流结束)
+                return "EOF"
+            if data == b"\x1b":                # ESC 或方向键序列
                 import select
-                if select.select([sys.stdin], [], [], 0.05)[0]:
-                    seq = sys.stdin.read(2)
-                    return {"[A": "UP", "[B": "DOWN"}.get(seq, "ESC")
-                return "ESC"
+                seq = b""
+                while len(seq) < 2 and select.select([fd], [], [], 0.05)[0]:
+                    chunk = os.read(fd, 2 - len(seq))
+                    if not chunk:
+                        break
+                    seq += chunk
+                return {b"[A": "UP", b"[B": "DOWN"}.get(seq, "ESC")
+            if data[0] >= 0x80:                # UTF-8 多字节(中文作答首字符)读满
+                need = 2 if data[0] < 0xE0 else (3 if data[0] < 0xF0 else 4)
+                while len(data) < need:
+                    chunk = os.read(fd, need - len(data))
+                    if not chunk:
+                        break
+                    data += chunk
+            ch = data.decode("utf-8", errors="replace")
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
         if ch in ("\r", "\n"):

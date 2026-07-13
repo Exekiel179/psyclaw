@@ -802,6 +802,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/mcp/client.py(call_tool_status);psyclaw/mcp/servers/pystat_server.py(SKELETON_MARK+pystat_meta 硬化);psyclaw/workflows/pystat_bridge.py(_real_result v2/_call_tool_status);psyclaw/workflows/steps_meta.py(extract_meta_rows)。tests/test_pystat_bridge.py +16 例。数值实测(uv+清华镜像真装 statsmodels):clean k=5 → 合并效应 0.327 CI[0.200,0.455] I²=9.7% Egger p=.0045 与 feat-072 基线逐位一致;dirty(2 坏行)→ 同数值+dropped_rows 呈报(修复前为 NaN 合并效应);k=2 → egger_note 不出 NaN;三例守卫均 PASS。全量 pytest → 1510 passed"
+    },
+    {
+      "id": "feat-080",
+      "name": "选择器 POSIX 方向键修复(v0.12 code-review 修复:↑↓ 在 macOS/Linux 上不可用)",
+      "description": "评审 pty 实证:方向键 \\x1b[A 三字节一包到达,旧 _get_key 经 sys.stdin.read(1) 缓冲读吸走全部字节,select 看 fd 内核队列为空 → 方向键被误判成 ESC 整题取消,且 '[A' 泄漏为后续假按键;测试套件全部注入 get_key,真实读取器零覆盖。修复:① POSIX _get_key 改 fd 级 os.read(不经 TextIOWrapper 缓冲,select 判据可靠),转义序列整体消费不泄漏,UTF-8 多字节(中文作答首字符)读满,os.read 空返回 → EOF;② tty.setraw 改 TCSADRAIN(默认 TCSAFLUSH 会把按键间隙的 type-ahead 静默冲掉);③ _pick_inline 循环加固:空键不重画、连续空键有界退出为跳过(修 EOF 100% CPU 忙等)、单选空格=选定高亮项(旧 radiolist 肌肉记忆,此前落自由作答被吞成跳过)、数字分支加 isascii 防 '²'.isdigit() 通过而 int() 崩。",
+      "dependencies": [
+        "feat-068"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/ui_input.py(POSIX _get_key 重写);psyclaw/choices.py(_pick_inline 循环加固+单选提示语)。tests/test_ui_input_keys.py 新文件 5 例(pty 真子进程喂原始字节:↓↑回车/裸 ESC/未知转义不泄漏/中文整读/EOF 不忙等——补上真实读取器零覆盖盲区);tests/test_choices_reads.py +5 例(单选空格选定/多选空格仍勾选/空键流有界跳过/偶发空键忽略/上标数字走自由作答)。全量 pytest → 1520 passed;eval 28/28"
     }
   ]
 }
