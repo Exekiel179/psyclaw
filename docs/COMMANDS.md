@@ -93,6 +93,7 @@
 | `lit <主题> --plan` | 检索计划包:中英布尔检索式+公开API路线+机构库浏览器桥接分步提示词+纳入/排除标准(检索前声明) |
 | `lit --import <结果表>` | 导入机构库桥接检索结果(Markdown 表/CSV)并入语料,PRISMA 留痕 |
 | `lit [主题] --matrix` | 从检索语料生成文献矩阵骨架(「待核查/全文未获取」约定;键与 cite-check 语料同源) |
+| `webbridge [install\|status\|start]` | Kimi WebBridge:驱动你已登录的**真实浏览器**(默认浏览器识别+扩展指引;/agent on 后 web__* 工具可用) |
 
 ### 记忆 / 消息 / IO
 | 命令 | 作用 |

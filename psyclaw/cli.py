@@ -1011,6 +1011,54 @@ def cmd_lit(args: argparse.Namespace) -> int:
                    zotero_doi=args.zotero, synthesize=getattr(args, "synthesize", False))
 
 
+def cmd_webbridge(args: argparse.Namespace) -> int:
+    """Kimi WebBridge:安装/状态/启动(feat-108)。驱动用户真实浏览器(登录态复用)。"""
+    from psyclaw import ui, webbridge as wb
+    act = getattr(args, "action", "status") or "status"
+    if act == "install":
+        if wb.binary_installed():
+            print(ui.dim(f"  二进制已在位:{wb.BIN}"))
+        else:
+            print(ui.dim("  下载官方二进制(cdn.kimi.com,与官方 install.sh 同源)…"))
+            try:
+                wb.download_binary()
+                print(ui.ok(f"✓ 已安装 → {wb.BIN}"))
+            except Exception as exc:  # noqa: BLE001
+                print(ui.err(f"✗ 下载失败:{exc};手动安装见 {wb.HELP_URL}"))
+                return 1
+        ok = wb.start_daemon()
+        print(ui.ok("✓ 守护进程已启动(127.0.0.1:10086)") if ok
+              else ui.err("✗ 守护进程未能启动"))
+        out = wb.install_skill()
+        print(ui.dim("  agent 技能:\n" + "\n".join(
+            f"    {ln}" for ln in out.strip().splitlines()[:6])))
+        act = "status"                     # 落到状态展示 + 扩展指引
+    if act == "start":
+        print(ui.ok("✓ 守护进程已启动") if wb.start_daemon()
+              else ui.err(f"✗ 启动失败(先 psyclaw webbridge install;帮助 {wb.HELP_URL})"))
+        return 0
+    # status
+    st = wb.daemon_status()
+    db = wb.default_browser()
+    print(ui.title("Kimi WebBridge") + ui.dim(f"  {wb.BIN if wb.binary_installed() else '(未安装)'}"))
+    if st:
+        mark = ui.ok("已连接") if st.get("extension_connected") else ui.warn("未连接")
+        v = str(st.get('version', '?')).lstrip('v')
+        print(f"  守护进程:运行中 v{v} · 端口 {st.get('port')} · 扩展:", end="")
+        print(mark)
+    else:
+        print(ui.warn("  守护进程:未运行(psyclaw webbridge start)"))
+    if db:
+        note = "" if db["chromium"] else "(非 Chromium 系,扩展可能不可用——建议用 Chromium 系浏览器)"
+        print(f"  默认浏览器:{db['name']} {note}")
+        if st and not st.get("extension_connected"):
+            print(ui.warn(f"  ⚠ 请在 {db['name']} 中安装 WebBridge 扩展(登录态复用的关键一步):"))
+            print(ui.dim(f"    {wb.HELP_URL}"))
+    if st and st.get("extension_connected"):
+        print(ui.ok("  ✓ 就绪:psyclaw 对话 /agent on 后即可用 web__* 工具驱动真实浏览器"))
+    return 0
+
+
 def cmd_plan(args: argparse.Namespace) -> int:
     from psyclaw.loop import run_plan
     return run_plan(topic=getattr(args, "topic", None),
@@ -1172,7 +1220,7 @@ COMMAND_CATEGORIES = [
     ("兼容 / 高级编排", ["repl", "agent", "auto-loop", "loop", "lit-loop", "meta-loop",
                       "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
-    ("检索 / 知识图谱", ["search", "kg", "lit"]),
+    ("检索 / 知识图谱", ["search", "kg", "lit", "webbridge"]),
     ("记忆 / 消息 / IO", ["memory", "session", "resume", "serve", "notify", "auth",
                        "export", "figures", "provenance"]),
 ]
@@ -1651,6 +1699,13 @@ def build_parser() -> argparse.ArgumentParser:
                       help="从检索语料生成文献矩阵骨架(notes/lit_matrix.md,"
                            "键与 cite-check 语料同源)")
     plit.set_defaults(func=cmd_lit)
+
+    pwb = sub.add_parser("webbridge",
+                         help="Kimi WebBridge:驱动你已登录的真实浏览器(机构库检索路线 B)")
+    pwb.add_argument("action", nargs="?", default="status",
+                     choices=["install", "status", "start"],
+                     help="install=下载+启动+装技能+扩展指引;status=状态;start=启动守护进程")
+    pwb.set_defaults(func=cmd_webbridge)
 
     sub.add_parser(
         "guide", help="首次使用上手介绍(chat / run / auto 三种工作方式)"

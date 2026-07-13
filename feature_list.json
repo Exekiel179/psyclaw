@@ -1066,6 +1066,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_browser_mcp.py 6 例(registry 条目/npx 健康/假客户端合并前缀与审批位/适配追加/用户自定义与缺浏览器不动/计划文案)。全量 pytest → 1637 passed;gates 通过;eval 28/28。活体端到端:psyclaw 自身 MCP 客户端 npx 拉起 chrome-devtools-mcp 列出 29 工具;agent 真实合并路径(catalog→健康→merge→run)自动适配本机 Edge,new_page 打开 example.com、take_snapshot 读到页面内容。"
+    },
+    {
+      "id": "feat-108",
+      "name": "Kimi WebBridge 接入——psyclaw 驱动真实浏览器(含安装配置+默认浏览器识别)",
+      "description": "用户明确要求用 Kimi 桥并内置安装配置。WebBridge=本地守护进程(127.0.0.1:10086 HTTP)+浏览器扩展,驱动用户已登录的真实浏览器(机构登录态复用,教学文档核心体验)。psyclaw/webbridge.py 纯 stdlib:①psyclaw webbridge install(官方同源下载二进制→启动守护进程[幂等]→install-skill 装 agent 技能→状态与扩展指引);②默认浏览器识别:macOS LaunchServices plist(Arc/Chrome/Edge/Brave/Safari 映射+Chromium 系判定),非 Chromium 给替换建议;③call() POST /command(action/args/session),守护进程未起自动 start 一次,失败如实报错;④merge_webbridge_tools 并入 agent 循环 9 个 web__* 工具(navigate/find_tab/snapshot/click/fill/evaluate/screenshot/list_tabs/close_session,side_effect 逐动作审批,PSYCLAW_WEBBRIDGE=0 可关);⑤检索计划路线 B 改 WebBridge 首选、浏览器 MCP 备选;⑥纪律:绝不自动 stop/restart/uninstall(官方 operations 明令,防与 Kimi 桌面端打架),登录永远人工。",
+      "dependencies": [
+        "feat-107"
+      ],
+      "status": "done",
+      "evidence": "tests/test_webbridge.py 8 例(Arc 识别/Safari 非 Chromium/无 plist 为 None/假守护进程 status+call 报文形状/不可达诚实报错/工具并入与默认会话/无二进制不并入/计划文案首选)。全量 pytest → 1645 passed;gates 通过;eval 28/28。活体:本机真装真跑——二进制 9.6MB 落位、守护进程 v1.11.3 起、install-skill 装进 Claude Code/Codex/Hermes、CLI status 识别默认浏览器 Arc 并给扩展指引、build_tools 并入 9 个 web__* 工具。"
     }
   ]
 }
