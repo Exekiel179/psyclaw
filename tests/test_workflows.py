@@ -304,6 +304,75 @@ def test_generate_meta_script_delegates_to_statsmodels(tmp_path):
     assert "** 2" in script          # se → 方差 = se²
 
 
+def test_extract_rows_negative_se_rejected_before_squaring(tmp_path):
+    """负 se 必须在平方前拒绝——平方会把负号洗白成合法方差(feat-094 活雷)。"""
+    from psyclaw.workflows.steps_meta import extract_meta_rows
+    p = _eff_csv(tmp_path, "negse.csv",
+                 [{"study": "A", "d": "0.4", "se": "0.15"},
+                  {"study": "B", "d": "0.61", "se": "-0.05"},
+                  {"study": "C", "d": "0.3", "se": "0.12"}],
+                 ["study", "d", "se"])
+    info = validate_effects(p)
+    assert info["n_studies"] == 2            # validate 与 extract 同口径
+    rows = extract_meta_rows(p, info)
+    assert rows["labels"] == ["A", "C"]
+    assert rows["dropped"][0]["study"] == "B"
+    assert "标准误非正" in rows["dropped"][0]["reason"]
+
+
+def test_extract_rows_inverted_ci_rejected(tmp_path):
+    from psyclaw.workflows.steps_meta import extract_meta_rows
+    p = _eff_csv(tmp_path, "badci.csv",
+                 [{"g": "0.3", "ci_lower": "0.1", "ci_upper": "0.5"},
+                  {"g": "0.5", "ci_lower": "0.8", "ci_upper": "0.2"},
+                  {"g": "0.4", "ci_lower": "0.2", "ci_upper": "0.6"}],
+                 ["g", "ci_lower", "ci_upper"])
+    info = validate_effects(p)
+    rows = extract_meta_rows(p, info)
+    assert len(rows["yi"]) == 2
+    assert "倒置" in rows["dropped"][0]["reason"]
+
+
+def test_generate_meta_script_cleans_and_fails_closed(tmp_path):
+    """生成脚本内嵌同口径行清洗:coerce 解析、剔除呈报、可用<2 拒算、k<3 不硬算 Egger。
+
+    feat-094:此前脚本裸读原始 CSV,对含 "n.s." 的脏表当场 ValueError 崩
+    (评估实测),"可复现脚本"在自己配套的数据上不可复现。
+    """
+    p = _eff_csv(tmp_path, "dirty.csv",
+                 [{"study": "A", "d": "0.4", "se": "0.15"},
+                  {"study": "B", "d": "n.s.", "se": "0.2"},
+                  {"study": "C", "d": "0.3", "se": "0.12"}],
+                 ["study", "d", "se"])
+    info = validate_effects(p)
+    script = generate_meta_script(p, info)
+    assert 'errors="coerce"' in script        # 坏单元不再 astype 崩
+    assert "剔除" in script and "dropped" in script
+    assert "SystemExit" in script             # 可用 < 2 fail-closed
+    assert "Egger 检验不适用" in script        # k<3 不硬算
+    assert "se_s > 0" in script               # 负 se 平方前拒绝
+    compile(script, "meta_analysis.py", "exec")   # 语法可执行
+
+
+def test_step_load_effects_reports_dropped_rows(tmp_path, capsys):
+    """载入步逐行点名剔除行——不再只打一句总数让坏行静默消失(feat-094)。"""
+    import types
+    from psyclaw.workflows.steps_meta import step_load_effects
+    p = _eff_csv(tmp_path, "dirty2.csv",
+                 [{"study": "A", "d": "0.4", "se": "0.15"},
+                  {"study": "Bad2019", "d": "0.5", "se": "0"},
+                  {"study": "C", "d": "0.3", "se": "0.12"}],
+                 ["study", "d", "se"])
+    ctx = types.SimpleNamespace(data={"effects_csv": p}, artifacts={},
+                                project=tmp_path)
+    out = step_load_effects(ctx)
+    assert out["n_studies"] == 2 and out["dropped"] == 1
+    assert ctx.data["effects_info"]["n_studies"] == 2   # 下游口径=可用行
+    text = capsys.readouterr().out
+    assert "Bad2019" in text and "剔除" in text
+    assert "原始 3 行" in text and "可用 2 项研究" in text
+
+
 def test_registry_meta_present():
     wf = get_workflow("meta")
     assert wf is not None and wf["command"] == "meta-loop"

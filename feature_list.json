@@ -903,6 +903,16 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml/psyclaw/__init__.py(0.13.0);CHANGELOG.md(v0.13.0 段);progress.md/session-handoff.md。终验:全量 pytest → 1553 passed;python -m psyclaw eval → 28/28 exit=0;python -m psyclaw gates → 通过;python -m psyclaw version → 0.13.0"
+    },
+    {
+      "id": "feat-094",
+      "name": "meta 行清洗单一真源+生成脚本消费清洗+dropped 逐行呈报",
+      "description": "对抗评估实测三连缺陷:①负 se 平方洗白混入计算;②生成脚本裸读原始 CSV 对脏表 ValueError 崩('n.s.');③12 行原始/10 项校验/9 行可用三口径无一处呈报 dropped。修复:_row_yv 单一真源(负 se/倒置 CI 在换算前拒绝),validate/extract 同口径;生成脚本内嵌 coerce 清洗+剔除逐行打印+可用<2 SystemExit fail-closed+k<3 不硬算 Egger;step_load_effects 逐行点名剔除;step_write_meta 把剔除明细写进稿件上下文要求如实报告。",
+      "dependencies": [
+        "feat-079"
+      ],
+      "status": "done",
+      "evidence": "tests +6(negative-se/inverted-CI/script-cleans-fails-closed/load-reports-dropped/write-carries-disclosure)。全量 pytest → 1558 passed;gates 通过;eval 28/28。实测:对 12 行埋雷表重新生成脚本并在 statsmodels 环境执行 → 剔除 4 行逐行点名(含 se=-0.05)· k=8 · 完整产出合并效应/I²/Egger,不再崩溃。"
     }
   ]
 }
