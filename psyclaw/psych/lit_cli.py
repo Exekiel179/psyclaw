@@ -126,6 +126,16 @@ def lit_cli_argv(argv: list[str], project_dir: str = ".") -> int:
         return cmd_lit(_ap.Namespace(query=" ".join(topic_parts), plan=True,
                                      limit=n_target, sources="", year_from=None,
                                      fulltext=None, zotero=None, synthesize=False))
+    if argv and argv[0] in ("import", "matrix"):   # feat-104:/lit import|matrix
+        import argparse as _ap
+        from psyclaw.cli import cmd_lit
+        rest = [a for a in argv[1:] if not a.startswith("-")]
+        return cmd_lit(_ap.Namespace(
+            query=" ".join(rest) if argv[0] == "matrix" else "",
+            plan=False, matrix=argv[0] == "matrix",
+            import_file=(rest[0] if rest else None) if argv[0] == "import" else None,
+            limit=10, sources="", year_from=None, fulltext=None, zotero=None,
+            synthesize=False))
     query_parts: list[str] = []
     sources, limit, year_from = "openalex,europepmc", 10, None
     fulltext_doi = zotero_doi = None

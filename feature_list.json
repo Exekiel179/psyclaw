@@ -1044,6 +1044,17 @@
       ],
       "status": "done",
       "evidence": "tests/test_litplan.py 9 例(同义词拼装/模板骨架/标准声明/离线可用/纪律内嵌/渲染分节/落盘/LLM 定制生效/LLM 炸回落)。全量 pytest → 1625 passed;gates 通过;eval 28/28。活体:psyclaw lit \"心理电子沙盘在心理咨询中的应用\" --plan(deepseek)→ LLM 定制 6 个中文同义词块 + 5 步桥接提示词 + 标准 sidecar 落盘。"
+    },
+    {
+      "id": "feat-104",
+      "name": "lit --import 桥接结果导入 + lit --matrix 文献矩阵(路线 B 回灌闭环)",
+      "description": "feat-103 计划包的最后一公里:机构库桥接检索结果表(Markdown 表/CSV,含「未显示」占位)经 parse_bridge_results 解析(缺标题剔除并计数,占位如实置空不编造)→ import_results 并入 notes/lit_search.json(DOI/标题去重,PRISMA 追加导入痕迹,公开 API 与机构库命中同一语料)→ write_matrix 生成文献矩阵骨架(教学文档字段:研究对象/方法/形式场景/发现/局限=「待核查」,全文未获取如实标注,纳入=待筛选,引用预先声明的筛选标准),条目注册进 notes/evidence_map.json——cite-check 允许键语料打通,综述引用可溯源到矩阵行。CLI --import/--matrix + REPL /lit import|matrix;COMMANDS 同步。",
+      "dependencies": [
+        "feat-103",
+        "feat-015"
+      ],
+      "status": "done",
+      "evidence": "tests/test_litmatrix.py 6 例(MD 表解析含占位/CSV 兜底/导入去重与 PRISMA 留痕/矩阵字段与诚实约定/cite-check load_allowed 读到导入键/无语料 fail-closed)。全量 pytest → 1631 passed;gates 通过;eval 28/28。活体端到端:模拟桥接结果表 → --import(新增 2 去重 0)→ --matrix(键=陈晓 & 刘芳 (2022) 式 citation key,evidence_map 落盘)→ 路线 A 直检 OpenAlex/EuropePMC 真实命中 10 条。"
     }
   ]
 }

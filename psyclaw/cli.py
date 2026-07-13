@@ -962,6 +962,30 @@ def cmd_figures(args: argparse.Namespace) -> int:
 
 def cmd_lit(args: argparse.Namespace) -> int:
     from psyclaw.psych.lit_cli import lit_cli
+    if getattr(args, "import_file", None):     # feat-104:桥接结果导入(路线 B 回灌)
+        from psyclaw import ui
+        from psyclaw.psych.litmatrix import import_results
+        try:
+            r = import_results(args.import_file)
+        except ValueError as exc:
+            print(ui.err(f"✗ {exc}"))
+            return 1
+        print(ui.ok(f"✓ 导入 {r['parsed']} 条:新增 {r['added']} · 重复 {r['duplicates']}"
+                    f" · 缺标题剔除 {r['skipped']} → 语料共 {r['total']} 条"))
+        print(ui.dim(f"  语料 → {r['corpus_path']}(PRISMA 已追加导入痕迹);"
+                     "下一步:psyclaw lit --matrix 生成文献矩阵"))
+        return 0
+    if getattr(args, "matrix", False):         # feat-104:文献矩阵 + evidence_map
+        from psyclaw import ui
+        from psyclaw.psych.litmatrix import write_matrix
+        try:
+            r = write_matrix(topic=args.query or "")
+        except ValueError as exc:
+            print(ui.err(f"✗ {exc}"))
+            return 1
+        print(ui.ok(f"✓ 文献矩阵({r['n']} 条)→ {r['matrix_path']}"))
+        print(ui.dim(f"  引用键语料 → {r['evidence_map_path']}(cite-check 溯源同源)"))
+        return 0
     if getattr(args, "plan", False):       # feat-103:检索计划包(检索式+桥接分步+标准)
         from psyclaw import ui
         from psyclaw.psych.litplan import write_search_plan
@@ -1621,6 +1645,11 @@ def build_parser() -> argparse.ArgumentParser:
     plit.add_argument("--plan", action="store_true",
                       help="生成检索计划包:中英检索式+公开API路线+机构库浏览器桥接"
                            "分步提示词+纳入/排除标准(检索前声明)")
+    plit.add_argument("--import", dest="import_file", default=None, metavar="FILE",
+                      help="导入机构库桥接检索结果表(Markdown 表/CSV)并入语料")
+    plit.add_argument("--matrix", action="store_true",
+                      help="从检索语料生成文献矩阵骨架(notes/lit_matrix.md,"
+                           "键与 cite-check 语料同源)")
     plit.set_defaults(func=cmd_lit)
 
     sub.add_parser(
