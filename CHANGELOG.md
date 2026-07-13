@@ -1,6 +1,33 @@
 # Changelog
 
-## Unreleased
+## v0.13.0(2026-07-13)
+
+> 主题:**交互心智模型收敛(chat / run / auto)+ v0.12 全面评审修复**。
+> 公开入口统一为三个动词;随后对 v0.12 做了一轮 max 强度 code-review
+> (10 查找角度 → 逐项对抗验证 → 15 项确认缺陷),本版全部修复清零。
+
+### 修复(v0.12 code-review,feat-079~088)
+- **真结果守卫结构化**(feat-079):`MCPClient.call_tool_status` 返回 {ok,text},
+  守卫拒 传输失败/骨架哨兵(`SKELETON_MARK` 单一来源)/`{"error"}` 载荷/NaN·inf
+  数值——MCP 报错串不再冒充统计结果进稿件;`extract_meta_rows` 行过滤,坏单元
+  剔除呈报,k<3 不算 Egger。数值实测与 v0.12 基线逐位一致。
+- **POSIX 方向键**(feat-080):`_get_key` 改 fd 级 `os.read`——↑↓ 在 macOS/Linux
+  不再被缓冲吞字节误判成 ESC 取消整题;TCSADRAIN 保 type-ahead、UTF-8 多字节读满、
+  EOF 不再 100% CPU 忙等;单选空格=选定;新增 pty 真键盘测试(此前零覆盖)。
+- **批准范围加固**(feat-081):`python -c`/`bash -c`/`uv run`/sudo/env 前缀等
+  「圈不住行为」的形态一律不泛化;Windows `.exe` 剥后缀恢复 `git.exe status ≠ push`;
+  复合命令不截断防前缀碰撞。
+- **期刊名拼错不静默**(feat-082):`--journal` 不识别时 sidecar 记痕、CLI 告警
+  +exit 1——required 期刊的 replication 质量检查不再被无声解除。
+- **教训系统三修**(feat-083/087/088):confirm 继承再现次数(强度不归 1);
+  落卡批量化+按实际数如实报(REPL/CLI 语义收敛);toolloop 教训每轮全量重放,
+  长任务不再被上下文修剪失忆重踩。
+- **eval 输出健壮**(feat-084):GBK 管道 emoji 降级不崩、报告先落盘、`--json`
+  stdout 纯净、重复 `--case` 去重。
+- **选择器 CJK 宽度**(feat-085):按显示宽度截断/折行(中文每字符 2 列),
+  中文选项不再物理换行破坏原地重画;`ui._ANSI_RE` 扩到全部 CSI。
+- **图片渲染路径**(feat-086):@图片 直渲已知路径(括号/盘符文件名不再误报
+  「终端不支持」);强制协议不越 TTY,不往管道/日志灌 base64。
 
 ### 改进
 - **运行行为统一**(feat-078):`run` 公开收敛到 literature/analysis/meta/qualitative 四条稳定

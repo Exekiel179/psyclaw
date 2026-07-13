@@ -5,7 +5,7 @@
 ## Current Objective
 
 - Goal: 修复 v0.12 code-review 的全部 15 项确认缺陷(用户 /goal「修复完剩余10项」)
-- Current status: **全部修复完毕**——feat-079~088 done;88 个 feature 全 done
+- Current status: **v0.13.0 已发布**——feat-079~089 done;89 个 feature 全 done
 - Branch / commit: master(领先 origin/master 11 个提交,**待用户推送**:`! git push origin master`)
 
 ## Completed This Session

@@ -892,6 +892,17 @@
       ],
       "status": "done",
       "evidence": "psyclaw/toolloop.py(run_tool_loop 教训全量重放)。tests/test_agent_learning.py TestLessonSurvivesTrim +2 例(8 轮长跑第 1 轮教训在最后一轮 provider 上下文仍在——trim 失忆回归断言;lessons 返回值无重复)。全量 pytest → 1553 passed;eval 28/28;gates ✓"
+    },
+    {
+      "id": "feat-089",
+      "name": "v0.13.0 发布收尾(版本 + CHANGELOG + progress/handoff)",
+      "description": "版本 0.12.0→0.13.0(pyproject+__init__);CHANGELOG 把 Unreleased(feat-076..078 交互心智模型收敛)定版为 v0.13.0 并补「v0.12 code-review 修复」段(feat-079~088 十项);主题:交互三入口收敛 + 评审缺陷清零。COMMANDS 已随 feat-076 同步(56 条)无需再动;progress/session-handoff 补版本发布记录。",
+      "dependencies": [
+        "feat-078",
+        "feat-088"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml/psyclaw/__init__.py(0.13.0);CHANGELOG.md(v0.13.0 段);progress.md/session-handoff.md。终验:全量 pytest → 1553 passed;python -m psyclaw eval → 28/28 exit=0;python -m psyclaw gates → 通过;python -m psyclaw version → 0.13.0"
     }
   ]
 }
