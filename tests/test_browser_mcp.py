@@ -95,3 +95,6 @@ def test_search_plan_mentions_psyclaw_self_drive():
     md = render_search_plan_md(build_search_plan("x"))
     assert "psyclaw 可亲自执行" in md
     assert "/agent on" in md and "mcp__browser__" in md
+    # 附连模式:复用已登录浏览器(登录态跨会话保留)——对齐教学文档的核心体验
+    assert "附连模式" in md and "--browserUrl" in md
+    assert "remote-debugging-port" in md and "browser-attach" in md
