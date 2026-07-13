@@ -108,6 +108,24 @@ def _synthesize_review(query: str, search_result: dict, project_dir: str, ui) ->
 def lit_cli_argv(argv: list[str], project_dir: str = ".") -> int:
     """薄入口(REPL `/lit` 复用):lit <检索式> [--synthesize] [--limit N]
     [--sources s1,s2] [--year-from Y] [--fulltext DOI] [--zotero DOI]。"""
+    if argv and argv[0] == "plan":         # feat-103:/lit plan <主题> [--target N]
+        topic_parts, n_target = [], 20
+        j = 1
+        while j < len(argv):
+            if argv[j] == "--target" and j + 1 < len(argv):
+                j += 1
+                try:
+                    n_target = int(argv[j])
+                except ValueError:
+                    n_target = 20
+            elif not argv[j].startswith("-"):
+                topic_parts.append(argv[j])
+            j += 1
+        import argparse as _ap
+        from psyclaw.cli import cmd_lit
+        return cmd_lit(_ap.Namespace(query=" ".join(topic_parts), plan=True,
+                                     limit=n_target, sources="", year_from=None,
+                                     fulltext=None, zotero=None, synthesize=False))
     query_parts: list[str] = []
     sources, limit, year_from = "openalex,europepmc", 10, None
     fulltext_doi = zotero_doi = None

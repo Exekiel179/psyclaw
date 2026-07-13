@@ -962,6 +962,26 @@ def cmd_figures(args: argparse.Namespace) -> int:
 
 def cmd_lit(args: argparse.Namespace) -> int:
     from psyclaw.psych.lit_cli import lit_cli
+    if getattr(args, "plan", False):       # feat-103:检索计划包(检索式+桥接分步+标准)
+        from psyclaw import ui
+        from psyclaw.psych.litplan import write_search_plan
+        if not (args.query or "").strip():
+            print(ui.err("✗ 需要主题:psyclaw lit \"<综述主题>\" --plan"))
+            return 1
+        provider = None
+        try:                               # LLM 定制可选,拿不到 provider 就用模板
+            from psyclaw.config import load_config
+            from psyclaw.providers import get_provider
+            provider = get_provider(load_config())
+        except Exception:  # noqa: BLE001
+            provider = None
+        res = write_search_plan(args.query, provider=provider,
+                                n_target=getattr(args, "limit", 20) or 20)
+        mode = "LLM 定制" if res["plan"]["llm_customized"] else "模板骨架"
+        print(ui.ok(f"✓ 检索计划({mode})→ {res['plan_path']}"))
+        print(ui.dim(f"  纳入/排除标准(检索前声明)→ {res['criteria_path']}"))
+        print(ui.dim("  路线 A:公开 API 直检(命令见计划);路线 B:机构库浏览器桥接分步提示词"))
+        return 0
     return lit_cli(query=args.query or "", sources=args.sources, limit=args.limit,
                    year_from=args.year_from, fulltext_doi=args.fulltext,
                    zotero_doi=args.zotero, synthesize=getattr(args, "synthesize", False))
@@ -1598,6 +1618,9 @@ def build_parser() -> argparse.ArgumentParser:
     plit.add_argument("--zotero", default=None, help="按 DOI 从你的 Zotero 文库取全文")
     plit.add_argument("--synthesize", "-s", action="store_true",
                       help="据检索命中一键合成结构化综述(notes/lit_review.md)")
+    plit.add_argument("--plan", action="store_true",
+                      help="生成检索计划包:中英检索式+公开API路线+机构库浏览器桥接"
+                           "分步提示词+纳入/排除标准(检索前声明)")
     plit.set_defaults(func=cmd_lit)
 
     sub.add_parser(
