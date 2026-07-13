@@ -183,6 +183,24 @@ def test_step_meta_script_survives_pystat_unavailable(tmp_path, monkeypatch):
     out = SM.step_meta_script(ctx)
     assert out["ran_via_pystat"] is False
     assert not (tmp_path / "outputs" / "meta_result.txt").exists()
+def test_step_write_meta_carries_dropped_disclosure(tmp_path, monkeypatch):
+    """剔除明细进写作上下文——稿件方法/结果如实报告数据清洗(feat-094)。"""
+    from psyclaw.output import writing_backend
+    from psyclaw.workflows import steps_meta as SM
+    ctx = _meta_ctx(tmp_path)
+    ctx.data["effects_rows"] = {
+        "labels": ["A", "C"], "yi": [0.4, 0.3], "vi": [0.0225, 0.0144],
+        "dropped": [{"study": "Liu2023", "reason": "标准误非正/非有限(se≤0)"}]}
+    seen = {}
+    def _fake_write(topic, context, provider, project):
+        seen["context"] = context
+        return "稿件正文", {}
+    monkeypatch.setattr(writing_backend, "write_paper", _fake_write)
+    SM.step_write_meta(ctx)
+    assert "数据清洗呈报" in seen["context"]
+    assert "Liu2023" in seen["context"] and "k = 2" in seen["context"]
+
+
 def test_step_write_meta_injects_real_result(tmp_path, monkeypatch):
     from psyclaw.output import writing_backend
     from psyclaw.workflows import steps_meta as SM

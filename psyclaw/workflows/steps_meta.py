@@ -35,6 +35,36 @@ def _pick(cols_lower: dict, candidates) -> str | None:
     return None
 
 
+def _row_yv(r: dict, info: dict):
+    """把一行转成 ((y, v), None) 或 (None, 拒绝原因)——行可用性判定的**单一真源**。
+
+    validate_effects 的计数与 extract_meta_rows 的取行都走这里,口径永不分叉。
+    负 se / 倒置 CI 必须在换算**之前**拒绝:平方会把负号洗白成"合法"方差
+    (feat-094,评估实测活雷:se=-0.05 曾以 vi=0.0025 混入计算)。
+    """
+    import math
+    kind, vcols = info["variance_kind"], info["variance_cols"]
+    try:
+        y = float(r[info["effect_col"]])
+        if kind == "variance":
+            v = float(r[vcols[0]])
+        elif kind == "se":
+            se = float(r[vcols[0]])
+            if not (math.isfinite(se) and se > 0):
+                return None, "标准误非正/非有限(se≤0)"
+            v = se ** 2
+        else:  # ci → se = (upper-lower)/(2*1.96)
+            lo, hi = float(r[vcols[0]]), float(r[vcols[1]])
+            if not (math.isfinite(lo) and math.isfinite(hi) and hi > lo):
+                return None, "CI 上下界倒置/相等/非有限"
+            v = ((hi - lo) / (2 * 1.959963985)) ** 2
+    except (ValueError, TypeError, KeyError):
+        return None, "效应量或方差来源不可解析"
+    if not (math.isfinite(y) and math.isfinite(v)) or v <= 0:
+        return None, "方差非有限正数(vi≤0/NaN/inf)"
+    return (y, v), None
+
+
 def validate_effects(csv_path: str) -> dict:
     """校验效应量 CSV,定位效应量列 + 方差来源(variance/se/ci),返回元信息。
 
@@ -71,20 +101,11 @@ def validate_effects(csv_path: str) -> dict:
         raise ValueError(
             "找不到方差来源(需 variance/vi,或 se,或 ci_lower+ci_upper 之一)")
 
-    # 数有效研究(效应量 + 方差来源都可解析为数)
-    n_valid = 0
-    for r in rows:
-        try:
-            float(r[effect_col])
-            if kind == "ci":
-                float(r[vcols[0]]); float(r[vcols[1]])
-            else:
-                float(r[vcols[0]])
-            n_valid += 1
-        except (ValueError, TypeError, KeyError):
-            continue
+    # 数可用研究——与 extract_meta_rows 同一真源(_row_yv),口径不分叉(feat-094)
+    probe = {"variance_kind": kind, "variance_cols": vcols, "effect_col": effect_col}
+    n_valid = sum(1 for r in rows if _row_yv(r, probe)[1] is None)
     if n_valid < 2:
-        raise ValueError(f"有效研究数 < 2(仅 {n_valid});元分析至少需 2 项研究")
+        raise ValueError(f"可用研究数 < 2(仅 {n_valid});元分析至少需 2 项可解析研究")
 
     study_col = _pick(cols_lower, _STUDY)
     return {
@@ -107,12 +128,10 @@ def extract_meta_rows(csv_path: str, info: dict) -> dict:
     返回 {labels, yi, vi, dropped}(vi 统一为方差)。这里只做数据清点与
     平方/区间换算,不算任何统计量(统计仍外移 statsmodels)。
     """
-    import math
     p = Path(csv_path)
     with p.open(encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
-    kind, vcols = info["variance_kind"], info["variance_cols"]
-    effect_col, study_col = info["effect_col"], info.get("study_col")
+    study_col = info.get("study_col")
     labels: list[str] = []
     yi: list[float] = []
     vi: list[float] = []
@@ -120,23 +139,13 @@ def extract_meta_rows(csv_path: str, info: dict) -> dict:
     for i, r in enumerate(rows):
         label = (str(r.get(study_col, "")).strip() or f"study{i + 1}") if study_col \
             else f"study{i + 1}"
-        try:
-            y = float(r[effect_col])
-            if kind == "variance":
-                v = float(r[vcols[0]])
-            elif kind == "se":
-                v = float(r[vcols[0]]) ** 2
-            else:  # ci → se = (upper-lower)/(2*1.96)
-                v = ((float(r[vcols[1]]) - float(r[vcols[0]])) / (2 * 1.959963985)) ** 2
-        except (ValueError, TypeError, KeyError):
-            dropped.append({"study": label, "reason": "效应量或方差来源不可解析"})
-            continue
-        if not (math.isfinite(y) and math.isfinite(v)) or v <= 0:
-            dropped.append({"study": label, "reason": "方差非有限正数(vi≤0/NaN/inf)"})
+        yv, reason = _row_yv(r, info)          # 单一真源(feat-094)
+        if reason:
+            dropped.append({"study": label, "reason": reason})
             continue
         labels.append(label)
-        yi.append(y)
-        vi.append(v)
+        yi.append(yv[0])
+        vi.append(yv[1])
     if len(yi) < 2:
         raise ValueError(f"可用研究数 < 2(仅 {len(yi)},剔除 {len(dropped)} 行);"
                          "元分析至少需 2 项可解析研究")
@@ -151,31 +160,55 @@ def generate_meta_script(csv_path: str, info: dict) -> str:
     kind = info["variance_kind"]
     vcols = info["variance_cols"]
     if kind == "variance":
-        vi_expr = f'vi = df["{vcols[0]}"].astype(float).to_numpy()'
+        conv = (f'vi_s = pd.to_numeric(raw["{vcols[0]}"], errors="coerce")\n'
+                'ok = np.isfinite(yi_s) & np.isfinite(vi_s) & (vi_s > 0)')
     elif kind == "se":
-        vi_expr = f'vi = df["{vcols[0]}"].astype(float).to_numpy() ** 2'
-    else:  # ci → vi = ((upper-lower)/(2*1.96))**2
-        vi_expr = (f'se = (df["{vcols[1]}"].astype(float) - df["{vcols[0]}"].astype(float)) '
-                   f'/ (2 * 1.959963985)\n    vi = (se.astype(float).to_numpy()) ** 2')
-    label_expr = (f'labels = df["{info["study_col"]}"].astype(str).tolist()'
+        conv = (f'se_s = pd.to_numeric(raw["{vcols[0]}"], errors="coerce")\n'
+                '# 负/零 se 在平方**前**拒绝:平方会把负号洗白成"合法"方差\n'
+                'ok = np.isfinite(yi_s) & np.isfinite(se_s) & (se_s > 0)\n'
+                'vi_s = se_s ** 2')
+    else:  # ci → se = (upper-lower)/(2*1.96),上下界倒置/相等拒绝
+        conv = (f'lo_s = pd.to_numeric(raw["{vcols[0]}"], errors="coerce")\n'
+                f'hi_s = pd.to_numeric(raw["{vcols[1]}"], errors="coerce")\n'
+                'se_s = (hi_s - lo_s) / (2 * 1.959963985)\n'
+                'ok = np.isfinite(yi_s) & np.isfinite(se_s) & (se_s > 0)\n'
+                'vi_s = se_s ** 2')
+    label_expr = (f'labels_all = raw["{info["study_col"]}"].astype(str)'
                   if info.get("study_col")
-                  else 'labels = [f"study{i+1}" for i in range(len(df))]')
+                  else 'labels_all = pd.Series([f"study{i+1}" for i in range(len(raw))])')
+    detail_cols = [info["effect_col"], *vcols]
 
     return f'''#!/usr/bin/env python
 """可复现随机效应元分析(委托 statsmodels;由 `psyclaw meta` 生成)。
 
 统计计算外移:运行前装统计栈 —— pip install "psyclaw[stats]"(或 statsmodels pandas numpy)。
-方法:DerSimonian-Laird 随机效应 + I²/τ²/Q 异质性 + Egger 回归(发表偏倚)。
+方法:行清洗(与 psyclaw 校验同口径)→ DerSimonian-Laird 随机效应 + I²/τ²/Q 异质性
++ Egger 回归(发表偏倚,k≥3 才适用)。剔除行逐条打印——如实报告,勿静默。
 """
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.stats.meta_analysis import combine_effects
 
-df = pd.read_csv(r"{csv_path}")
-yi = df["{info['effect_col']}"].astype(float).to_numpy()
-{vi_expr}
+raw = pd.read_csv(r"{csv_path}")
+yi_s = pd.to_numeric(raw["{info['effect_col']}"], errors="coerce")
+{conv}
 {label_expr}
+
+# ---- 行清洗呈报(与 psyclaw extract_meta_rows 同口径;fail-closed)----
+dropped = raw.loc[~ok]
+if len(dropped):
+    print(f"⚠ 剔除 {{len(dropped)}} 行不可用数据(不可解析/非有限/方差非正)——稿件须如实报告:")
+    for _i in dropped.index:
+        _cells = ", ".join(f"{{c}}={{raw.loc[_i, c]!r}}" for c in {detail_cols!r})
+        print(f"  ✂ {{labels_all[_i]}}: {{_cells}}")
+if int(ok.sum()) < 2:
+    raise SystemExit(f"可用研究数 {{int(ok.sum())}} < 2,无法元分析(fail-closed,不产出假结果)")
+
+yi = yi_s[ok].to_numpy(dtype=float)
+vi = vi_s[ok].to_numpy(dtype=float)
+labels = labels_all[ok].tolist()
+print(f"可用研究 k = {{len(yi)}}(原始 {{len(raw)}} 行)")
 
 res = combine_effects(yi, vi, method_re="dl", row_names=labels, use_t=False)
 print(res.summary_frame())
@@ -186,12 +219,15 @@ print(f"  合并效应 = {{res.mean_effect_re:.4f}}")
 print(f"  tau^2 = {{res.tau2:.4f}}   I^2 = {{i2*100:.1f}}%   Q = {{res.q:.2f}}   k = {{res.k}}")
 
 # Egger 回归(发表偏倚):标准正态离差 ~ 精度;截距显著 → 漏斗图不对称
-se = np.sqrt(vi)
-snd = yi / se
-X = sm.add_constant(1.0 / se)
-egger = sm.OLS(snd, X).fit()
-print(f"\\nEgger 检验:截距 = {{egger.params[0]:.3f}}, p = {{egger.pvalues[0]:.3f}}"
-      f"  ({{'提示不对称/可能发表偏倚' if egger.pvalues[0] < 0.05 else '未见显著不对称'}})")
+if len(yi) >= 3:
+    se = np.sqrt(vi)
+    snd = yi / se
+    X = sm.add_constant(1.0 / se)
+    egger = sm.OLS(snd, X).fit()
+    print(f"\\nEgger 检验:截距 = {{egger.params[0]:.3f}}, p = {{egger.pvalues[0]:.3f}}"
+          f"  ({{'提示不对称/可能发表偏倚' if egger.pvalues[0] < 0.05 else '未见显著不对称'}})")
+else:
+    print("\\n(k < 3,Egger 检验不适用——研究数过少,不硬算)")
 
 # 森林图(可选)
 try:
@@ -215,11 +251,20 @@ def step_load_effects(ctx) -> dict:
     if not csv_path:
         raise ValueError("未提供效应量 CSV:用 `psyclaw meta <effects.csv>`。")
     info = validate_effects(csv_path)
+    rows = extract_meta_rows(csv_path, info)   # feat-094:载入即清点,dropped 逐行呈报
+    info["n_studies"] = len(rows["yi"])        # 全流程统一「可用行」口径
     ctx.data["effects_info"] = info
+    ctx.data["effects_rows"] = rows
     ctx.artifacts["load_effects"] = csv_path
-    print(ui.dim(f"  {info['n_studies']} 项研究 · 效应量列 {info['effect_col']} · "
-                 f"方差来源 {info['variance_kind']}"))
-    return {"n_studies": info["n_studies"], "effect_col": info["effect_col"]}
+    total = len(rows["yi"]) + len(rows["dropped"])
+    print(ui.dim(f"  原始 {total} 行 · 可用 {info['n_studies']} 项研究 · "
+                 f"效应量列 {info['effect_col']} · 方差来源 {info['variance_kind']}"))
+    for d in rows["dropped"]:
+        print(ui.warn(f"  ✂ 剔除 {d['study']}:{d['reason']}"))
+    if rows["dropped"]:
+        print(ui.dim("    (剔除明细须在稿件方法/结果如实报告,不静默混入)"))
+    return {"n_studies": info["n_studies"], "effect_col": info["effect_col"],
+            "dropped": len(rows["dropped"])}
 
 
 def step_meta_script(ctx) -> dict:
@@ -269,6 +314,11 @@ def step_write_meta(ctx) -> dict:
         "I²/τ²/Q 异质性、Egger 发表偏倚检验。统计由 outputs/meta_analysis.py "
         "在外部 statsmodels 环境运行,结果回填本稿(只引用脚本实际产出,不杜撰数值)。\n"
         f"\n# 研究准备清单\n{ctx.clar}")
+    rows = ctx.data.get("effects_rows") or {}
+    if rows.get("dropped"):                    # feat-094:剔除明细进稿件上下文,方法/结果如实报告
+        context += ("\n\n# 数据清洗呈报(方法与结果部分**必须如实报告**以下剔除,不得静默)\n"
+                    + "\n".join(f"- 剔除 {d['study']}:{d['reason']}" for d in rows["dropped"])
+                    + f"\n- 可用研究数 k = {len(rows.get('yi') or [])}")
     # v0.12 feat-072:pystat 真跑出的结果注入写作上下文——结果节引用真实数值,不再是空骨架
     result = ctx.data.get("meta_result")
     if result:
