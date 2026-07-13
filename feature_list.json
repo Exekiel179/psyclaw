@@ -983,6 +983,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_generation_interrupt.py 9 例(pty 孤立 ESC 中断/方向键不误判/丢弃明示+终端恢复/非 TTY no-op/toolloop 上抛/慢首 token 2 秒内取消/异常透传/裸退出词)。全量 pytest → 1590 passed;gates 通过;eval 28/28。活体:pty 驱动真会话(deepseek),生成 6 秒后发 ESC → 「[已中断本轮生成(ESC/Ctrl+C)]」回提示符;裸 quit → 正常退出。"
+    },
+    {
+      "id": "feat-098",
+      "name": "数值×措辞矛盾检测 + 边缘显著话术双向根除",
+      "description": "第二轮对抗评估实测三类漏网:p=.051 写「差异显著,得到确证」、d=0.08 吹「强效应/意义重大/建议全国推广」、α=.58 称「信度良好」全部放行。jars 诚信启发式扩展:I.p_overstate(p≥.05 ±60 字符内显著宣称,否定式剥除)=block;I.effect_overclaim(|d|<0.2 × 夸大措辞)=warn;I.reliability_overclaim(α<.60 × 良好措辞)=warn。另按用户明令「边缘显著措辞一定避免」双向根除:检查层 I.marginal_significance warn→block(补「边际显著」词形);生成层 lean_core 增补硬约束——此类措辞自己绝不使用也绝不建议(第一轮 chat 曾建议「边缘显著」措辞,与检查层口径冲突)。",
+      "dependencies": [
+        "feat-096"
+      ],
+      "status": "done",
+      "evidence": "tests +9(p 谎报阻断/如实不显著不误伤/合法显著不误伤/效应夸大/正常效应/低信度洗白/高信度不误伤/边缘话术升阻断/lean_core 禁令断言)。全量 pytest → 1597 passed。活体:draft2.md 重跑 jars → I.p_overstate ✗ block · I.effect_overclaim ⚠ · I.reliability_overclaim ⚠ 三颗新雷全命中。"
     }
   ]
 }

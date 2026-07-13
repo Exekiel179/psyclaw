@@ -303,11 +303,63 @@ def test_negated_correction_still_counts_as_uncorrected():
     assert "I.subgroup_harking" in [f["id"] for f in r["integrity"]]
 
 
-def test_marginal_significance_language_warns():
+def test_marginal_significance_language_blocks():
+    """feat-098:「边缘显著」类话术必须避免(用户明令)——warn 升 block。"""
     text = _INTEGRITY_BASE + "\n焦虑的相关 r = -.13, p = .08,呈显著趋势。"
     r = check_draft(text, "quant")
     flags = {f["id"]: f for f in r["integrity"]}
-    assert flags["I.marginal_significance"]["severity"] == "warn"
+    assert flags["I.marginal_significance"]["severity"] == "block"
+    assert r["passed"] is False
+
+
+def test_p_over_05_claimed_significant_blocks():
+    """feat-098:p=.051 写「差异显著,得到确证」→ 阻断(第二轮实测漏网)。"""
+    text = _INTEGRITY_BASE + "\nβ = 0.06, t = 1.96, p = .051,差异显著,H1 得到确证。"
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.p_overstate"]["severity"] == "block"
+    assert r["passed"] is False
+
+
+def test_p_over_05_honestly_not_significant_ok():
+    """如实写「未达显著」不误伤(否定式剥除)。"""
+    text = _INTEGRITY_BASE + "\np = .073,未达到统计显著,效应量 CI 包含 0。"
+    r = check_draft(text, "quant")
+    assert "I.p_overstate" not in [f["id"] for f in r["integrity"]]
+
+
+def test_significant_p_not_flagged():
+    text = _INTEGRITY_BASE + "\np = .003,差异显著。"
+    r = check_draft(text, "quant")
+    assert "I.p_overstate" not in [f["id"] for f in r["integrity"]]
+
+
+def test_tiny_effect_overclaim_warns():
+    """feat-098:d=0.08 却称「强效应/意义重大/建议推广」→ 警告(第二轮实测漏网)。"""
+    text = _INTEGRITY_BASE + "\n效应量 d = 0.08,为强效应,意义重大,建议全国推广。"
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.effect_overclaim"]["severity"] == "warn"
+
+
+def test_normal_effect_not_flagged():
+    text = _INTEGRITY_BASE + "\n效应量 d = 0.45,中等效应。"
+    r = check_draft(text, "quant")
+    assert "I.effect_overclaim" not in [f["id"] for f in r["integrity"]]
+
+
+def test_low_alpha_overclaim_warns():
+    """feat-098:α=.58 却称「信度良好」→ 警告(第二轮实测漏网)。"""
+    text = _INTEGRITY_BASE.replace("量表 Cronbach α = .81。",
+                                   "自编测评 Cronbach α = .58,信度良好。")
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.reliability_overclaim"]["severity"] == "warn"
+
+
+def test_good_alpha_not_flagged():
+    r = check_draft(_INTEGRITY_BASE + "\n量表 α = .86,内部一致性良好。", "quant")
+    assert "I.reliability_overclaim" not in [f["id"] for f in r["integrity"]]
 
 
 def test_integrity_not_run_for_qual():

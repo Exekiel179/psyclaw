@@ -320,9 +320,27 @@ _CONFIRMATORY_PAT = [r"验证了[^。\n]{0,10}假设", r"证实了[^。\n]{0,10}
                      r"(?:支持|验证)了\s*H\s*\d", r"得到确证",
                      r"confirm(?:ed|s)?\s+(?:our\s+)?hypothes"]
 
-_MARGINAL_PAT = [r"边缘显著", r"临界显著", r"(?:呈|存在)?显著趋势", r"接近显著",
-                 r"趋于显著", r"marginal(?:ly)?\s+significant",
+_MARGINAL_PAT = [r"边缘显著", r"边际显著", r"临界显著", r"(?:呈|存在)?显著趋势",
+                 r"接近显著", r"趋于显著", r"marginal(?:ly)?\s+significant",
                  r"trend(?:ing|ed)?\s+toward", r"approach(?:ed|ing)\s+significance"]
+
+# ---- 数值 × 措辞矛盾(feat-098)——第二轮对抗评估实测三类漏网 ------------------
+# p 值抓取:p = .051 / p=0.06 / p = .10(排除 p < .05 之类的不等式,只看等号报告)
+_P_VALUE_RE = re.compile(r"\bp\s*=\s*(0?\.\d+)", re.IGNORECASE)
+# 命中 p 值后,同句 ±60 字符内的显著宣称(否定式「不显著/未达显著」先剥除)
+_SIG_CLAIM_RE = re.compile(r"显著|得到确证|significant", re.IGNORECASE)
+_NEGATED_SIG = re.compile(r"(?:不|未|没有|未达(?:到)?(?:统计)?|无)[^。\n]{0,6}?显著"
+                          r"|not\s+significant|non.?significant", re.IGNORECASE)
+# 效应量抓取(d/g;r 的口径不同不混判)与夸大措辞
+_D_VALUE_RE = re.compile(r"\b[dg]\s*=\s*(-?0?\.\d+)", re.IGNORECASE)
+_OVERCLAIM_PAT = [r"强效应", r"效应(?:确凿|显著且|巨大)", r"意义重大", r"效果显著且",
+                  r"(?:建议|应当?)[^。\n]{0,10}(?:全国|大规模|全面)?推广",
+                  r"large effect", r"substantial effect"]
+# 信度抓取与洗白措辞
+_ALPHA_VALUE_RE = re.compile(r"(?:Cronbach\s*)?(?:α|alpha)\s*=\s*(0?\.\d+)",
+                             re.IGNORECASE)
+_RELIABLE_CLAIM_PAT = [r"信度(?:良好|较好|可靠|理想)", r"内部一致性(?:良好|较好|高)",
+                       r"good reliability", r"acceptable reliability"]
 
 
 def _hit(text: str, pats: list[str]) -> str | None:
@@ -382,11 +400,59 @@ def integrity_flags(text: str) -> list[dict]:
     marginal = _hit(text, _MARGINAL_PAT)
     if marginal:
         flags.append({
-            "id": "I.marginal_significance", "severity": "warn",
+            "id": "I.marginal_significance", "severity": "block",   # feat-098:用户明令必须避免,升阻断
             "label": "「边缘显著/显著趋势」话术",
             "evidence": marginal,
-            "fix": "p 值不显著就是不显著:删除「趋势/边缘/接近显著」表述,"
-                   "如实报告效应量+CI,把解释留给区间。"})
+            "fix": "p 值不显著就是不显著:删除「趋势/边缘/边际/接近显著」表述,"
+                   "如实报告精确 p+效应量+CI,把解释留给区间。"})
+
+    # ---- 数值 × 措辞矛盾(feat-098,第二轮对抗评估实测三类漏网)----------
+    for m in _P_VALUE_RE.finditer(text):
+        try:
+            pv = float(m.group(1))
+        except ValueError:
+            continue
+        if pv < 0.05:
+            continue
+        window = _NEGATED_SIG.sub("", text[max(0, m.start() - 60):m.end() + 60])
+        if _SIG_CLAIM_RE.search(window):
+            flags.append({
+                "id": "I.p_overstate", "severity": "block",
+                "label": f"p = {m.group(1)} ≥ .05 却宣称「显著/得到确证」",
+                "evidence": text[m.start():m.end() + 40].split("\n")[0][:60],
+                "fix": "p ≥ .05 不得称显著,四舍五入到阈值即数据不诚实:如实报告"
+                       "精确 p 值与效应量+CI,结论按未达显著撰写。"})
+            break
+
+    for m in _D_VALUE_RE.finditer(text):
+        try:
+            dv = abs(float(m.group(1)))
+        except ValueError:
+            continue
+        if dv < 0.2 and _hit(text, _OVERCLAIM_PAT):
+            flags.append({
+                "id": "I.effect_overclaim", "severity": "warn",
+                "label": f"效应量 |d| = {dv:g} < 0.2(不足小效应)却用「强效应/意义重大/推广」措辞",
+                "evidence": _hit(text, _OVERCLAIM_PAT),
+                "fix": "按 Cohen 基准 d<0.2 连小效应都不到:删除夸大措辞,"
+                       "讨论实际意义时以效应量与 CI 为准,不以 p 值背书重要性。"})
+            break
+
+    for m in _ALPHA_VALUE_RE.finditer(text):
+        try:
+            av = float(m.group(1))
+        except ValueError:
+            continue
+        if av < 0.60:
+            window = text[max(0, m.start() - 60):m.end() + 60]
+            if _hit(window, _RELIABLE_CLAIM_PAT):
+                flags.append({
+                    "id": "I.reliability_overclaim", "severity": "warn",
+                    "label": f"α = {m.group(1)} < .60 却称「信度良好」",
+                    "evidence": window.strip()[:60],
+                    "fix": "α<.60 低于常规可接受线(.70):如实描述信度不足,"
+                           "报告对结论的影响或改用/补验更可靠的测量。"})
+                break
     return flags
 
 

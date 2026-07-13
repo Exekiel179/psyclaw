@@ -51,6 +51,12 @@ class TestLeanCore:
     def test_contains_psyclaw_identity(self):
         assert "PsyClaw" in lean_core()
 
+    def test_marginal_significance_ban(self):
+        """feat-098:「边缘显著」类措辞自己不用、也不建议(第一轮 chat 曾建议)。"""
+        s = lean_core()
+        assert "边缘显著" in s and "绝不建议" in s.replace("、也绝不建议", "绝不建议")
+        assert "如实写不显著" in s
+
     def test_citation_antifabrication_hard_constraint(self):
         """feat-093:对抗评估实测 chat 拒编条目后又凭记忆供出带页码的替代文献。"""
         s = lean_core()
