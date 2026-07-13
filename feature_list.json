@@ -1024,6 +1024,16 @@
       ],
       "status": "done",
       "evidence": "tests +7(多行引号一条/续行合并/尾接续/heredoc/未闭合残尾不丢/纯单行不变/显示形态)。全量 pytest → 1615 passed;gates 通过;eval 28/28。缺陷现场:evalcase3 转录 transcript3.raw/3b/3c 三次复现逐行拆碎。"
+    },
+    {
+      "id": "feat-102",
+      "name": "@小 CSV 全量注入,截断必须显式告知",
+      "description": "第三轮评估实测:21 行 (~600B) 的 data.csv 经 _csv_excerpt 只注入 5 行样例(290 字符),模型明说「只能看到 5 行训练组样本」,后续统计全在半个数据集上打转。修复:≤4KB(CSV_FULL_CHARS)的 CSV 全量注入(<csv rows=N 全量注入>);大 CSV 保留结构摘录但截断提示改为「⚠ 已截断:仅样例 5 行 / 共 N 行——任何计数/统计都不要基于此样例」;行数口径统一为数据行数(此前数 \\n 连表头一起算)。",
+      "dependencies": [
+        "feat-069"
+      ],
+      "status": "done",
+      "evidence": "tests +2(小 CSV 全量注入含末行数据 / 大 CSV 显式截断提示),既有 CSV 摘录测试改用 400 行大文件。全量 pytest → 1616 passed。"
     }
   ]
 }
