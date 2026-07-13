@@ -4,9 +4,9 @@
 
 ## Current Objective
 
-- Goal: 修复 v0.12 code-review 的全部 15 项确认缺陷(用户 /goal「修复完剩余10项」)
-- Current status: **v0.13.0 已发布**——feat-079~089 done;89 个 feature 全 done
-- Branch / commit: master(领先 origin/master 11 个提交,**待用户推送**:`! git push origin master`)
+- Goal: 修复对抗评估(埋雷研究包,31/100)立案的全部 8 项缺陷(用户 /goal)
+- Current status: **全部修复并活体复测**——feat-090~097 done;97 个 feature 全 done
+- Branch / commit: master(领先 origin/master 8 个提交,**待用户推送**:`! git push origin master`)
 
 ## Completed This Session
 - [x] 快进合并 feat/interaction-model-run-contracts(feat-076..078)进 master(先测后并:1495 绿)
