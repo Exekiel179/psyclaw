@@ -913,6 +913,16 @@
       ],
       "status": "done",
       "evidence": "tests +6(negative-se/inverted-CI/script-cleans-fails-closed/load-reports-dropped/write-carries-disclosure)。全量 pytest → 1558 passed;gates 通过;eval 28/28。实测:对 12 行埋雷表重新生成脚本并在 statsmodels 环境执行 → 剔除 4 行逐行点名(含 se=-0.05)· k=8 · 完整产出合并效应/I²/Egger,不再崩溃。"
+    },
+    {
+      "id": "feat-096",
+      "name": "check/jars 判据升级:效应量+CI 阻断级 + 学术诚信启发式层",
+      "description": "对抗评估 B 部分实测五处漏网:①效应量/CI 缺失仅警告(铁律应阻断);②裸 d=0.29 不被识别为效应量;③横断面+因果表述放行;④亚组 HARKing(仅个别显著+无校正+「验证了事先假设」)放行;⑤「边缘显著/显著趋势」话术放行;另有事后剔除被记 ✓ 加分、「未进行校正」被当已校正、write_paper 的 run_jars_check 误传 study_type= 关键字致每次 TypeError 被吞(sidecar 永远 error+passed:False)。修复:effect_size/ci 升 blocking 并识别裸 d/g/r=;新增 integrity_flags 诚信启发式(因果×设计×无随机化=block、亚组确证×无校正=block、事后剔除 ±200 字符邻近窗口找预先标准=warn、边缘显著=warn),独立 integrity 键不破 n_* 求和不变式,block 参与 passed;否定短语「未…校正」剥除后再匹配;checkup 一并点名诚信阻断;run_jars_check 关键字修正。",
+      "dependencies": [
+        "feat-009"
+      ],
+      "status": "done",
+      "evidence": "tests +12(阻断升级/因果拦截/随机化不误伤/事后剔除邻近窗口/HARKing/否定校正/边缘显著/qual 不适用/报告渲染/run_jars_check 回归)。全量 pytest → 1570 passed;gates 通过;eval 28/28。实测埋雷 draft.md:B1 因果✗block·B2 事后剔除⚠·B3 HARKing✗block·B4 CI✗block·B5 边缘显著⚠ 全部有痕,效应量正确识别为已报。"
     }
   ]
 }

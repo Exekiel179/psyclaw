@@ -130,8 +130,11 @@ _QUANT_ITEMS: list[dict] = [
             r"R\s*[²2]\s*=",
             r"Glass'? delta",
             r"Hedges'?\s*g",
+            r"\b[dgr]\s*=\s*[-−\.0-9]",   # 裸报 d = 0.29 / r = -.21 也算已报告
         ],
-        "blocking": False,
+        "blocking": True,   # BLOCKING(feat-096)— 效应量必报是铁律,缺失不是"建议补充"
+        "fix": "在结果部分为每个主要检验报告效应量(Cohen's d / Hedges' g / η² / r 等)——"
+               "效应量必报(gates/PSYCLAW.md 铁律)。",
     },
     {
         "id": "Q.results.ci",
@@ -143,7 +146,9 @@ _QUANT_ITEMS: list[dict] = [
             r"CI\s*[\[\(]",
             r"\[\s*[\-\d\.]+\s*,\s*[\-\d\.]+\s*\]",
         ],
-        "blocking": False,
+        "blocking": True,   # BLOCKING(feat-096)— 效应量+CI 成对必报
+        "fix": "为效应量报告 95% 置信区间(如 d = 0.29, 95% CI [-0.02, 0.60])——"
+               "效应量+CI 成对必报(gates/PSYCLAW.md 铁律)。",
     },
     {
         "id": "Q.results.multiple_comparison",
@@ -281,6 +286,111 @@ VALID_RESEARCH_TYPES = list(_RESEARCH_TYPE_ITEMS)
 
 
 # ---------------------------------------------------------------------------
+# 学术诚信启发式(feat-096)——quant/mixed 适用的越界信号,对抗评估实测四类漏网
+# ---------------------------------------------------------------------------
+
+_CAUSAL_CLAIM_PAT = [
+    r"证明[了]?[^。\n]{0,20}?(?:导致|降低|提升|改善|减少|增加|有效)",
+    r"(?:导致|引起)[了]?[^。\n]{0,12}(?:下降|上升|降低|提升|改善|减少|增加)",
+    r"(?:显著)?(?:降低|提升|改善|减少|增加)[了]?[^。\n]{0,15}(?:水平|症状|得分|风险|抑郁|焦虑)",
+    r"因果性?(?:作用|效应|保护)",
+    r"\bcaus(?:es?|al(?:ly)?|ed)\b",
+    r"\b(?:reduc|improv|decreas|increas)(?:es?|ed)\b[^.\n]{0,30}"
+    r"\b(?:depression|anxiety|symptom|level)s?\b",
+]
+_CROSS_DESIGN_PAT = [r"横断面", r"cross.?sectional", r"相关(?:设计|研究|数据|调查)",
+                     r"correlational"]
+_RANDOMIZED_PAT = [r"随机分配", r"随机对照", r"随机分组", r"随机化",
+                   r"randomi[sz]ed\s+(?:controlled|assignment|allocation)", r"\bRCT\b"]
+
+_EXCLUSION_N_PAT = [r"剔除[了的]?\s*\d", r"排除[了的]?\s*\d", r"excluded?\s+\d",
+                    r"\d+\s*(?:participants?|被试|人|名)[^。\n]{0,12}excluded"]
+_PRESPECIFIED_PAT = [r"预注册", r"pre.?regist", r"预先(?:定义|设定|确定|规定)",
+                     r"事先(?:定义|设定|确定|规定)", r"a\s?priori",
+                     r"预定(?:的)?(?:剔除|排除)?标准", r"预设标准",
+                     r"3\s*(?:个)?(?:SD|标准差)"]
+
+_SUBGROUP_PAT = [r"亚组", r"分层分析", r"subgroup"]
+_SIG_PAT = [r"显著", r"significant", r"p\s*[<=≤]"]
+_CORRECTION_PAT = [r"Bonferroni", r"Holm", r"FDR\b", r"Benjamini", r"Šidák", r"Sidak",
+                   r"multiple comparison correction", r"校正", r"familywise"]
+# 否定短语(「未/无/没/不…校正」)在匹配前剥除,防止「未进行多重比较校正」被当已校正
+_NEGATED_CORRECTION = re.compile(r"[未无没不][^。\n]{0,8}?校正")
+_CONFIRMATORY_PAT = [r"验证了[^。\n]{0,10}假设", r"证实了[^。\n]{0,10}假设",
+                     r"(?:支持|验证)了\s*H\s*\d", r"得到确证",
+                     r"confirm(?:ed|s)?\s+(?:our\s+)?hypothes"]
+
+_MARGINAL_PAT = [r"边缘显著", r"临界显著", r"(?:呈|存在)?显著趋势", r"接近显著",
+                 r"趋于显著", r"marginal(?:ly)?\s+significant",
+                 r"trend(?:ing|ed)?\s+toward", r"approach(?:ed|ing)\s+significance"]
+
+
+def _hit(text: str, pats: list[str]) -> str | None:
+    """返回第一个命中片段(供报告展示定位),无命中返回 None。"""
+    for kw in pats:
+        m = re.search(kw, text, re.IGNORECASE)
+        if m:
+            return m.group(0)[:60]
+    return None
+
+
+def integrity_flags(text: str) -> list[dict]:
+    """学术诚信启发式:返回 [{id,label,severity,fix,evidence}](feat-096)。
+
+    关键词层的**信号检测**,不是审稿判决——目的是把「相关≠因果 / p-hacking /
+    HARKing / 边缘显著话术」这类铁律级越界从「静默放行」变成「有痕拦截」;
+    误报由人工复核消化,漏报比误报贵得多(fail-closed 取向)。
+    """
+    flags: list[dict] = []
+    causal = _hit(text, _CAUSAL_CLAIM_PAT)
+    cross = _hit(text, _CROSS_DESIGN_PAT)
+    randomized = _hit(text, _RANDOMIZED_PAT)
+    if causal and cross and not randomized:
+        flags.append({
+            "id": "I.causal_language_design", "severity": "block",
+            "label": "因果结论越界:横断面/相关设计使用因果表述",
+            "evidence": causal,
+            "fix": "横断面/相关设计不支持因果结论:把「导致/降低/证明有效」改为"
+                   "「相关/预测/与…有关」,或补充随机分配等因果识别设计并如实描述。"})
+
+    # 剔除声明的预先标准按 ±200 字符**邻近窗口**找:引言里一句「已预注册」
+    # 不能给结果节的事后剔除背书(对抗评估实测:假预注册声明吸收了全局信号)
+    excl_hits = [m for kw in _EXCLUSION_N_PAT
+                 for m in re.finditer(kw, text, re.IGNORECASE)]
+    if excl_hits and not any(
+            _hit(text[max(0, m.start() - 200):m.end() + 200], _PRESPECIFIED_PAT)
+            for m in excl_hits):
+        flags.append({
+            "id": "I.posthoc_exclusion", "severity": "warn",
+            "label": "剔除被试未见预先定义标准(研究者自由度信号)",
+            "evidence": excl_hits[0].group(0)[:60],
+            "fix": "在剔除声明处说明标准是否在数据收集前预先定义(预注册/±3SD 等);"
+                   "事后剔除需附敏感性分析(含/不含两套结果)。"})
+
+    subgroup = _hit(text, _SUBGROUP_PAT)
+    corr_text = _NEGATED_CORRECTION.sub("", text)
+    if subgroup and _hit(text, _SIG_PAT) and not _hit(corr_text, _CORRECTION_PAT):
+        confirmatory = _hit(text, _CONFIRMATORY_PAT)
+        flags.append({
+            "id": "I.subgroup_harking", "severity": "block" if confirmatory else "warn",
+            "label": ("亚组结果冒充确证假设且无多重比较校正(HARKing 信号)"
+                      if confirmatory else "亚组分析无多重比较校正"),
+            "evidence": confirmatory or subgroup,
+            "fix": "多个亚组仅个别显著且无校正时,不得表述为「验证了事先假设」——"
+                   "如实标注探索性,做 Bonferroni/FDR 校正或交互效应检验。"})
+
+    marginal = _hit(text, _MARGINAL_PAT)
+    if marginal:
+        flags.append({
+            "id": "I.marginal_significance", "severity": "warn",
+            "label": "「边缘显著/显著趋势」话术",
+            "evidence": marginal,
+            "fix": "p 值不显著就是不显著:删除「趋势/边缘/接近显著」表述,"
+                   "如实报告效应量+CI,把解释留给区间。"})
+    return flags
+
+
+# ---------------------------------------------------------------------------
 # 核心检查
 # ---------------------------------------------------------------------------
 
@@ -333,16 +443,23 @@ def check_draft(text: str, research_type: str = "quant") -> dict:
     md_ok = _item_present(text, _id_to_item("Q.procedure.missing_data"))
     ex_ok = _item_present(text, _id_to_item("Q.procedure.exclusions"))
 
+    # 学术诚信启发式(feat-096)——独立于 JARS 条目计数(n_* 求和不变式不动),
+    # 但 severity=block 的信号参与 passed 判定:铁律越界不放行。
+    integrity = integrity_flags(text) if rt in ("quant", "mixed") else []
+    n_integrity_block = sum(1 for f in integrity if f["severity"] == "block")
+
     return {
         "research_type": rt,
         "n_total": len(items),
         "n_present": len(present),
         "n_blocking": len(missing_blocking),
         "n_warnings": len(missing_warnings),
-        "passed": len(missing_blocking) == 0,
+        "passed": len(missing_blocking) == 0 and n_integrity_block == 0,
         "present": present,
         "blocking": missing_blocking,
         "warnings": missing_warnings,
+        "integrity": integrity,
+        "n_integrity_block": n_integrity_block,
         "jars_missing_data_ok": md_ok,
         "jars_exclusions_ok": ex_ok,
     }
@@ -379,6 +496,14 @@ def format_report(result: dict) -> str:
         lines.append("\n【警告缺失项】— 建议补充（APA JARS-2018 推荐）:")
         for w in result["warnings"]:
             lines.append(f"  ⚠ [{w['id']}] {w['label']}")
+    for f in result.get("integrity") or []:
+        mark = "✗" if f["severity"] == "block" else "⚠"
+        if "【诚信启发式】" not in "\n".join(lines):
+            lines.append("\n【诚信启发式】— 疑似铁律越界(block 阻断投稿;人工复核可推翻):")
+        lines.append(f"  {mark} [{f['id']}] {f['label']}")
+        if f.get("evidence"):
+            lines.append(f"       命中:「{f['evidence']}」")
+        lines.append(f"       → {f['fix']}")
     if result["present"]:
         labels = [p["label"] for p in result["present"]]
         lines.append(f"\n【已报告】{', '.join(labels)}")

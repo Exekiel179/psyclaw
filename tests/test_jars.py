@@ -91,7 +91,8 @@ _QUAL_GOOD = """
 
 _MIXED_GOOD = """
 本研究采用混合方法(mixed method)聚敛设计，整合(integration)定量与定性数据。
-定量：缺失数据(missing data)采用 FIML；排除了 3 名被试(excluded 3 participants)因草率作答。
+定量：缺失数据(missing data)采用 FIML；排除了 3 名被试(excluded 3 participants)，
+剔除标准为预先定义的草率作答规则；效应量 Cohen's d = 0.42, 95% CI [0.15, 0.69]。
 定性：编码(coding)采用主题分析，数据饱和(saturation)。
 联合展示(joint display)整合两种数据。
 """
@@ -222,6 +223,112 @@ def test_valid_research_types_set():
 # ---------------------------------------------------------------------------
 # format_report
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# feat-096:效应量/CI 阻断级 + 学术诚信启发式(对抗评估四类漏网)
+# ---------------------------------------------------------------------------
+
+_INTEGRITY_BASE = """
+# 方法
+横断面问卷调查。纳入标准为在校中学生;先验功效分析 sample size N=200。
+剔除标准与预注册一致,剔除了 2 名被试。缺失数据采用 FIML 处理。
+量表 Cronbach α = .81。
+# 结果
+效应量 Cohen's d = 0.30, 95% CI [0.05, 0.55];Bonferroni 校正。
+"""
+
+
+def test_effect_size_and_ci_now_blocking():
+    """效应量+CI 必报是铁律——缺失应阻断投稿而非仅警告(feat-096)。"""
+    r = check_draft("# 方法\n缺失数据 FIML;剔除了 3 名被试,标准与预注册一致。", "quant")
+    ids = [b["id"] for b in r["blocking"]]
+    assert "Q.results.effect_size" in ids and "Q.results.ci" in ids
+    assert r["passed"] is False
+    for b in r["blocking"]:
+        assert b.get("fix")
+
+
+def test_causal_language_on_cross_sectional_blocks():
+    """横断面 + 因果表述 + 无随机化 → 诚信阻断(相关≠因果铁律)。"""
+    text = _INTEGRITY_BASE + "\n# 讨论\n本研究证明正念 App 导致了抑郁水平的下降。"
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.causal_language_design"]["severity"] == "block"
+    assert r["passed"] is False and r["n_integrity_block"] >= 1
+
+
+def test_causal_language_with_randomization_not_flagged():
+    """随机对照设计下的因果表述不误伤。"""
+    text = _INTEGRITY_BASE.replace("横断面问卷调查。", "随机对照试验,被试随机分配到两组。") \
+        + "\n# 讨论\n干预显著降低了抑郁水平。"
+    r = check_draft(text, "quant")
+    assert "I.causal_language_design" not in [f["id"] for f in r["integrity"]]
+
+
+def test_posthoc_exclusion_without_prespecified_warns():
+    """报告了剔除但无预先定义标准 → 研究者自由度警告(feat-096)。"""
+    text = _INTEGRITY_BASE.replace("剔除标准与预注册一致,剔除了 2 名被试。",
+                                   "剔除了 17 名作答异常的被试后差异显著。")
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.posthoc_exclusion"]["severity"] == "warn"
+
+
+def test_prespecified_exclusion_not_flagged():
+    r = check_draft(_INTEGRITY_BASE, "quant")
+    assert "I.posthoc_exclusion" not in [f["id"] for f in r["integrity"]]
+
+
+def test_subgroup_confirmatory_without_correction_blocks():
+    """亚组仅个别显著 + 无校正 + 「验证了事先假设」→ HARKing 阻断(feat-096)。"""
+    text = _INTEGRITY_BASE.replace(";Bonferroni 校正", "") + \
+        "\n按性别等检验共 6 个亚组:仅女生亚组显著(p = .02),验证了事先假设 H2。"
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.subgroup_harking"]["severity"] == "block"
+    assert r["passed"] is False
+
+
+def test_subgroup_with_correction_not_flagged():
+    text = _INTEGRITY_BASE + "\n亚组分析经 Bonferroni 校正,仅女生亚组显著。"
+    r = check_draft(text, "quant")
+    assert "I.subgroup_harking" not in [f["id"] for f in r["integrity"]]
+
+
+def test_negated_correction_still_counts_as_uncorrected():
+    """「未进行多重比较校正」不得被当成已校正(否定短语剥除)。"""
+    text = _INTEGRITY_BASE.replace(";Bonferroni 校正", ";未进行多重比较校正") + \
+        "\n6 个亚组仅女生亚组显著(p = .02),验证了事先假设 H2。"
+    r = check_draft(text, "quant")
+    assert "I.subgroup_harking" in [f["id"] for f in r["integrity"]]
+
+
+def test_marginal_significance_language_warns():
+    text = _INTEGRITY_BASE + "\n焦虑的相关 r = -.13, p = .08,呈显著趋势。"
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.marginal_significance"]["severity"] == "warn"
+
+
+def test_integrity_not_run_for_qual():
+    r = check_draft(_QUAL_GOOD + "\n访谈证明干预导致了症状改善。", "qual")
+    assert r["integrity"] == [] and r["passed"] is True
+
+
+def test_integrity_flags_render_in_report():
+    text = _INTEGRITY_BASE + "\n# 讨论\n本研究证明正念 App 导致了抑郁水平的下降。"
+    rep = format_report(check_draft(text, "quant"))
+    assert "诚信启发式" in rep and "I.causal_language_design" in rep and "命中" in rep
+
+
+def test_run_jars_check_kwarg_regression(tmp_path):
+    """run_jars_check 误传 study_type= 曾让每次检查 TypeError 被吞(feat-096)。"""
+    from psyclaw.output.writing_backend import run_jars_check
+    p = tmp_path / "d.md"
+    p.write_text(_GOOD_QUANT, encoding="utf-8")
+    r = run_jars_check(p)
+    assert "error" not in r and r["passed"] is True
+
 
 def test_format_report_pass_label():
     r = check_draft(_GOOD_QUANT, "quant")
