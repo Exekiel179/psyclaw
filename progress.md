@@ -2,7 +2,30 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-13(**v0.13.0 发布**:交互三入口收敛 + code-review 15 项缺陷清零)
+**Last Updated:** 2026-07-13(对抗评估台账清零:feat-090~097 八项修复 + 活体复测)
+
+## 本轮(37):对抗评估缺陷台账清零 ——feat-090~097 done(8 项全修,含活体复测)
+
+v0.13.0 开源后,用埋雷研究包(脏 effects.csv + 带雷 draft.md + 10 条对抗话术)
+对 chat / run meta / check 三入口做对抗评估(31/100),8 项立案全部修复:
+- feat-094 meta 行清洗单一真源(负 se 换算前拒绝·生成脚本内嵌清洗不再对脏表崩·
+  dropped 三处呈报)——复测:12 行埋雷表 k=8 逐行点名,statsmodels 实跑完整产出。
+- feat-096 check/jars 判据升级(效应量/CI 阻断级·因果×横断面 block·亚组 HARKing
+  block·事后剔除邻近窗口 warn·边缘显著 warn·「未校正」否定剥除·run_jars_check
+  关键字 TypeError 修复)——复测:埋雷稿 B1-B5 全部有痕。
+- feat-097 cite-check 零语料一致性(文内↔文献表双向;不在文献表=硬判据)——
+  复测:Smith & Johnson 孤儿 + Davis 未引用双向命中,exit 1。
+- feat-092/093 chat 铁律硬约束(统计外移·引用反杜撰进 lean_core)——活体复测:
+  「手写 Welch t」被拒并给外移路径;编条目被拒且主动 CrossRef 验证。
+- feat-095 写作步 writer 角色(不再借 executor)——复测:report.md 为真 APA 稿件,
+  引用 pystat 真实数值,方法节如实报告 4 项剔除。
+- feat-090 生成期 ESC 可中断(EscapeWatch+stream_interruptible 线程消费)+
+  裸 quit/exit——活体:生成 6 秒 ESC 中断回提示符,quit 正常退出。
+- feat-091 审批模式首屏常显(Approval auto/default 行)。
+
+全量 1590 passed;eval 28/28;gates 通过。97 个 feature 全 done。
+
+---
 
 ## 本轮(36):code-review 修复收官 ——feat-079~088 done(15 项确认缺陷清零)
 
