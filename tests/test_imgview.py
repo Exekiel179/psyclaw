@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 
+import pytest
+
 from psyclaw import imgview
 
 # 1x1 PNG(合法最小图),测试用真实字节
@@ -42,13 +44,22 @@ def test_proto_from_env_iterm2_family():
     assert imgview._proto_from_env({"LC_TERMINAL": "iTerm2"}) == "iterm2"
 
 
+
+@pytest.fixture()
+def tty_stdout(monkeypatch):
+    """feat-086:supports_inline 的 isatty 判定先于 force——需要 force 生效的
+    测试用本桩模拟 TTY(pytest 捕获的 stdout 不是 TTY)。"""
+    import sys as _sys
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: True, raising=False)
+
+
 def test_proto_from_env_unsupported_and_tmux():
     assert imgview._proto_from_env({"TERM_PROGRAM": "Apple_Terminal"}) is None
     assert imgview._proto_from_env({"TERM": "screen-256color",
                                     "TERM_PROGRAM": "iTerm.app"}) is None  # tmux/screen 不支持
 
 
-def test_supports_inline_force_override(monkeypatch):
+def test_supports_inline_force_override(monkeypatch, tty_stdout):
     assert imgview.supports_inline(force="none") is None
     assert imgview.supports_inline(force="iterm2") == "iterm2"
     assert imgview.supports_inline(force="kitty") == "kitty"
@@ -70,20 +81,20 @@ def test_render_kitty_shape():
 
 
 # -- render_escape 端到端(用临时文件 + force 绕过终端探测)----------------
-def test_render_escape_iterm2(tmp_path):
+def test_render_escape_iterm2(tmp_path, tty_stdout):
     p = tmp_path / "fig.png"
     p.write_bytes(_PNG)
     esc = imgview.render_escape(p, force="iterm2")
     assert esc and esc.startswith("\033]1337;File=inline=1;")
 
 
-def test_render_escape_kitty_png(tmp_path):
+def test_render_escape_kitty_png(tmp_path, tty_stdout):
     p = tmp_path / "fig.png"
     p.write_bytes(_PNG)
     assert imgview.render_escape(p, force="kitty").startswith("\033_G")
 
 
-def test_render_escape_kitty_rejects_nonpng(tmp_path):
+def test_render_escape_kitty_rejects_nonpng(tmp_path, tty_stdout):
     p = tmp_path / "fig.jpg"
     p.write_bytes(_PNG)                       # 内容不重要,kitty 只按后缀限 PNG
     assert imgview.render_escape(p, force="kitty") is None
@@ -95,15 +106,21 @@ def test_render_escape_none_when_unsupported(tmp_path):
     assert imgview.render_escape(p, force="none") is None
 
 
-def test_render_escape_rejects_nonimage_and_missing(tmp_path):
+def test_render_escape_rejects_nonimage_and_missing(tmp_path, tty_stdout):
     txt = tmp_path / "a.txt"
     txt.write_text("hi")
     assert imgview.render_escape(txt, force="iterm2") is None
     assert imgview.render_escape(tmp_path / "nope.png", force="iterm2") is None
 
 
-def test_render_escape_rejects_oversize(tmp_path, monkeypatch):
+def test_render_escape_rejects_oversize(tmp_path, monkeypatch, tty_stdout):
     monkeypatch.setattr(imgview, "MAX_IMG_BYTES", 10)
     p = tmp_path / "big.png"
     p.write_bytes(_PNG)                       # 67 字节 > 10
     assert imgview.render_escape(p, force="iterm2") is None
+
+
+def test_supports_inline_force_needs_tty():
+    """feat-086:pytest 捕获 stdout 非 TTY——force 不再越过 TTY 检查灌管道。"""
+    assert imgview.supports_inline(force="iterm2") is None
+    assert imgview.supports_inline(force="kitty") is None

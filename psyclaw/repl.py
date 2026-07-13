@@ -351,6 +351,26 @@ def cmd_approval_scope(cmd: str) -> str:
     return head
 
 
+def render_image_file(path, force: str | None = None) -> bool:
+    """内联渲染**已知**图片文件(feat-086):路径已在手,不做正则再发现。
+
+    @图片 引用此前把已知路径回环进 find_image_paths 的正则重新提取——
+    含 '('、')'、'+'、':'(Windows 盘符)的文件名匹配不到,0 张渲染还向
+    用户与模型谎报「终端不支持」。直接渲染,不回环。
+    """
+    from psyclaw import imgview
+    if not imgview.supports_inline(force):
+        return False
+    p = Path(path).expanduser()
+    esc = imgview.render_escape(p, force=force)
+    if not esc:
+        return False
+    print(ui.dim(f"  🖼 {p.name}"))
+    sys.stdout.write(esc)
+    sys.stdout.flush()
+    return True
+
+
 def render_images_in_text(text: str, force: str | None = None, limit: int = 3) -> int:
     """文本里提到的图片文件,若存在且终端支持,内联渲染;返回渲染张数。
 
@@ -367,11 +387,7 @@ def render_images_in_text(text: str, force: str | None = None, limit: int = 3) -
         p = Path(raw).expanduser()
         if not p.is_file():
             continue
-        esc = imgview.render_escape(p, force=force)
-        if esc:
-            print(ui.dim(f"  🖼 {p.name}"))
-            sys.stdout.write(esc)
-            sys.stdout.flush()
+        if render_image_file(p, force=force):
             shown += 1
     return shown
 
@@ -705,9 +721,11 @@ class ReplSession:
                     from psyclaw import imgview
                     if imgview.is_image(p):
                         # 图片:终端支持则内联显示给用户;上下文只注入元信息——
-                        # 二进制像素既不该灌给模型,smart_excerpt 也只会摘出乱码
-                        n = render_images_in_text(
-                            str(p), force=self.conf.get("image_protocol"))
+                        # 二进制像素既不该灌给模型,smart_excerpt 也只会摘出乱码。
+                        # feat-086:路径已知,直接渲染(不再回环正则,含括号/盘符
+                        # 的文件名此前渲染不出还谎报「终端不支持」)
+                        n = render_image_file(
+                            p, force=self.conf.get("image_protocol"))
                         note = "已在终端内联显示" if n else "当前终端不支持内联显示"
                         out_parts.append(
                             f"(用户引用了图片 {p}({p.stat().st_size // 1024} KB),"

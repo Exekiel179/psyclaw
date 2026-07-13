@@ -55,16 +55,22 @@ def _proto_from_env(env: dict) -> str | None:
 
 
 def supports_inline(force: str | None = None) -> str | None:
-    """当前终端支持的内联协议;force(config)可覆盖探测。非 TTY 一律 None。"""
+    """当前终端支持的内联协议;force(config)可覆盖探测。非 TTY 一律 None。
+
+    feat-086(评审修复):isatty 判定先于 force——force 的用途是纠正**探测**
+    (Warp 探测不到时手动指 iterm2),不是往管道/重定向里灌转义序列;此前
+    force 先行,配置了 image_protocol 的用户跑 `psyclaw run … > log` 会把
+    数 MB base64 二进制灌进日志文件。
+    """
+    if force and force.lower() == "none":
+        return None                      # 显式关闭永远生效
+    if not sys.stdout.isatty():
+        return None                      # 非 TTY 一律不渲染,force 也不例外
     if force:
         low = force.lower()
-        if low == "none":
-            return None
         if low in ("iterm2", "kitty"):
             return low
         # "auto" 或未知 → 落到探测
-    if not sys.stdout.isatty():
-        return None
     return _proto_from_env(os.environ)
 
 

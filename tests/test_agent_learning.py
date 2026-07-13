@@ -109,7 +109,9 @@ def test_ingest_lessons_dedups_and_drafts(monkeypatch, capsys):
 
 
 # -- 图片内联渲染(REPL/CLI 共用)-----------------------------------------------
-def test_render_images_in_text_renders_existing(tmp_path, capsys):
+def test_render_images_in_text_renders_existing(tmp_path, capsys, monkeypatch):
+    import sys as _sys
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: True, raising=False)
     img = tmp_path / "forest_plot.png"
     img.write_bytes(b"\x89PNG fake")
     n = repl.render_images_in_text(f"图已保存:{img}", force="iterm2")
@@ -129,7 +131,9 @@ def test_render_images_in_text_missing_file_skipped():
     assert repl.render_images_in_text("看 /no/such/plot.png", force="iterm2") == 0
 
 
-def test_render_images_in_text_limit(tmp_path, capsys):
+def test_render_images_in_text_limit(tmp_path, capsys, monkeypatch):
+    import sys as _sys
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: True, raising=False)
     paths = []
     for i in range(5):
         p = tmp_path / f"p{i}.png"
@@ -141,7 +145,9 @@ def _img_sess(proto="iterm2"):
     s = repl.ReplSession.__new__(repl.ReplSession)
     s.conf = {"image_protocol": proto}
     return s
-def test_expand_at_image_renders_and_injects_meta(tmp_path, capsys):
+def test_expand_at_image_renders_and_injects_meta(tmp_path, capsys, monkeypatch):
+    import sys as _sys
+    monkeypatch.setattr(_sys.stdout, "isatty", lambda: True, raising=False)
     img = tmp_path / "erp_wave.png"
     img.write_bytes(b"\x89PNG fake data")
     s = _img_sess()
@@ -164,3 +170,45 @@ def test_expand_at_text_file_still_excerpts(tmp_path, capsys):
     s = _img_sess()
     out = s._expand_files(f"@{f}")
     assert "正念降低焦虑" in out                    # 文本文件行为不回归
+class TestRenderImageDirect:
+    """feat-086(评审修复):@图片 直接渲染已知路径,不回环正则;force 不越 TTY。"""
+    def _fake_env(self, monkeypatch, tmp_path, name):
+        from pathlib import Path
+
+        from psyclaw import imgview
+        img = tmp_path / name
+        img.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 40)
+        monkeypatch.setattr(imgview, "supports_inline", lambda force=None: "iterm2")
+        monkeypatch.setattr(imgview, "render_escape",
+                            lambda p, force=None: "<ESC:" + str(p).rsplit("/", 1)[-1] + ">")
+        return img
+    def test_parenthesized_filename_renders(self, monkeypatch, tmp_path, capsys):
+        """fig(1).png:正则匹配不到的文件名,直接渲染路径照样出图。"""
+        from psyclaw.repl import render_image_file
+        img = self._fake_env(monkeypatch, tmp_path, "fig(1).png")
+        assert render_image_file(img) is True
+        assert "fig(1).png" in capsys.readouterr().out
+    def test_plus_and_percent_filename_renders(self, monkeypatch, tmp_path, capsys):
+        from psyclaw.repl import render_image_file
+        img = self._fake_env(monkeypatch, tmp_path, "fig+2%20a.png")
+        assert render_image_file(img) is True
+    def test_forced_protocol_does_not_write_to_pipe(self, monkeypatch):
+        """feat-086:isatty 先于 force——配置了 image_protocol 的用户重定向
+        stdout 时不再被灌 base64 转义(此前 force 越过 TTY 检查)。"""
+        import io
+        import sys as _sys
+        from psyclaw import imgview
+        fake = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")  # 非 TTY
+        monkeypatch.setattr(_sys, "stdout", fake)
+        assert imgview.supports_inline("iterm2") is None
+        assert imgview.supports_inline("kitty") is None
+        assert imgview.supports_inline("none") is None
+    def test_forced_protocol_honored_on_tty(self, monkeypatch):
+        import sys as _sys
+        from psyclaw import imgview
+        class _Tty:
+            def isatty(self):
+                return True
+        monkeypatch.setattr(_sys, "stdout", _Tty())
+        assert imgview.supports_inline("iterm2") == "iterm2"
+        assert imgview.supports_inline("none") is None
