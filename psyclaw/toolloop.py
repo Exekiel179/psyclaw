@@ -260,6 +260,12 @@ def build_tools(project_dir: str = ".") -> dict:
         merge_mcp_tools(tools, project_dir)
     except Exception:  # noqa: BLE001
         pass
+    # Kimi WebBridge(feat-108:真实浏览器登录态,web__ 前缀,逐动作审批)
+    try:
+        from psyclaw.webbridge import merge_webbridge_tools
+        merge_webbridge_tools(tools)
+    except Exception:  # noqa: BLE001
+        pass
     return tools
 
 
