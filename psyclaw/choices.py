@@ -137,7 +137,7 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
     sel = 0
     checked: set[int] = set()
     hint = ("↑↓ 移动 · 空格勾选 · 回车确认 · Esc 跳过 · 直接打字作答" if multi
-            else "↑↓ 移动 · 回车选定 · Esc 跳过 · 直接打字作答")
+            else "↑↓ 移动 · 回车/空格选定 · Esc 跳过 · 直接打字作答")
     out = sys.stdout
     out.write(ui.accent(f"  {choice['question']}") + ui.dim(f"  ({hint})") + "\n")
     # 按终端宽度截断,高亮项被截断时在下方详情区给全文(feat-071,用户反馈:
@@ -172,22 +172,36 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
         out.flush()
 
     _draw(first=True)
+    empty_streak = 0
     try:
         while True:
             key = keyf()
+            if not key:
+                # feat-080:空键不重画;连续空 = 流已死(EOF/句柄失效),跳过而非
+                # 100% CPU 忙等重画(此前 '' 不命中任何分支直落 _draw 热转)。
+                empty_streak += 1
+                if empty_streak >= 8:
+                    return [], None
+                continue
+            empty_streak = 0
             if key == "UP":
                 sel = (sel - 1) % n
             elif key in ("DOWN", "TAB"):
                 sel = (sel + 1) % n
-            elif key == " " and multi:
-                checked.symmetric_difference_update({sel})
+            elif key == " ":
+                if multi:
+                    checked.symmetric_difference_update({sel})
+                else:                          # feat-080:单选空格=选定高亮项
+                    _draw()                    # (旧 radiolist 肌肉记忆;此前落进
+                    return [opts[sel]], None   # 自由作答,空回车把选择吞成跳过)
             elif key == "ENTER":
                 if multi and checked:
                     return [opts[i] for i in sorted(checked)], None
                 return [opts[sel]], None       # 多选没勾任何项=选高亮那个;单选同
             elif key in ("ESC", "EOF"):
                 return [], None
-            elif key.isdigit() and key != "0" and int(key) <= n:
+            elif (key.isascii() and key.isdigit()   # isascii 防 '²'.isdigit() 过而
+                  and key != "0" and int(key) <= n):  # int() 崩(isdigit≠可 int)
                 sel = int(key) - 1
                 if not multi:
                     _draw()

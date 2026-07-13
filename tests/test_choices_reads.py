@@ -210,3 +210,27 @@ def test_inline_no_detail_zone_for_short_options(monkeypatch, capsys):
                         lambda fallback=None: os.terminal_size((100, 24)))
     _pick_inline(_single(), get_key=_feed(["ENTER"]))
     assert "▏" not in capsys.readouterr().out      # 短选项无需详情区
+def test_space_selects_in_single_mode(capsys):
+    from psyclaw.choices import _pick_inline
+    """单选按空格 = 选定高亮项(旧 radiolist 肌肉记忆;此前被吞成跳过)。"""
+    chosen, free = _pick_inline(_single(), get_key=_feed(["DOWN", " "]))
+    assert free is None and len(chosen) == 1
+def test_space_still_toggles_in_multi_mode(capsys):
+    from psyclaw.choices import _pick_inline
+    chosen, _ = _pick_inline(_multi(), get_key=_feed([" ", "ENTER"]))
+    assert len(chosen) == 1
+def test_empty_key_stream_returns_skip_not_busy_loop(capsys):
+    from psyclaw.choices import _pick_inline
+    """读取器持续返回 ''(流已死)→ 有界退出为跳过,绝不无限重画。"""
+    assert _pick_inline(_single(), get_key=_feed([""] * 50)) == ([], None)
+def test_isolated_empty_key_ignored(capsys):
+    from psyclaw.choices import _pick_inline
+    """偶发空键(如 Windows 未知功能键)被忽略,不打断选择。"""
+    chosen, _ = _pick_inline(_single(), get_key=_feed(["", "DOWN", "", "ENTER"]))
+    assert len(chosen) == 1
+def test_superscript_digit_goes_to_free_text_not_crash(capsys):
+    from psyclaw.choices import _pick_inline
+    """'²'.isdigit() 为真但 int('²') 崩——须走自由作答而非异常降级。"""
+    chosen, free = _pick_inline(_single(), get_key=_feed(["²"]),
+                                read_rest=lambda _="": "自由回答")
+    assert chosen == [] and free == "²自由回答"
