@@ -51,6 +51,14 @@ class TestLeanCore:
     def test_contains_psyclaw_identity(self):
         assert "PsyClaw" in lean_core()
 
+    def test_stats_delegation_hard_constraint(self):
+        """feat-092:对抗评估实测 chat 手写 Welch t——统计外移必须是显式硬约束。"""
+        s = lean_core()
+        assert "统计计算一律外移" in s
+        assert "绝不手写统计算法实现" in s
+        assert "statsmodels" in s          # 给出外移路径而非光拒绝
+        assert "psyclaw[stats]" in s
+
     def test_reproducible(self):
         assert lean_core() == lean_core()
 

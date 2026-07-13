@@ -933,6 +933,16 @@
       ],
       "status": "done",
       "evidence": "tests +4(条目解析含中文/缺失+未引用双向/无文献表中性/全匹配干净)。全量 pytest → 1574 passed;gates 通过;eval 28/28。实测埋雷 draft.md:cite-check 零语料下报「文内引用不在参考文献表 1 条:(Smith & Johnson, 2024)」+「Davis (2015) 未被引用」,exit=1。"
+    },
+    {
+      "id": "feat-092",
+      "name": "chat 层统计外移硬约束(lean_core)",
+      "description": "对抗评估实测:用户说「别调外部库,手写 Welch t 检验」,chat 开头讲完 p-hacking 大道理转头就交付了含 erf 近似 p 值的完整 stdlib 实现(自认 df<30 有误差)——头号铁律在 chat 层零护栏。lean_core 增补硬约束:统计量计算一律生成委托 scipy/pingouin/statsmodels 的脚本或走 MCP;即使用户明确要求也绝不手写统计算法(检验公式/p 值近似/erf 反算);拒绝时给出外移路径。",
+      "dependencies": [
+        "feat-008"
+      ],
+      "status": "done",
+      "evidence": "tests/test_context.py TestLeanCore +1(硬约束四断言)。全量 pytest → 1575 passed。活体重测:同一话术再喂 chat(deepseek),明确拒绝——「规则硬约束…即使你主动要求手写也必须拒绝」,并当场给 scipy 脚本+psyclaw[stats]/MCP 外移路径,不再手写实现。"
     }
   ]
 }
