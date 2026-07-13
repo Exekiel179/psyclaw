@@ -862,6 +862,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/choices.py(_draw 显示宽度几何+parse_choices 单行化);psyclaw/ui.py(_ANSI_RE 全 CSI)。tests/test_choices_reads.py +3 例(60 CJK 字符选项任何输出行显示宽度≤终端列宽/CJK 截断详情区给全文且不超宽/JSON 选项内嵌换行单行化)。全量 pytest → 1543 passed"
+    },
+    {
+      "id": "feat-086",
+      "name": "图片渲染路径修正(v0.12 评审修复:@图片 正则回环误报 + 强制协议灌管道)",
+      "description": "评审 finding 10+13:① _expand_files 明知确切图片路径,却把 str(p) 交给 render_images_in_text 用 find_image_paths 的正则([\\w./\\\\~\\-]+)重新提取——含 '('、')'、'+'、'%'、':'(Windows 盘符)的文件名匹配不到,0 张渲染还向用户与模型双双谎报「当前终端不支持内联显示」,误导用户去调救不了的 image_protocol;② supports_inline 的 force 判定先于 isatty,配置了 image_protocol 的用户在管道/重定向(CI/cron)下每张图被灌数 MB base64 转义进日志。修复:新增 render_image_file 直接渲染已知路径(render_images_in_text 复用之);supports_inline 改 isatty 先于 force(force=none 显式关闭仍永远生效)——force 的用途是纠正探测,不是越过非 TTY。",
+      "dependencies": [
+        "feat-069"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/repl.py(render_image_file+_expand_files 直渲);psyclaw/imgview.py(supports_inline isatty 先行)。tests/test_agent_learning.py TestRenderImageDirect +4 例(括号文件名/+%文件名直渲/force 非 TTY 不写管道/force 在 TTY 生效);tests/test_imgview.py 按新契约补 tty_stdout 桩 +1 非 TTY 回归例。全量 pytest → 1548 passed"
     }
   ]
 }
