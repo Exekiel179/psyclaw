@@ -463,10 +463,16 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
     empty_streak = 0
     repeat_streak = 0
     prev_sig: tuple | None = None
+    from psyclaw.ui_input import EscapeWatch, stream_interruptible
     for it in range(1, max_iters + 1):
         # feat-045:每次调 provider 前规整消息序列(去空 content/合并同角色/首条 user),
         # 防多轮回灌引入的非法序列触发 provider 400。
-        reply = "".join(provider.chat(sanitize_messages(convo), system=full_system))
+        # feat-090:流式消费期监听孤立 ESC——多步 agent 循环也能即时取消,
+        # KeyboardInterrupt 上抛由调用方(REPL 深处捕获)取消本轮;监听只罩
+        # provider 流式段,不罩工具审批 input()(cbreak 会破坏行编辑回显)。
+        with EscapeWatch() as _esc:
+            reply = "".join(stream_interruptible(
+                provider.chat(sanitize_messages(convo), system=full_system), _esc))
         calls = parse_tool_calls(reply)
         cut = has_truncated_tool_block(reply) or (
             not calls and getattr(provider, "last_stop_reason", "") == "max_tokens")

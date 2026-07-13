@@ -973,6 +973,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_ui.py TestStartupApproval +3(auto/default/未知隐藏)。全量 pytest → 1581 passed。"
+    },
+    {
+      "id": "feat-090",
+      "name": "生成期可中断(ESC)+ 裸 quit/exit 退出词",
+      "description": "用户实测反馈:LLM 流式阻塞期 ESC/Ctrl+C 无响应(Ctrl+C 捕获只在输入态两处),裸 quit/exit 不认。实现:①EscapeWatch——生成期 stdin 置 cbreak 逐键轮询,孤立 ESC(30ms 无后续)=中断,方向键序列不误判;其余键入尝试 TIOCSTI 回注,现代 macOS(EPERM)/Linux≥6.2 禁用则明示丢弃不静默;非 TTY 全程 no-op。②stream_interruptible——后台 daemon 线程消费 provider 流,主线程 0.1s 轮询队列+ESC,等首 token 期间也能取消(逐 chunk 查会石沉大海,活体实测);chat 流式循环与 toolloop 各接一处,KeyboardInterrupt 取消本轮不炸 REPL。③裸 quit/exit(_is_exit_word 整行精确词)与 /exit 同效。",
+      "dependencies": [
+        "feat-080"
+      ],
+      "status": "done",
+      "evidence": "tests/test_generation_interrupt.py 9 例(pty 孤立 ESC 中断/方向键不误判/丢弃明示+终端恢复/非 TTY no-op/toolloop 上抛/慢首 token 2 秒内取消/异常透传/裸退出词)。全量 pytest → 1590 passed;gates 通过;eval 28/28。活体:pty 驱动真会话(deepseek),生成 6 秒后发 ESC → 「[已中断本轮生成(ESC/Ctrl+C)]」回提示符;裸 quit → 正常退出。"
     }
   ]
 }
