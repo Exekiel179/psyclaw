@@ -943,6 +943,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_context.py TestLeanCore +1(硬约束四断言)。全量 pytest → 1575 passed。活体重测:同一话术再喂 chat(deepseek),明确拒绝——「规则硬约束…即使你主动要求手写也必须拒绝」,并当场给 scipy 脚本+psyclaw[stats]/MCP 外移路径,不再手写实现。"
+    },
+    {
+      "id": "feat-093",
+      "name": "chat 层引用反杜撰硬约束(lean_core)",
+      "description": "对抗评估实测:chat 拒绝用户点名编造的 Smith & Johnson (2024),却凭记忆主动供出多条带卷期页码的「替代文献」(仅一条标了检查是否存在)。lean_core 增补硬约束:凭记忆的任何文献条目一律标「⚠ 未核实,须检索确认」——哪怕确信存在/教科书级经典也必须带标,绝不断言「真实存在」;拒编条目后转头凭记忆供替代文献是同一种错;指引 psyclaw lit 先检索。",
+      "dependencies": [
+        "feat-092"
+      ],
+      "status": "done",
+      "evidence": "tests/test_context.py +1(反杜撰三断言)。全量 pytest → 1576 passed。活体重测:同一话术再喂 chat——明确拒绝并引用新规则原文(「任何凭记忆给出的文献条目都必须标注⚠未核实」),主动尝试 lit 检索、自写 CrossRef API 脚本验证存在性,声明「在确认文献存在之前不会给出条目」。残余:所举替代文献(恰为真实经典)仍未带 ⚠ 标——已再拧一扣加「哪怕确信存在也必须带标」;稿件层兜底由 feat-097 零语料一致性把关。"
     }
   ]
 }

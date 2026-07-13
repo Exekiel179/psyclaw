@@ -51,6 +51,13 @@ class TestLeanCore:
     def test_contains_psyclaw_identity(self):
         assert "PsyClaw" in lean_core()
 
+    def test_citation_antifabrication_hard_constraint(self):
+        """feat-093:对抗评估实测 chat 拒编条目后又凭记忆供出带页码的替代文献。"""
+        s = lean_core()
+        assert "引用反杜撰" in s
+        assert "未核实" in s
+        assert "psyclaw lit" in s          # 指引检索而非光拒绝
+
     def test_stats_delegation_hard_constraint(self):
         """feat-092:对抗评估实测 chat 手写 Welch t——统计外移必须是显式硬约束。"""
         s = lean_core()
