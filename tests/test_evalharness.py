@@ -92,3 +92,49 @@ class TestCliEval:
         rc = cli.main(["eval", "--case", "nope"])
         assert rc == 1
         assert "未知评测用例" in capsys.readouterr().out
+class TestEvalOutputRobustness:
+    """feat-084(评审修复):GBK 管道不崩、报告先落盘、--json 纯净、重复用例去重。"""
+    def test_duplicate_case_ids_deduped(self):
+        r = run_evals(["error_learning", "error_learning"])
+        assert list(r["cases"]) == ["error_learning"]
+        assert r["total"] == r["cases"]["error_learning"]["total"]  # 合计=分项
+    def test_print_encoding_safe_survives_gbk(self, capsys):
+        """✅/❌ 在 GBK stdout 下降级替换而非 UnicodeEncodeError(中文 Windows 管道)。"""
+        import io
+        import sys as _sys
+        from psyclaw.cli import _print_encoding_safe
+        buf = io.TextIOWrapper(io.BytesIO(), encoding="gbk")
+        old = _sys.stdout
+        _sys.stdout = buf
+        try:
+            _print_encoding_safe("✅ gates_enforcement(4/4)—质量检查")
+        finally:
+            _sys.stdout = old
+        buf.seek(0)
+        assert "质量检查" in buf.buffer.getvalue().decode("gbk")  # 中文保留,不崩
+    def test_report_written_even_if_print_crashes(self, tmp_path, monkeypatch, capsys):
+        """落盘先于打印:打印层崩溃也不能吞掉报告工件。"""
+        from psyclaw import cli
+        monkeypatch.chdir(tmp_path)
+        calls = {"n": 0}
+        def boom(_s):
+            calls["n"] += 1
+            raise RuntimeError("print 层意外")
+        monkeypatch.setattr(cli, "_print_encoding_safe", boom)
+        try:
+            cli.main(["eval", "--case", "error_learning"])
+        except RuntimeError:
+            pass
+        assert calls["n"] == 1
+        assert (tmp_path / ".psyclaw" / "eval_report.json").exists()
+    def test_json_stdout_stays_pure_when_save_fails(self, tmp_path, monkeypatch, capsys):
+        """--json 时落盘失败的提示走 stderr,stdout 仍是可解析 JSON。"""
+        from psyclaw import cli
+        monkeypatch.chdir(tmp_path)
+        ro = tmp_path / ".psyclaw"
+        ro.write_text("挡路的文件", encoding="utf-8")   # 同名文件令 mkdir 失败
+        rc = cli.main(["eval", "--case", "error_learning", "--json"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        json.loads(captured.out)                        # stdout 纯 JSON
+        assert "落盘失败" in captured.err

@@ -559,6 +559,20 @@ def cmd_gates(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _print_encoding_safe(s: str) -> None:
+    """打印任意文本,stdout 编码不支持的字符降级替换而非崩溃(feat-084)。
+
+    中文 Windows 下管道/重定向 stdout 用 ANSI 代码页(cp936),✅/❌/✗ 不可编码,
+    print 直接 UnicodeEncodeError——全绿的评测跑出崩溃退出码。中文字符 GBK 可编,
+    只有 emoji 被替换,报告仍可读。
+    """
+    try:
+        print(s)
+    except UnicodeEncodeError:
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+        print(s.encode(enc, errors="replace").decode(enc, errors="replace"))
+
+
 def cmd_eval(args: argparse.Namespace) -> int:
     """确定性离线评测(feat-073):编排/质量检查/自学习契约的端到端 scorecard。"""
     import json
@@ -571,19 +585,23 @@ def cmd_eval(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(ui.err(str(exc)))
         return 1
-    if args.json:
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-    else:
-        print(format_report(report))
+    # feat-084:先落盘再打印——打印层任何意外都不能吞掉报告工件
     out = Path(".psyclaw") / "eval_report.json"
+    saved = False
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(report, ensure_ascii=False, indent=2),
                        encoding="utf-8")
-        if not args.json:
-            print(ui.dim(f"报告已写入 {out}"))
+        saved = True
     except OSError as exc:
-        print(ui.dim(f"(报告落盘失败,不影响评测结果:{exc})"))
+        # 落盘失败提示走 stderr:--json 的 stdout 必须保持纯 JSON 可解析
+        print(ui.dim(f"(报告落盘失败,不影响评测结果:{exc})"), file=sys.stderr)
+    if args.json:
+        _print_encoding_safe(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        _print_encoding_safe(format_report(report))
+        if saved:
+            print(ui.dim(f"报告已写入 {out}"))
     return 0 if report["all_passed"] else 1
 
 

@@ -842,6 +842,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/memory.py(confirm_lesson)。tests/test_audit_memory.py TestConfirmCarriesHits +3 例(hits=5 确认后 strength=5 且 hits 键并账/新卡确认 strength=1/多次再现的教训在 memory_prompt 排序先于偶发教训)。全量 pytest → 1536 passed"
+    },
+    {
+      "id": "feat-084",
+      "name": "eval 输出健壮性(v0.12 评审修复:GBK 管道崩溃吞报告 + --json 污染 + 重复用例双记)",
+      "description": "评审 finding 9 + 两个裁剪项:① format_report 的 ✅/❌/✗ 在中文 Windows 管道/重定向 stdout(cp936)下 UnicodeEncodeError——全绿评测跑出崩溃退出码,且打印在写文件之前,eval_report.json 永远写不出来;② --json 模式落盘失败提示打进 stdout,污染机器可读 JSON;③ 重复 --case 把 total/passed 记两遍而 cases 字典只留一份,合计与分项自相矛盾。修复:_print_encoding_safe(编码不支持字符降级替换,中文保留);先落盘再打印(打印层任何意外不吞报告工件);落盘失败提示改走 stderr;run_evals 用例 id 去重保序。",
+      "dependencies": [
+        "feat-073"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/cli.py(_print_encoding_safe+cmd_eval 落盘先行/stderr);psyclaw/evalharness.py(ids 去重)。tests/test_evalharness.py TestEvalOutputRobustness +4 例(GBK stdout 不崩且中文保留/打印崩报告仍在/--json stdout 纯净/重复用例合计=分项)。全量 pytest → 1540 passed"
     }
   ]
 }

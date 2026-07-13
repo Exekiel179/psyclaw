@@ -339,7 +339,9 @@ CASES: dict = {
 def run_evals(case_ids: list[str] | None = None) -> dict:
     """跑指定(默认全部)用例 → scorecard。用例崩溃记失败 check,不静默。"""
     import tempfile
-    ids = case_ids or list(CASES)
+    # 去重保序(feat-084):重复 --case 曾把 total/passed 记两遍而 cases 字典
+    # 只留一份,合计与分项自相矛盾;同一用例跑两遍也不产生新信息。
+    ids = list(dict.fromkeys(case_ids or list(CASES)))
     unknown = [i for i in ids if i not in CASES]
     if unknown:
         raise ValueError(f"未知评测用例:{unknown};可用:{list(CASES)}")
