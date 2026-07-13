@@ -227,3 +227,68 @@ def test_gate_passes_when_grounded(tmp_path):
                        encoding="utf-8")
     res = check_artifact(str(sidecar), "citation")
     assert res["passed"] is True
+
+
+# ---------------------------------------------------------------------------
+# feat-097:文内引用 ↔ 参考文献表 双向一致性(零语料本地核查)
+# ---------------------------------------------------------------------------
+
+_DRAFT_WITH_REFLIST = """## 引言
+
+青少年抑郁是问题(Brown & Ryan, 2003)。正念有效(Kabat-Zinn, 1990)。
+最新元分析已有定论(Smith & Johnson, 2024)。
+
+## 参考文献
+
+- Brown, K. W., & Ryan, R. M. (2003). The benefits of being present. *JPSP, 84*(4), 822-848.
+- Davis, M. (2015). Mindfulness in schools. *Educ Psych Rev, 27*(1), 103-134.
+- Kabat-Zinn, J. (1990). *Full catastrophe living*. Delacorte.
+"""
+
+
+def test_extract_reference_entries_shapes():
+    refs = C.extract_reference_entries(
+        "- Brown, K. W., & Ryan, R. M. (2003). Title.\n"
+        "1. Smith, J. (2020a). Another.\n"
+        "王明, 李红 (2019). 中文条目. 心理学报.\n"
+        "不是条目的散文行\n")
+    canons = {r["canon"] for r in refs}
+    assert ("brown", "2003") in canons
+    assert ("smith", "2020") in canons          # 2020a 归一到 2020
+    assert ("王明", "2019") in canons
+    assert len(refs) == 3
+
+
+def test_consistency_catches_missing_and_uncited(tmp_path):
+    """正文引 Smith & Johnson (2024) 文献表没有 → 硬判据;Davis (2015) 未被引用 → 软警告。"""
+    draft = tmp_path / "d.md"
+    draft.write_text(_DRAFT_WITH_REFLIST, encoding="utf-8")
+    a = C.run_citation_audit(str(draft), project_dir=str(tmp_path))
+    cons = a["consistency"]
+    assert cons["has_reference_list"] is True and cons["refs_n"] == 3
+    assert cons["missing_in_reflist_n"] == 1
+    assert cons["missing_in_reflist"][0]["surname"] == "smith"
+    assert cons["uncited_n"] == 1 and "Davis" in cons["uncited_references"][0]
+    # 零语料也判杜撰:no_fabricated_citations 翻 False,gate 可拦
+    assert a["no_fabricated_citations"] is False
+    report = (tmp_path / "notes" / "citation_audit.md").read_text(encoding="utf-8")
+    assert "文内引用不在参考文献表" in report and "未被正文引用" in report
+
+
+def test_consistency_neutral_without_reflist(tmp_path):
+    draft = tmp_path / "d.md"
+    draft.write_text("只有正文引用 Smith (2020),无参考文献区。", encoding="utf-8")
+    a = C.run_citation_audit(str(draft), project_dir=str(tmp_path))
+    assert a["consistency"]["has_reference_list"] is False
+    assert a["no_fabricated_citations"] is True   # 无文献表不误伤
+
+
+def test_consistency_all_matched_stays_clean(tmp_path):
+    draft = tmp_path / "d.md"
+    draft.write_text(
+        "正念有效(Kabat-Zinn, 1990)。\n\n## References\n\n"
+        "- Kabat-Zinn, J. (1990). Full catastrophe living.\n", encoding="utf-8")
+    a = C.run_citation_audit(str(draft), project_dir=str(tmp_path))
+    cons = a["consistency"]
+    assert cons["missing_in_reflist_n"] == 0 and cons["uncited_n"] == 0
+    assert a["no_fabricated_citations"] is True

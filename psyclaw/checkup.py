@@ -64,16 +64,32 @@ def run_check(draft: str | None = None, journal: str | None = None,
             from psyclaw.psych.citations import run_citation_audit
             a = run_citation_audit(str(draft_p), project_dir=project_dir,
                                    journal=journal)
-            if a["orphan_n"]:
-                orphans = "; ".join(o["raw"] for o in a["orphan"][:3])
+            cons = a.get("consistency") or {}
+            miss_n = cons.get("missing_in_reflist_n", 0)
+            if a["orphan_n"] or miss_n:      # feat-097:文内不在文献表同为硬判据
+                parts = []
+                if a["orphan_n"]:
+                    parts.append(f"孤儿引用 {a['orphan_n']} 条:"
+                                 + "; ".join(o["raw"] for o in a["orphan"][:3]))
+                if miss_n:
+                    parts.append(f"文内引用不在参考文献表 {miss_n} 条:"
+                                 + "; ".join(c["raw"] for c in
+                                             cons["missing_in_reflist"][:3]))
                 items.append(_item("引用保真", "fail",
-                                   f"孤儿引用 {a['orphan_n']} 条(疑似杜撰):{orphans}",
+                                   "(疑似杜撰)" + " · ".join(parts),
                                    "删除或先 psyclaw lit 补检索"))
             elif a["manual_review"]:
-                items.append(_item("引用保真", "manual", a["method"]))
+                note = a["method"]
+                if cons.get("has_reference_list"):
+                    note += f";文内↔文献表一致(共 {cons['refs_n']} 条)"
+                items.append(_item("引用保真", "manual", note))
             else:
                 items.append(_item("引用保真", "pass",
                                    f"{a['cited_n']} 条文内引用均可溯源"))
+            if cons.get("uncited_n"):
+                items.append(_item("文献表整理", "manual",
+                                   f"{cons['uncited_n']} 条文献未被正文引用:"
+                                   + "; ".join(cons["uncited_references"][:3])))
             if a.get("journal"):
                 ok = a.get("citation_style_ok")
                 items.append(_item(

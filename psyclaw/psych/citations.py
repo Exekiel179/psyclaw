@@ -213,6 +213,66 @@ def _body_only(text: str) -> str:
     return "".join(out)
 
 
+# 参考文献条目行:可选列表标记/编号,作者段(到第一个年份括号为止)+ (YEAR)
+_REF_ENTRY = re.compile(rf"^\s*(?:[-*•]\s*|\d+[.)]\s*)?(.{{2,120}}?)\s*[(（]\s*({_YR})\s*[)）]")
+
+
+def _reference_section(text: str) -> str:
+    """返回参考文献/证据图谱标题行**之后**的文本(``_body_only`` 的补集);无该区返回 ''。"""
+    lines = (text or "").splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if _REF_LINE.match(line):
+            return "".join(lines[i + 1:])
+    return ""
+
+
+def extract_reference_entries(text: str) -> list[dict]:
+    """从参考文献区逐行抽取条目 → 去重后 ``[{raw, surname, year, canon}]``(纯函数,feat-097)。"""
+    seen: dict[tuple[str, str], dict] = {}
+    for line in (text or "").splitlines():
+        m = _REF_ENTRY.match(line)
+        if not m or not _NAME_RE.search(m.group(1)):
+            continue
+        surname, yb = _canon(m.group(1), m.group(2))
+        if surname:
+            seen.setdefault((surname, yb), {
+                "raw": line.strip()[:90], "surname": surname, "year": yb,
+                "canon": (surname, yb)})
+    return list(seen.values())
+
+
+def consistency_check(full_text: str) -> dict:
+    """文内引用 ↔ 参考文献表**双向**一致性。纯函数,零语料即可跑(feat-097)。
+
+    对抗评估实测:正文引 Smith & Johnson (2024) 而文献表没有(疑似杜撰)、
+    文献表 Davis (2015) 正文从未引用——此前全靠「无语料需人工核」放过,
+    而这两个方向的核对根本不需要任何检索语料。
+    - ``missing_in_reflist``:文内引用不在文献表 → **硬判据**(计入 no_fabricated_citations);
+    - ``uncited_references``:文献表条目未被引用 → 软警告(整理问题,非杜撰)。
+    稿件没有参考文献区时不判(has_reference_list=False),不误伤无文献表的草稿。
+    """
+    body = _body_only(full_text)
+    refs = extract_reference_entries(_reference_section(full_text))
+    if not refs:
+        return {"has_reference_list": False, "refs_n": 0,
+                "missing_in_reflist": [], "missing_in_reflist_n": 0,
+                "uncited_references": [], "uncited_n": 0}
+    cites = extract_intext_citations(body)
+    refset = {r["canon"] for r in refs}
+    citeset = {c["canon"] for c in cites}
+    missing = [c for c in cites if c["canon"] not in refset]
+    uncited = [r for r in refs if r["canon"] not in citeset]
+    return {
+        "has_reference_list": True,
+        "refs_n": len(refs),
+        "missing_in_reflist": [{"raw": c["raw"], "surname": c["surname"],
+                                "year": c["year"]} for c in missing],
+        "missing_in_reflist_n": len(missing),
+        "uncited_references": [r["raw"] for r in uncited],
+        "uncited_n": len(uncited),
+    }
+
+
 def _render_report(audit: dict) -> str:
     lines = ["# 引用保真核查报告", ""]
     lines.append(f"- 稿件:{audit.get('manuscript', '?')}")
@@ -226,10 +286,25 @@ def _render_report(audit: dict) -> str:
         lines.append("")
         lines.append("**处理**:删除该引用,或先 `psyclaw lit <检索式>` 把它检索进来再复核。")
     elif audit["manual_review"]:
-        lines.append("## ⚠ 未能自动核验(需人工核)")
+        lines.append("## ⚠ 检索语料核验未完成(需人工核)")
         lines.append(f"- {audit['method']}")
     else:
         lines.append(f"## ✓ 全部 {audit['cited_n']} 条文内引用均可溯源到检索命中")
+    cons = audit.get("consistency") or {}
+    if cons.get("has_reference_list"):
+        lines.append("")
+        if cons["missing_in_reflist_n"]:
+            lines.append(f"## ✗ 文内引用不在参考文献表 {cons['missing_in_reflist_n']} 条"
+                         "(疑似杜撰——零语料本地核查,feat-097)")
+            for c in cons["missing_in_reflist"]:
+                lines.append(f"- `{c['raw']}` — 文献表无 ({c['surname']}, {c['year']}) 条目")
+        else:
+            lines.append(f"## ✓ 文内引用均见于参考文献表(共 {cons['refs_n']} 条)")
+        if cons["uncited_n"]:
+            lines.append("")
+            lines.append(f"### ⚠ 文献表条目未被正文引用 {cons['uncited_n']} 条(整理问题)")
+            for r in cons["uncited_references"]:
+                lines.append(f"- `{r}`")
     if audit.get("journal"):
         lines.append("")
         lines.append(f"## 期刊定制:{audit['journal']}")
@@ -277,11 +352,17 @@ def run_citation_audit(manuscript_path: str, project_dir: str = ".",
     notes = project / "notes"
     notes.mkdir(parents=True, exist_ok=True)
     mp = Path(manuscript_path)
-    text = _body_only(mp.read_text(encoding="utf-8")) if mp.exists() else ""
+    full = mp.read_text(encoding="utf-8") if mp.exists() else ""
+    text = _body_only(full)
     keys, source = load_allowed(project_dir)
     audit = audit_citations(text, keys)
     audit["manuscript"] = str(manuscript_path)
     audit["corpus_source"] = source
+    # feat-097:文内 ↔ 文献表双向一致性(零语料);不在文献表=硬判据
+    cons = consistency_check(full)
+    audit["consistency"] = cons
+    if cons["missing_in_reflist_n"]:
+        audit["no_fabricated_citations"] = False
     if journal:
         _apply_journal(audit, text, journal)
     (notes / "citation_audit.json").write_text(
