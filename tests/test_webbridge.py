@@ -139,6 +139,38 @@ def test_merge_tools_absent_without_binary(monkeypatch):
     assert not tools
 
 
+def test_extension_store_url_and_open(monkeypatch):
+    """商店页常量就位;open 用系统默认浏览器(macOS open URL 尊重默认设置)。"""
+    assert wb.EXTENSION_ID in wb.EXTENSION_STORE_URL
+    seen = {}
+    monkeypatch.setattr("sys.platform", "darwin")
+    monkeypatch.setattr(wb.subprocess, "run",
+                        lambda argv, **kw: seen.setdefault("argv", argv))
+    assert wb.open_in_default_browser("https://x") is True
+    assert seen["argv"] == ["open", "https://x"]
+
+
+def test_wait_extension_polls_until_connected(monkeypatch):
+    seq = [None, {"extension_connected": False}, {"extension_connected": True}]
+    monkeypatch.setattr(wb, "daemon_status", lambda timeout=2.0: seq.pop(0))
+    ticks = []
+    assert wb.wait_extension(timeout=10, poll=0.01,
+                             on_tick=lambda: ticks.append(1)) is True
+    assert len(ticks) == 2                     # 前两次未连,各 tick 一次
+
+
+def test_wait_extension_times_out(monkeypatch):
+    monkeypatch.setattr(wb, "daemon_status",
+                        lambda timeout=2.0: {"extension_connected": False})
+    assert wb.wait_extension(timeout=0.05, poll=0.01) is False
+
+
+def test_official_support_arc_is_not():
+    """Arc 实测半兼容(tabGroups 缺失致 navigate 挂)——官方支持只认 Chrome/Edge。"""
+    assert wb.officially_supported({"bundle_id": "com.google.chrome"}) is True
+    assert wb.officially_supported({"bundle_id": "com.microsoft.edgemac"}) is True
+    assert wb.officially_supported({"bundle_id": "company.thebrowser.browser"}) is False
+    assert wb.officially_supported(None) is False
 def test_search_plan_prefers_webbridge():
     from psyclaw.psych.litplan import build_search_plan, render_search_plan_md
     md = render_search_plan_md(build_search_plan("x"))
