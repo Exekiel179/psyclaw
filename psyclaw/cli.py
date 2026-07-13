@@ -1049,11 +1049,36 @@ def cmd_webbridge(args: argparse.Namespace) -> int:
     else:
         print(ui.warn("  守护进程:未运行(psyclaw webbridge start)"))
     if db:
-        note = "" if db["chromium"] else "(非 Chromium 系,扩展可能不可用——建议用 Chromium 系浏览器)"
+        note = "" if db["chromium"] else "(非 Chromium 系,扩展不可用)"
         print(f"  默认浏览器:{db['name']} {note}")
-        if st and not st.get("extension_connected"):
-            print(ui.warn(f"  ⚠ 请在 {db['name']} 中安装 WebBridge 扩展(登录态复用的关键一步):"))
-            print(ui.dim(f"    {wb.HELP_URL}"))
+        if db["chromium"] and not wb.officially_supported(db):
+            # 实测教训(Arc):查询类正常,但建标签要走 chrome.tabGroups——
+            # 未实现该 API 的浏览器 navigate 挂死。如实警告并给出路。
+            print(ui.warn(f"  ⚠ {db['name']} 不在 WebBridge 官方支持列表(Chrome/Edge):"
+                          "只读操作可用,新开标签会挂——建议把扩展装到 Chrome/Edge 并在"
+                          "那里登录机构库"))
+    if st and not st.get("extension_connected"):
+        # 自动化到只剩一次点击:浏览器安全模型禁止静默装扩展(psyclaw 不越这条线),
+        # 但可以替用户打开确切的商店安装页并轮询等连接。
+        bname = db["name"] if db else "默认浏览器"
+        if wb.open_in_default_browser(wb.EXTENSION_STORE_URL):
+            print(ui.ok(f"  → 已在 {bname} 打开扩展安装页,点一下「添加至 Chrome」即可:"))
+            print(ui.dim(f"    {wb.EXTENSION_STORE_URL}"))
+            print(ui.dim("  等待扩展连接(最长 120 秒,Ctrl+C 可跳过;装好后重跑 "
+                         "psyclaw webbridge status 即可)…"))
+            try:
+                ok2 = wb.wait_extension(timeout=120,
+                                        on_tick=lambda: print(".", end="", flush=True))
+            except KeyboardInterrupt:
+                ok2 = False
+                print()
+            if ok2:
+                print(ui.ok("\n  ✓ 扩展已连接!"))
+                st = wb.daemon_status()
+            else:
+                print(ui.warn("\n  ⚠ 还没连上——装好扩展后重跑 psyclaw webbridge status 即可"))
+        else:
+            print(ui.warn(f"  ⚠ 请在 {bname} 打开并安装扩展:{wb.EXTENSION_STORE_URL}"))
     if st and st.get("extension_connected"):
         print(ui.ok("  ✓ 就绪:psyclaw 对话 /agent on 后即可用 web__* 工具驱动真实浏览器"))
     return 0

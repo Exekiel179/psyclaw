@@ -25,8 +25,14 @@ from pathlib import Path
 BIN = Path.home() / ".kimi-webbridge" / "bin" / "kimi-webbridge"
 DAEMON = "http://127.0.0.1:10086"
 HELP_URL = "https://www.kimi.com/zh-cn/features/webbridge"
+# Chrome Web Store 官方扩展页(Arc/Chrome/Edge/Brave 均可从此安装)。
+# 浏览器安全模型禁止静默装扩展(扩展可读全部页面,必须用户亲点「添加」)——
+# psyclaw 能自动化的极限:打开确切安装页 + 轮询等连接,只给用户留一次点击。
+EXTENSION_ID = "fldmhceldgbpfpkbgopacenieobmligc"
+EXTENSION_STORE_URL = ("https://chromewebstore.google.com/detail/"
+                       f"kimi-webbridge/{EXTENSION_ID}")
 _DL_BASE = "https://cdn.kimi.com/webbridge"      # 与官方 install.sh 同源
-_TIMEOUT = 8.0
+_TIMEOUT = 30.0    # 真实浏览器开标签+页面加载可能不止 8 秒(活体实测 navigate 超时)
 DEFAULT_SESSION = "psyclaw-research"
 
 # macOS 常见浏览器 bundle id → 人读名(默认浏览器识别与扩展指引用)
@@ -42,6 +48,13 @@ _BUNDLE_NAMES = {
 _CHROMIUM_BUNDLES = {"company.thebrowser.browser", "com.google.chrome",
                      "com.microsoft.edgemac", "com.brave.browser",
                      "org.chromium.chromium"}
+# WebBridge 官方支持列表只有 Chrome / Edge。Arc 实测半兼容:查询类(list_tabs/
+# find_tab)正常,但建标签会话要走 chrome.tabGroups——Arc 未实现,navigate 挂死。
+_OFFICIAL_BUNDLES = {"com.google.chrome", "com.microsoft.edgemac"}
+
+
+def officially_supported(db: dict | None) -> bool:
+    return bool(db) and db.get("bundle_id") in _OFFICIAL_BUNDLES
 
 
 def default_browser() -> dict | None:
@@ -149,6 +162,37 @@ def call(action: str, args: dict | None = None,
             return _post()
         except Exception as exc:  # noqa: BLE001
             return {"success": False, "error": f"webbridge 调用失败:{exc}"}
+
+
+def open_in_default_browser(url: str) -> bool:
+    """在系统默认浏览器打开 URL(macOS open / Linux xdg-open / Windows start)。"""
+    import sys
+    try:
+        if sys.platform == "darwin":
+            argv = ["open", url]
+        elif os.name == "nt":
+            argv = ["cmd", "/c", "start", "", url]
+        else:
+            argv = ["xdg-open", url]
+        subprocess.run(argv, capture_output=True, timeout=15)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def wait_extension(timeout: float = 120.0, poll: float = 3.0,
+                   on_tick=None) -> bool:
+    """轮询守护进程直到扩展连接(用户在商店页点完「添加」即连上)。"""
+    import time
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        st = daemon_status()
+        if st and st.get("extension_connected"):
+            return True
+        if on_tick:
+            on_tick()
+        time.sleep(poll)
+    return False
 
 
 # ---------------------------------------------------------------------------
