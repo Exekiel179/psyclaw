@@ -882,6 +882,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/memory.py(draft_lessons);psyclaw/cli.py(cmd_agent 三态如实报);psyclaw/repl.py(_ingest_lessons 复用)。tests/test_agent_learning.py TestDraftLessonsBatch +3 例(首卡失败后两张仍落且逐张尝试/全失败返 0/CLI 全失败时明说「未持久化」)。全量 pytest → 1551 passed"
+    },
+    {
+      "id": "feat-088",
+      "name": "toolloop 教训抗修剪(v0.12 评审修复:长任务恰在最需要止损时失忆重踩)",
+      "description": "评审 finding 7(验证器逐行确认):环境教训只随首次出现的那条「# 工具结果」用户消息注入一次;trim_convo 在 3 条更新的结果消息出现后用 _compress_result_msg 压缩旧消息(只留 '## tool' 头+首行),整个「# 环境教训」块被销毁;而 lesson_keys 去重让 collect_env_lessons 永不再返回同一教训 → N+4 轮起教训从上下文消失,20+ 轮的长任务恰在最需要止损时重踩同一坑。修复:每轮把**全量**累计教训重放进最新反馈消息——旧副本照常被 trim 压掉,最新消息恒携带完整教训,上下文中始终只有约 3 份活副本(_KEEP_RECENT_RESULTS)不失控;lessons 返回值仍按去重累计,契约不变。",
+      "dependencies": [
+        "feat-065"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/toolloop.py(run_tool_loop 教训全量重放)。tests/test_agent_learning.py TestLessonSurvivesTrim +2 例(8 轮长跑第 1 轮教训在最后一轮 provider 上下文仍在——trim 失忆回归断言;lessons 返回值无重复)。全量 pytest → 1553 passed;eval 28/28;gates ✓"
     }
   ]
 }

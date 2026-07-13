@@ -252,3 +252,47 @@ class TestDraftLessonsBatch:
         out = capsys.readouterr().out
         assert rc == 0
         assert "落卡全部失败" in out and "未持久化" in out
+class TestLessonSurvivesTrim:
+    """feat-088(评审修复):教训每轮全量重放,trim 压掉旧副本后最新消息仍带完整教训。"""
+    def _long_run(self, iters=8):
+        """脚本化 provider:前 iters-1 轮各发一次失败工具调用,最后一轮收尾。
+        捕获每次 provider.chat 收到的消息,供断言教训在晚期轮次仍在上下文。"""
+        from psyclaw.toolloop import run_tool_loop
+        captured = []
+        class _Prov:
+            def __init__(self):
+                self.i = 0
+                self.last_stop_reason = ""
+            def chat(self, messages, system=""):
+                captured.append([dict(m) for m in messages])
+                self.i += 1
+                if self.i < iters:
+                    yield ('```tool\n{"name": "probe", "args": {"i": %d}}\n```'
+                           % self.i)
+                else:
+                    yield "最终答案:改用别的方案。"
+        calls = {"n": 0}
+        def _probe(a):
+            calls["n"] += 1
+            if calls["n"] == 1:                     # 只有第 1 次失败产出教训
+                raise RuntimeError("zsh: command not found: rscript")
+            return f"结果 {calls['n']}"
+        tools = {"probe": {"desc": "探针", "args": "", "run": _probe,
+                           "side_effect": False}}
+        res = run_tool_loop(_Prov(), "sys", [{"role": "user", "content": "任务"}],
+                            tools=tools, max_iters=iters + 2)
+        return res, captured
+    def test_lesson_present_in_late_iterations(self):
+        """第 1 轮学到的教训,第 8 轮的最新用户消息里仍然在(trim 后不失忆)。"""
+        res, captured = self._long_run(iters=8)
+        assert res["stopped"] == "answered"
+        assert any(le["trigger"] == "rscript" for le in res["lessons"])
+        last_msgs = captured[-1]                    # 最后一次 provider 调用的上下文
+        user_texts = [m["content"] for m in last_msgs if m["role"] == "user"]
+        assert any("rscript" in t for t in user_texts), \
+            "教训在晚期轮次的上下文中消失(trim 失忆回归)"
+    def test_lesson_not_duplicated_in_lessons_list(self):
+        """全量重放只影响反馈文本,lessons 返回值仍按去重累计。"""
+        res, _ = self._long_run(iters=6)
+        keys = [(le["trigger"], le["lesson"]) for le in res["lessons"]]
+        assert len(keys) == len(set(keys))
