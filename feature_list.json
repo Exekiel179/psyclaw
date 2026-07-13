@@ -822,6 +822,16 @@
       ],
       "status": "done",
       "evidence": "psyclaw/repl.py(cmd_approval_scope 重写 + _WRAPPER_TOOLS/_NO_GENERALIZE_PAIRS)。tests/test_repl_approval.py TestApprovalScopeHardening +9 例(解释器 flag/uv run/git.exe 子命令区分/env 前缀/包装程序/80 字碰撞/后台 &/py 启动器/不误伤回归);旧 bash -c 泛化断言按新契约移除。全量 pytest → 1529 passed"
+    },
+    {
+      "id": "feat-082",
+      "name": "期刊名不识别绝不静默(v0.12 评审修复:拼错 --journal 曾无声解除 replication 质量检查)",
+      "description": "评审 finding 8:--journal 拼错(且不构成任何期刊名子串)时 get_journal 返回 None 被静默吞掉——prov['journal']=None、data_availability_required=False,CLI 一行警告不打、exit 0「✓ 溯源完整」,required 期刊的 replication-package 质量检查被无声解除而用户毫不知情。修复(fail-closed 呈报):build_provenance 记 journal_unmatched 入 sidecar;.provenance.md 渲染「期刊定制未生效」醒目警告;cmd_provenance 打 ✗ 并列全部可用期刊 id,退出码 1(sidecar 仍写、有痕)。判据口径不动(未识别仍按无期刊,不自作主张强制)。",
+      "dependencies": [
+        "feat-074"
+      ],
+      "status": "done",
+      "evidence": "psyclaw/provenance.py(journal_unmatched+md 警告);psyclaw/cli.py(cmd_provenance ✗ 告警+exit 1+可用 id 列表)。tests/test_provenance.py TestJournalUnmatched +4 例(记录不静默/正常匹配无键/md 警告/CLI 退出码)。全量 pytest → 1533 passed"
     }
   ]
 }
