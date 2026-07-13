@@ -354,7 +354,7 @@ class TestSmartExcerptCSV:
         assert "score" in result
 
     def test_csv_shows_column_types(self, tmp_path):
-        p = _make_csv(tmp_path)
+        p = _make_csv(tmp_path, rows=400)          # 大 CSV 才走结构摘录(feat-102)
         result = smart_excerpt(p)
         # 列类型标注 (num) 或 (str)
         assert "(num)" in result or "(str)" in result
@@ -370,11 +370,19 @@ class TestSmartExcerptCSV:
         # 应包含提示而不是全部 100 行
         assert "100" not in result.split("<csv")[0] or "统计" in result or "样例" in result
 
-    def test_csv_hint_to_use_cli(self, tmp_path):
-        p = _make_csv(tmp_path)
+    def test_csv_hint_when_truncated(self, tmp_path):
+        p = _make_csv(tmp_path, rows=400)
         result = smart_excerpt(p)
-        # 提示用 CLI 做全量分析
-        assert "psyclaw" in result
+        # 大 CSV 截断必须显式告知,并禁止基于样例做计数/统计(feat-102)
+        assert "已截断" in result and "400 行" in result
+
+    def test_small_csv_fully_injected(self, tmp_path):
+        """feat-102:小 CSV 全量注入——第三轮实测 21 行数据只给 5 行样例,
+        模型在半个数据集上打转。"""
+        p = _make_csv(tmp_path, rows=21)
+        result = smart_excerpt(p)
+        assert "全量注入" in result and "rows=21" in result
+        assert "21,70.0,A" in result          # 最后一行数据也在上下文里
 
     def test_tsv_also_works(self, tmp_path):
         p = tmp_path / "data.tsv"

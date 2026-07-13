@@ -275,8 +275,17 @@ def _pdf_excerpt(path: Path) -> str:
     return (f"<pdf path={path} 抽取失败>\n{res['note']}\n</pdf>")
 
 
+CSV_FULL_CHARS = 4_096   # feat-102:小 CSV 全量注入阈值
+
+
 def _csv_excerpt(path: Path) -> str:
     raw = path.read_text(encoding="utf-8", errors="replace")
+    # feat-102:小 CSV **全量注入**——第三轮评估实测 21 行 (~600B) 数据只给 5 行
+    # 样例,模型明说「只能看到 5 行训练组样本」,后续统计全在半个数据集上打转。
+    if len(raw) <= CSV_FULL_CHARS:
+        n_rows = max(0, len([ln for ln in raw.splitlines() if ln.strip()]) - 1)
+        return (f"<csv path={path} rows={n_rows} 全量注入>\n"
+                f"{raw.rstrip()}\n</csv>")
     sniff = raw[:4096]
     try:
         dialect = _csv.Sniffer().sniff(sniff, delimiters=",\t;")
@@ -289,7 +298,7 @@ def _csv_excerpt(path: Path) -> str:
             rows.append(row)
         else:
             pass
-    n_rows = raw.count("\n")
+    n_rows = max(0, len([ln for ln in raw.splitlines() if ln.strip()]) - 1)  # 数据行数
     header = rows[0] if rows else []
     sample = rows[1:CSV_SAMPLE_ROWS + 1]
     # 粗略列类型
@@ -304,7 +313,8 @@ def _csv_excerpt(path: Path) -> str:
              "列: " + ", ".join(f"{h}({t})" for h, t in zip(header, types))]
     for r in sample[:5]:
         lines.append("  " + " | ".join(x[:18] for x in r))
-    lines.append(f"(数据样例 {min(5, len(sample))} 行;统计请用 psyclaw check/screen 直接跑全量)")
+    lines.append(f"(⚠ 已截断:仅样例 {min(5, len(sample))} 行 / 共 {n_rows} 行——"
+                 "任何计数/统计都不要基于此样例,请用工具直接读全量)")
     lines.append("</csv>")
     return "\n".join(lines)
 
