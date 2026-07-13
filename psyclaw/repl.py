@@ -296,8 +296,21 @@ def probe_env_card_stale(card: dict) -> bool | None:
 # (git status ≠ git push),范围要带上它;其余程序按程序名归类即可(pytest、ls…)。
 _SUBCMD_TOOLS = frozenset({
     "git", "uv", "uvx", "npm", "pnpm", "yarn", "pip", "pip3", "conda", "brew",
-    "docker", "kubectl", "cargo", "make", "python", "python3", "node", "ruby",
-    "perl", "bash", "sh", "zsh", "Rscript",
+    "docker", "kubectl", "cargo", "make", "python", "python3", "py", "node",
+    "ruby", "perl", "bash", "sh", "zsh", "Rscript",
+})
+
+# feat-081(v0.12 评审修复):包装/提权/延迟执行类程序——真正跑什么由后面的参数
+# 决定,任何前缀键都无法圈住行为 → 一律不泛化(范围=整条原文,逐条同意)。
+_WRAPPER_TOOLS = frozenset({
+    "sudo", "doas", "env", "nohup", "time", "nice", "timeout", "xargs",
+    "watch", "uvx", "npx", "bunx", "setsid", "stdbuf", "caffeinate",
+})
+
+# 「程序+子命令」仍等于任意代码执行的组合(uv run X 可跑任何脚本)→ 不泛化。
+_NO_GENERALIZE_PAIRS = frozenset({
+    ("uv", "run"), ("npm", "exec"), ("npm", "x"), ("pnpm", "dlx"),
+    ("yarn", "dlx"), ("pip", "download"), ("conda", "run"),
 })
 
 
@@ -305,20 +318,36 @@ def cmd_approval_scope(cmd: str) -> str:
     """把一条 shell 命令归类成「全部同意」的范围键。纯函数,可单测。
 
     - 一般程序 → 程序名(`pytest -q` → `pytest`):同意 pytest 不放行 rm;
-    - 子命令型/解释器型程序 → 程序名+第二个词(`git status`、`python3 analyze.py`、
-      `bash -c`):同意 `git status` 不放行 `git push`;
-    - 管道/连接符(| && ; >)的复合命令 → 整条原文(不拆,复合行为不外推);
+    - 子命令型/解释器型程序 → 程序名+第二个词(`git status`、`python3 analyze.py`):
+      同意 `git status` 不放行 `git push`;Windows 的 `git.exe` 剥后缀同样归类
+      (feat-081:此前 .exe 绕过子命令区分,status 的同意会放行 push);
+    - **不泛化**(范围=整条原文,逐条同意;feat-081 收紧):复合命令(| && ; > 等,
+      不再截断 80 字防前缀碰撞)、环境变量前缀(`FOO=1 …` 可改写任意程序行为)、
+      包装/提权程序(sudo/env/nohup/uvx/npx…)、解释器直跑代码的 flag 形
+      (`python -c/-m`、`bash -c`、`node -e`…——同意一条=放行任意代码,必须逐条)、
+      以及 `uv run` 这类「子命令仍是任意执行」的组合;
     - 危险命令另有红线,永远逐条问,不进这里。
     """
     raw = (cmd or "").strip()
     if not raw:
         return "空命令"
-    if any(t in raw for t in ("|", "&&", "||", ";", ">", "<", "`", "$(")):
-        return raw[:80]                      # 复合命令:范围=整条,不泛化
+    if any(t in raw for t in ("|", "&&", "||", ";", ">", "<", "`", "$(", "&")):
+        return raw                           # 复合/后台命令:范围=整条,不泛化
     toks = raw.split()
+    if "=" in toks[0]:                       # 环境变量赋值前缀:不泛化
+        return raw
     head = toks[0].replace("\\", "/").rsplit("/", 1)[-1]   # 剥路径取程序名
+    if head.lower().endswith((".exe", ".bat", ".cmd")):    # Windows 后缀剥掉
+        head = head[:-4]
+    if head in _WRAPPER_TOOLS:
+        return raw
     if head in _SUBCMD_TOOLS and len(toks) > 1:
-        return f"{head} {toks[1]}"
+        sub = toks[1]
+        if sub.startswith("-"):              # flag ≠ 子命令(-c/-m/-e 直跑代码)
+            return raw
+        if (head, sub) in _NO_GENERALIZE_PAIRS:
+            return raw
+        return f"{head} {sub}"
     return head
 
 

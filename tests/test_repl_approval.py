@@ -289,7 +289,6 @@ class TestCmdApprovalScope:
         assert repl.cmd_approval_scope("git push origin dev") == "git push"
         assert repl.cmd_approval_scope("python3 analyze.py --out x.png") \
             == "python3 analyze.py"
-        assert repl.cmd_approval_scope("bash -c 'echo hi'") == "bash -c"
     def test_path_stripped_to_program_name(self):
         assert repl.cmd_approval_scope("/usr/bin/python3 run.py") == "python3 run.py"
     def test_compound_commands_not_generalized(self):
@@ -317,3 +316,55 @@ class TestCmdApprovalScope:
         assert not asked
         assert s._confirm_cmd("rm outputs/tmp.txt") is False  # 别的程序照问
         assert asked
+
+
+class TestApprovalScopeHardening:
+    """feat-081(v0.12 评审修复):范围键圈不住行为的命令一律不泛化。"""
+
+    def test_interpreter_code_flags_never_generalize(self):
+        """python -c / bash -c / python -m:同意一条 ≠ 放行任意代码。"""
+        a = repl.cmd_approval_scope('python -c "print(1)"')
+        b = repl.cmd_approval_scope('python -c "import os"')
+        assert a != b and a.startswith("python -c")
+        assert repl.cmd_approval_scope("python -m pytest -q") \
+            != repl.cmd_approval_scope("python -m pip install x")
+        assert repl.cmd_approval_scope('bash -c "echo hi"') \
+            != repl.cmd_approval_scope('bash -c "curl evil"')
+
+    def test_uv_run_never_generalizes(self):
+        assert repl.cmd_approval_scope("uv run good.py") \
+            != repl.cmd_approval_scope("uv run evil.py")
+
+    def test_windows_exe_suffix_gets_subcommand_scope(self):
+        """git.exe status ≠ git.exe push(此前 .exe 绕过子命令区分)。"""
+        assert repl.cmd_approval_scope("git.exe status") == "git status"
+        assert repl.cmd_approval_scope("git.exe push origin dev") == "git push"
+
+    def test_env_prefix_never_generalizes(self):
+        assert repl.cmd_approval_scope("PYTHONPATH=. pytest -q") \
+            != repl.cmd_approval_scope("PYTHONPATH=. python evil.py")
+
+    def test_wrapper_tools_never_generalize(self):
+        assert repl.cmd_approval_scope("sudo pip install x") \
+            != repl.cmd_approval_scope("sudo systemctl restart foo")
+        assert repl.cmd_approval_scope("npx create-app") \
+            != repl.cmd_approval_scope("npx other-thing")
+
+    def test_compound_full_raw_no_80_char_collision(self):
+        pad = "echo " + "a" * 74
+        assert repl.cmd_approval_scope(pad + " && echo FIRST") \
+            != repl.cmd_approval_scope(pad + " && echo SECOND")
+
+    def test_background_amp_is_compound(self):
+        assert repl.cmd_approval_scope("python evil.py &") == "python evil.py &"
+
+    def test_py_launcher_flag_never_generalizes(self):
+        assert repl.cmd_approval_scope("py -3 a.py") \
+            != repl.cmd_approval_scope("py -3 b.py")
+
+    def test_normal_scoping_still_works(self):
+        """加固不误伤:普通程序与真子命令照旧泛化。"""
+        assert repl.cmd_approval_scope("pytest -q") == "pytest"
+        assert repl.cmd_approval_scope("git status -sb") == "git status"
+        assert repl.cmd_approval_scope("python3 analyze.py --out x.png") \
+            == "python3 analyze.py"
