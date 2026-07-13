@@ -2,7 +2,29 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-11(feat-078:统一 run 执行契约与可恢复状态)
+**Last Updated:** 2026-07-13(feat-076..078 合并 + v0.12 code-review 15 项缺陷全部修复)
+
+## 本轮(36):code-review 修复收官 ——feat-079~088 done(15 项确认缺陷清零)
+
+/code-review max(10 查找角度→对抗验证→15 项确认)后用户下达「修复完剩余10项」:
+- feat-079 真结果守卫结构化(call_tool_status {ok,text}·SKELETON_MARK 单源·拒 error/NaN
+  载荷·extract_meta_rows 行过滤·k<3 不算 Egger)——数值实测与 feat-072 基线逐位一致。
+- feat-080 POSIX 方向键(fd 级 os.read 修缓冲吞字节·TCSADRAIN·UTF-8 读满·EOF 不忙等·
+  单选空格选定·pty 真读取器测试补零覆盖盲区)。
+- feat-081 批准范围加固(解释器 flag/uv run/sudo/env 前缀不泛化·.exe 剥后缀恢复子命令
+  区分·复合命令不截断防前缀碰撞)。
+- feat-082 期刊名不识别不静默(journal_unmatched 有痕·CLI 告警+exit 1)。
+- feat-083 confirm 继承 hits(强度不再归 1 倒挂排序)。
+- feat-084 eval 输出健壮(GBK 管道不崩·报告先落盘·--json 纯净·重复用例去重)。
+- feat-085 选择器 CJK 显示宽度几何(ui._clip/wrap_display·选项换行单行化·_ANSI_RE 全 CSI)。
+- feat-086 图片渲染路径修正(render_image_file 直渲已知路径·force 不越 TTY)。
+- feat-087 教训落卡诚实计数(draft_lessons 批量·三态如实报·REPL/CLI 收敛)。
+- feat-088 toolloop 教训抗修剪(每轮全量重放,长任务不失忆重踩)。
+另:快进合并 feat/interaction-model-run-contracts(feat-076..078)进 master。
+
+全量 1553 passed;eval 28/28;gates 通过。88 个 feature 全 done;master 领先远端 11 个提交待推送。
+
+---
 
 ## 本轮(35):feat-078 done —— 统一 run 运行行为
 
