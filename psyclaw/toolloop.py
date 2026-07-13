@@ -515,8 +515,15 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
             lessons.extend(fresh)
             if emit:
                 emit(f"记下环境教训 {len(fresh)} 条")
+        if lessons:
+            # feat-088(评审修复):每轮把**全量**教训重放进最新反馈——教训此前
+            # 只随首次出现的那条结果消息注入一次,trim_convo 在 3 条更新的结果
+            # 消息后把它压缩掉,而 lesson_keys 去重让它永不再注入:长任务(20+ 轮)
+            # 恰在最需要止损时失忆重踩。旧副本会被 trim 压掉,最新消息恒携带全量,
+            # 上下文里始终只有 ~3 份活副本,不失控。
             feedback += ("\n\n" + _LESSON_FEEDBACK_HEAD + "\n"
-                         + "\n".join(f"- [{le['trigger']}] {le['lesson']}" for le in fresh))
+                         + "\n".join(f"- [{le['trigger']}] {le['lesson']}"
+                                     for le in lessons))
         if cut:  # 有完整调用但尾部还挂着截断的残块 → 一并告知,避免模型以为已发出
             feedback += "\n\n(注意:你上一条输出末尾有一个被截断的 tool 块未被执行,如仍需要请重发完整块。)"
         convo.append({"role": "user", "content": feedback})
