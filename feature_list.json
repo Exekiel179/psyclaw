@@ -993,6 +993,16 @@
       ],
       "status": "done",
       "evidence": "tests +9(p 谎报阻断/如实不显著不误伤/合法显著不误伤/效应夸大/正常效应/低信度洗白/高信度不误伤/边缘话术升阻断/lean_core 禁令断言)。全量 pytest → 1597 passed。活体:draft2.md 重跑 jars → I.p_overstate ✗ block · I.effect_overclaim ⚠ · I.reliability_overclaim ⚠ 三颗新雷全命中。"
+    },
+    {
+      "id": "feat-099",
+      "name": "因果设计检测泛化(纵向/观察性)+ 选择性报告信号",
+      "description": "第二轮对抗评估实测:「观察性两波追踪」稿写「提升了/证明」全放行——因果检测旧口径只认横断面/相关关键词。设计信号扩到纵向/追踪/N 波/观察性/队列(中英),无随机分配即触发 I.causal_language_design block(纵向 RCT 不误伤);新增 I.selective_reporting warn(「限于篇幅仅报告(达到)显著」类 outcome reporting bias 措辞)。",
+      "dependencies": [
+        "feat-096"
+      ],
+      "status": "done",
+      "evidence": "tests +4(纵向因果阻断/纵向 RCT 不误伤/选择性报告警告/完整报告不误伤)。全量 pytest → 1602 passed。活体:draft2.md 重跑 jars → 六条诚信信号全亮(I.causal ✗·I.p_overstate ✗·posthoc/effect/selective/reliability ⚠),八颗雷零漏网。"
     }
   ]
 }

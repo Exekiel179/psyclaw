@@ -362,6 +362,39 @@ def test_good_alpha_not_flagged():
     assert "I.reliability_overclaim" not in [f["id"] for f in r["integrity"]]
 
 
+def test_longitudinal_causal_language_blocks():
+    """feat-099:纵向/观察性追踪 + 因果表述 + 无随机化 → 阻断——
+    第二轮实测「观察性两波追踪」稿绕开了只认横断面的旧口径。"""
+    text = _INTEGRITY_BASE.replace("横断面问卷调查。", "观察性两波追踪设计。") \
+        + "\n# 讨论\n结果证明认知训练提升了学业成绩。"
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.causal_language_design"]["severity"] == "block"
+
+
+def test_longitudinal_rct_causal_not_flagged():
+    """纵向 RCT(有随机分配)下的因果表述不误伤。"""
+    text = _INTEGRITY_BASE.replace("横断面问卷调查。",
+                                   "纵向追踪的随机对照试验,被试随机分配到两组。") \
+        + "\n干预显著降低了抑郁水平。"
+    r = check_draft(text, "quant")
+    assert "I.causal_language_design" not in [f["id"] for f in r["integrity"]]
+
+
+def test_selective_reporting_language_warns():
+    """feat-099:「限于篇幅仅报告达到显著的」→ outcome reporting 警告。"""
+    text = _INTEGRITY_BASE + "\n共设置 5 个结果变量,限于篇幅仅报告达到显著的关键结果。"
+    r = check_draft(text, "quant")
+    flags = {f["id"]: f for f in r["integrity"]}
+    assert flags["I.selective_reporting"]["severity"] == "warn"
+
+
+def test_complete_reporting_not_flagged():
+    text = _INTEGRITY_BASE + "\n全部 5 个结果变量的分析结果均完整报告于表 2。"
+    r = check_draft(text, "quant")
+    assert "I.selective_reporting" not in [f["id"] for f in r["integrity"]]
+
+
 def test_integrity_not_run_for_qual():
     r = check_draft(_QUAL_GOOD + "\n访谈证明干预导致了症状改善。", "qual")
     assert r["integrity"] == [] and r["passed"] is True
