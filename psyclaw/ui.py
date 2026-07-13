@@ -94,7 +94,7 @@ def display_width(s: str) -> int:
     import re
     global _ANSI_RE
     if _ANSI_RE is None:
-        _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+        _ANSI_RE = re.compile(r"\033\[[0-9;]*[A-Za-z]")  # 全部 CSI(SGR/清行/移动),不只 m
     return sum(_char_width(c) for c in _ANSI_RE.sub("", s))
 
 
@@ -105,7 +105,7 @@ def wrap_display(line: str, width: int) -> list:
     import re
     global _ANSI_RE
     if _ANSI_RE is None:
-        _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
+        _ANSI_RE = re.compile(r"\033\[[0-9;]*[A-Za-z]")  # 全部 CSI(SGR/清行/移动),不只 m
     out, cur, cw, i = [], "", 0, 0
     n = len(line)
     while i < n:

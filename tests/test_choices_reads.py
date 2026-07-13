@@ -234,3 +234,41 @@ def test_superscript_digit_goes_to_free_text_not_crash(capsys):
     chosen, free = _pick_inline(_single(), get_key=_feed(["²"]),
                                 read_rest=lambda _="": "自由回答")
     assert chosen == [] and free == "²自由回答"
+def test_cjk_options_never_exceed_terminal_width(monkeypatch, capsys):
+    """feat-085:60 个中文字符的选项按显示宽度截断——任何输出行都不超终端列宽,
+    原地重画的固定行数几何才成立(此前按 len() 截断,CJK 行物理换行花屏)。"""
+    import os
+    import shutil
+    from psyclaw import ui
+    from psyclaw.choices import _pick_inline
+    monkeypatch.setattr(shutil, "get_terminal_size",
+                        lambda fallback=None: os.terminal_size((100, 24)))
+    long_cjk = "究" * 60                             # len=60 但显示宽 120
+    choice = {"question": "选", "multi": False, "options": ["短", long_cjk]}
+    _pick_inline(choice, get_key=_feed(["ENTER"]))
+    out = capsys.readouterr().out
+    for line in out.splitlines():
+        assert ui.display_width(line) <= 100, f"超宽行:{line!r}"
+def test_cjk_truncated_option_gets_detail_zone(monkeypatch, capsys):
+    """CJK 选项被截断时详情区给全文(按显示宽度折行,同样不超宽)。"""
+    import os
+    import shutil
+    from psyclaw import ui
+    from psyclaw.choices import _pick_inline
+    monkeypatch.setattr(shutil, "get_terminal_size",
+                        lambda fallback=None: os.terminal_size((60, 24)))
+    long_cjk = "先做预注册再收数据然后做稳健性检验" * 3
+    choice = {"question": "选", "multi": False, "options": [long_cjk, "简版"]}
+    chosen, _ = _pick_inline(choice, get_key=_feed(["ENTER"]))
+    out = capsys.readouterr().out
+    assert chosen == [long_cjk]
+    assert "▏" in out                               # 详情区出现
+    for line in out.splitlines():
+        assert ui.display_width(line) <= 60
+def test_parse_choices_flattens_embedded_newlines():
+    """feat-085:JSON 选项含 \\n 在解析源头单行化(多物理行会破坏重画几何)。"""
+    from psyclaw.choices import parse_choices
+    reply = '```choices\n{"question": "Q", "options": ["第一行\\n第二行", "B"]}\n```'
+    c = parse_choices(reply)
+    assert c and "\n" not in c["options"][0]
+    assert c["options"][0] == "第一行 第二行"
