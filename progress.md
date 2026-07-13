@@ -2,7 +2,26 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-13(对抗评估台账清零:feat-090~097 八项修复 + 活体复测)
+**Last Updated:** 2026-07-13(两轮对抗评估共 11 项缺陷清零:feat-090~100)
+
+## 本轮(38):第二轮对抗评估三缺陷清零 ——feat-098~100 done + 边缘显著双向根除
+
+第二轮评估(evalcase2,52/100)立案三条,全部修复并活体复测:
+- feat-098 数值×措辞矛盾检测:I.p_overstate(p≥.05 称显著,block)/
+  I.effect_overclaim(|d|<0.2 吹强效应)/I.reliability_overclaim(α<.60 称良好);
+  「边缘显著」双向根除(用户明令)——检查层 warn→block,lean_core 生成禁令
+  (自己不用也不建议)。复测:draft2 三颗漏网雷全命中。
+- feat-099 因果检测泛化:非实验设计信号扩到纵向/追踪/N波/观察性/队列
+  (纵向 RCT 不误伤)+ I.selective_reporting 选择性报告警告。
+  复测:draft2 八颗雷零漏网(六条诚信信号全亮)。
+- feat-100 analysis 路径对齐 feat-094:_pick_dv 结局语义优先(不再拿基线
+  pre_score 当 DV)+ data_quality_flags 三警示(重复 id/缺失码/微型组,
+  画像即体检并进写作上下文)+ 生成脚本 _clean_prelude 内嵌清洗呈报。
+  复测:埋雷 data.csv 三警示齐亮·DV=post_score·pingouin 实跑全呈报。
+
+全量 1608 passed;eval 28/28;gates 通过。100 个 feature 全 done。
+
+---
 
 ## 本轮(37):对抗评估缺陷台账清零 ——feat-090~097 done(8 项全修,含活体复测)
 
