@@ -137,6 +137,26 @@ def test_typed_loop_commands_registered():
     assert {"review-lit", "meta", "analysis", "qualitative"}.isdisjoint(names)
 
 
+def test_help_and_guide_same_source():
+    """feat-130:help 与 guide 合并为单一真源(cmd_guide→_print_help),内容一致。"""
+    from psyclaw.cli import build_parser
+    p = build_parser()
+    names = {name for name, _ in _iter_subparsers(p)}
+    assert "help" in names and "guide" in names
+    assert p.parse_args(["help"]).func.__name__ == "cmd_guide"
+    assert p.parse_args(["guide"]).func.__name__ == "cmd_guide"
+def test_start_next_step_routing():
+    """start 收尾据意图给下一步命令(与 setup 划界:start 不装东西)。"""
+    from psyclaw.cli import _start_next_step
+    import io, contextlib
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        _start_next_step("做文献综述", ["lit"])
+    assert "run literature" in buf.getvalue()
+    buf2 = io.StringIO()
+    with contextlib.redirect_stdout(buf2):
+        _start_next_step("跑数据统计分析", ["run-stats-mcp"])
+    assert "run analysis" in buf2.getvalue()
 def test_guide_command_registered():
     """`guide` 首次使用上手介绍命令已注册并可分发。"""
     p = build_parser()

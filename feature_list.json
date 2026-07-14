@@ -1247,6 +1247,17 @@
       ],
       "status": "done",
       "evidence": "tests/test_sandbox.py +6(能力并集去重/未知 skill 零能力/恒定硬约束保留/意图路由/start 写策略/不启用不落策略)。全量 pytest → 1760 passed;gates 通过;eval 28/28。活体:psyclaw start --intent「文献综述并跑统计」--sandbox → 选定 lit+run-stats-mcp,生成 6 域网络白名单+6 类科研栈代码放行+notes/outputs 写允许的最小权限策略,恒定硬约束齐备。"
+    },
+    {
+      "id": "feat-130",
+      "name": "guide 合并进 help + start/setup 职责划清",
+      "description": "用户反馈:guide 与 help 内容重复应合并;start 与 setup 应保持区分。①guide 合并进 help——单一真源 _print_help(零基础第一步 psyclaw start + 三种工作方式 + run 类型 + 命令去向),新增 help 命令,guide 成为其别名,内容不再两处维护;②start/setup 职责划清——setup=【一次性】装依赖/建目录/配 MCP(把机器与项目搭好),start=【每次开工】意图向导(说要做什么→选能力→配沙箱→引导进流程);start 收尾新增 _start_next_step 据意图给「下一步跑什么」具体命令,仅在缺配置时才回指 setup(start 不装东西);help 文案明确标注【一次性】/【每次开工】边界。",
+      "dependencies": [
+        "feat-076",
+        "feat-129"
+      ],
+      "status": "done",
+      "evidence": "tests/test_cli_help.py +2(help/guide 同源分发/start 下一步意图路由),既有 guide 注册测试保留。全量 pytest → 1762 passed;eval 28/28。活体:psyclaw help 显示合并后内容(零基础第一步突出 start);psyclaw start --intent 文献综述 → 收尾给「下一步: psyclaw run literature ...」。"
     }
   ]
 }
