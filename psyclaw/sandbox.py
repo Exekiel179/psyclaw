@@ -324,6 +324,59 @@ def _verdict(project_dir, face, action, args, allow, reason) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# start 意图配置(feat-129)——按启用 skill 的能力清单取并集配沙箱(最小权限)。
+# 每个 skill 声明需要的执行面与范围;沙箱只开声明过的,多余能力一律不开。
+# ---------------------------------------------------------------------------
+
+# 内置/已知 skill 的能力声明(面 → 需要的范围)。未知 skill 视为零能力(最小权限)。
+SKILL_CAPABILITIES: dict = {
+    "lit": {"net": ["api.openalex.org", "www.ebi.ac.uk", "api.crossref.org",
+                    "export.arxiv.org", "arxiv.org", "api.unpaywall.org"],
+            "file_write": ["notes/", "outputs/"]},
+    "run-stats-mcp": {"exec": ["pandas", "pingouin", "numpy", "scipy",
+                               "statsmodels", "matplotlib"],
+                      "file_write": ["outputs/"]},
+    "verify": {"exec": ["pandas", "numpy"], "file_write": ["outputs/", "notes/"]},
+    "webbridge": {"net": [], "file_write": ["notes/"]},   # 浏览器工具走工具面审批
+}
+
+
+def build_policy_from_skills(skill_names: list[str], enabled: bool = True) -> dict:
+    """据启用的 skill 能力声明取并集,生成**最小权限**沙箱策略。
+
+    - net.allow_domains / exec.allow_intent / file.write_allow = 各 skill 声明的并集;
+    - 未声明某面的能力 → 该面保持默认拒绝态(白名单为空/仅默认拒绝模式);
+    - 未知 skill → 不贡献任何能力(不因不认识就放开);
+    - 恒定项(private_paths / deny_patterns / upload=deny / require_codebook)
+      始终是默认硬约束,不被 skill 放开。
+    """
+    net_domains: list[str] = []
+    exec_intents: list[str] = []
+    file_writes: list[str] = []
+    for name in skill_names or []:
+        cap = SKILL_CAPABILITIES.get(name)
+        if not cap:
+            continue
+        net_domains += cap.get("net", [])
+        exec_intents += cap.get("exec", [])
+        file_writes += cap.get("file_write", [])
+    def _uniq(xs):
+        seen, out = set(), []
+        for x in xs:
+            if x not in seen:
+                seen.add(x); out.append(x)
+        return out
+    pol = {k: (dict(v) if isinstance(v, dict) else v)
+           for k, v in DEFAULT_POLICY.items()}
+    pol["enabled"] = enabled
+    # 恒定硬约束保留;能力面按声明并集(空并集=最小权限,不放开)
+    pol["net"]["allow_domains"] = _uniq(net_domains)
+    pol["exec"]["allow_intent"] = _uniq(exec_intents)
+    pol["file"]["write_allow"] = _uniq(file_writes) or [".psyclaw/"]
+    return pol
+
+
+# ---------------------------------------------------------------------------
 # 极简 YAML(仅支持本策略需要的:两级 map + 内联 list + 标量;不引 pyyaml)
 # ---------------------------------------------------------------------------
 

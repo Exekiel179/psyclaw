@@ -1012,6 +1012,70 @@ def cmd_lit(args: argparse.Namespace) -> int:
                    download=getattr(args, "download", False))
 
 
+def _route_skills_by_intent(intent: str) -> list[str]:
+    """据意图关键词路由建议 skill(轻量,复用 SKILL_CAPABILITIES 的键)。纯函数。"""
+    low = (intent or "").lower()
+    picks = []
+    kw = {
+        "lit": ["文献", "综述", "检索", "literature", "review", "citation", "引用"],
+        "run-stats-mcp": ["统计", "检验", "分析", "回归", "方差", "stats", "anova",
+                          "regression", "效应量", "ttest"],
+        "verify": ["验证", "复现", "verify", "reproduce"],
+        "webbridge": ["浏览器", "网页", "知网", "万方", "browser", "机构库"],
+    }
+    for skill, words in kw.items():
+        if any(w in low for w in words):
+            picks.append(skill)
+    return picks or ["run-stats-mcp"]     # 兜底:研究默认涉及统计
+
+
+def cmd_start(args: argparse.Namespace) -> int:
+    """psyclaw start(feat-129):澄清意图 → 选 skill → 询问是否启用沙箱 →
+    按 skill 能力清单配最小权限策略。非交互(--intent + --sandbox/--no-sandbox)可脚本化。"""
+    from psyclaw import ui
+    from psyclaw.sandbox import build_policy_from_skills, save_policy, SKILL_CAPABILITIES
+
+    print(ui.title("PsyClaw 启动向导"))
+    intent = getattr(args, "intent", None)
+    if not intent:
+        try:
+            intent = input("  你要做什么研究?(一句话): ").strip()
+        except EOFError:
+            intent = ""
+    skills = _route_skills_by_intent(intent)
+    print(ui.ok(f"  据意图选定 skill:{', '.join(skills)}"))
+    for sk in skills:
+        cap = SKILL_CAPABILITIES.get(sk, {})
+        faces = []
+        if cap.get("net"):
+            faces.append(f"网络[{len(cap['net'])} 域]")
+        if cap.get("exec"):
+            faces.append(f"代码执行[{'/'.join(cap['exec'][:3])}…]")
+        if cap.get("file_write"):
+            faces.append(f"写[{','.join(cap['file_write'])}]")
+        print(ui.dim(f"    - {sk}:{' · '.join(faces) or '仅只读'}"))
+
+    use_sandbox = getattr(args, "sandbox", None)
+    if use_sandbox is None:
+        try:
+            ans = input("  启用沙箱?(按最小权限约束文件/代码/网络)[Y/n]: ").strip().lower()
+            use_sandbox = ans in ("", "y", "yes")
+        except EOFError:
+            use_sandbox = True
+    if not use_sandbox:
+        print(ui.warn("  沙箱未启用(各面沿用既有守卫;可随时 psyclaw start 重配)"))
+        return 0
+    pol = build_policy_from_skills(skills, enabled=True)
+    path = save_policy(pol, ".")
+    print(ui.ok(f"  ✓ 沙箱已按最小权限配置 → {path}"))
+    print(ui.dim(f"    网络白名单 {len(pol['net']['allow_domains'])} 域 · "
+                 f"代码放行 {len(pol['exec']['allow_intent'])} 类科研栈 · "
+                 f"写允许 {pol['file']['write_allow']}"))
+    print(ui.dim("    私密数据(data/raw)禁止原样外传,须编码表脱敏;上传默认拒;"
+                 "恶意代码硬拒。审计 → .psyclaw/sandbox_audit.jsonl"))
+    return 0
+
+
 def cmd_sleep(args: argparse.Namespace) -> int:
     """睡眠整合(feat-116):重放蒸馏→合并→衰减结算。手动触发通道。"""
     from psyclaw import ui
@@ -1263,7 +1327,7 @@ COMMAND_CATEGORIES = [
                       "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("检索 / 知识图谱", ["search", "kg", "lit", "webbridge"]),
-    ("记忆 / 消息 / IO", ["memory", "sleep", "session", "resume", "serve", "notify", "auth",
+    ("记忆 / 消息 / IO", ["memory", "sleep", "start", "session", "resume", "serve", "notify", "auth",
                        "export", "figures", "provenance"]),
 ]
 
@@ -1746,6 +1810,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("sleep", help="睡眠整合:情景重放蒸馏候选记忆→教训合并→衰减结算"
                    ).set_defaults(func=cmd_sleep)
+    pstart = sub.add_parser("start", help="启动向导:澄清意图→选 skill→询问是否启用沙箱→按能力配最小权限")
+    pstart.add_argument("--intent", default=None, help="研究意图(免交互;脚本化用)")
+    pstart.add_argument("--sandbox", dest="sandbox", action="store_true", default=None,
+                        help="免交互:直接启用沙箱")
+    pstart.add_argument("--no-sandbox", dest="sandbox", action="store_false",
+                        help="免交互:不启用沙箱")
+    pstart.set_defaults(func=cmd_start)
     pwb = sub.add_parser("webbridge",
                          help="Kimi WebBridge:驱动你已登录的真实浏览器(机构库检索路线 B)")
     pwb.add_argument("action", nargs="?", default="status",

@@ -246,3 +246,43 @@ def test_litsearch_get_blocked_under_sandbox(tmp_path, monkeypatch):
     import urllib.error
     with __import__("pytest").raises(urllib.error.URLError):
         litsearch._get("https://not-whitelisted.com/api")
+def test_build_policy_union_of_skills():
+    pol = SB.build_policy_from_skills(["lit", "run-stats-mcp"])
+    assert pol["enabled"] is True
+    assert "api.openalex.org" in pol["net"]["allow_domains"]     # lit 的网络
+    assert "pingouin" in pol["exec"]["allow_intent"]             # stats 的代码
+    assert set(pol["file"]["write_allow"]) == {"notes/", "outputs/"}  # 并集去重
+def test_build_policy_unknown_skill_zero_capability():
+    pol = SB.build_policy_from_skills(["不存在的skill"])
+    assert pol["net"]["allow_domains"] == []                     # 不认识就不放开
+    assert pol["exec"]["allow_intent"] == []
+    assert pol["file"]["write_allow"] == [".psyclaw/"]           # 兜底最小
+def test_build_policy_keeps_hard_constraints():
+    pol = SB.build_policy_from_skills(["lit"])
+    assert pol["file"]["private_paths"] == ["data/raw/"]         # 恒定不被放开
+    assert pol["net"]["upload"] == "deny"
+    assert pol["exec"]["deny_patterns"]                          # 默认拒绝模式仍在
+    assert pol["file"]["require_codebook"] is True
+def test_route_skills_by_intent():
+    from psyclaw.cli import _route_skills_by_intent
+    assert set(_route_skills_by_intent("做文献综述")) == {"lit"}
+    assert "run-stats-mcp" in _route_skills_by_intent("跑个方差分析")
+    assert "webbridge" in _route_skills_by_intent("用浏览器上知网检索")
+    assert _route_skills_by_intent("随便") == ["run-stats-mcp"]  # 兜底
+def test_start_command_writes_policy(tmp_path, monkeypatch, capsys):
+    import argparse
+    monkeypatch.chdir(tmp_path)
+    from psyclaw.cli import cmd_start
+    rc = cmd_start(argparse.Namespace(
+        intent="文献综述加统计分析", sandbox=True))
+    assert rc == 0
+    pol = SB.load_policy(str(tmp_path))
+    assert pol["enabled"] is True
+    assert "api.openalex.org" in pol["net"]["allow_domains"]
+    assert "pingouin" in pol["exec"]["allow_intent"]
+def test_start_no_sandbox_writes_nothing(tmp_path, monkeypatch):
+    import argparse
+    monkeypatch.chdir(tmp_path)
+    from psyclaw.cli import cmd_start
+    cmd_start(argparse.Namespace(intent="做统计", sandbox=False))
+    assert not (tmp_path / ".psyclaw" / "sandbox.yaml").exists()   # 不启用不落策略
