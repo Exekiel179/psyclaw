@@ -1157,6 +1157,34 @@
       ],
       "status": "done",
       "evidence": "tests/test_audit_memory.py TestSemanticFacts +7(建卡强化/冲突时近降置信留历史/scope 隔离/检索取用刷新/冲突横幅注入/裁决保历史/agent 工具冲突提示)。全量 pytest → 1682 passed;eval 28/28。活体(隔离 HOME):fact 记入 → 第二种说法触发 ⚠ 冲突(时近生效降置信) → conflicts 列出新旧对照 → resolve 裁决 → 中文查询检索命中并按置信注入。"
+    },
+    {
+      "id": "feat-114",
+      "name": "按角色模型路由——常驻 agent 可各自配置 provider/model",
+      "description": "六个常驻角色(planner/executor/critic/reviewer/auditor/writer)支持扁平配置键 <role>_provider/<role>_model/<role>_base_url(config.yaml 与 PSYCLAW_<ROLE>_<KEY> 环境变量同源生效)。providers.get_role_provider:任一角色键存在才构建专属 provider,否则原样返回默认实例;换 provider 时不继承全局 model/base_url(跨厂商张冠李戴是硬错误),未指定项回落 preset 默认。loop._role_providers 统一在 run_plan/run_loop/run_pipeline/run_review/repl(/audit) 六个调用点路由,有覆盖时打印一行「角色路由」可观测说明。用途:便宜模型起草、强模型当裁判(critic/reviewer),为辩论式评审的裁判多样性铺路。",
+      "dependencies": [],
+      "status": "done",
+      "evidence": ""
+    },
+    {
+      "id": "feat-115",
+      "name": "统一衰减生命周期(遗忘机制)",
+      "description": "docs/MEMORY.md §三:card_activation = strength×0.5^(days/90);语义卡与教训卡统一结算(apply_decay)——activation<0.5 休眠(不注入不检索,保留可复活),休眠 >180 天且零取用删除(语义卡留 purged 快照,教训卡进 archived 注明「衰减」);再遇即复活(record_fact/draft_lesson 命中休眠卡 → 回 active 且强度+1);情景档案不删原文。升级过人审、降级全自动(错学比忘记贵)。",
+      "dependencies": [
+        "feat-114"
+      ],
+      "status": "done",
+      "evidence": "tests/test_audit_memory.py TestDecayLifecycle +5(激活衰减/休眠转移与检索排除/再遇复活/到期清除留快照/教训休眠与复活)。全量 pytest → 1702 passed。"
+    },
+    {
+      "id": "feat-116",
+      "name": "睡眠整合(psyclaw sleep + 会话结束自动触发)",
+      "description": "docs/MEMORY.md §四。触发:手动 psyclaw sleep + REPL 退出自动(sleep_due:自上次睡眠新增 ≥20 轮才睡,不扰人;失败绝不影响退出)。四步:①重放——archive 增量轮次(上限 40)LLM 蒸馏候选语义事实与程序教训,产物一律待确认(教训进既有 pending 区,语义卡 status=pending 不注入,memory approve <概念> 确认);②合并——同触发词教训簇 ≥3 且有 LLM 时蒸馏一条原则卡(pending),无 LLM 只报簇数绝不机械拼接;③衰减结算 apply_decay;④sleep_state 增量推进。诚实纪律:每步实际计数,无 LLM 如实跳过。",
+      "dependencies": [
+        "feat-115"
+      ],
+      "status": "done",
+      "evidence": "tests/test_sleep.py 6 例(due 判定/蒸馏落 pending 不注入/approve 激活/无 LLM 诚实跳过/状态增量不重睡/簇合并原则卡)。全量 pytest → 1702 passed;eval 28/28。活体(隔离 HOME):psyclaw sleep 重放 23 轮,无 LLM 如实跳过并报告;REPL 退出钩子接入。"
     }
   ]
 }

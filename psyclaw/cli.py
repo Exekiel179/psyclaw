@@ -1012,6 +1012,22 @@ def cmd_lit(args: argparse.Namespace) -> int:
                    download=getattr(args, "download", False))
 
 
+def cmd_sleep(args: argparse.Namespace) -> int:
+    """睡眠整合(feat-116):重放蒸馏→合并→衰减结算。手动触发通道。"""
+    from psyclaw import ui
+    from psyclaw.sleep import render_report, run_sleep
+    provider = None
+    try:
+        from psyclaw.config import load_config
+        from psyclaw.providers import get_provider
+        provider = get_provider(load_config())
+    except Exception:  # noqa: BLE001
+        pass
+    rep = run_sleep(provider=provider)
+    print(ui.ok(render_report(rep)))
+    if rep["fact_candidates"] or rep["lesson_candidates"]:
+        print(ui.dim("  候选均为待确认:psyclaw memory list / memory approve <概念> / memory confirm <序号>"))
+    return 0
 def cmd_webbridge(args: argparse.Namespace) -> int:
     """Kimi WebBridge:安装/状态/启动(feat-108)。驱动用户真实浏览器(登录态复用)。"""
     from psyclaw import ui, webbridge as wb
@@ -1247,7 +1263,7 @@ COMMAND_CATEGORIES = [
                       "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("检索 / 知识图谱", ["search", "kg", "lit", "webbridge"]),
-    ("记忆 / 消息 / IO", ["memory", "session", "resume", "serve", "notify", "auth",
+    ("记忆 / 消息 / IO", ["memory", "sleep", "session", "resume", "serve", "notify", "auth",
                        "export", "figures", "provenance"]),
 ]
 
@@ -1728,6 +1744,8 @@ def build_parser() -> argparse.ArgumentParser:
                            "键与 cite-check 语料同源)")
     plit.set_defaults(func=cmd_lit)
 
+    sub.add_parser("sleep", help="睡眠整合:情景重放蒸馏候选记忆→教训合并→衰减结算"
+                   ).set_defaults(func=cmd_sleep)
     pwb = sub.add_parser("webbridge",
                          help="Kimi WebBridge:驱动你已登录的真实浏览器(机构库检索路线 B)")
     pwb.add_argument("action", nargs="?", default="status",

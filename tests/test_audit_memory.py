@@ -463,3 +463,67 @@ class TestSemanticFacts:
         assert "已记入" in out1
         out2 = tools["remember_fact"]["run"]({"concept": "c", "statement": "y"})
         assert "冲突" in out2 and "请向用户确认" in out2
+
+class TestDecayLifecycle:
+    """feat-115:激活度衰减 + 休眠/复活/删除(docs/MEMORY.md §三)。"""
+    def _age_fact(self, days, use_count=0):
+        from psyclaw.memory import _load, _save
+        from datetime import datetime, timedelta
+        data = _load("facts")
+        c = data["facts"][0]
+        old = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+        c["last_used"] = old
+        c["recorded"] = old
+        c["use_count"] = use_count
+        _save("facts", data)
+    def test_activation_decays(self, mem_dir):
+        from psyclaw.memory import record_fact, card_activation, _load
+        record_fact("k", "v")
+        fresh = card_activation(_load("facts")["facts"][0])
+        assert fresh > 0.9
+        self._age_fact(days=180)
+        assert card_activation(_load("facts")["facts"][0]) < 0.5
+    def test_decay_moves_to_dormant_and_excludes_from_recall(self, mem_dir):
+        from psyclaw.memory import record_fact, apply_decay, recall_facts, _load
+        record_fact("缺失码", "缺失码是 99 和 -999")
+        self._age_fact(days=200)
+        r = apply_decay()
+        assert r["facts_dormant"] == 1
+        assert _load("facts")["facts"][0]["status"] == "dormant"
+        assert recall_facts("数据里的缺失码怎么处理") == []   # 休眠不注入
+    def test_dormant_fact_revives_on_reencounter(self, mem_dir):
+        from psyclaw.memory import record_fact, apply_decay, _load
+        record_fact("k", "v")
+        self._age_fact(days=200)
+        apply_decay()
+        r = record_fact("k", "v")                             # 再遇即复活
+        assert r["status"] == "reinforced"
+        assert _load("facts")["facts"][0].get("status") == "active"
+    def test_dormant_unused_purged_with_snapshot(self, mem_dir):
+        from psyclaw.memory import record_fact, apply_decay, _load, _save
+        from datetime import datetime, timedelta
+        record_fact("k", "v")
+        self._age_fact(days=200, use_count=0)
+        apply_decay()                                          # → dormant
+        data = _load("facts")
+        data["facts"][0]["dormant_ts"] = (
+            datetime.now() - timedelta(days=200)).isoformat(timespec="seconds")
+        _save("facts", data)
+        r = apply_decay()                                      # → purge
+        assert r["facts_purged"] == 1
+        data = _load("facts")
+        assert data["facts"] == [] and data["purged"][0]["concept"] == "k"
+    def test_lesson_decay_and_revival(self, mem_dir):
+        import time as _t
+        from psyclaw.memory import (draft_lesson, confirm_lesson, apply_decay,
+                                    active_lessons, _load, _save)
+        draft_lesson("python", "用 python3", "error")
+        confirm_lesson(0)
+        data = _load("lessons")
+        data["active"][0]["ts"] = int(_t.time()) - 200 * 86400   # 老化
+        _save("lessons", data)
+        r = apply_decay()
+        assert r["lessons_dormant"] == 1 and active_lessons() == []
+        draft_lesson("python", "用 python3", "error")            # 再踩同坑 → 复活
+        acts = active_lessons()
+        assert len(acts) == 1 and acts[0]["strength"] == 2

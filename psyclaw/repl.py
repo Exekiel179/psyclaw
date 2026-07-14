@@ -964,7 +964,9 @@ class ReplSession:
         # 逐轮审计(显式开启时)
         if self.audit_mode and reply.strip():
             from psyclaw.audit import render_verdict, run_audit
-            result = run_audit(self.provider, text, reply)
+            from psyclaw.providers import get_role_provider
+            auditor_p = get_role_provider(self.conf, "auditor", self.provider)
+            result = run_audit(auditor_p, text, reply)
             print(render_verdict(result))
         # 自动跟进:模型请求读文件(开放模式自动读)/ 给出选项(弹键盘选择器)→ 回传续聊
         follow = self._recover_empty_reply(reply, internal, self._auto_followup(reply))
@@ -1779,6 +1781,13 @@ class ReplSession:
                     self.ask(line)
             except KeyboardInterrupt:      # 深处的 Ctrl+C 也只取消本轮(评审修复)
                 print(ui.dim("\n  (已中断本轮;继续对话或 /exit 退出)"))
+        # feat-116:会话结束自动睡眠(自上次睡眠新增 ≥20 轮才触发,轻量不扰人)
+        try:
+            from psyclaw.sleep import render_report, run_sleep, sleep_due
+            if sleep_due("."):
+                print(ui.dim("  " + render_report(run_sleep(".", provider=self.provider))))
+        except Exception:  # noqa: BLE001  # 睡眠失败绝不影响退出
+            pass
         print(ui.dim("再见。研究顺利!"))
         return 0
 

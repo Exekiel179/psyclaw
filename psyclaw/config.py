@@ -54,7 +54,10 @@ def load_config() -> dict:
     if CONFIG_FILE.exists():
         conf.update(_parse_simple(CONFIG_FILE))
         source = str(CONFIG_FILE)
-    for key in list(conf) + ["provider", "model"]:
+    from psyclaw.providers import AGENT_ROLES
+    role_keys = [f"{r}_{s}" for r in AGENT_ROLES
+                 for s in ("provider", "model", "base_url")]
+    for key in dict.fromkeys(list(conf) + ["provider", "model"] + role_keys):
         env = os.environ.get(f"PSYCLAW_{key.upper()}")
         if env:
             conf[key] = env

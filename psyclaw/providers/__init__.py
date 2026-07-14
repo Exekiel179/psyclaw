@@ -71,6 +71,38 @@ PRESETS: dict = {
 }
 
 
+# 常驻 agent 角色(feat-114:可按角色配置 <role>_provider/_model/_base_url)。
+AGENT_ROLES = ("planner", "executor", "critic", "reviewer", "auditor", "writer")
+
+
+def get_role_provider(conf: dict, role: str, default: Provider | None = None) -> Provider:
+    """按常驻角色解析 provider(feat-114 按角色模型路由)。
+
+    配置键为扁平键(与 config._parse_simple 一致):
+      <role>_provider / <role>_model / <role>_base_url
+    任一存在 → 构建该角色专属 provider;都不存在 → 返回 default(或全局)。
+    换 provider 时不继承全局 model/base_url(跨厂商张冠李戴是硬错误),
+    未指定项回落该 preset 的默认值。
+    """
+    role = (role or "").lower()
+    r_provider = str(conf.get(f"{role}_provider") or "").strip()
+    r_model = str(conf.get(f"{role}_model") or "").strip()
+    r_base = str(conf.get(f"{role}_base_url") or "").strip()
+    if not (r_provider or r_model or r_base):
+        return default if default is not None else get_provider(conf)
+    sub = dict(conf)
+    if r_provider:
+        sub["provider"] = r_provider
+        sub["model"] = r_model      # 空 → get_provider 回落 preset 默认模型
+        sub["base_url"] = r_base    # 空 → preset 默认端点
+    else:
+        if r_model:
+            sub["model"] = r_model
+        if r_base:
+            sub["base_url"] = r_base
+    return get_provider(sub)
+
+
 def get_provider(conf: dict) -> Provider:
     name = (conf.get("provider") or "mock").lower()
     preset = PRESETS.get(name, PRESETS["custom"])

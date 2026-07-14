@@ -168,8 +168,7 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
            评审未达 ACCEPT/MINOR 不视为运行失败(交人工,符合 HITL 纪律)。
     """
     from psyclaw import config as cfg, ui
-    from psyclaw.loop import _gen, _log, _read
-    from psyclaw.providers import get_provider
+    from psyclaw.loop import _gen, _log, _read, _role_providers
     from psyclaw.psych.clarify import check_card
     from psyclaw.review import run_review, summarize
     from psyclaw.tasks import get_goal, set_goal
@@ -202,14 +201,15 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     print(ui.ok("✓ 研究准备检查通过"))
 
     conf = cfg.load_config()
-    provider = get_provider(conf)
+    prov = _role_providers(conf, ("planner", "executor", "writer"))
+    provider = prov["_default"]
     clar = _read(project / "notes" / "clarification.md")
     _log(project, f"pipeline start · provider={provider.name} · goal={goal[:60]}")
     artifacts: dict[str, str] = {}
 
     # —— ① 文献 ——
     print("\n" + ui.accent("① 文献(背景综述)"))
-    lit = _literature_stage(provider, goal, clar, project)
+    lit = _literature_stage(prov["executor"], goal, clar, project)
     (project / "notes" / "lit_review.md").write_text(lit, encoding="utf-8")
     artifacts["literature"] = "notes/lit_review.md"
     _log(project, "pipeline ① 文献 → notes/lit_review.md")
@@ -217,7 +217,7 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
 
     # —— ② 设计 ——
     print("\n" + ui.accent("② 设计(假设·变量·功效·样本量)"))
-    design = _gen(provider, "planner", _design_task(goal),
+    design = _gen(prov["planner"], "planner", _design_task(goal),
                   f"# 背景综述\n{lit}\n\n# 研究准备清单\n{clar}")
     (project / "notes" / "design.md").write_text(design, encoding="utf-8")
     artifacts["design"] = "notes/design.md"
@@ -231,7 +231,7 @@ def run_pipeline(topic: str | None = None, project_dir: str = ".",
     backend_label = "ARS插件" if writing_backend == BACKEND_ARS else "内置"
     print("\n" + ui.accent(f"③ 写作(APA-JARS 结构稿 · {backend_label}写作后端)"))
     write_ctx = f"# 背景综述\n{lit}\n\n# 研究设计\n{design}"
-    report, write_meta = write_paper(goal, write_ctx, provider, project,
+    report, write_meta = write_paper(goal, write_ctx, prov["writer"], project,
                                      backend=writing_backend)
     report_path = project / "outputs" / "report.md"
     if not report.strip():
