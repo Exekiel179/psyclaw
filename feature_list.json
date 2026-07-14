@@ -1279,6 +1279,17 @@
       ],
       "status": "planned",
       "evidence": "蓝图立案(未实现);现状核查:滑动窗口/摘要压缩/resume 压缩三项已有,缺口=skill 闲置清走/重要性打分/中间状态外存。"
+    },
+    {
+      "id": "feat-136",
+      "name": "sequential-thinking MCP 内置开箱即用 + setup 板块扩展 + 网络镜像回退",
+      "description": "用户目标:sequential-thinking MCP 内置、开箱即用无需手配 npm;setup 勾选「序列化思考」即启用(mne MCP/目标期刊 skill 类似);网络不通走国内镜像。实现:①registry.yaml 加 sequential-thinking(npx -y @modelcontextprotocol/server-sequential-thinking,detect:npx,category reasoning)——npx -y 自动拉包,零手配;②_SETUP_MODULES 扩到 7 项并带 kind(pip/npx/mcp/skill):序列化思考(npx 预热)、EEG 脑电(mne MCP)、目标期刊(skill),setup 按 kind 分派(pip 装 extra/npx warm_npx 预热/mcp 提示装依赖后自动启用/skill 指引);③psyclaw/mirror.py 网络镜像回退:official_reachable 探测官方源(PSYCLAW_FORCE_MIRROR 可强制),不通则 pip_index_args 走清华源、npm_env 设 npmmirror registry;warm_npx 预热 npx 包(镜像感知,失败给手动命令不中断)。",
+      "dependencies": [
+        "feat-131",
+        "feat-107"
+      ],
+      "status": "done",
+      "evidence": "tests/test_mirror.py 6 例(强制镜像/官方默认源/describe 状态/无 npx/registry 含 sequential-thinking/setup 板块含新能力)。全量 pytest → 1770 passed;eval 28/28。活体:①npx -y 真起 sequential-thinking MCP,list_tools=[sequentialthinking] 开箱即用;②setup --modules stats,sequential-thinking → 板块入全局配置 + 网络探测 + 「已启用,首次对话自动拉包」。"
     }
   ]
 }

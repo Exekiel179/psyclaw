@@ -54,6 +54,16 @@ servers:
     enable_when: always
     provides: [pubmed, psycinfo, semantic_scholar, openalex, arxiv]
 
+  # 序列化思考 MCP(feat-136)——官方 sequential-thinking:把复杂推理拆成
+  # 可回溯/可修正的思考步骤,适合研究设计/统计策略/评审这类多步权衡。
+  # 开箱即用:npx -y 自动拉包无需手配 npm;setup 勾选「序列化思考」即启用。
+  - name: sequential-thinking
+    category: reasoning
+    origin: optional                 # 需要 node/npx;npx -y 首次运行自动下载
+    enable_when: detect:npx
+    command: npx -y @modelcontextprotocol/server-sequential-thinking
+    provides: [sequentialthinking]
+
   # 浏览器 MCP(feat-107)——机构库检索路线 B 的执行引擎:psyclaw 亲自驱动浏览器
   # 进知网/万方/WoS(登录由用户在浏览器窗口人工完成,凭据不经 psyclaw)。
   # 与统计同一铁律:能力外移到 MCP,仓内零浏览器代码。用法:psyclaw chat 高级
