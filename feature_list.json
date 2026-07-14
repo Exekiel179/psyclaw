@@ -1277,8 +1277,8 @@
         "feat-111",
         "feat-113"
       ],
-      "status": "planned",
-      "evidence": "蓝图立案(未实现);现状核查:滑动窗口/摘要压缩/resume 压缩三项已有,缺口=skill 闲置清走/重要性打分/中间状态外存。"
+      "status": "done",
+      "evidence": "feat-133/134/135 分轮全部落地;滑动窗口/摘要压缩/resume 压缩三项本就已有。"
     },
     {
       "id": "feat-136",
@@ -1320,6 +1320,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_audit_memory.py TestDivergentRetrieval +4(意图判定/focused 无远距/diverge 采入中等相关/render 单独标注)。全量 pytest → 1784 passed;eval 28/28。"
+    },
+    {
+      "id": "feat-135",
+      "name": "任务中间状态外存(步骤级快照,便于召回)",
+      "description": "用户提议任务执行中间状态存外部便于后期召回。workflow 引擎已有 checkpoint(resume 用);本轮建通用 psyclaw/taskstate.py:save_step 追加步骤快照到 .psyclaw/state/<task>.jsonl(append-only 保留完整轨迹,值摘要不落原始数据/密钥,fail-safe),load_steps/list_tasks/recall_task 召回。workflow engine 每步 checkpoint 时顺带 save_step(chat/agent 流程状态可查)。CLI:psyclaw tasks state(列有中间状态的任务)/ tasks state <名>(渲染某任务步骤轨迹供续做/复盘)。至此 feat-132 拆的三项(133 skill 清走/134 重要性打分/135 中间状态)全部完成。",
+      "dependencies": [
+        "feat-012"
+      ],
+      "status": "done",
+      "evidence": "tests/test_taskstate.py 7 例(存读/append-only 保历史/摘要截断不落原文/list_tasks/recall 渲染/空召回/fail-safe)。全量 pytest → 1791 passed;eval 28/28;gates 通过。"
     }
   ]
 }

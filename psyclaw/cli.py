@@ -1323,8 +1323,26 @@ def cmd_goal(args: argparse.Namespace) -> int:
 
 
 def cmd_tasks(args: argparse.Namespace) -> int:
+    argv = args.args or ["list"]
+    if argv and argv[0] == "state":            # feat-135:任务中间状态召回
+        from psyclaw import ui
+        from psyclaw.taskstate import list_tasks, recall_task
+        if len(argv) >= 2:
+            block = recall_task(argv[1])
+            print(block or ui.dim(f"  无「{argv[1]}」的中间状态"))
+            return 0
+        rows = list_tasks()
+        if not rows:
+            print(ui.dim("  暂无任务中间状态(运行 run/流程后自动记录)"))
+            return 0
+        print(ui.title("任务中间状态(可召回)"))
+        for r in rows:
+            print(f"  - {r['task']:<20} {r['n_steps']} 步 · 最后 {r['last_step']} "
+                  + ui.dim(f"({r['last_ts']})"))
+        print(ui.dim("  召回详情:psyclaw tasks state <任务名>"))
+        return 0
     from psyclaw.tasks import tasks_cli
-    return tasks_cli(args.args or ["list"])
+    return tasks_cli(argv)
 
 
 def cmd_research(args: argparse.Namespace) -> int:
