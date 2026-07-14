@@ -312,3 +312,18 @@ class TestPrivacyInvariant:
         ctx, errors = process_message(f"看 {p}", cwd=tmp_path)
         assert "<data_file" in ctx
         assert errors == []
+
+def test_subpath_mention_not_split(tmp_path):
+    """「保存为 outputs/compare_basic.py」不得切出 /compare_basic.py(第三轮实测)。"""
+    from psyclaw.path_ingest import extract_paths, process_message
+    text = "改用纯标准库重写,保存为 outputs/compare_basic.py 然后跑一下。"
+    assert extract_paths(text, tmp_path) == []
+    _, errors = process_message(text, tmp_path)
+    assert errors == []
+def test_cjk_prefixed_absolute_path_still_detected(tmp_path):
+    """中文紧邻绝对路径(「数据在/…/x.csv」)仍要能识别注入。"""
+    from psyclaw.path_ingest import extract_paths
+    f = tmp_path / "x.csv"
+    f.write_text("a,b\n1,2\n", encoding="utf-8")
+    found = extract_paths(f"数据在{f}。", tmp_path)
+    assert f in found
