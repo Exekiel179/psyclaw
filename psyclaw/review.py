@@ -202,6 +202,155 @@ def blocking_items(items: list[dict]) -> list[dict]:
     return [i for i in items if i.get("severity") == "BLOCKING"]
 
 
+# ---------------------------------------------------------------------------
+# 辩论式评审(feat-119):独立评审 → 交叉质证 → EIC 综合
+# ---------------------------------------------------------------------------
+
+# 评审档位:panel = 现状单次五 persona 生成(1 次调用/轮);
+# debate = 独立评审 + 交叉质证 + EIC 综合(2×persona+1 = 9 次调用/轮)。
+REVIEW_MODES = ("panel", "debate")
+
+# 辩论档的四位评审(label, 职责描述;EIC 由综合阶段单独调用)。
+DEBATE_PERSONAS = [
+    ("R1", "方法学审稿人:聚焦设计与统计——抽样与功效、测量信效度、"
+           "检验选择、效应量与置信区间、多重比较、因果断言是否越界"),
+    ("R2", "理论/文献审稿人:聚焦理论贡献与文献定位——研究问题重要性、"
+           "新意、与既有文献的对话是否充分、解释是否过度外推"),
+    ("R3", "可复现性/透明审稿人:聚焦开放科学——数据与代码可得性、"
+           "预注册与探索/确证区分、剔除规则与缺失数据处理、JARS 报告完整性"),
+    ("DA", "Devil's Advocate 魔鬼代言人:刻意找致命缺陷——替代解释、"
+           "混淆变量、统计陷阱;判断偏严,仅作压力测试不直接决定结论"),
+]
+
+_REC_CONTRACT = ("末尾**单独一行、行首**给出机器可解析的推荐:"
+                 "`RECOMMENDATION: ACCEPT|MINOR|MAJOR|REJECT`。"
+                 "不按格式输出会被系统按保守决定处理。")
+
+
+def last_recommendation(text: str) -> str:
+    """取一段文本(单个评审块)内**最后一个可归一**的 RECOMMENDATION。
+
+    没有 → 返回 ''(fail-closed:该评审不计票,同行不足自然触发保守决定)。
+    无法归一的 token 跳过,回落上一个可归一推荐——绝不猜。
+    """
+    rec = ""
+    for m in _REC_RE.finditer(text or ""):
+        r = _normalize_rec(m.group(1))
+        if r:
+            rec = r
+    return rec
+
+
+def debate_summary(blocks: dict, eic_text: str) -> dict:
+    """由各评审最终块 + EIC 综合块生成结构化结论(与 summarize 同形)。
+
+    与单次生成的 parse_recommendations 不同:每位评审的推荐取自**自己的块**
+    (块内提及其他评审标签不会改推荐归属);行动项取自 EIC 综合块。
+    聚合仍走 aggregate_decision(保守规则原样:致命缺陷不可被平均掉)。
+    """
+    recs: list[dict] = []
+    for label, text in blocks.items():
+        rec = last_recommendation(text)
+        if rec:
+            recs.append({"reviewer": label, "recommendation": rec,
+                         "is_peer": _is_peer(label)})
+    eic_rec = last_recommendation(eic_text)
+    if eic_rec:
+        recs.append({"reviewer": "EIC", "recommendation": eic_rec,
+                     "is_peer": False})
+    items = extract_action_items(eic_text)
+    decision = aggregate_decision(recs)
+    return {
+        "decision": decision,
+        "passed": decision == DECISION_PASS,
+        "recommendations": recs,
+        "n_peer_reviews": sum(1 for r in recs if r["is_peer"]),
+        "action_items": items,
+        "n_blocking": len(blocking_items(items)),
+        "n_major": sum(1 for i in items if i["severity"] == "MAJOR"),
+        "n_minor": sum(1 for i in items if i["severity"] == "MINOR"),
+    }
+
+
+def _persona_task(label: str, desc: str, rnd: int) -> str:
+    return (f"你在本次评审中**只扮演一位评审:{label}({desc})**。"
+            f"对下方研究稿做第 {rnd} 轮**独立**评审——你看不到其他评审的意见,"
+            "只依据稿件本身与你的专长给出:简评 / 优点 / 问题(按严重度)。"
+            + _REC_CONTRACT)
+
+
+def _rebuttal_task(label: str, desc: str, rnd: int) -> str:
+    return (f"你是评审 {label}({desc}),第 {rnd} 轮交叉质证阶段。"
+            "下方附有其他评审的独立意见与你自己的独立意见:逐条审视——"
+            "同意的吸收,不同意的**点名反驳并给出理由**;然后基于质证结果"
+            "输出你的**最终**意见(可以维持,也可以修正;修正要说明被谁的"
+            "哪条论据说服)。" + _REC_CONTRACT)
+
+
+def _eic_task(rnd: int) -> str:
+    return (f"你是主编(EIC),第 {rnd} 轮综合阶段。下方是四位评审经交叉质证"
+            "后的最终意见:给出编辑层面的叙述性综合(分歧点如何裁决、以谁的"
+            "论据为准),然后输出 `## REQUIRED REVISIONS` 复选框清单,每条"
+            "**行首**标 `[BLOCKING]`/`[MAJOR]`/`[MINOR]`。" + _REC_CONTRACT)
+
+
+def _debate_round(provider, draft_text: str, rnd: int,
+                  project: Path) -> tuple[str, dict]:
+    """跑一轮辩论式评审,返回 (面板文本, 结构化结论)。
+
+    调用量 2×len(DEBATE_PERSONAS)+1(默认 9);任何一位评审生成失败
+    (_gen 返回错误占位文本)都解析不出推荐 → 不计票,保守规则兜底。
+    """
+    from psyclaw.loop import _gen
+
+    opinions: dict[str, str] = {}
+    for label, desc in DEBATE_PERSONAS:
+        opinions[label] = _gen(provider, "reviewer",
+                               _persona_task(label, desc, rnd),
+                               f"# 待审稿件\n{draft_text}")
+    finals: dict[str, str] = {}
+    for label, desc in DEBATE_PERSONAS:
+        others = "\n\n".join(f"### {lb} 的独立意见\n{tx}"
+                             for lb, tx in opinions.items() if lb != label)
+        finals[label] = _gen(provider, "reviewer",
+                             _rebuttal_task(label, desc, rnd),
+                             f"# 待审稿件\n{draft_text}\n\n"
+                             f"# 其他评审的独立意见\n{others}\n\n"
+                             f"# 你({label})的独立意见\n{opinions[label]}")
+    finals_md = "\n\n".join(f"### {lb}\n{tx}" for lb, tx in finals.items())
+    eic = _gen(provider, "reviewer", _eic_task(rnd),
+               f"# 待审稿件\n{draft_text}\n\n"
+               f"# 四位评审经交叉质证后的最终意见\n{finals_md}")
+
+    summary = debate_summary(finals, eic)
+
+    parts = [f"# 评审面板(辩论档 · 第 {rnd} 轮)", ""]
+    for label, desc in DEBATE_PERSONAS:
+        parts += [f"### {label} {desc.split(':', 1)[0]}",
+                  finals[label].strip(), ""]
+    parts += ["### EIC 主编(综合)", eic.strip(), ""]
+    panel = "\n".join(parts)
+
+    t = [f"# 辩论式评审过程 · 第 {rnd} 轮", "",
+         "## 第一阶段:独立评审(互相不可见)", ""]
+    for label, _desc in DEBATE_PERSONAS:
+        t += [f"### {label}", opinions[label].strip(), ""]
+    t += ["## 第二阶段:交叉质证(可见他人意见后的最终立场)", ""]
+    for label, _desc in DEBATE_PERSONAS:
+        t += [f"### {label}", finals[label].strip(), ""]
+    t += ["## 第三阶段:EIC 综合", "", eic.strip(), ""]
+    (project / "notes" / "review_debate.md").write_text(
+        "\n".join(t), encoding="utf-8")
+
+    return panel, summary
+
+
+def _resolve_mode(mode: str | None, conf: dict) -> str:
+    """档位选择:显式 mode 参数 > 配置 review_mode > 默认 panel;未知值回落 panel。"""
+    m = str(mode or conf.get("review_mode") or "panel").strip().lower()
+    return m if m in REVIEW_MODES else "panel"
+
+
 def summarize(panel_text: str) -> dict:
     """把一段评审面板文本汇总成结构化结论(供 JSON 落盘 / 程序判定)。"""
     recs = parse_recommendations(panel_text)
@@ -262,8 +411,13 @@ def _review_task(round_no: int) -> str:
 
 def run_review(draft: str | None = None, project_dir: str = ".",
                auto: bool = False, revise: bool = False,
-               rounds: int = 3) -> int:
+               rounds: int = 3, mode: str | None = None) -> int:
     """跑审稿模拟。revise=True 时把 BLOCKING/MAJOR 回灌 executor 修订并复审。
+
+    mode 档位(None → 配置 review_mode → panel):
+      panel  快评:单次生成五 persona 面板(1 次调用/轮,现状行为);
+      debate 深评:R1/R2/R3/DA 独立评审 → 交叉质证 → EIC 综合
+             (9 次调用/轮,评审推荐按块归属,防单次生成的锚定与附和)。
 
     返回:plain 模式恒 0(评审本身即产物);revise 模式若达最大轮次仍未到 ACCEPT
     返回 1(与 run_loop 的「修复环不收敛即停」一致)。
@@ -284,19 +438,30 @@ def run_review(draft: str | None = None, project_dir: str = ".",
         return 1
 
     conf = cfg.load_config()
+    mode = _resolve_mode(mode, conf)
     prov = _role_providers(conf, ("reviewer", "executor"))
     provider = prov["reviewer"]
+    mode_note = ("辩论档:独立评审→交叉质证→EIC 综合,"
+                 f"每轮 {2 * len(DEBATE_PERSONAS) + 1} 次调用"
+                 if mode == "debate" else "快评档:单次面板,每轮 1 次调用")
     print(ui.panel("Review — 审稿模拟(EIC + R1/R2/R3 + Devil's Advocate)",
-                   f"稿件:{src}（{len(draft_text)} 字符）\nprovider:{provider.name}"))
-    _log(project, f"review start · src={src.name} · provider={provider.name}")
+                   f"稿件:{src}（{len(draft_text)} 字符）\n"
+                   f"provider:{provider.name} · {mode_note}"))
+    _log(project, f"review start · src={src.name} · provider={provider.name}"
+                  f" · mode={mode}")
 
     summary: dict = {}
     current = draft_text
     max_rounds = max(1, rounds) if revise else 1
     for rnd in range(1, max_rounds + 1):
-        panel = _gen(provider, "reviewer", _review_task(rnd), f"# 待审稿件\n{current}")
+        if mode == "debate":
+            panel, summary = _debate_round(provider, current, rnd, project)
+        else:
+            panel = _gen(provider, "reviewer", _review_task(rnd),
+                         f"# 待审稿件\n{current}")
+            summary = summarize(panel)
+        summary["mode"] = mode
         (project / "notes" / "review_panel.md").write_text(panel, encoding="utf-8")
-        summary = summarize(panel)
         (project / "notes" / "review_panel.json").write_text(
             json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
         (project / "notes" / "response_letter.md").write_text(
@@ -354,10 +519,12 @@ def _print_artifacts(project: Path, ui) -> None:
 
 
 def review_cli(argv: list[str]) -> int:
-    """供 cli.py / repl.py 调用的薄入口:review <draft> [--revise] [--auto] [--rounds N]。"""
+    """供 cli.py / repl.py 调用的薄入口:
+    review <draft> [--revise] [--auto] [--rounds N] [--debate | --mode panel|debate]。"""
     draft = None
     revise = auto = False
     rounds = 3
+    mode: str | None = None
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -365,6 +532,14 @@ def review_cli(argv: list[str]) -> int:
             revise = True
         elif a == "--auto":
             auto = True
+        elif a == "--debate":
+            mode = "debate"
+        elif a == "--mode":
+            i += 1
+            try:
+                mode = argv[i]
+            except IndexError:
+                mode = None
         elif a == "--rounds":
             i += 1
             try:
@@ -374,4 +549,5 @@ def review_cli(argv: list[str]) -> int:
         elif not a.startswith("-"):
             draft = a
         i += 1
-    return run_review(draft=draft, revise=revise, auto=auto, rounds=rounds)
+    return run_review(draft=draft, revise=revise, auto=auto, rounds=rounds,
+                      mode=mode)

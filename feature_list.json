@@ -1179,12 +1179,22 @@
    "evidence": "tests/test_sleep.py 6 例(due 判定/蒸馏落 pending 不注入/approve 激活/无 LLM 诚实跳过/状态增量不重睡/簇合并原则卡)。全量 pytest → 1702 passed;eval 28/28。活体(隔离 HOME):psyclaw sleep 重放 23 轮,无 LLM 如实跳过并报告;REPL 退出钩子接入。"
   },
   {
-   "id": "feat-118",
+   "id": "feat-123",
    "name": "按角色模型路由——常驻 agent 可各自配置 provider/model",
    "description": "六个常驻角色(planner/executor/critic/reviewer/auditor/writer)支持扁平配置键 <role>_provider/<role>_model/<role>_base_url(config.yaml 与 PSYCLAW_<ROLE>_<KEY> 环境变量同源生效)。providers.get_role_provider:任一角色键存在才构建专属 provider,否则原样返回默认实例;换 provider 时不继承全局 model/base_url(跨厂商张冠李戴是硬错误),未指定项回落 preset 默认。loop._role_providers 统一在 run_plan/run_loop/run_pipeline/run_review/repl(/audit) 六个调用点路由,有覆盖时打印一行「角色路由」可观测说明。用途:便宜模型起草、强模型当裁判(critic/reviewer),为辩论式评审的裁判多样性铺路。",
    "dependencies": [],
    "status": "done",
-   "evidence": "tests/test_role_routing.py +9(角色常量/无覆盖返回默认实例/仅改 model/换 provider 用 preset 默认不继承全局端点/role_model+base_url 组合/角色相互独立/PSYCLAW_<ROLE>_<KEY> 环境变量/run_review 集成点:reviewer 调用打在 rev-x 上且全局 provider 零调用)。全量 pytest → 1702 passed;eval 28/28。注:实现代码因并行会话 git add -A 已随 d95f29f 入库;原登记编号 feat-114 与记忆线撞号,改登记为 feat-118。"
+   "evidence": "tests/test_role_routing.py +9(角色常量/无覆盖返回默认实例/仅改 model/换 provider 用 preset 默认不继承全局端点/role_model+base_url 组合/角色相互独立/PSYCLAW_<ROLE>_<KEY> 环境变量/run_review 集成点:reviewer 调用打在 rev-x 上且全局 provider 零调用)。全量 pytest → 1702 passed;eval 28/28。注:实现代码因并行会话 git add -A 已随 d95f29f 入库;原登记编号 feat-114 与记忆线撞号,两度撞号(114 记忆线/118 沙箱线),终登记 feat-123。"
+  },
+  {
+   "id": "feat-124",
+   "name": "评审档位:panel 快评 / debate 辩论式深评",
+   "description": "run_review 增 mode 档位(参数 > 配置 review_mode > 默认 panel):panel=现状单次五 persona 生成(1 调用/轮);debate=R1/R2/R3/DA 各自独立调用评审(互相不可见)→ 交叉质证(看到他人意见后点名反驳/修正,输出最终推荐)→ EIC 独立综合并产 REQUIRED REVISIONS(2×4+1=9 调用/轮)。辩论档评审推荐按块归属(last_recommendation 纯函数,块内提及他人标签不改归属——单次生成的逐行解析做不到),聚合复用 aggregate_decision 保守规则(致命缺陷不可被平均掉),行动项取自 EIC 块;任一评审生成失败解析不出推荐即不计票,fail-closed 兜底。产物文件名不变(review_panel.{md,json},json 增 mode 字段),辩论全程另存 notes/review_debate.md;--revise 修复环两档通用。CLI review --debate / --mode;配置 review_mode: debate 可让 research 流水线的评审阶段整体走深评档。与 feat-123 按角色模型路由组合可实现「便宜模型起草、异构模型评审团辩论」。",
+   "dependencies": [
+    "feat-123"
+   ],
+   "status": "done",
+   "evidence": "tests/test_review_debate.py +13(last_recommendation 空/取最后可归一/跳过不可归一;debate_summary 推荐归属自己块不受他人标签影响/DA REJECT 不可被平均/无可解析推荐 fail-closed MAJOR/EIC 行动项抽取;e2e 9 次调用与 ACCEPT 判定/面板+辩论过程落盘/质证阶段可见他人意见且 EIC 见质证后终意见/配置 review_mode 生效/默认档仍 1 次调用不涨成本/CLI --debate)。全量 pytest → 1724 passed;eval 28/28。"
   }
  ]
 }
