@@ -1116,6 +1116,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_context.py TestLeanCore +1。全量 pytest → 1663 passed。活体复测:同场景(写 Welch t 脚本且「先别运行」)重喂 chat——保存脚本后只列「运行后输出将包含哪些量」,并原话声明「没有预估值,没有模板数字——实际结果需真正跑过才知」,全文零编造统计量(正则扫描 t=/d=/p= 具体数值:无)。"
+    },
+    {
+      "id": "feat-111",
+      "name": "教训注入改相关性检索(治上下文膨胀)",
+      "description": "用户指出自进化体系随使用时间上下文占用递增。此前跨会话教训卡在会话启动时静态全量注入 system(top10 按强度)。改为 relevant_lessons 逐消息检索:强度最高 always_top(2)张无条件保底(python→python3 类普适坑),其余按与当前消息的关键词覆盖(复用 recall.extract_keywords)命中取 top_k(4);空 query 回落强度排序且上限更低。_build_system_prompt 剥离静态教训(memory_prompt include_lessons=False),ask() 逐消息注入 render_lesson_block;memory CLI 等旧消费方行为不变。",
+      "dependencies": [
+        "feat-066"
+      ],
+      "status": "done",
+      "evidence": "tests/test_audit_memory.py TestRelevantLessons +5(相关命中/无关不注入/强度保底/空 query 回落/静态剥离)。全量 pytest → 1668 passed;eval 28/28。"
     }
   ]
 }

@@ -201,8 +201,13 @@ def active_lessons(context: str = "") -> list:
 # system 提示注入
 # ---------------------------------------------------------------------------
 
-def memory_prompt() -> str:
-    """拼装注入 REPL system 提示的记忆段(空记忆返回空串)。"""
+def memory_prompt(include_lessons: bool = True) -> str:
+    """拼装注入 REPL system 提示的记忆段(空记忆返回空串)。
+
+    feat-111:REPL 改为逐消息按相关性注入教训(relevant_lessons),调用方传
+    include_lessons=False 剥离静态全量注入;默认 True 保持 memory CLI 等
+    旧消费方行为不变。
+    """
     parts = []
     prof = get_profile()
     if prof:
@@ -217,12 +222,60 @@ def memory_prompt() -> str:
                           f"(置信 {s['confidence']:.0%},可推翻)")
     if strong:
         parts.append("# 决策惯性(自动学习,呈现为默认而非强制)\n" + "\n".join(strong))
-    # 强度高(被多次印证)的卡排前:[:10] 截断时优先保住最可靠的教训(feat-066)
-    lessons = sorted(active_lessons(), key=lambda c: -int(c.get("strength", 1)))
-    if lessons:
-        parts.append("# 教训卡(经用户确认的历史教训)\n"
-                     + "\n".join(f"- [{c['trigger']}] {c['lesson']}" for c in lessons[:10]))
+    if include_lessons:
+        # 强度高(被多次印证)的卡排前:[:10] 截断时优先保住最可靠的教训(feat-066)
+        lessons = sorted(active_lessons(), key=lambda c: -int(c.get("strength", 1)))
+        if lessons:
+            parts.append("# 教训卡(经用户确认的历史教训)\n"
+                         + "\n".join(f"- [{c['trigger']}] {c['lesson']}"
+                                     for c in lessons[:10]))
     return "\n\n".join(parts)
+
+
+def relevant_lessons(query: str, top_k: int = 4, always_top: int = 2) -> list[dict]:
+    """按当前消息挑教训卡(feat-111:全量注入改相关性检索,治上下文膨胀)。
+
+    - 强度最高的 always_top 张**无条件保底**(python→python3 这类普适环境坑,
+      任何任务都可能踩);
+    - 其余卡按与 query 的关键词覆盖打分,命中 >0 者取 top_k;
+    - 空 query / 无法取关键词 → 回落强度排序前 always_top+top_k 张
+      (与旧行为同构但上限更低)。
+    """
+    cards = sorted(active_lessons(), key=lambda c: -int(c.get("strength", 1)))
+    if not cards:
+        return []
+    base = cards[:always_top]
+    rest = cards[always_top:]
+    if not (query or "").strip() or not rest:
+        return (base + rest)[:always_top + top_k]
+    try:
+        from psyclaw.recall import extract_keywords
+        q_kws = set(extract_keywords(query))
+    except Exception:  # noqa: BLE001
+        q_kws = set()
+    if not q_kws:
+        return (base + rest)[:always_top + top_k]
+    scored = []
+    for c in rest:
+        text = f"{c.get('trigger', '')} {c.get('lesson', '')}"
+        try:
+            c_kws = set(extract_keywords(text))
+        except Exception:  # noqa: BLE001
+            c_kws = set()
+        hit = len(q_kws & c_kws)
+        if hit:
+            scored.append((hit, c))
+    scored.sort(key=lambda x: (-x[0], -int(x[1].get("strength", 1))))
+    return base + [c for _, c in scored[:top_k]]
+
+
+def render_lesson_block(cards: list[dict]) -> str:
+    """教训卡 → system 注入块;空列表返回空串。"""
+    if not cards:
+        return ""
+    return ("# 教训卡(历史教训,按相关性检索注入)\n"
+            + "\n".join(f"- [{c.get('trigger', '?')}] {c.get('lesson', '')}"
+                        for c in cards))
 
 
 # ---------------------------------------------------------------------------
