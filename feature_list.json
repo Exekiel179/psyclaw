@@ -1235,6 +1235,18 @@
       ],
       "status": "done",
       "evidence": "tests/test_sandbox.py +8(白名单与子域/get 白名单内放行/未知域拒/upload 默认拒与授权放行/私密无表拒与有表 needs/litsearch._get 白名单外 URLError)。全量 pytest → 1754 passed;eval 28/28。"
+    },
+    {
+      "id": "feat-129",
+      "name": "start 澄清式沙箱配置(意图→skill→按能力最小权限配置)",
+      "description": "docs/SANDBOX.md start 集成。新增 psyclaw start 启动向导:①澄清意图(交互问一句/--intent 免交互);②_route_skills_by_intent 据关键词路由建议 skill(lit/run-stats-mcp/verify/webbridge);③询问是否启用沙箱(--sandbox/--no-sandbox 免交互;默认建议启用);④build_policy_from_skills 据启用 skill 的 SKILL_CAPABILITIES 声明取并集配最小权限策略——net.allow_domains/exec.allow_intent/file.write_allow 为各 skill 声明的并集,未声明的面保持默认拒绝态,未知 skill 零贡献(不因不认识就放开),恒定硬约束(private_paths/deny_patterns/upload=deny/require_codebook)始终保留不被放开;⑤落 .psyclaw/sandbox.yaml。至此沙箱四执行面 + start 配置全部完成。",
+      "dependencies": [
+        "feat-126",
+        "feat-127",
+        "feat-128"
+      ],
+      "status": "done",
+      "evidence": "tests/test_sandbox.py +6(能力并集去重/未知 skill 零能力/恒定硬约束保留/意图路由/start 写策略/不启用不落策略)。全量 pytest → 1760 passed;gates 通过;eval 28/28。活体:psyclaw start --intent「文献综述并跑统计」--sandbox → 选定 lit+run-stats-mcp,生成 6 域网络白名单+6 类科研栈代码放行+notes/outputs 写允许的最小权限策略,恒定硬约束齐备。"
     }
   ]
 }
