@@ -183,6 +183,45 @@ def test_catalog_lists_tools():
     assert "```tool" in cat and "save_file" in cat and "[副作用" in cat
 
 
+# --- feat-113:工具目录意图路由 + tool_help 按需展开 ---------------------------
+def _routing_tools():
+    mk = lambda desc: {"desc": desc, "args": "x:str", "run": lambda a: "", "side_effect": True}
+    return {
+        "read_file": {"desc": "读文件", "args": "path:str", "run": lambda a: "", "side_effect": False},
+        "mcp__pystat__ttest": mk("[MCP:pystat] 独立样本 t 检验"),
+        "mcp__pystat__anova": mk("[MCP:pystat] 单因素方差"),
+        "web__navigate": mk("[WebBridge 真实浏览器] 打开 URL"),
+        "web__snapshot": mk("[WebBridge 真实浏览器] 读页面"),
+    }
+def test_catalog_routes_by_intent_stats():
+    cat = TL.render_tool_catalog(_routing_tools(), "帮我跑 ttest 比较两组效应量")
+    assert "mcp__pystat__ttest(x:str)" in cat          # 命中组展开详情
+    assert "web__navigate(x:str)" not in cat           # 未命中组不给参数
+    assert "web__*" in cat and "tool_help" in cat      # 收进索引 + 展开指引
+    assert "read_file(path:str)" in cat                # 内置常驻
+def test_catalog_routes_by_intent_browser():
+    cat = TL.render_tool_catalog(_routing_tools(), "打开知网页面检索文献")
+    assert "web__navigate(x:str)" in cat
+    assert "mcp__pystat__ttest(x:str)" not in cat and "mcp__pystat__*" in cat
+def test_catalog_no_intent_indexes_all_ext():
+    cat = TL.render_tool_catalog(_routing_tools(), "帮我改一下论文引言")
+    assert "web__*" in cat and "mcp__pystat__*" in cat
+    assert "web__navigate(x:str)" not in cat and "mcp__pystat__anova(x:str)" not in cat
+def test_catalog_backward_compat_full_without_task():
+    cat = TL.render_tool_catalog(_routing_tools())
+    assert "web__navigate(x:str)" in cat and "mcp__pystat__ttest(x:str)" in cat
+def test_tool_help_expands_on_demand():
+    tools = TL.build_tools(".")
+    out = tools["tool_help"]["run"]({"prefix": "save"})
+    assert "save_file(" in out                          # 完整参数行
+    out2 = tools["tool_help"]["run"]({"prefix": "不存在的前缀"})
+    assert "无匹配工具" in out2
+def test_unregistered_group_expands_on_server_name():
+    tools = _routing_tools()
+    tools["mcp__stata__panel"] = {"desc": "[MCP:stata] 面板", "args": "y:str",
+                                  "run": lambda a: "", "side_effect": True}
+    cat = TL.render_tool_catalog(tools, "用 stata 跑面板")
+    assert "mcp__stata__panel(y:str)" in cat            # 未登记组按 server 名兜底
 # --- run_tool_loop ------------------------------------------------------------
 
 def test_loop_calls_tool_then_answers():
