@@ -700,7 +700,7 @@ def _build_system_prompt() -> str:
         "带推荐答案),而不是直接给方案。设计决策必须给文献背书(/cite 查背书库)。")
     parts.append(_SAVE_SYSTEM)
     from psyclaw.memory import memory_prompt
-    mem = memory_prompt()
+    mem = memory_prompt(include_lessons=False)   # feat-111:教训改逐消息相关性注入
     if mem:
         parts.append("\n" + mem)
     return "\n".join(parts)
@@ -872,6 +872,15 @@ class ReplSession:
             system += ("\n\n# 本会话已知环境限制(命令失败教训,务必遵守别重复踩)\n"
                        + "\n".join(f"- [{le['trigger']}] {le['lesson']}"
                                    for le in self.session_lessons[-12:]))
+        # feat-111:跨会话教训卡按**当前消息相关性**检索注入(强度前 2 张保底),
+        # 不再全量常驻 system——治「用得越久注入越多」的上下文膨胀
+        try:
+            from psyclaw.memory import relevant_lessons, render_lesson_block
+            block = render_lesson_block(relevant_lessons(text))
+            if block:
+                system += "\n\n" + block
+        except Exception:  # noqa: BLE001  # 记忆读取失败不阻断对话
+            pass
         knowledge = relevant_knowledge(text)
         if knowledge:
             system += "\n\n" + knowledge

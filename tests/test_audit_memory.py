@@ -358,3 +358,54 @@ class TestConfirmCarriesHits:
         M.draft_lesson("rare", "偶发的坑", source="error", kind="cmd")  # rare 强度 2
         prompt = M.memory_prompt()
         assert prompt.index("常踩的坑") < prompt.index("偶发的坑")
+
+class TestRelevantLessons:
+    """feat-111:教训注入改相关性检索——强度保底 + 关键词命中 top-k,治上下文膨胀。"""
+    def _seed(self):
+        from psyclaw.memory import draft_lesson, confirm_lesson
+        cards = [
+            ("python", "本机没有 python 命令,用 python3", "error"),
+            ("mne", "系统 Python 没装 mne,EEG 任务先 pip install mne", "error"),
+            ("pandas", "读大 CSV 用 chunksize 防内存爆", "error"),
+            ("zotero", "Zotero API 取全文需要 ZOTERO_API_KEY", "error"),
+            ("latex", "导出 PDF 前先装 texlive", "error"),
+        ]
+        for i, (t, l, s_) in enumerate(cards):
+            draft_lesson(t, l, s_)
+            confirm_lesson(0)
+        from psyclaw.memory import _load, _save
+        data = _load("lessons")
+        for c in data.get("cards", []):
+            if c.get("trigger") == "python":
+                c["strength"] = 9
+        _save("lessons", data)
+    def test_relevance_picks_matching_card(self, mem_dir):
+        from psyclaw.memory import relevant_lessons
+        self._seed()
+        cards = relevant_lessons("帮我做 EEG 预处理,数据要用 mne 读", top_k=2, always_top=1)
+        triggers = [c["trigger"] for c in cards]
+        assert triggers[0] == "python"          # 强度最高保底
+        assert "mne" in triggers                # 相关命中
+        assert "latex" not in triggers          # 无关不注入
+    def test_empty_query_falls_back_to_strength(self, mem_dir):
+        from psyclaw.memory import relevant_lessons
+        self._seed()
+        cards = relevant_lessons("", top_k=2, always_top=2)
+        assert len(cards) == 4                  # always_top + top_k 上限
+        assert cards[0]["trigger"] == "python"
+    def test_no_cards_returns_empty(self, mem_dir):
+        from psyclaw.memory import relevant_lessons, render_lesson_block
+        assert relevant_lessons("任何话") == []
+        assert render_lesson_block([]) == ""
+    def test_render_block_format(self, mem_dir):
+        from psyclaw.memory import relevant_lessons, render_lesson_block
+        self._seed()
+        block = render_lesson_block(relevant_lessons("mne EEG"))
+        assert block.startswith("# 教训卡") and "[python]" in block
+    def test_static_prompt_can_exclude_lessons(self, mem_dir):
+        """feat-111:REPL 静态 system 剥离教训(include_lessons=False)。"""
+        from psyclaw.memory import draft_lesson, confirm_lesson, memory_prompt
+        draft_lesson("t", "某教训内容", "error")
+        confirm_lesson(0)
+        assert "某教训内容" in memory_prompt()
+        assert "某教训内容" not in memory_prompt(include_lessons=False)
