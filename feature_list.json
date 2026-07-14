@@ -1096,6 +1096,16 @@
       ],
       "status": "done",
       "evidence": "pyproject.toml/psyclaw/__init__.py(0.14.0);CHANGELOG.md(v0.14.0 段);progress.md/session-handoff.md。终验:全量 pytest → 1660 passed;python -m psyclaw eval → 28/28 exit=0;python -m psyclaw gates → 通过;python -m psyclaw version → 0.14.0"
+    },
+    {
+      "id": "feat-106",
+      "name": "路径注入子路径误报修复",
+      "description": "第三轮评估实测:用户消息含「保存为 outputs/compare_basic.py」时,unix_abs 正则从中间的 / 起匹配,切出 /compare_basic.py 误报「[文件未找到]」噪音。修复:unix_abs/tilde/rel 加 ASCII 负向后顾((?<![A-Za-z0-9_.~/-])),子路径中缝不再当路径起点;中文紧邻绝对路径(「数据在/…/x.csv」)不受影响仍可识别注入。",
+      "dependencies": [
+        "feat-010"
+      ],
+      "status": "done",
+      "evidence": "tests/test_path_ingest.py +2(子路径不切分零误报/中文前缀绝对路径仍识别)。全量 pytest → 1663 passed。"
     }
   ]
 }
