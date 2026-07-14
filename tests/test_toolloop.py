@@ -575,3 +575,28 @@ def test_loop_sends_only_sanitized_messages_to_provider():
         assert all(str(m["content"]).strip() for m in msgs)   # 无空 content
         roles = [m["role"] for m in msgs]
         assert all(roles[i] != roles[i + 1] for i in range(len(roles) - 1))  # 交替
+def test_update_idle_increments_and_evicts():
+    tools = _routing_tools()          # 含 mcp__pystat__ / web__ 组 + 内置 read_file
+    idle = {}
+    for _ in range(2):
+        idle, ev = TL.update_idle(idle, tools, "改一下论文引言")
+    assert not ev                     # 还没到阈值(3)
+    idle, ev = TL.update_idle(idle, tools, "改一下论文引言")
+    assert "mcp__pystat__" in ev and "web__" in ev   # 第 3 轮清走
+def test_update_idle_intent_revives():
+    tools = _routing_tools()
+    idle = {"mcp__pystat__": 5, "web__": 5}
+    idle, ev = TL.update_idle(idle, tools, "帮我跑个 ttest")   # 统计意图命中
+    assert idle["mcp__pystat__"] == 0 and "mcp__pystat__" not in ev
+    assert "web__" in ev              # 浏览器组仍闲置
+def test_update_idle_used_tool_resets():
+    tools = _routing_tools()
+    idle = {"web__": 5}
+    idle, ev = TL.update_idle(idle, tools, "无关任务", used_names=["web__navigate"])
+    assert idle["web__"] == 0         # 实际调用过 → 复活
+def test_catalog_hides_evicted_groups():
+    tools = _routing_tools()
+    cat = TL.render_tool_catalog(tools, "改论文", evicted={"web__", "mcp__pystat__"})
+    assert "web__*" not in cat and "mcp__pystat__*" not in cat   # 连索引都没有
+    assert "长期未用" in cat and "唤回" in cat                    # 但告知可唤回
+    assert "read_file(path:str)" in cat                          # 内置照常

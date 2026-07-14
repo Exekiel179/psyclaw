@@ -764,6 +764,7 @@ class ReplSession:
         self._followup_repeat = 0        # 连续重复次数
         self._empty_reply_streak = 0     # 命令结果后 provider 空回复的有限自动恢复
         # 错误学习:本会话从命令失败蒸馏的环境教训(每轮注入,当场止损);跨会话见 memory 待确认卡
+        self._tool_idle: dict = {"idle": {}}   # feat-133:工具组闲置计数(跨消息)
         self.session_lessons: list[dict] = []
         self._session_lesson_keys: set = set()
         # 「全部同意」:用户对某类副作用(执行 shell/覆盖文件/工具)说过 a 后,本会话该类不再逐条问
@@ -1248,7 +1249,8 @@ class ReplSession:
         try:
             res = run_tool_loop(
                 self.provider, system, self.messages, project_dir=".",
-                approve=_approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
+                approve=_approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")),
+                idle_state=self._tool_idle)   # feat-133:跨消息累积工具组闲置,长期不用清走
         except KeyboardInterrupt:              # feat-090:ESC/Ctrl+C 取消本轮,不炸 REPL
             print(ui.warn("  [已中断本轮生成(ESC/Ctrl+C)]"))
             return None

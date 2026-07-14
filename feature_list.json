@@ -1300,6 +1300,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_context.py TestTurnImportance +5 + compact 保留高重要早轮 +1。全量 pytest → 1776 passed。"
+    },
+    {
+      "id": "feat-133",
+      "name": "工具组闲置清走(长期不用完全隐藏,意图再命中复活)",
+      "description": "用户提议上下文长期不用的 skill 直接清走。feat-113 是每消息按意图收成索引行;本轮加跨消息闲置追踪:update_idle 纯函数——本轮意图命中或被实际调用的扩展组(mcp__/web__)计数清零,否则+1,连续 IDLE_EVICT_ROUNDS(3)轮未用进 evicted;render_tool_catalog 对 evicted 组完全不注入(连索引行都不给,只留一行「N 个长期未用组已隐藏,说出用途唤回」);内置工具始终常驻。run_tool_loop 收 idle_state(跨消息累积),预增计数持久化+工具执行时按组清零,哪个返回点都对;REPL session 持 _tool_idle。意图再命中自动复活。",
+      "dependencies": [
+        "feat-113"
+      ],
+      "status": "done",
+      "evidence": "tests/test_toolloop.py +4(闲置累积到阈值清走/意图复活/实际调用复活/catalog 隐藏 evicted 组但告知唤回)。全量 pytest → 1780 passed;eval 28/28。"
     }
   ]
 }
