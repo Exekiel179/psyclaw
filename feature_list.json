@@ -1076,6 +1076,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_webbridge.py 8 例(Arc 识别/Safari 非 Chromium/无 plist 为 None/假守护进程 status+call 报文形状/不可达诚实报错/工具并入与默认会话/无二进制不并入/计划文案首选)。全量 pytest → 1645 passed;gates 通过;eval 28/28。活体:本机真装真跑——二进制 9.6MB 落位、守护进程 v1.11.3 起、install-skill 装进 Claude Code/Codex/Hermes、CLI status 识别默认浏览器 Arc 并给扩展指引、build_tools 并入 9 个 web__* 工具。"
+    },
+    {
+      "id": "feat-109",
+      "name": "OA PDF 真下载 + 规范命名(检索三样例实测修复)",
+      "description": "goal:文献检索 3 测试样例 → 修错 → 可下载 PDF 命好名放项目文件夹。三样例(英文 OA 批量/裸 DOI 全文/中文检索)实测四错并修复:①get_fulltext 宣称「可直接下载」却从不下载——新增 download_pdf(%PDF 魔数校验,落地页/HTML 绝不存成 .pdf,如实报失败)+ fetch_and_save 落盘编排;②落盘命名丑(fulltext_10.1016_….txt)——pdf_filename 统一 <一作姓>_<年份>_<标题词>.pdf(CJK 原样,非法字符清洗,_dedup_path 绝不覆盖),_save_text 同方案;③裸 DOI 无元数据——paper_from_doi 经 OpenAlex 补题录;④「Chen Z.」缩写被当姓(Z_2026 bug)——单字母末 token 取首 token,Wu/Li 双字母真姓不误伤。增强:候选链依次尝试(unpaywall→EuropePMC 渲染→OpenAlex oa_url→arXiv)、浏览器 UA(工具 UA 被出版社 403)、TLS 瞬断重试+LibreSSL 老栈提示;CLI --fulltext 真下载、新 --download 批量拉 OA 命中至 outputs/pdfs/,成功/失败逐条如实呈报。",
+      "dependencies": [
+        "feat-007"
+      ],
+      "status": "done",
+      "evidence": "tests/test_pdf_download.py 11 例(命名 latin/CJK/缩写/缺字段/非法字符/去重不覆盖;假服务器下载真 PDF/拒落地页;fetch_and_save 编排/裸 DOI 补名;_save_text 同方案)。全量 pytest → 1660 passed;gates 通过;eval 28/28。活体三样例(Python3.12):①批量 --download 下载 Liberati_2009/Morr_2020 等真 PDF;②裸 DOI 10.2196/18595 → Morr_2020_…pdf 349KB(元数据补名生效);③中文检索 → WANG_2013_…pdf 190KB,tandfonline 反爬失败如实标注。"
     }
   ]
 }

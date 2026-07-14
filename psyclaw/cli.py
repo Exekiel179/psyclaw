@@ -1008,7 +1008,8 @@ def cmd_lit(args: argparse.Namespace) -> int:
         return 0
     return lit_cli(query=args.query or "", sources=args.sources, limit=args.limit,
                    year_from=args.year_from, fulltext_doi=args.fulltext,
-                   zotero_doi=args.zotero, synthesize=getattr(args, "synthesize", False))
+                   zotero_doi=args.zotero, synthesize=getattr(args, "synthesize", False),
+                   download=getattr(args, "download", False))
 
 
 def cmd_webbridge(args: argparse.Namespace) -> int:
@@ -1720,6 +1721,8 @@ def build_parser() -> argparse.ArgumentParser:
                            "分步提示词+纳入/排除标准(检索前声明)")
     plit.add_argument("--import", dest="import_file", default=None, metavar="FILE",
                       help="导入机构库桥接检索结果表(Markdown 表/CSV)并入语料")
+    plit.add_argument("--download", "-d", action="store_true",
+                      help="检索后把 OA 命中的 PDF 批量下载到 outputs/pdfs/(规范命名)")
     plit.add_argument("--matrix", action="store_true",
                       help="从检索语料生成文献矩阵骨架(notes/lit_matrix.md,"
                            "键与 cite-check 语料同源)")

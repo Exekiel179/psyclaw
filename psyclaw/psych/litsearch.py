@@ -14,6 +14,7 @@ PRISMA:检索→去重→筛选的计数贯穿,对接 LIT.prisma 质量检查。
 from __future__ import annotations
 
 import json
+import re
 import urllib.parse
 import urllib.request
 
@@ -279,7 +280,155 @@ def _save_text(text: str, paper: dict, out_dir: str | None):
     from pathlib import Path
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
-    safe = (paper.get("doi") or paper.get("title", "paper"))[:60].replace("/", "_")
-    fp = d / f"fulltext_{safe}.txt"
+    fp = _dedup_path(d / (pdf_filename(paper)[:-4] + ".txt"))   # feat-109:同一命名方案
     fp.write_text(text, encoding="utf-8")
     return str(fp)
+
+
+# ---------------------------------------------------------------------------
+# PDF 下载与规范命名(feat-109)——goal 实测三错:宣称可下载却不下载 /
+# 落盘名无作者年份标题 / 裸 DOI 无元数据可命名。
+# ---------------------------------------------------------------------------
+
+_FNAME_BAD = re.compile(r'[\\/:*?"<>|\s]+')
+
+
+def pdf_filename(paper: dict) -> str:
+    """题录 → 规范文件名:<一作姓>_<年份>_<标题前若干词>.pdf(CJK 原样保留)。"""
+    authors = paper.get("authors") or []
+    first = (authors[0] if authors else "").strip()
+    if first:
+        toks = [t.strip(".") for t in first.replace(",", " ").split() if t.strip(".")]
+        if _has_cjk(first) or not toks:
+            surname = first
+        else:
+            # 末 token 通常是姓;但「Chen Z.」式单字母缩写在末尾时取首 token
+            # (实测 Z_2026 bug;Wu/Li 等双字母真姓不受影响)
+            surname = toks[-1] if len(toks[-1]) > 1 else toks[0]
+    else:
+        surname = "UnknownAuthor"
+    year = str(paper.get("year") or "n.d.")
+    title = (paper.get("title") or "untitled").strip()
+    words = title.split()
+    short = "".join(title[:24].split()) if _has_cjk(title) else "-".join(words[:7])
+    name = f"{surname}_{year}_{short}"
+    name = _FNAME_BAD.sub("-", name).strip("-._")[:90]
+    return f"{name}.pdf"
+
+
+def _has_cjk(s: str) -> bool:
+    return any("一" <= ch <= "鿿" for ch in s or "")
+
+
+def _dedup_path(fp):
+    """同名文件已存在 → 追加 -2/-3 …,绝不静默覆盖。"""
+    if not fp.exists():
+        return fp
+    stem, suffix, parent = fp.stem, fp.suffix, fp.parent
+    for i in range(2, 100):
+        cand = parent / f"{stem}-{i}{suffix}"
+        if not cand.exists():
+            return cand
+    return parent / f"{stem}-dup{suffix}"
+
+
+def paper_from_doi(doi: str) -> dict | None:
+    """裸 DOI → 题录(OpenAlex),供命名用;取不到返回 None(不阻塞下载)。"""
+    try:
+        data = _get("https://api.openalex.org/works/doi:"
+                    + urllib.parse.quote(doi) + "?mailto=psyclaw@example.org")
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(data, dict) or not data.get("title"):
+        return None
+    return _paper(
+        title=data.get("title", ""),
+        authors=[a.get("author", {}).get("display_name", "")
+                 for a in data.get("authorships", [])[:5]],
+        year=data.get("publication_year"), doi=doi, source="OpenAlex")
+
+
+# PDF 直下用浏览器式 UA:多家出版社对工具 UA 一律 403(实测 annualreviews),
+# 目标是**合法 OA** 内容,换 UA 不涉付费墙。
+_PDF_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36")
+
+
+def _fetch_pdf_bytes(url: str) -> tuple[bytes | None, str]:
+    """取一个候选链接的 PDF 字节;返回 (bytes|None, 失败原因)。TLS 瞬断重试一次。"""
+    req = urllib.request.Request(url, headers={"User-Agent": _PDF_UA,
+                                               "Accept": "application/pdf,*/*"})
+    last = ""
+    for _attempt in (1, 2):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                head = r.read(5)
+                if not head.startswith(b"%PDF"):
+                    return None, "返回的不是 PDF(落地页/HTML)"
+                return head + r.read(), ""
+        except Exception as exc:  # noqa: BLE001
+            last = str(exc)
+            if "EOF occurred" not in last and "handshake" not in last:
+                break              # 非 TLS 瞬断不重试
+    if ("EOF occurred" in last or "handshake" in last):
+        import ssl
+        if "LibreSSL" in ssl.OPENSSL_VERSION:   # 实测:系统 Py3.9 老栈连不上部分出版社
+            last += "(本机 Python 用 LibreSSL 老 TLS 栈——建议在 Python 3.12/OpenSSL 环境重试)"
+    return None, f"下载失败:{last}"
+
+
+def download_pdf(url: str, dest_dir: str, paper: dict) -> dict:
+    """把 OA PDF 真正下载到 dest_dir(规范命名)。诚实校验:响应必须是 PDF
+    (%PDF 魔数),落地页/HTML 一律如实报失败,绝不把网页存成 .pdf。"""
+    from pathlib import Path
+    body, why = _fetch_pdf_bytes(url)
+    if body is None:
+        return {"ok": False, "url": url,
+                "note": f"{why}——已放弃保存,可用浏览器打开链接手动下载"}
+    d = Path(dest_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    fp = _dedup_path(d / pdf_filename(paper))
+    fp.write_bytes(body)
+    return {"ok": True, "path": str(fp), "bytes": len(body), "url": url}
+
+
+def _pdf_candidates(paper: dict, res: dict) -> list[str]:
+    """按可信度排 PDF 候选链接:unpaywall pdf → EuropePMC 渲染 → OpenAlex oa_url
+    → arXiv。逐个试到 %PDF 为止(单一链接失败率高,实测 5/7 可救)。"""
+    cands: list[str] = []
+    if res.get("pdf_url"):
+        cands.append(res["pdf_url"])
+    pmcid = paper.get("pmcid")
+    if pmcid:
+        pid = pmcid if str(pmcid).startswith("PMC") else f"PMC{pmcid}"
+        cands.append("https://europepmc.org/backend/ptpmcrender.fcgi"
+                     f"?accid={pid}&blobtype=pdf")
+    if paper.get("oa_url"):
+        cands.append(paper["oa_url"])
+    if paper.get("arxiv_id"):
+        cands.append(f"https://arxiv.org/pdf/{paper['arxiv_id']}")
+    seen: set[str] = set()
+    return [c for c in cands if c and not (c in seen or seen.add(c))]
+
+
+def fetch_and_save(paper: dict, out_dir: str) -> dict:
+    """取全文并**真正落盘**:OA PDF 下载为规范命名 .pdf;EuropePMC 文本存 .txt。
+
+    候选链接依次尝试,第一个真 PDF 落盘;全失败则逐条原因如实呈报。
+    返回 get_fulltext 的结果并附 {downloaded: {ok, path?, note?, tried}}。
+    """
+    res = get_fulltext(paper, out_dir=out_dir)
+    if res.get("status") == "oa_pdf":
+        meta = paper if paper.get("title") else (paper_from_doi(paper.get("doi") or "")
+                                                 or paper)
+        notes = []
+        for url in _pdf_candidates(paper, res):
+            dl = download_pdf(url, out_dir, meta)
+            if dl.get("ok"):
+                dl["tried"] = len(notes) + 1
+                res["downloaded"] = dl
+                return res
+            notes.append(f"{url[:60]}: {dl.get('note', '')[:60]}")
+        res["downloaded"] = {"ok": False, "tried": len(notes),
+                             "note": " | ".join(notes) or "无候选链接"}
+    return res
