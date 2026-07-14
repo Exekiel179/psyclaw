@@ -1086,6 +1086,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_pdf_download.py 11 例(命名 latin/CJK/缩写/缺字段/非法字符/去重不覆盖;假服务器下载真 PDF/拒落地页;fetch_and_save 编排/裸 DOI 补名;_save_text 同方案)。全量 pytest → 1660 passed;gates 通过;eval 28/28。活体三样例(Python3.12):①批量 --download 下载 Liberati_2009/Morr_2020 等真 PDF;②裸 DOI 10.2196/18595 → Morr_2020_…pdf 349KB(元数据补名生效);③中文检索 → WANG_2013_…pdf 190KB,tandfonline 反爬失败如实标注。"
+    },
+    {
+      "id": "feat-110",
+      "name": "v0.14.0 发布收尾(版本 + CHANGELOG + progress/handoff)",
+      "description": "版本 0.13.0→0.14.0(pyproject+__init__);CHANGELOG 定版 v0.14.0——主题:三轮对抗评估缺陷清零(feat-090~102,评分 31→52→100)+ 文献查找全链(feat-103/104/107/108/109:检索计划→机构库浏览器桥[Kimi WebBridge+浏览器 MCP 双引擎]→回灌矩阵→OA PDF 规范落盘)。评估资产 evalcase/1/2/3 随库存档供回归。progress/session-handoff 补发布记录。",
+      "dependencies": [
+        "feat-109"
+      ],
+      "status": "done",
+      "evidence": "pyproject.toml/psyclaw/__init__.py(0.14.0);CHANGELOG.md(v0.14.0 段);progress.md/session-handoff.md。终验:全量 pytest → 1660 passed;python -m psyclaw eval → 28/28 exit=0;python -m psyclaw gates → 通过;python -m psyclaw version → 0.14.0"
     }
   ]
 }
