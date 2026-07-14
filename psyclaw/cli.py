@@ -1062,18 +1062,41 @@ def cmd_start(args: argparse.Namespace) -> int:
             use_sandbox = ans in ("", "y", "yes")
         except EOFError:
             use_sandbox = True
-    if not use_sandbox:
+    if use_sandbox:
+        pol = build_policy_from_skills(skills, enabled=True)
+        path = save_policy(pol, ".")
+        print(ui.ok(f"  ✓ 沙箱已按最小权限配置 → {path}"))
+        print(ui.dim(f"    网络白名单 {len(pol['net']['allow_domains'])} 域 · "
+                     f"代码放行 {len(pol['exec']['allow_intent'])} 类科研栈 · "
+                     f"写允许 {pol['file']['write_allow']}"))
+        print(ui.dim("    私密数据(data/raw)禁止原样外传,须编码表脱敏;上传默认拒;"
+                     "恶意代码硬拒。审计 → .psyclaw/sandbox_audit.jsonl"))
+    else:
         print(ui.warn("  沙箱未启用(各面沿用既有守卫;可随时 psyclaw start 重配)"))
-        return 0
-    pol = build_policy_from_skills(skills, enabled=True)
-    path = save_policy(pol, ".")
-    print(ui.ok(f"  ✓ 沙箱已按最小权限配置 → {path}"))
-    print(ui.dim(f"    网络白名单 {len(pol['net']['allow_domains'])} 域 · "
-                 f"代码放行 {len(pol['exec']['allow_intent'])} 类科研栈 · "
-                 f"写允许 {pol['file']['write_allow']}"))
-    print(ui.dim("    私密数据(data/raw)禁止原样外传,须编码表脱敏;上传默认拒;"
-                 "恶意代码硬拒。审计 → .psyclaw/sandbox_audit.jsonl"))
+
+    # feat-130:start 收尾引导进流程——与 setup(一次性装依赖/建目录)划清界限:
+    # start = 每次开工的意图向导,自然衔接三种工作方式;缺依赖时才回指 setup。
+    print()
+    _start_next_step(intent, skills)
     return 0
+
+
+def _start_next_step(intent: str, skills: list[str]) -> None:
+    """据意图给出「下一步跑什么」的具体命令;并在缺基础环境时回指 setup。"""
+    from pathlib import Path
+    from psyclaw import ui
+    low = (intent or "").lower()
+    if "run-stats-mcp" in skills and ("统计" in low or "分析" in low or "数据" in low):
+        nxt = 'psyclaw run analysis <你的数据.csv>'
+    elif "lit" in skills:
+        nxt = f'psyclaw run literature "{intent[:24] or "你的主题"}"'
+    else:
+        nxt = "psyclaw            (直接对话,边聊边做)"
+    print(ui.ok("  下一步:") + " " + ui.accent(nxt))
+    # 环境未就绪(无配置/无 API key)时,才提示 setup——职责边界:start 不装东西
+    if not (Path.home() / ".psyclaw" / "config.yaml").exists() \
+            and not (Path(".") / ".psyclaw" / "config.yaml").exists():
+        print(ui.dim("  提示:首次使用先 psyclaw setup 装依赖/建目录、psyclaw config 配 API key"))
 
 
 def cmd_sleep(args: argparse.Namespace) -> int:
@@ -1308,7 +1331,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 常用命令集——`--help` 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅供 `guide`/`commands`
 # 标注 ★ 常用,帮助新用户聚焦上手路径。改这个集合只影响 ★ 标注,不影响命令可见性/可用性。
 CORE_COMMANDS = {
-    "chat", "run", "auto", "guide", "status", "prepare", "check",
+    "chat", "run", "auto", "start", "guide", "status", "prepare", "check",
     "config", "setup", "doctor", "resume", "commands",
 }
 
@@ -1316,7 +1339,7 @@ CORE_COMMANDS = {
 # 成熟库/MCP——本 CLI 只保留研究编排 + 知识参考 + 文献/写作 harness。
 COMMAND_CATEGORIES = [
     ("三种交互入口", ["chat", "run", "auto"]),
-    ("环境 / 系统", ["guide", "status", "version", "doctor", "config", "setup",
+    ("环境 / 系统", ["help", "guide", "status", "version", "doctor", "config", "setup",
                   "skills", "mcp", "plugins", "gates", "eval", "commands"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
                     "journal"]),
@@ -1333,17 +1356,29 @@ COMMAND_CATEGORIES = [
 
 
 def cmd_guide(args: argparse.Namespace) -> int:
-    """首次使用上手:三种稳定入口,执行引擎细节不暴露给普通用户。"""
+    """上手介绍 = 帮助总览(feat-130:guide 与 help 合并,单一真源 _print_help)。"""
+    return _print_help()
+
+
+def _print_help() -> int:
+    """psyclaw help / guide / --help 的统一内容:三种工作方式 + 上手路径 + 命令去哪找。
+
+    合并原 guide(工作方式/run 类型)与 help(命令去向),消除重复入口。
+    """
     from psyclaw import __version__, ui
     print(ui.startup(__version__))
-    print(ui.panel("Three Ways to Work",
+    print(ui.panel("零基础第一步",
+                   ui.ok("psyclaw start") + ui.dim("   一句话说你要做什么,系统澄清意图、"
+                         "选能力、配好就绪——只需回答几个问题"),
+                   color="brgreen"))
+    print(ui.panel("三种工作方式",
                    "\n".join([
-                       ui.ok("1. psyclaw") + ui.dim("                    对话:边讨论边做,关键操作确认"),
-                       ui.ok("2. psyclaw run analysis data.csv") + ui.dim(" 运行:明确、可复现的单次流程"),
-                       ui.ok("3. psyclaw auto") + ui.dim("               自动:据项目状态持续推进"),
+                       ui.ok("psyclaw") + ui.dim("                       对话:边讨论边做,关键操作确认"),
+                       ui.ok("psyclaw run analysis data.csv") + ui.dim("  运行:明确、可复现的单次流程"),
+                       ui.ok("psyclaw auto") + ui.dim("                  自动:据项目状态持续推进"),
                    ]),
                    color="brmagenta"))
-    print(ui.panel("Run Types",
+    print(ui.panel("Run 类型",
                    "\n".join([
                        "run literature <主题>      " + ui.dim("文献综述 / 系统综述"),
                        "run analysis <data.csv>    " + ui.dim("实证分析 + 外部统计"),
@@ -1351,8 +1386,9 @@ def cmd_guide(args: argparse.Namespace) -> int:
                        "run qualitative <目录>     " + ui.dim("主题分析 + COREQ"),
                    ]),
                    color="brcyan"))
-    print(ui.dim("配置: psyclaw config   自检: psyclaw doctor   全部命令: psyclaw commands"))
-    print(ui.dim("教程: docs/TUTORIAL.md"))
+    print(ui.dim("准备: psyclaw setup(装依赖/建目录,一次性)   配置: psyclaw config   "
+                 "自检: psyclaw doctor"))
+    print(ui.dim("全部命令: psyclaw commands   教程: docs/TUTORIAL.md"))
     return 0
 
 
@@ -1508,7 +1544,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc.set_defaults(func=cmd_config)
 
     pst = sub.add_parser("setup",
-                         help="项目脚手架+能力选装:目录/据研究准备清单生成概览/项目记忆/能力依赖/MCP·skill")
+                         help="【一次性】装依赖/建目录/配 MCP:把机器与项目搭好(区别于每次开工的 start)")
     pst.add_argument("--env", action="store_true",
                      help="一键配置缺失的基础环境(检查 provider/key + stats/full 组;--online 实装)")
     pst.add_argument("--groups", default=None, help="直接装指定组(逗号分隔:stats,viz,eeg,full)")
@@ -1810,7 +1846,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("sleep", help="睡眠整合:情景重放蒸馏候选记忆→教训合并→衰减结算"
                    ).set_defaults(func=cmd_sleep)
-    pstart = sub.add_parser("start", help="启动向导:澄清意图→选 skill→询问是否启用沙箱→按能力配最小权限")
+    pstart = sub.add_parser("start", help="【每次开工】意图向导:说要做什么→选能力→配沙箱→引导进流程")
     pstart.add_argument("--intent", default=None, help="研究意图(免交互;脚本化用)")
     pstart.add_argument("--sandbox", dest="sandbox", action="store_true", default=None,
                         help="免交互:直接启用沙箱")
@@ -1825,7 +1861,10 @@ def build_parser() -> argparse.ArgumentParser:
     pwb.set_defaults(func=cmd_webbridge)
 
     sub.add_parser(
-        "guide", help="首次使用上手介绍(chat / run / auto 三种工作方式)"
+        "help", help="上手介绍 + 命令去向(= guide;三种工作方式/run 类型/常用命令)"
+    ).set_defaults(func=cmd_guide)
+    sub.add_parser(
+        "guide", help="上手介绍(help 的别名)"
     ).set_defaults(func=cmd_guide)
     sub.add_parser(
         "commands", help="按职能分类列出全部命令（★=常用）"
