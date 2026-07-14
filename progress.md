@@ -725,3 +725,14 @@ goal/plan/tasks/research/review · memory/serve/notify/lit/auth/export/figures
 
 本地测试解释器:`C:\Python314\python`。PsyClaw 现为纯研究编排 harness,
 **不要再往 psyclaw 里加任何统计计算**——统计交给外部成熟库/MCP(见 CLAUDE.md 铁律)。
+- ✅ feat-123 按角色模型路由:六常驻角色(planner/executor/critic/reviewer/auditor/writer)
+  支持 `<role>_provider/_model/_base_url` 扁平配置键 + `PSYCLAW_<ROLE>_<KEY>` 环境变量;
+  `providers.get_role_provider` + `loop._role_providers` 覆盖 run_plan/run_loop/
+  run_pipeline/run_review/repl(/audit) 六调用点(tests +9)。
+- ✅ feat-124 评审档位:`review --debate`(或配置 `review_mode: debate`)= R1/R2/R3/DA
+  独立评审→交叉质证→EIC 综合(9 调用/轮);推荐按块归属(`last_recommendation`),
+  fail-closed 聚合复用 `aggregate_decision`;辩论过程存 notes/review_debate.md;
+  默认 panel 档零变化(tests +13)。
+- 验证:全量 pytest 1724 passed · eval 28/28 · gates 通过 · mock 冒烟 CLI --debate 走通。
+- ⚠ 编号协调:与并行会话两度撞号(114 记忆线 / 118 沙箱线),角色路由终登记 feat-123;
+  角色路由实现代码曾被并行会话 `git add -A` 卷入 d95f29f(代码完好,账目见 535368a)。

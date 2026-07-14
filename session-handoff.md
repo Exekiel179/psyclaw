@@ -27,3 +27,11 @@
 - 评审遗留的低优先级清理(未立项):steps_meta/steps_analysis 注入块共享 helper、
   生成脚本 res.i2 退化角落加 q>0 守卫、CHANGELOG 补 pre-v0.12 required 期刊 sidecar
   迁移说明。无阻塞项;等用户新需求。
+- feat-123(角色模型路由)+ feat-124(辩论式评审档位)已完成入库(95967f1),
+  1724 绿 / eval 28/28。用法:配置 `reviewer_provider/reviewer_model` 等键实现
+  「便宜模型起草、强模型评审」;`psyclaw review --debate` 或配置
+  `review_mode: debate` 开深评档(9 调用/轮,快评档默认零变化)。
+- 后续候选(未立项):critic 修复环加辩护人+独立裁判、audit 多裁判面板、
+  LLM-judge 汇入 pipeline_verdict(只收紧不放宽)、埋缺陷稿件的裁判召回率小基准。
+- ⚠ 并行会话正在做沙箱系统(feat-118~122,TODO 已立案、工作树有未提交文件),
+  提交时**不要 `git add -A`**,按文件显式 add,避免互卷。
