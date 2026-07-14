@@ -51,6 +51,11 @@ class TestLeanCore:
     def test_contains_psyclaw_identity(self):
         assert "PsyClaw" in lean_core()
 
+    def test_no_fabricated_example_output(self):
+        """feat-105:脚本未运行不得给带具体数值的「输出示例」(实测编出假 t 值)。"""
+        s = lean_core()
+        assert "未运行不造数" in s
+        assert "输出示例" in s and "占位" in s
     def test_marginal_significance_ban(self):
         """feat-098:「边缘显著」类措辞自己不用、也不建议(第一轮 chat 曾建议)。"""
         s = lean_core()

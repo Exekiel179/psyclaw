@@ -1106,6 +1106,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_path_ingest.py +2(子路径不切分零误报/中文前缀绝对路径仍识别)。全量 pytest → 1663 passed。"
+    },
+    {
+      "id": "feat-105",
+      "name": "chat 未运行不造数硬约束(lean_core)",
+      "description": "第三轮评估 3d 次实测:save 脚本后模型附带具体统计量的「输出示例(基于你提供的已清洗数据)」——t=4.202/d=2.101 全是编的,与真值(t=4.741/d=2.35)相去甚远,数字长得像真算过的极易被抄进论文。lean_core 增补硬约束:脚本/命令未真正运行前,绝不给带具体数值的「输出示例/预期结果」;要么运行拿真值,要么用占位符并明说。",
+      "dependencies": [
+        "feat-092"
+      ],
+      "status": "done",
+      "evidence": "tests/test_context.py TestLeanCore +1。全量 pytest → 1663 passed。活体复测:同场景(写 Welch t 脚本且「先别运行」)重喂 chat——保存脚本后只列「运行后输出将包含哪些量」,并原话声明「没有预估值,没有模板数字——实际结果需真正跑过才知」,全文零编造统计量(正则扫描 t=/d=/p= 具体数值:无)。"
     }
   ]
 }
