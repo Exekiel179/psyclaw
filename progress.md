@@ -2,7 +2,20 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-13(两轮对抗评估共 11 项缺陷清零:feat-090~100)
+**Last Updated:** 2026-07-14(**v0.14.0 发布**:三轮评估清零 + 文献查找全链)
+
+## 本轮(39):v0.14.0 发布 ——三轮评估清零 + 文献查找全链(feat-101~110)
+
+- 第三轮评估(多轮交互+工具调用力学)实锤并修复 feat-101(shell 块多行拆碎)/
+  feat-102(小 CSV 摘录截断);终测 100/100(全部对磁盘与独立真值核验)。
+- 文献查找全链落地:feat-103 lit --plan 检索计划包 · feat-104 --import/--matrix
+  回灌矩阵 · feat-107 浏览器 MCP(chrome-devtools,Chromium 适配+附连模式)·
+  feat-108 Kimi WebBridge(安装配置+默认浏览器识别 Arc+扩展页自动打开,
+  9 个 web__* 真实浏览器工具)· feat-109 OA PDF 真下载+规范命名(三样例四错清零)。
+- feat-110 v0.14.0 发布收尾。全量 1660 passed;eval 28/28;gates 通过;
+  110 个 feature 全 done。
+
+---
 
 ## 本轮(38):第二轮对抗评估三缺陷清零 ——feat-098~100 done + 边缘显著双向根除
 

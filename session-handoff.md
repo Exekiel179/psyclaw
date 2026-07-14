@@ -4,9 +4,10 @@
 
 ## Current Objective
 
-- Goal: 两轮对抗评估立案缺陷全部修复(第一轮 8 项 feat-090~097 + 第二轮 3 项 feat-098~100)
-- Current status: **11 项全部修复并活体复测**——100 个 feature 全 done
-- Branch / commit: master(领先 origin/master 多个提交,**待用户推送**:`! git push origin master`)
+- Goal: v0.14.0 发布(三轮对抗评估缺陷清零 + 文献查找全链)
+- Current status: **v0.14.0 已发布**——feat-090~110 done;110 个 feature 全 done
+- Branch / commit: master(待用户推送:`! git push origin master`;tag:`git tag v0.14.0 && git push origin v0.14.0`)
+- 待排期候选:feat-105(未跑先造示例数值)/feat-106(路径注入误报,低优先)
 
 ## Completed This Session
 - [x] 快进合并 feat/interaction-model-run-contracts(feat-076..078)进 master(先测后并:1495 绿)
