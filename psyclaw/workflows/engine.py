@@ -166,6 +166,13 @@ def run_workflow(workflow: dict, topic: str | None = None,
                         "artifact": ctx.artifacts.get(step.id), **out})
         ctx.log(f"workflow {workflow['id']} ✓ {step.id}")
         _write_checkpoint(ctx, workflow, results, status="running")
+        try:                                   # feat-135:步骤级快照外存,便于后期召回
+            from psyclaw.taskstate import save_step
+            save_step(workflow["id"], step.id,
+                      {"artifact": ctx.artifacts.get(step.id), **out},
+                      project_dir=str(ctx.project))
+        except Exception:  # noqa: BLE001
+            pass
 
         # ④ 步间 HITL(末步不问)
         if i < len(steps) and not _ask_continue(ctx, step):
