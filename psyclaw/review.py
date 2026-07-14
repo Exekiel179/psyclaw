@@ -269,8 +269,7 @@ def run_review(draft: str | None = None, project_dir: str = ".",
     返回 1(与 run_loop 的「修复环不收敛即停」一致)。
     """
     from psyclaw import config as cfg, ui
-    from psyclaw.loop import _gen, _log, _ask_yn
-    from psyclaw.providers import get_provider
+    from psyclaw.loop import _gen, _log, _ask_yn, _role_providers
 
     project = Path(project_dir)
     (project / "notes").mkdir(parents=True, exist_ok=True)
@@ -285,7 +284,8 @@ def run_review(draft: str | None = None, project_dir: str = ".",
         return 1
 
     conf = cfg.load_config()
-    provider = get_provider(conf)
+    prov = _role_providers(conf, ("reviewer", "executor"))
+    provider = prov["reviewer"]
     print(ui.panel("Review — 审稿模拟(EIC + R1/R2/R3 + Devil's Advocate)",
                    f"稿件:{src}（{len(draft_text)} 字符）\nprovider:{provider.name}"))
     _log(project, f"review start · src={src.name} · provider={provider.name}")
@@ -331,7 +331,7 @@ def run_review(draft: str | None = None, project_dir: str = ".",
             print(ui.dim("已停在评审阶段。评审产物已落盘。"))
             break
         panel_text = (project / "notes" / "review_panel.md").read_text(encoding="utf-8")
-        current = _gen(provider, "executor",
+        current = _gen(prov["executor"], "executor",
                        "按下列评审意见修订研究稿,只改被指出的问题,其余保持不变;"
                        "输出修订后的**完整稿件**(全文替换,不要引用或附加旧稿)。",
                        f"# 评审行动项(BLOCKING/MAJOR)\n{todo_md}\n\n"

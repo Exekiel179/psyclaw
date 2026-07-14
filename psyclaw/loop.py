@@ -64,6 +64,24 @@ def _log(project: Path, line: str) -> None:
         f.write(f"- {datetime.now().isoformat(timespec='seconds')} {line}\n")
 
 
+def _role_providers(conf: dict, roles: tuple) -> dict:
+    """为一组常驻角色解析 provider(feat-114 按角色模型路由)。
+
+    共享一个全局默认实例;配置了 <role>_provider/_model/_base_url 的角色
+    构建专属 provider,并打印一行路由说明(可观测,防静默用错模型)。
+    """
+    from psyclaw.providers import get_provider, get_role_provider
+    base = get_provider(conf)
+    out: dict = {"_default": base}
+    for role in roles:
+        p = get_role_provider(conf, role, default=base)
+        if p is not base:
+            print(ui.dim(f"  角色路由:{role} → {p.name}"
+                         f"({getattr(p, 'model', '?')})"))
+        out[role] = p
+    return out
+
+
 def _gen(provider, role: str, task: str, context: str = "") -> str:
     """让 provider 以某角色生成内容。"""
     msgs = [{"role": "user", "content": f"{task}\n\n{context}".strip()}]
@@ -130,7 +148,6 @@ def run_plan(topic: str | None = None, project_dir: str = ".",
     与 run_loop 的 ① 等价,但不进入执行;适合「先规划、人改完计划再开工」。
     """
     from psyclaw import config as cfg
-    from psyclaw.providers import get_provider
     from psyclaw.tasks import get_goal, set_goal
 
     project = Path(project_dir)
@@ -142,7 +159,7 @@ def run_plan(topic: str | None = None, project_dir: str = ".",
     if topic:
         set_goal(topic, project)
     conf = cfg.load_config()
-    provider = get_provider(conf)
+    provider = _role_providers(conf, ("planner",))["planner"]
     clar = _read(project / "notes" / "clarification.md")
     print(ui.panel("Plan — 规划(planner)",
                    f"目标:{goal.splitlines()[0][:80]}\nprovider:{provider.name}"))
@@ -176,7 +193,6 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
              auto: bool = False) -> int:
     """跑完整 HITL 研究回路。auto=True 跳过确认,但**绝不**自动批准数据操作。"""
     from psyclaw import config as cfg
-    from psyclaw.providers import get_provider
     from psyclaw.psych.clarify import check_card
 
     project = Path(project_dir)
@@ -202,14 +218,15 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
         print(ui.dim(f"  data/raw 快照:{len(raw_snapshot)} 个文件已记录 SHA-256"))
 
     conf = cfg.load_config()
-    provider = get_provider(conf)
+    prov = _role_providers(conf, ("planner", "executor", "critic"))
+    provider = prov["_default"]
     clar = _read(project / "notes" / "clarification.md")
     goal = topic or _read(project / "notes" / "goal.md") or "(见研究准备清单)"
     _log(project, f"loop start · provider={provider.name} · topic={goal[:60]}")
 
     # —— 1. planner ——
     print("\n" + ui.accent("① 规划(planner)"))
-    plan = _gen(provider, "planner", _planner_task(goal), clar)
+    plan = _gen(prov["planner"], "planner", _planner_task(goal), clar)
     (project / "notes" / "plan.md").write_text(plan, encoding="utf-8")
     print(ui.panel("notes/plan.md", plan[:1200] + ("…" if len(plan) > 1200 else "")))
     _log(project, "planner → notes/plan.md")
@@ -221,7 +238,7 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
 
     # —— 2. executor ——
     print("\n" + ui.accent("② 执行(executor)"))
-    execed = _gen(provider, "executor",
+    execed = _gen(prov["executor"], "executor",
                   "按 plan.md 产出第一阶段分析脚本(数据质量+描述统计)。"
                   "脚本写法遵循严谨性协议;若需删除/重编码数据,不要执行,"
                   "改为**单独一行、行首**以 `DECISION_REQUEST:` 开头说明理由"
@@ -257,7 +274,7 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
     gates_report = _gates_report(project)
     review = ""
     for rnd in range(1, MAX_REVIEW_ROUNDS + 1):
-        review = _gen(provider, "critic",
+        review = _gen(prov["critic"], "critic",
                       f"审查以下计划与执行产出(第 {rnd} 轮)。按 Blocking / Warning / "
                       "Approved 三段输出;逐条核对严谨性协议第四节常见错误。"
                       "程序化质量检查结果已附,作为客观依据。"
@@ -277,7 +294,7 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
             print(ui.warn("  critic 未输出 VERDICT,按 BLOCK 处理(fail-closed)"))
         if rnd < MAX_REVIEW_ROUNDS:
             print(ui.warn(f"  第 {rnd} 轮 BLOCK,executor 修复后重审…"))
-            execed = _gen(provider, "executor",
+            execed = _gen(prov["executor"], "executor",
                           "仅修复 critic 指出的 Blocking,其余保持不变。"
                           "输出修复后的**完整版本**(全文替换,不要引用或附加旧稿)。",
                           f"# REVIEW\n{review}\n\n# 当前版本\n{execed}")
@@ -315,7 +332,7 @@ def run_loop(topic: str | None = None, project_dir: str = ".",
 
     # —— 4. 交付 ——
     print("\n" + ui.accent("④ 交付"))
-    report = _gen(provider, "executor",
+    report = _gen(prov["executor"], "executor",
                   "整理最终分析报告(只引用 outputs/ 中存在的表图;"
                   "解释用限定性措辞,效应量+CI 优先)。", f"{plan}\n{review}")
     (project / "outputs" / "report.md").write_text(report, encoding="utf-8")

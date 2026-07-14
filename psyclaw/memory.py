@@ -117,6 +117,15 @@ def draft_lesson(trigger: str, lesson: str, source: str, kind: str | None = None
             c["hits"] = int(c.get("hits", 1)) + 1
             _save("lessons", data)
             return
+    for c in list(data.get("dormant", [])):      # feat-115:休眠同卡再现 → 复活
+        if c.get("trigger") == trigger and c.get("lesson") == lesson:
+            data["dormant"].remove(c)
+            c.pop("dormant_ts", None)
+            c["strength"] = int(c.get("strength", 1)) + 1
+            c["reinforced_ts"] = int(time.time())
+            data.setdefault("active", []).append(c)
+            _save("lessons", data)
+            return
     card = {"trigger": trigger, "lesson": lesson, "source": source,
             "ts": int(time.time())}
     if kind:
@@ -319,6 +328,9 @@ def record_fact(concept: str, statement: str, scope: str = "project",
     key = concept.lower()
     for c in cards:
         if c.get("concept", "").lower() == key and c.get("scope") == scope:
+            if c.get("status") == "dormant":     # feat-115:再遇即复活
+                c["status"] = "active"
+                c.pop("dormant_ts", None)
             if _norm_stmt(c.get("statement")) == _norm_stmt(statement):
                 c["strength"] = int(c.get("strength", 1)) + 1
                 c["confidence"] = min(0.95, float(c.get("confidence", 0.7)) + 0.05)
@@ -355,6 +367,8 @@ def recall_facts(query: str, top_k: int = 4) -> list[dict]:
         return []
     scored = []
     for c in cards:
+        if c.get("status") in ("dormant", "pending"):   # 休眠可复活;pending 待确认(睡眠产物)
+            continue
         hit = len(q_kws & _mem_tokens(f"{c.get('concept', '')} {c.get('statement', '')}"))
         if hit:
             scored.append((hit, c))
@@ -382,6 +396,94 @@ def render_fact_block(cards: list[dict]) -> str:
             lines.append(f"  ⚠ 曾有不同说法:「{old['statement']}」"
                          "——如与当前任务相关,请向用户确认后以确认为准")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 遗忘机制(feat-115,docs/MEMORY.md §三)——激活度衰减 + 休眠/复活/删除。
+# 方向不对称(故意):升级为长期过人审,降级遗忘全自动——错学比忘记贵。
+# 情景档案不删原文;遗忘只发生在语义/程序卡的「取用权」上。
+# ---------------------------------------------------------------------------
+
+DORMANT_THRESHOLD = 0.5      # activation 低于此 → 休眠(不注入,可复活)
+PURGE_AFTER_DAYS = 180.0     # 休眠超此天数且从未被取用 → 删除(留快照)
+
+
+def _days_since(stamp) -> float:
+    """ISO 字符串(facts)或 epoch 秒(lessons)→ 距今天数;缺失按 0 天。"""
+    if not stamp:
+        return 0.0
+    try:
+        if isinstance(stamp, (int, float)):
+            return max(0.0, (time.time() - float(stamp)) / 86400.0)
+        from datetime import datetime
+        return max(0.0, (time.time()
+                         - datetime.fromisoformat(str(stamp)).timestamp()) / 86400.0)
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
+def card_activation(card: dict) -> float:
+    """activation = strength × 0.5^(days_since_last_use / 90)。"""
+    last = card.get("last_used") or card.get("reinforced_ts") or \
+        card.get("recorded") or card.get("ts")
+    return float(card.get("strength", 1)) * math.pow(
+        0.5, _days_since(last) / HALF_LIFE_DAYS)
+
+
+def apply_decay() -> dict:
+    """批量衰减结算(睡眠机制的第三步,也可单独跑)。返回处置计数。"""
+    report = {"facts_dormant": 0, "facts_purged": 0,
+              "lessons_dormant": 0, "lessons_purged": 0}
+    # 语义卡
+    data = _load("facts")
+    keep = []
+    changed = False
+    for c in data.get("facts", []):
+        if c.get("status") == "dormant":
+            if _days_since(c.get("dormant_ts")) > PURGE_AFTER_DAYS \
+                    and int(c.get("use_count", 0)) == 0:
+                data.setdefault("purged", []).append({**c, "purged_ts": _now_iso()})
+                report["facts_purged"] += 1
+                changed = True
+                continue
+            keep.append(c)
+            continue
+        if card_activation(c) < DORMANT_THRESHOLD:
+            c["status"] = "dormant"
+            c["dormant_ts"] = _now_iso()
+            report["facts_dormant"] += 1
+            changed = True
+        keep.append(c)
+    if changed:
+        data["facts"] = keep
+        _save("facts", data)
+    # 程序卡(active → dormant 列表;休眠到期 → archived,留痕不删)
+    ldata = _load("lessons")
+    still_active = []
+    lchanged = False
+    for c in ldata.get("active", []):
+        if card_activation(c) < DORMANT_THRESHOLD:
+            c["dormant_ts"] = int(time.time())
+            ldata.setdefault("dormant", []).append(c)
+            report["lessons_dormant"] += 1
+            lchanged = True
+        else:
+            still_active.append(c)
+    still_dormant = []
+    for c in ldata.get("dormant", []):
+        if _days_since(c.get("dormant_ts")) > PURGE_AFTER_DAYS:
+            c["archived_ts"] = int(time.time())
+            c["archived_reason"] = "衰减(长期休眠未复用)"
+            ldata.setdefault("archived", []).append(c)
+            report["lessons_purged"] += 1
+            lchanged = True
+        else:
+            still_dormant.append(c)
+    if lchanged:
+        ldata["active"] = still_active
+        ldata["dormant"] = still_dormant
+        _save("lessons", ldata)
+    return report
 
 
 def resolve_fact(concept: str, scope: str = "project") -> bool:
@@ -429,6 +531,19 @@ def memory_cli(argv: list) -> int:
             for h in c.get("history", [])[-3:]:
                 print(f"     曾「{h['statement'][:50]}」({h.get('recorded', '?')})")
             print(f"     裁决:psyclaw memory resolve {c['concept']}(接受现行)")
+        return 0
+    if argv and argv[0] == "approve" and len(argv) >= 2:   # feat-116:确认睡眠蒸馏的语义卡
+        data = _load("facts")
+        hit = False
+        for c in data.get("facts", []):
+            if c.get("concept", "").lower() == argv[1].lower() \
+                    and c.get("status") == "pending":
+                c["status"] = "active"
+                c["confidence"] = max(float(c.get("confidence", 0.5)), 0.7)
+                hit = True
+        if hit:
+            _save("facts", data)
+        print("  ✓ 已确认,开始注入" if hit else "  (无该概念的待确认语义卡)")
         return 0
     if argv and argv[0] == "resolve" and len(argv) >= 2:
         ok = resolve_fact(argv[1])
