@@ -198,3 +198,51 @@ def test_recursive_delete_regex_catches_flag_variants(tmp_path):
     for c in ("rm -fr /tmp/x", "rm   -r /data"):
         ok, _ = SB.classify_exec(c, pol)
         assert ok is False
+def test_host_allowed_whitelist_and_subdomain(tmp_path):
+    pol = SB.load_policy(str(tmp_path))
+    assert SB.host_allowed("https://api.openalex.org/works?x=1", pol) is True
+    assert SB.host_allowed("https://sub.arxiv.org/pdf/1", pol) is True   # 子域
+    assert SB.host_allowed("https://evil.example.com/x", pol) is False
+def test_net_get_whitelisted_allowed(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("net", "get",
+                         {"url": "https://api.crossref.org/works"}, str(tmp_path))
+    assert r["allow"] is True
+def test_net_get_unknown_domain_denied(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("net", "get",
+                         {"url": "https://tracker.ad.net/beacon"}, str(tmp_path))
+    assert r["allow"] is False and "白名单" in r["reason"]
+def test_net_upload_denied_by_default(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("net", "upload",
+                         {"url": "https://api.openalex.org/x"}, str(tmp_path))
+    assert r["allow"] is False and "上传" in r["reason"]
+def test_net_upload_allowed_when_authorized(tmp_path):
+    _enable(tmp_path, net={"upload": "allow",
+                           "allow_domains": ["api.openalex.org"]})
+    r = SB.sandbox_check("net", "upload",
+                         {"url": "https://api.openalex.org/x"}, str(tmp_path))
+    assert r["allow"] is True
+def test_net_private_data_no_codebook_denied(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("net", "get",
+                         {"url": "https://api.openalex.org/x",
+                          "contains_private": True}, str(tmp_path))
+    assert r["allow"] is False and "私密" in r["reason"]
+def test_net_private_data_with_codebook_needs_redaction(tmp_path):
+    _enable(tmp_path)
+    _write_codebook(tmp_path, {"张三": "S01"})
+    r = SB.sandbox_check("net", "get",
+                         {"url": "https://api.openalex.org/x",
+                          "contains_private": True}, str(tmp_path))
+    assert r["allow"] is True and r.get("needs") == "codebook"
+def test_litsearch_get_blocked_under_sandbox(tmp_path, monkeypatch):
+    """启用沙箱时 litsearch._get 白名单外域名被网络面拒(不真联网)。"""
+    import os
+    monkeypatch.chdir(tmp_path)
+    _enable(tmp_path)
+    from psyclaw.psych import litsearch
+    import urllib.error
+    with __import__("pytest").raises(urllib.error.URLError):
+        litsearch._get("https://not-whitelisted.com/api")

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -23,6 +24,19 @@ TIMEOUT = 30
 
 
 def _get(url: str, headers: dict | None = None) -> dict | str:
+    # feat-128:启用沙箱时,学术 API 请求过网络面裁决(白名单外拒;PDF 下载
+    # 是用户明确要的 OA 只读内容,走 download_pdf 不经此,不受白名单硬拦)。
+    try:
+        from psyclaw import sandbox as _sb
+        pol = _sb.load_policy(".")
+        if pol.get("enabled"):
+            v = _sb.sandbox_check("net", "get", {"url": url}, project_dir=".")
+            if not v["allow"]:
+                raise urllib.error.URLError(f"沙箱网络面拒绝:{v['reason']}")
+    except urllib.error.URLError:
+        raise
+    except Exception:  # noqa: BLE001  # 沙箱异常不阻断检索
+        pass
     req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         data = r.read().decode("utf-8", errors="replace")

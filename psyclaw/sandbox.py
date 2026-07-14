@@ -118,8 +118,58 @@ def sandbox_check(face: str, action: str, args: dict | None = None,
     if face == "file":
         return _check_file(policy, project_dir, action, args)
 
-    # tools/net:入口已通,判据待 feat-127~128 填;当前放行并审计(不回归)
-    return _verdict(project_dir, face, action, args, True, "该面判据待实现,暂放行")
+    if face == "net":
+        return _check_net(policy, project_dir, action, args)
+
+    # tools:入口已通,判据沿用既有逐动作审批;当前放行并审计(不回归)
+    return _verdict(project_dir, face, action, args, True, "工具面沿用既有审批")
+
+
+def _host_of(url: str) -> str:
+    from urllib.parse import urlparse
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def host_allowed(url: str, policy: dict) -> bool:
+    """域名在白名单(精确或子域)。"""
+    host = _host_of(url)
+    if not host:
+        return False
+    for a in policy.get("net", {}).get("allow_domains", []):
+        a = str(a).lower().strip()
+        if host == a or host.endswith("." + a):
+            return True
+    return False
+
+
+def _check_net(policy: dict, project_dir: str, action: str, args: dict) -> dict:
+    """网络面裁决(feat-128)。action ∈ get(读取) | upload(外发数据)。
+
+    - upload(把数据发外部服务)默认拒,策略 upload=allow 才放;
+    - **私密数据不出网**:请求体经编码表脱敏后仍含 private 真实值,或标了
+      contains_private 但无编码表 → 拒(与文件面同一脱敏纪律);
+    - get:域名在白名单放行,否则灰区(拒绝优先——最小权限,未知域名不默认信任)。
+    """
+    url = str(args.get("url", ""))
+    ncfg = policy.get("net", {})
+    if action == "upload":
+        if ncfg.get("upload", "deny") != "allow":
+            return _verdict(project_dir, "net", action, args, False,
+                            "上传/外发数据默认拒(须策略 upload=allow 显式授权)")
+    if args.get("contains_private"):
+        if not codebook_exists(project_dir):
+            return _verdict(project_dir, "net", action, args, False,
+                            "请求含私密数据且无编码表——禁止出网,先脱敏")
+        r = _verdict(project_dir, "net", action, args, True, "私密数据出网须脱敏")
+        r["needs"] = "codebook"
+        return r
+    if host_allowed(url, policy):
+        return _verdict(project_dir, "net", action, args, True, "域名在白名单")
+    return _verdict(project_dir, "net", action, args, False,
+                    f"域名 {_host_of(url) or '?'} 不在白名单(最小权限,未知域名不默认信任)")
 
 
 # ---------------------------------------------------------------------------
