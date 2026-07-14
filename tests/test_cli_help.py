@@ -177,3 +177,28 @@ def test_commands_catalog_registered_and_covers_all():
     assert len(flat) == len(set(flat)), "COMMAND_CATEGORIES 有重复命令"
     # 所有注册命令都被归类（统计命令已删，无 stub 例外）
     assert names == catalogued
+def test_setup_global_writes_modules(tmp_path, monkeypatch):
+    """feat-131:setup=全局首配,板块选择写 ~/.psyclaw/config.yaml(逗号串可读回)。"""
+    import argparse
+    from pathlib import Path
+    monkeypatch.setattr("psyclaw.config.HOME_DIR", tmp_path / ".psyclaw")
+    monkeypatch.setattr("psyclaw.config.CONFIG_FILE", tmp_path / ".psyclaw" / "config.yaml")
+    monkeypatch.setattr("psyclaw.config.ENV_FILE", tmp_path / ".psyclaw" / ".env")
+    from psyclaw.cli import cmd_setup
+    rc = cmd_setup(argparse.Namespace(env=False, project=False, online=False,
+                                      non_interactive=True, modules="stats,embed",
+                                      groups=None))
+    assert rc == 0
+    text = (tmp_path / ".psyclaw" / "config.yaml").read_text(encoding="utf-8")
+    assert "modules: stats,embed" in text
+    from psyclaw.config import load_config, CONFIG_FILE
+    conf = load_config()
+    assert "stats" in str(conf.get("modules"))       # 逗号串读回可用
+def test_setup_project_flag_scaffolds(tmp_path, monkeypatch):
+    """--project 才走项目脚手架(与全局首配分开)。"""
+    import argparse
+    monkeypatch.chdir(tmp_path)
+    from psyclaw.cli import cmd_setup
+    rc = cmd_setup(argparse.Namespace(env=False, project=True, online=False,
+                                      non_interactive=True, modules=None, groups=None))
+    assert rc == 0 and (tmp_path / "outputs").exists()   # 建了项目目录
