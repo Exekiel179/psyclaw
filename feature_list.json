@@ -1258,6 +1258,27 @@
       ],
       "status": "done",
       "evidence": "tests/test_cli_help.py +2(help/guide 同源分发/start 下一步意图路由),既有 guide 注册测试保留。全量 pytest → 1762 passed;eval 28/28。活体:psyclaw help 显示合并后内容(零基础第一步突出 start);psyclaw start --intent 文献综述 → 收尾给「下一步: psyclaw run literature ...」。"
+    },
+    {
+      "id": "feat-131",
+      "name": "setup 重定位为全局首配(选能力板块)· start 保持项目级",
+      "description": "用户澄清 setup/start 语义:setup=新手第一次配置、全局、用户决定需要哪些板块;start=项目级。实现:setup 默认走 _setup_global——展示 4 个能力板块(stats 统计后端/embed 语义记忆增强/full REPL 增强/browser 浏览器桥)让用户勾选,写 ~/.psyclaw/config.yaml 的 modules(逗号串,_parse_simple 可读回),提示配 provider/key,选装依赖(--online 联网装,browser 指 webbridge install);--modules 免交互、--project 才做原项目脚手架。setup/start help 文案标注【全局首配】/【项目级】边界。start 收尾引导进流程不变(feat-130)。",
+      "dependencies": [
+        "feat-130"
+      ],
+      "status": "done",
+      "evidence": "tests/test_cli_help.py +2(setup 全局写 modules 逗号串可读回/--project 才脚手架)。全量 pytest → 1764 passed;eval 28/28。活体(隔离 HOME):setup --modules stats,embed → 「能力板块已记入全局配置:stats, embed」+ config.yaml 落 modules: stats,embed;提示未配 provider 与装依赖命令。"
+    },
+    {
+      "id": "feat-132",
+      "name": "上下文长对话增强(蓝图,分轮):skill 闲置清走 + 历史重要性打分 + 中间状态外存",
+      "description": "用户补充的长对话/上下文需求,核查后拆分:①长对话滑动窗口+早轮摘要压缩=已有(compact_history 留 8 轮超 60k LLM 蒸馏 memo);②resume 太长也压缩=已有(_resume_session 载入即 compact_history);以下为真缺口分轮做:feat-133 上下文长期不用的 skill/工具组闲置清走(工具目录路由已按意图过滤 feat-113,再加「N 轮未命中的组从注入完全移除」);feat-134 历史记录重要性打分(recall 现按时近/关键词/语义,增重要性维度:含决策/纠正/结论的轮次加权,低信息寒暄降权,影响召回排序与压缩保留优先级);feat-135 任务执行中间状态外存便于召回(workflow 已有 .psyclaw/workflows/*.json resume 雏形,扩到 chat/agent 的步骤级快照)。",
+      "dependencies": [
+        "feat-111",
+        "feat-113"
+      ],
+      "status": "planned",
+      "evidence": "蓝图立案(未实现);现状核查:滑动窗口/摘要压缩/resume 压缩三项已有,缺口=skill 闲置清走/重要性打分/中间状态外存。"
     }
   ]
 }

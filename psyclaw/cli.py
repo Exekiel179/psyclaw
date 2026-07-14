@@ -391,11 +391,16 @@ def _setup_print_mcp_skill() -> None:
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
-    # 项目脚手架 + 能力选装向导:①目录 ②clarify→概览 ③项目记忆 ④能力依赖 ⑤MCP/skill。
+    # feat-131:setup =【全局首配】——选能力板块 + 配 provider/key,写 ~/.psyclaw
+    #（区别于 start 的项目级)。板块选择向导默认走这条;--project 才做项目脚手架。
     from psyclaw import ui
     from psyclaw.scaffold import scaffold_project
     ni = getattr(args, "non_interactive", False)
     online = getattr(args, "online", False)
+
+    # --env:一键配置缺失的基础环境(v0.9),不做板块选择/脚手架
+    if not getattr(args, "env", False) and not getattr(args, "project", False):
+        return _setup_global(args, online, ni)
 
     # --env:一键配置缺失的基础环境(v0.9 feat-051),不做项目脚手架
     if getattr(args, "env", False):
@@ -1012,6 +1017,79 @@ def cmd_lit(args: argparse.Namespace) -> int:
                    download=getattr(args, "download", False))
 
 
+# feat-131:全局能力板块(setup 首配让用户勾选;写 ~/.psyclaw/config.yaml modules)
+_SETUP_MODULES = [
+    ("stats", "统计后端", "在本机直接跑统计(pingouin/statsmodels/scipy);不装则走 MCP/生成脚本"),
+    ("embed", "语义记忆增强", "本地向量嵌入,记忆/文献召回更准;不装用内置哈希兜底"),
+    ("full", "REPL 增强", "命令补全/富交互等对话体验增强"),
+    ("browser", "浏览器桥", "驱动真实浏览器进机构库检索(需 node/npx + 扩展)"),
+]
+
+
+def _setup_global(args, online: bool, ni: bool) -> int:
+    """setup 全局首配:选能力板块 → 配 provider/key → 写 ~/.psyclaw/config.yaml。"""
+    from psyclaw import ui
+    from psyclaw.config import _write_config, load_config
+
+    def _modules_of(conf) -> list:
+        m = conf.get("modules", "")
+        return [x.strip() for x in str(m).split(",") if x.strip()] if m else []
+
+    print(ui.title("PsyClaw 首次配置(全局)")
+          + ui.dim("  一次配好,所有项目通用;项目级设置用 psyclaw start"))
+    conf = load_config()
+    cur = _modules_of(conf)
+    chosen = getattr(args, "modules", None)
+    if chosen is not None:                          # 免交互:--modules stats,embed
+        picks = [m.strip() for m in chosen.split(",") if m.strip()]
+    elif ni:
+        picks = cur or ["stats"]
+    else:
+        print(ui.accent("\n  你需要哪些能力板块?(逗号分隔序号,回车=默认统计):"))
+        for i, (key, name, desc) in enumerate(_SETUP_MODULES, 1):
+            on = "✓" if key in cur else " "
+            print(f"    [{on}] {i}. {ui.ok(name)} — {ui.dim(desc)}")
+        try:
+            sel = input("  选择: ").strip()
+        except EOFError:
+            sel = ""
+        if not sel:
+            picks = ["stats"]
+        else:
+            idx = [int(x) - 1 for x in sel.replace(" ", ",").split(",")
+                   if x.strip().isdigit()]
+            picks = [_SETUP_MODULES[i][0] for i in idx if 0 <= i < len(_SETUP_MODULES)]
+    modules = list(dict.fromkeys(picks))
+    conf["modules"] = ",".join(modules)             # 逗号字符串:_parse_simple 可读回
+    _write_config({k: v for k, v in conf.items() if not k.startswith("_")}, {})
+    print(ui.ok(f"\n  ✓ 能力板块已记入全局配置:{', '.join(modules) or '(无)'}"))
+
+    # provider/key:无 provider 或 mock 时提示配置(不强制,可后续 config)
+    if conf.get("provider", "mock") == "mock":
+        print(ui.warn("  ⚠ 尚未配置 LLM provider —— psyclaw config 配 API key"
+                      "(未配则 provider 降级 mock,可先体验)"))
+    else:
+        print(ui.dim(f"  LLM:{conf.get('provider')} · {conf.get('model', 'default')}"))
+
+    # 装依赖:选了的板块可联网装(--online),否则给命令
+    pip_groups = [m for m in modules if m in ("stats", "embed", "full")]
+    if pip_groups:
+        if online:
+            print(ui.dim(f"  联网安装板块依赖:{', '.join(pip_groups)} …"))
+            try:
+                from psyclaw.bootstrap import run_setup
+                run_setup(non_interactive=True, groups=pip_groups)
+            except Exception as exc:  # noqa: BLE001
+                print(ui.err(f"  安装失败(请手动 pip install 'psyclaw[{','.join(pip_groups)}]'):{exc}"))
+        else:
+            print(ui.dim(f"  装依赖:pip install \"psyclaw[{','.join(pip_groups)}]\""
+                         "  或加 --online 自动装"))
+    if "browser" in modules:
+        print(ui.dim("  浏览器桥:psyclaw webbridge install(装守护进程+扩展指引)"))
+    print(ui.ok("\n  全局配置完成。开工:psyclaw start(项目级意图向导)"))
+    return 0
+
+
 def _route_skills_by_intent(intent: str) -> list[str]:
     """据意图关键词路由建议 skill(轻量,复用 SKILL_CAPABILITIES 的键)。纯函数。"""
     low = (intent or "").lower()
@@ -1386,7 +1464,7 @@ def _print_help() -> int:
                        "run qualitative <目录>     " + ui.dim("主题分析 + COREQ"),
                    ]),
                    color="brcyan"))
-    print(ui.dim("准备: psyclaw setup(装依赖/建目录,一次性)   配置: psyclaw config   "
+    print(ui.dim("首配: psyclaw setup(全局选板块,一次)   开工: psyclaw start(项目级)   "
                  "自检: psyclaw doctor"))
     print(ui.dim("全部命令: psyclaw commands   教程: docs/TUTORIAL.md"))
     return 0
@@ -1544,13 +1622,17 @@ def build_parser() -> argparse.ArgumentParser:
     pc.set_defaults(func=cmd_config)
 
     pst = sub.add_parser("setup",
-                         help="【一次性】装依赖/建目录/配 MCP:把机器与项目搭好(区别于每次开工的 start)")
+                         help="【全局首配】选能力板块+配 provider/key(一次配好所有项目通用;--project 做项目脚手架)")
     pst.add_argument("--env", action="store_true",
                      help="一键配置缺失的基础环境(检查 provider/key + stats/full 组;--online 实装)")
     pst.add_argument("--groups", default=None, help="直接装指定组(逗号分隔:stats,viz,eeg,full)")
     pst.add_argument("--online", action="store_true",
                      help="联网自动安装缺失的能力依赖(否则交互询问/仅显示矩阵)")
     pst.add_argument("--non-interactive", action="store_true")
+    pst.add_argument("--project", action="store_true",
+                     help="做项目脚手架(建目录/概览);默认 setup=全局首配选板块")
+    pst.add_argument("--modules", default=None,
+                     help="免交互选板块(逗号:stats,embed,full,browser)")
     pst.set_defaults(func=cmd_setup)
 
     pks = sub.add_parser("skills",
