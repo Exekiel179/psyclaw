@@ -1017,12 +1017,16 @@ def cmd_lit(args: argparse.Namespace) -> int:
                    download=getattr(args, "download", False))
 
 
-# feat-131:全局能力板块(setup 首配让用户勾选;写 ~/.psyclaw/config.yaml modules)
+# feat-131/136:全局能力板块(setup 首配让用户勾选;写 ~/.psyclaw/config.yaml modules)。
+# kind:pip=装 extra;npx=预热 npx 包(开箱即用);mcp=启用 registry 服务器;skill=装技能。
 _SETUP_MODULES = [
-    ("stats", "统计后端", "在本机直接跑统计(pingouin/statsmodels/scipy);不装则走 MCP/生成脚本"),
-    ("embed", "语义记忆增强", "本地向量嵌入,记忆/文献召回更准;不装用内置哈希兜底"),
-    ("full", "REPL 增强", "命令补全/富交互等对话体验增强"),
-    ("browser", "浏览器桥", "驱动真实浏览器进机构库检索(需 node/npx + 扩展)"),
+    ("stats", "统计后端", "在本机直接跑统计(pingouin/statsmodels/scipy);不装则走 MCP/生成脚本", "pip"),
+    ("embed", "语义记忆增强", "本地向量嵌入,记忆/文献召回更准;不装用内置哈希兜底", "pip"),
+    ("full", "REPL 增强", "命令补全/富交互等对话体验增强", "pip"),
+    ("sequential-thinking", "序列化思考", "把复杂推理拆成可回溯/可修正的思考步骤(设计/统计策略/评审);npx 开箱即用", "npx"),
+    ("browser", "浏览器桥", "驱动真实浏览器进机构库检索(需 node/npx + 扩展)", "npx"),
+    ("mne", "EEG/脑电分析", "MNE 事件相关电位/预处理 MCP(需 mne)", "mcp"),
+    ("journal", "目标期刊 skill", "目标期刊专属写作/投稿规范 skill(据你的目标期刊)", "skill"),
 ]
 
 
@@ -1046,7 +1050,7 @@ def _setup_global(args, online: bool, ni: bool) -> int:
         picks = cur or ["stats"]
     else:
         print(ui.accent("\n  你需要哪些能力板块?(逗号分隔序号,回车=默认统计):"))
-        for i, (key, name, desc) in enumerate(_SETUP_MODULES, 1):
+        for i, (key, name, desc, _kind) in enumerate(_SETUP_MODULES, 1):
             on = "✓" if key in cur else " "
             print(f"    [{on}] {i}. {ui.ok(name)} — {ui.dim(desc)}")
         try:
@@ -1064,6 +1068,11 @@ def _setup_global(args, online: bool, ni: bool) -> int:
     _write_config({k: v for k, v in conf.items() if not k.startswith("_")}, {})
     print(ui.ok(f"\n  ✓ 能力板块已记入全局配置:{', '.join(modules) or '(无)'}"))
 
+    # feat-136:网络探测——不通则后续 pip/npx 走国内镜像
+    from psyclaw import mirror
+    print(ui.dim("  " + mirror.describe()))
+    kinds = {k: kind for k, _n, _d, kind in _SETUP_MODULES}
+
     # provider/key:无 provider 或 mock 时提示配置(不强制,可后续 config)
     if conf.get("provider", "mock") == "mock":
         print(ui.warn("  ⚠ 尚未配置 LLM provider —— psyclaw config 配 API key"
@@ -1072,20 +1081,49 @@ def _setup_global(args, online: bool, ni: bool) -> int:
         print(ui.dim(f"  LLM:{conf.get('provider')} · {conf.get('model', 'default')}"))
 
     # 装依赖:选了的板块可联网装(--online),否则给命令
-    pip_groups = [m for m in modules if m in ("stats", "embed", "full")]
+    pip_groups = [m for m in modules if kinds.get(m) == "pip"]
     if pip_groups:
         if online:
-            print(ui.dim(f"  联网安装板块依赖:{', '.join(pip_groups)} …"))
+            idx = mirror.pip_index_args()
+            note = "(国内镜像)" if idx else ""
+            print(ui.dim(f"  联网安装 pip 板块{note}:{', '.join(pip_groups)} …"))
             try:
                 from psyclaw.bootstrap import run_setup
                 run_setup(non_interactive=True, groups=pip_groups)
             except Exception as exc:  # noqa: BLE001
-                print(ui.err(f"  安装失败(请手动 pip install 'psyclaw[{','.join(pip_groups)}]'):{exc}"))
+                print(ui.err(f"  安装失败(手动 pip install {' '.join(idx)} "
+                             f"'psyclaw[{','.join(pip_groups)}]'):{exc}"))
         else:
             print(ui.dim(f"  装依赖:pip install \"psyclaw[{','.join(pip_groups)}]\""
                          "  或加 --online 自动装"))
-    if "browser" in modules:
-        print(ui.dim("  浏览器桥:psyclaw webbridge install(装守护进程+扩展指引)"))
+
+    # npx 类(sequential-thinking / browser):开箱即用——预热到本地缓存
+    npx_mods = [m for m in modules if kinds.get(m) == "npx"]
+    for m in npx_mods:
+        if m == "browser":
+            print(ui.dim("  浏览器桥:psyclaw webbridge install(装守护进程+扩展指引)"))
+            continue
+        # sequential-thinking:setup 勾选即启用(registry detect:npx),可选预热
+        pkg = "@modelcontextprotocol/server-sequential-thinking" \
+            if m == "sequential-thinking" else m
+        if online:
+            print(ui.dim(f"  预热 npx 包 {pkg}(开箱即用,首次拉到本地缓存)…"))
+            r = mirror.warm_npx(pkg)
+            mk = ui.ok("  ✓") if r["ok"] else ui.warn("  ⚠")
+            print(f"{mk} {m}:{r['note']}"
+                  + ("(国内镜像)" if r.get("mirror") else ""))
+        else:
+            print(ui.dim(f"  {m}:已启用(npx -y 开箱即用,首次对话自动拉包);"
+                         "加 --online 预热离线可用"))
+
+    # mcp 类(mne):提示装依赖后 registry 自动启用
+    for m in modules:
+        if kinds.get(m) == "mcp":
+            print(ui.dim(f"  {m} MCP:装依赖后自动启用(pip install {m};"
+                         "psyclaw mcp 看状态)"))
+        elif kinds.get(m) == "skill":
+            print(ui.dim(f"  {m} skill:psyclaw journal 看已收录期刊;"
+                         "目标期刊专属规范随 check/export 生效"))
     print(ui.ok("\n  全局配置完成。开工:psyclaw start(项目级意图向导)"))
     return 0
 
