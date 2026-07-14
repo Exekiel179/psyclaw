@@ -1147,6 +1147,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_toolloop.py +6(统计意图展开 pystat 收 web/浏览器意图反向/无意图全收索引/向后兼容全量/tool_help 命中与无匹配/未登记组 server 名兜底)。全量 pytest → 1675 passed;eval 28/28。活体量测:全量 8839 字符 → 统计意图 2033(-77%)· 纯写作 1256(-86%)· 浏览器意图 7749(该任务真需要全套浏览器工具,合理)。"
+    },
+    {
+      "id": "feat-114",
+      "name": "语义记忆 + 冲突协议(类人记忆系统第一轮,蓝图 docs/MEMORY.md)",
+      "description": "与用户共同定稿的类人记忆蓝图:情景(archive 原文)/程序(lessons)/语义(新)三分 + 遗忘/睡眠/发散/冲突四机制,feat-114~117 分轮实现。本轮:①facts 语义卡(概念/陈述/scope/置信/strength/use_count/source 指回情景);②冲突协议——同概念同陈述再现=强化,不同陈述=时近优先生效但降置信(≤0.6)、旧说法进 history 不删、conflicted 标记、注入时如实带出「曾有不同说法」请用户确认;绝不静默覆盖/丢弃;③recall_facts 相关性检索注入(取用即刷新 use_count/last_used,为 feat-115 衰减留信号);④CLI memory fact/facts/conflicts/resolve + agent 工具 remember_fact(冲突时提示向用户确认);⑤修复检索中文全盲:_mem_tokens(拉丁关键词+中文二元组),recall_facts 与 feat-111 的 relevant_lessons 共用——此前 extract_keywords 对纯中文提取为空,教训/语义检索对中文查询零命中。",
+      "dependencies": [
+        "feat-111"
+      ],
+      "status": "done",
+      "evidence": "tests/test_audit_memory.py TestSemanticFacts +7(建卡强化/冲突时近降置信留历史/scope 隔离/检索取用刷新/冲突横幅注入/裁决保历史/agent 工具冲突提示)。全量 pytest → 1682 passed;eval 28/28。活体(隔离 HOME):fact 记入 → 第二种说法触发 ⚠ 冲突(时近生效降置信) → conflicts 列出新旧对照 → resolve 裁决 → 中文查询检索命中并按置信注入。"
     }
   ]
 }

@@ -267,6 +267,23 @@ def build_tools(project_dir: str = ".") -> dict:
     except Exception:  # noqa: BLE001
         pass
 
+    # feat-114:语义记忆写入(研究语境概念/约定;冲突协议见 docs/MEMORY.md)
+    def _remember_fact(a):
+        from psyclaw.memory import record_fact
+        r = record_fact(str(a.get("concept", "")), str(a.get("statement", "")),
+                        scope=str(a.get("scope", "project")),
+                        source=str(a.get("source", "agent")))
+        if r["status"] == "conflict":
+            old = (r["card"].get("history") or [{}])[-1].get("statement", "")
+            return (f"⚠ 记下了,但与既有说法冲突:曾「{old}」→ 现「{a.get('statement')}」。"
+                    "已时近生效并降置信,请向用户确认哪个是对的。")
+        return {"created": "✓ 已记入语义记忆", "reinforced": "✓ 再现,强化既有卡",
+                "rejected": "✗ 概念/陈述为空"}.get(r["status"], r["status"])
+    _t("remember_fact", "把研究语境的概念/约定/事实记入长期语义记忆"
+       "(如「缺失码=99/-999」「构念 X 的操作定义」;同概念冲突会如实报告)",
+       "concept:str, statement:str, scope?:project|global", _remember_fact,
+       side_effect=True)
+
     # feat-113:按需展开——目录里未展开的扩展组,模型先查这个再调用。
     # 闭包引用同一 tools dict(上面的 MCP/WebBridge 合并结果都看得见)。
     def _tool_help(a):

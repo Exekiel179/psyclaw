@@ -248,21 +248,12 @@ def relevant_lessons(query: str, top_k: int = 4, always_top: int = 2) -> list[di
     rest = cards[always_top:]
     if not (query or "").strip() or not rest:
         return (base + rest)[:always_top + top_k]
-    try:
-        from psyclaw.recall import extract_keywords
-        q_kws = set(extract_keywords(query))
-    except Exception:  # noqa: BLE001
-        q_kws = set()
+    q_kws = _mem_tokens(query)          # feat-114:拉丁+中文二元组,中文不再全盲
     if not q_kws:
         return (base + rest)[:always_top + top_k]
     scored = []
     for c in rest:
-        text = f"{c.get('trigger', '')} {c.get('lesson', '')}"
-        try:
-            c_kws = set(extract_keywords(text))
-        except Exception:  # noqa: BLE001
-            c_kws = set()
-        hit = len(q_kws & c_kws)
+        hit = len(q_kws & _mem_tokens(f"{c.get('trigger', '')} {c.get('lesson', '')}"))
         if hit:
             scored.append((hit, c))
     scored.sort(key=lambda x: (-x[0], -int(x[1].get("strength", 1))))
@@ -279,10 +270,171 @@ def render_lesson_block(cards: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 语义记忆(feat-114,蓝图 docs/MEMORY.md)——研究语境下的概念/约定/事实。
+# 与情景(archive 原文)、程序(lessons 坑)三分;每张卡 source 指回情景,
+# 冲突时回底片裁决。协议:绝不静默覆盖,绝不静默丢弃。
+# ---------------------------------------------------------------------------
+
+def _now_iso() -> str:
+    from datetime import datetime
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _mem_tokens(s: str) -> set:
+    """记忆检索用分词:拉丁关键词 + 中文二元组。
+
+    feat-114 实测:recall.extract_keywords 对纯中文提取为空——教训/语义
+    检索对中文查询全盲。CJK 连续段切 bigram 补上(仅记忆层局部,不动
+    archive 的 FTS 通道)。"""
+    import re as _re
+    toks: set = set()
+    try:
+        from psyclaw.recall import extract_keywords
+        toks |= set(extract_keywords(s))
+    except Exception:  # noqa: BLE001
+        pass
+    for run in _re.findall(r"[一-鿿]{2,}", s or ""):
+        toks |= {run[i:i + 2] for i in range(len(run) - 1)}
+    return toks
+
+
+def _norm_stmt(s: str) -> str:
+    return " ".join((s or "").split())
+
+
+def record_fact(concept: str, statement: str, scope: str = "project",
+                source: str = "", confidence: float = 0.7) -> dict:
+    """记一条语义事实。冲突协议(docs/MEMORY.md §六):
+
+    - 同概念同陈述再现 → 强化(strength+1,置信小步上调)——频率是编码信号;
+    - 同概念不同陈述 → **时近优先生效但降置信**,旧说法进 history 不删,
+      卡标 conflicted(注入时如实带出「曾有不同说法」);
+    - 新概念 → 建卡。返回 {status: created|reinforced|conflict, card}。
+    """
+    concept = (concept or "").strip()
+    if not concept or not _norm_stmt(statement):
+        return {"status": "rejected", "reason": "概念/陈述为空"}
+    data = _load("facts")
+    cards = data.setdefault("facts", [])
+    key = concept.lower()
+    for c in cards:
+        if c.get("concept", "").lower() == key and c.get("scope") == scope:
+            if _norm_stmt(c.get("statement")) == _norm_stmt(statement):
+                c["strength"] = int(c.get("strength", 1)) + 1
+                c["confidence"] = min(0.95, float(c.get("confidence", 0.7)) + 0.05)
+                c["last_used"] = _now_iso()
+                _save("facts", data)
+                return {"status": "reinforced", "card": c}
+            c.setdefault("history", []).append({
+                "statement": c.get("statement"),
+                "confidence": c.get("confidence", 0.7),
+                "recorded": c.get("recorded", "?")})
+            c.update({"statement": statement.strip(),
+                      "confidence": min(float(confidence), 0.6),   # 冲突降置信
+                      "conflicted": True, "recorded": _now_iso(),
+                      "source": source or c.get("source", "")})
+            _save("facts", data)
+            return {"status": "conflict", "card": c}
+    card = {"concept": concept, "statement": statement.strip(), "scope": scope,
+            "source": source, "confidence": float(confidence),
+            "strength": 1, "use_count": 0, "conflicted": False,
+            "recorded": _now_iso(), "last_used": _now_iso(), "history": []}
+    cards.append(card)
+    _save("facts", data)
+    return {"status": "created", "card": card}
+
+
+def recall_facts(query: str, top_k: int = 4) -> list[dict]:
+    """按当前消息检索语义卡(关键词覆盖,与教训卡同方);命中即取用刷新。"""
+    data = _load("facts")
+    cards = data.get("facts", [])
+    if not cards or not (query or "").strip():
+        return []
+    q_kws = _mem_tokens(query)
+    if not q_kws:
+        return []
+    scored = []
+    for c in cards:
+        hit = len(q_kws & _mem_tokens(f"{c.get('concept', '')} {c.get('statement', '')}"))
+        if hit:
+            scored.append((hit, c))
+    scored.sort(key=lambda x: (-x[0], -float(x[1].get("confidence", 0))))
+    hits = [c for _, c in scored[:top_k]]
+    if hits:                                   # 取用即强化(遗忘机制的输入信号)
+        now = _now_iso()
+        for c in hits:
+            c["use_count"] = int(c.get("use_count", 0)) + 1
+            c["last_used"] = now
+        _save("facts", data)
+    return hits
+
+
+def render_fact_block(cards: list[dict]) -> str:
+    """语义卡 → system 注入块;冲突卡如实带出旧说法(知情权衡,不静默)。"""
+    if not cards:
+        return ""
+    lines = ["# 研究语境记忆(语义卡,按相关性检索注入)"]
+    for c in cards:
+        lines.append(f"- {c['concept']}:{c['statement']}"
+                     f"(置信 {float(c.get('confidence', 0.7)):.0%})")
+        if c.get("conflicted") and c.get("history"):
+            old = c["history"][-1]
+            lines.append(f"  ⚠ 曾有不同说法:「{old['statement']}」"
+                         "——如与当前任务相关,请向用户确认后以确认为准")
+    return "\n".join(lines)
+
+
+def resolve_fact(concept: str, scope: str = "project") -> bool:
+    """人工裁决:接受当前陈述,清除冲突标记(历史保留可追溯)。"""
+    data = _load("facts")
+    for c in data.get("facts", []):
+        if c.get("concept", "").lower() == (concept or "").lower() \
+                and c.get("scope") == scope and c.get("conflicted"):
+            c["conflicted"] = False
+            c["confidence"] = max(float(c.get("confidence", 0.6)), 0.7)
+            _save("facts", data)
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def memory_cli(argv: list) -> int:
+    if argv and argv[0] == "fact" and len(argv) >= 3:      # feat-114:记语义事实
+        r = record_fact(argv[1], " ".join(argv[2:]))
+        marks = {"created": "✓ 已记", "reinforced": "✓ 再现强化",
+                 "conflict": "⚠ 与既有说法冲突(时近生效已降置信,旧说法保留;"
+                             "psyclaw memory resolve <概念> 裁决)"}
+        print(f"  {marks.get(r['status'], r['status'])}:"
+              f"{argv[1]} → {' '.join(argv[2:])[:60]}")
+        return 0
+    if argv and argv[0] == "facts":
+        cards = _load("facts").get("facts", [])
+        if not cards:
+            print("  (无语义卡。psyclaw memory fact <概念> <陈述> 记一条)")
+        for c in cards:
+            flag = " ⚠冲突" if c.get("conflicted") else ""
+            print(f"  [{c['scope']}] {c['concept']}:{c['statement'][:70]}"
+                  f"(置信 {float(c.get('confidence', 0.7)):.0%},"
+                  f"用过 {c.get('use_count', 0)} 次){flag}")
+        return 0
+    if argv and argv[0] == "conflicts":
+        cards = [c for c in _load("facts").get("facts", []) if c.get("conflicted")]
+        if not cards:
+            print("  (无冲突卡)")
+        for c in cards:
+            print(f"  ⚠ {c['concept']}:现「{c['statement'][:50]}」")
+            for h in c.get("history", [])[-3:]:
+                print(f"     曾「{h['statement'][:50]}」({h.get('recorded', '?')})")
+            print(f"     裁决:psyclaw memory resolve {c['concept']}(接受现行)")
+        return 0
+    if argv and argv[0] == "resolve" and len(argv) >= 2:
+        ok = resolve_fact(argv[1])
+        print("  ✓ 已裁决(接受现行陈述,历史保留)" if ok
+              else "  (无该概念的冲突卡)")
+        return 0
     if not argv or argv[0] == "list":
         prof = get_profile()
         habits = _load("habits")

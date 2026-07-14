@@ -881,6 +881,14 @@ class ReplSession:
                 system += "\n\n" + block
         except Exception:  # noqa: BLE001  # 记忆读取失败不阻断对话
             pass
+        # feat-114:语义记忆(研究语境概念/约定)同方检索注入,冲突卡如实带出
+        try:
+            from psyclaw.memory import recall_facts, render_fact_block
+            fblock = render_fact_block(recall_facts(text))
+            if fblock:
+                system += "\n\n" + fblock
+        except Exception:  # noqa: BLE001
+            pass
         knowledge = relevant_knowledge(text)
         if knowledge:
             system += "\n\n" + knowledge

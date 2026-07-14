@@ -409,3 +409,57 @@ class TestRelevantLessons:
         confirm_lesson(0)
         assert "某教训内容" in memory_prompt()
         assert "某教训内容" not in memory_prompt(include_lessons=False)
+
+class TestSemanticFacts:
+    """feat-114:语义记忆 + 冲突协议(docs/MEMORY.md)——绝不静默覆盖/丢弃。"""
+    def test_create_and_reinforce(self, mem_dir):
+        from psyclaw.memory import record_fact
+        r1 = record_fact("缺失码", "post_score 的 99 和 -999 是缺失码")
+        assert r1["status"] == "created" and r1["card"]["strength"] == 1
+        r2 = record_fact("缺失码", "post_score 的 99 和 -999 是缺失码")
+        assert r2["status"] == "reinforced" and r2["card"]["strength"] == 2
+        assert r2["card"]["confidence"] > 0.7          # 频率是编码信号
+    def test_conflict_recency_wins_but_demoted(self, mem_dir):
+        from psyclaw.memory import record_fact
+        record_fact("缺失码", "缺失码是 99", confidence=0.9)
+        r = record_fact("缺失码", "缺失码是 999", confidence=0.9)
+        assert r["status"] == "conflict"
+        c = r["card"]
+        assert c["statement"] == "缺失码是 999"          # 时近优先生效
+        assert c["confidence"] <= 0.6                    # 但降置信
+        assert c["conflicted"] is True
+        assert c["history"][-1]["statement"] == "缺失码是 99"   # 旧说法不删
+    def test_scope_separation_no_conflict(self, mem_dir):
+        from psyclaw.memory import record_fact
+        record_fact("alpha", "项目里 α 定 .01", scope="project")
+        r = record_fact("alpha", "常规 α 是 .05", scope="global")
+        assert r["status"] == "created"                  # 不同 scope 不算冲突
+    def test_recall_scores_and_bumps_usage(self, mem_dir):
+        from psyclaw.memory import record_fact, recall_facts
+        record_fact("缺失码", "post_score 的 99 和 -999 是缺失码")
+        record_fact("latex", "导出 PDF 前装 texlive")
+        hits = recall_facts("清洗 post_score 时缺失码怎么处理")
+        assert [c["concept"] for c in hits] == ["缺失码"]
+        assert hits[0]["use_count"] == 1                 # 取用即强化(遗忘输入)
+    def test_render_conflict_banner(self, mem_dir):
+        from psyclaw.memory import record_fact, recall_facts, render_fact_block
+        record_fact("缺失码", "缺失码是 99")
+        record_fact("缺失码", "缺失码是 999")
+        block = render_fact_block(recall_facts("数据里的缺失码是什么来着"))
+        assert "缺失码是 999" in block
+        assert "曾有不同说法" in block and "缺失码是 99" in block   # 知情注入
+    def test_resolve_clears_flag_keeps_history(self, mem_dir):
+        from psyclaw.memory import record_fact, resolve_fact, _load
+        record_fact("k", "v1")
+        record_fact("k", "v2")
+        assert resolve_fact("k") is True
+        c = _load("facts")["facts"][0]
+        assert c["conflicted"] is False and c["history"]   # 历史保留可追溯
+        assert resolve_fact("k") is False                  # 无冲突再裁决=False
+    def test_agent_tool_reports_conflict(self, mem_dir):
+        from psyclaw.toolloop import build_tools
+        tools = build_tools(".")
+        out1 = tools["remember_fact"]["run"]({"concept": "c", "statement": "x"})
+        assert "已记入" in out1
+        out2 = tools["remember_fact"]["run"]({"concept": "c", "statement": "y"})
+        assert "冲突" in out2 and "请向用户确认" in out2
