@@ -527,3 +527,32 @@ class TestDecayLifecycle:
         draft_lesson("python", "用 python3", "error")            # 再踩同坑 → 复活
         acts = active_lessons()
         assert len(acts) == 1 and acts[0]["strength"] == 2
+class TestDivergentRetrieval:
+    """feat-117:发散检索——创新任务额外采样中等相关卡,造远距联想。"""
+    def _seed_many(self):
+        from psyclaw.memory import record_fact
+        record_fact("沙盘治疗", "电子沙盘用于青少年心理咨询,记录摆放轨迹")
+        record_fact("叙事治疗", "叙事疗法通过重写故事线帮助来访者")
+        record_fact("团体辅导", "团体心理辅导在学校场景的应用")
+        record_fact("表达性艺术", "绘画音乐等表达性艺术治疗的心理机制")
+    def test_is_divergent_task(self):
+        from psyclaw.memory import is_divergent_task
+        assert is_divergent_task("帮我头脑风暴几个研究设计") is True
+        assert is_divergent_task("还能怎么拓展这个方向") is True
+        assert is_divergent_task("把这段统计结果写进结果部分") is False
+    def test_focused_mode_no_diverge(self, mem_dir):
+        from psyclaw.memory import recall_facts
+        self._seed_many()
+        hits = recall_facts("心理咨询用什么方法", mode="focused", top_k=1)
+        assert all(not c.get("_diverge") for c in hits)
+    def test_diverge_mode_adds_distant(self, mem_dir):
+        from psyclaw.memory import recall_facts
+        self._seed_many()
+        hits = recall_facts("心理治疗方法有哪些", mode="diverge", top_k=1, diverge_k=2)
+        assert any(c.get("_diverge") for c in hits)      # 有远距联想卡被采入
+    def test_render_labels_diverge_separately(self, mem_dir):
+        from psyclaw.memory import recall_facts, render_fact_block
+        self._seed_many()
+        block = render_fact_block(
+            recall_facts("心理治疗方法", mode="diverge", top_k=1, diverge_k=2))
+        assert "远距联想" in block
