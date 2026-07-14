@@ -1290,6 +1290,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_mirror.py 6 例(强制镜像/官方默认源/describe 状态/无 npx/registry 含 sequential-thinking/setup 板块含新能力)。全量 pytest → 1770 passed;eval 28/28。活体:①npx -y 真起 sequential-thinking MCP,list_tools=[sequentialthinking] 开箱即用;②setup --modules stats,sequential-thinking → 板块入全局配置 + 网络探测 + 「已启用,首次对话自动拉包」。"
+    },
+    {
+      "id": "feat-134",
+      "name": "历史重要性打分 + 压缩保留高重要早轮",
+      "description": "用户提议给历史记录做重要性打分。turn_importance(user,reply)→[0,1] 纯函数启发式:含决策/纠正/结论/研究约定(决定/剔除/预注册/缺失码/不对/改成…)+统计量(t=/p</=/n=)加权,纯寒暄(你好/谢谢/收到,<30 字)封顶 0.15;热路径不调 LLM。接入 compact_history:早轮不再纯按时近丢——重要性≥0.6 的早轮原样保住(决策/纠正/研究约定),其余进 LLM/规则蒸馏;最近 K 轮照常保留。既有 compact 测试全绿(纯填充轮低分被压缩,行为不变)。",
+      "dependencies": [
+        "feat-111"
+      ],
+      "status": "done",
+      "evidence": "tests/test_context.py TestTurnImportance +5 + compact 保留高重要早轮 +1。全量 pytest → 1776 passed。"
     }
   ]
 }

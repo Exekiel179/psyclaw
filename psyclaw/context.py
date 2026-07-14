@@ -196,6 +196,34 @@ def _llm_distill(dropped: list, provider) -> str | None:
     return out or None
 
 
+_IMPORTANCE_HIGH = ("决定", "采用", "选择", "剔除", "排除", "结论", "确证",
+                    "假设", "预注册", "样本量", "效应量", "缺失码", "不对", "改成",
+                    "应该是", "纠正", "约定", "α", "CI", "批准", "驳回", "报告")
+_IMPORTANCE_LOW = ("你好", "谢谢", "好的", "收到", "嗯", "ok", "thanks", "继续")
+
+
+def turn_importance(user_text: str, reply_text: str = "") -> float:
+    """一轮对话的重要性打分 [0,1](feat-134)。纯函数。
+
+    含决策/纠正/结论/研究约定 → 高;纯寒暄/确认 → 低。用于:①压缩时保住
+    重要早轮、丢弃寒暄近轮;②召回排序加重要性维度。启发式(关键词+长度+
+    数字信号),不调 LLM——压缩/召回是热路径,要快且确定。
+    """
+    text = f"{user_text}\n{reply_text}"
+    low = text.lower().strip()
+    if not low:
+        return 0.0
+    score = 0.3                                   # 基线
+    hits = sum(1 for k in _IMPORTANCE_HIGH if k in text)
+    score += min(0.5, hits * 0.12)
+    import re as _re
+    if _re.search(r"\b[dprFt]\s*[=<>]\s*[-\d.]|\bp\s*[<=]\s*\.?\d|\bn\s*=\s*\d", text):
+        score += 0.15                             # 含统计量=高信息
+    if len(text) < 30 and any(k in low for k in _IMPORTANCE_LOW):
+        score = min(score, 0.15)                  # 短寒暄封顶
+    return max(0.0, min(1.0, score))
+
+
 def compact_history(messages: list, memo: str, provider=None) -> tuple:
     """超预算时压缩。返回 (new_messages, new_memo)。
 
@@ -207,7 +235,28 @@ def compact_history(messages: list, memo: str, provider=None) -> tuple:
     if total <= CHAR_BUDGET_HISTORY or len(messages) <= KEEP_RECENT_TURNS:
         return messages, memo
     cut = len(messages) - KEEP_RECENT_TURNS
-    dropped, kept = messages[:cut], messages[cut:]
+    old, kept = messages[:cut], messages[cut:]
+    # feat-134:早轮里的**高重要性**轮次(含决策/纠正/结论)也保住,不只按时近丢。
+    # 相邻 user+assistant 视为一轮打分;高于阈值的原样保留,其余进蒸馏。
+    HIGH = 0.6
+    keep_old: list = []
+    dropped: list = []
+    i = 0
+    while i < len(old):
+        m = old[i]
+        pair = old[i + 1] if (i + 1 < len(old) and m["role"] == "user"
+                              and old[i + 1]["role"] == "assistant") else None
+        imp = turn_importance(m["content"], pair["content"] if pair else "")
+        if imp >= HIGH:
+            keep_old.append(m)
+            if pair:
+                keep_old.append(pair)
+        else:
+            dropped.append(m)
+            if pair:
+                dropped.append(pair)
+        i += 2 if pair else 1
+    kept = keep_old + kept                        # 高重要早轮 + 最近 K 轮
     new_notes = _llm_distill(dropped, provider)
     if new_notes is None:   # 回落规则蒸馏
         new_notes = "\n".join(_distill(m) for m in dropped if m["content"].strip())

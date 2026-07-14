@@ -423,3 +423,36 @@ class TestIsNum:
     @pytest.mark.parametrize("s", ["hello", "", "1,2", "NA", " "])
     def test_non_numeric(self, s):
         assert not _is_num(s)
+class TestTurnImportance:
+    def test_decision_turn_high(self):
+        from psyclaw.context import turn_importance
+        s = turn_importance("我们决定采用被试内设计,剔除作答异常的被试",
+                            "好的,已记录:被试内设计 + 预注册剔除标准")
+        assert s >= 0.6
+    def test_correction_high(self):
+        from psyclaw.context import turn_importance
+        assert turn_importance("不对,缺失码应该是 99 和 -999") >= 0.5
+    def test_stat_numbers_boost(self):
+        from psyclaw.context import turn_importance
+        assert turn_importance("结果 t = 4.74, p = .002, d = 0.8") >= 0.44
+    def test_greeting_low(self):
+        from psyclaw.context import turn_importance
+        assert turn_importance("你好") <= 0.15
+        assert turn_importance("好的,谢谢") <= 0.15
+    def test_empty_zero(self):
+        from psyclaw.context import turn_importance
+        assert turn_importance("") == 0.0
+def test_compact_keeps_high_importance_old_turn():
+    """feat-134:早轮里的决策轮次被保住,不因时近被丢(与纯滑动窗口的区别)。"""
+    from psyclaw.context import compact_history, CHAR_BUDGET_HISTORY, KEEP_RECENT_TURNS
+    pad = "x" * (CHAR_BUDGET_HISTORY // 6)
+    msgs = []
+    msgs.append({"role": "user", "content": "我们决定采用 Welch t 检验,α = .01,预注册"})
+    msgs.append({"role": "assistant", "content": "已记录该确证性分析约定"})
+    for i in range(12):
+        msgs.append({"role": "user", "content": "好的 " + pad})
+        msgs.append({"role": "assistant", "content": "收到 " + pad})
+    kept, memo = compact_history(msgs, "")
+    joined = " ".join(m["content"] for m in kept)
+    assert "Welch t 检验" in joined and "预注册" in joined   # 决策早轮保住
+    assert len(kept) < len(msgs)                              # 确实压缩了
