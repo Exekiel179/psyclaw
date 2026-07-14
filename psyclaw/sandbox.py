@@ -112,17 +112,65 @@ def sandbox_check(face: str, action: str, args: dict | None = None,
 
     if face == "exec":
         cmd = str(args.get("code") or args.get("cmd") or "")
-        for pat in policy.get("exec", {}).get("deny_patterns", []):
-            if pat in cmd:
-                return _verdict(project_dir, face, action, args, False,
-                                f"命中恶意模式「{pat}」(快速失败)")
-        return _verdict(project_dir, face, action, args, True, "未命中恶意模式")
+        allow, reason = classify_exec(cmd, policy)
+        return _verdict(project_dir, face, action, args, allow, reason)
 
     if face == "file":
         return _check_file(policy, project_dir, action, args)
 
     # tools/net:入口已通,判据待 feat-127~128 填;当前放行并审计(不回归)
     return _verdict(project_dir, face, action, args, True, "该面判据待实现,暂放行")
+
+
+# ---------------------------------------------------------------------------
+# 代码执行面(feat-127)——静态分层:恶意硬拒 / 科研意图放行不打断 / 灰区问。
+# 目标是"不频繁中断正常任务":白名单意图 + 黑名单模式 + regex 危险签名。
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+# 危险签名(正则,比子串更准):补 deny_patterns 抓不到的形态。
+_DANGER_SIGNS = [
+    (r"\brm\s+-[a-z]*[rf]", "递归/强制删除"),
+    (r":\s*\(\s*\)\s*\{.*\|.*&\s*\}\s*;", "fork 炸弹"),
+    (r"\b(curl|wget)\b[^\n|]*\|\s*(sh|bash|python)", "下载并直接执行"),
+    (r"\bmkfs\b|\bdd\s+if=", "磁盘写/格式化"),
+    (r">\s*/dev/sd|>\s*/dev/disk", "写裸磁盘设备"),
+    (r"\bshutdown\b|\breboot\b|\bhalt\b", "关机/重启"),
+    (r"\bchmod\s+-R\s+777\b", "递归开放全权限"),
+    (r"\beval\s*\(\s*(base64|codecs|bytes\.fromhex)", "混淆后 eval 执行"),
+    (r"os\.system\s*\(|subprocess\.(call|run|Popen)\s*\([^)]*shell\s*=\s*True",
+     "shell 注入面"),
+    (r"/etc/(passwd|shadow|sudoers)|~/\.ssh/|\.aws/credentials", "读敏感系统文件"),
+]
+
+
+def classify_exec(cmd: str, policy: dict) -> tuple[bool, str]:
+    """代码/命令分类。返回 (allow, reason)。
+
+    ① 命中 deny_patterns(子串)或危险签名(regex)→ 硬拒(快速失败);
+    ② 命中 allow_intent(pandas/pingouin… 科研栈)且无危险签名 → 放行不打断;
+    ③ 灰区(既不明显恶意也不明显科研)→ 放行但标注(逐动作审批已在上层兜)。
+    纯静态,不执行代码。
+    """
+    ecfg = policy.get("exec", {})
+    for pat in ecfg.get("deny_patterns", []):
+        if pat in cmd:
+            return False, f"命中恶意模式「{pat}」(快速失败)"
+    for sign, why in _DANGER_SIGNS:
+        if _re.search(sign, cmd):
+            return False, f"危险签名:{why}(快速失败)"
+    intents = ecfg.get("allow_intent", [])
+    if any(f"import {kw}" in cmd or f"{kw}." in cmd or kw in cmd for kw in intents):
+        return True, "科研栈意图(白名单),放行不打断"
+    return True, "灰区代码:未见危险,放行(副作用仍走逐动作审批)"
+
+
+def exec_limits(policy: dict) -> dict:
+    """资源上限(超限杀掉并审计,不挂死)。"""
+    e = policy.get("exec", {})
+    return {"timeout_s": int(e.get("timeout_s", 180)),
+            "max_output": int(e.get("max_output", 200_000))}
 
 
 def is_private_path(path: str, policy: dict) -> bool:

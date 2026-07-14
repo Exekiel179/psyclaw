@@ -1215,6 +1215,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_sandbox.py +14(私密识别/externalize 无表拒有表 needs/非私密放行/write 拒 data-raw 与越清单/redact 按表替换与长值优先与空表不变/require_codebook 关可放开/process_message 端到端拒注入与脱敏注入与未启用不变)。全量 pytest → 1738 passed;eval 28/28。"
+    },
+    {
+      "id": "feat-127",
+      "name": "沙箱代码执行面(静态分层 + 资源上限)",
+      "description": "docs/SANDBOX.md 代码执行面,核心目标「保护系统但不频繁中断正常任务」。classify_exec 静态分层:①deny_patterns 子串 + _DANGER_SIGNS 正则签名(递归删除含 rm -fr/rm  -r 变体、fork 炸弹、curl|sh 下载执行、mkfs/dd、写裸磁盘、关机、chmod -R 777、混淆 eval、shell=True 注入面、读 /etc/shadow 等敏感文件)→ 硬拒快速失败;②allow_intent 科研栈(pandas/pingouin/numpy/scipy/statsmodels/matplotlib)且无危险签名 → 放行不打断;③灰区 → 放行(副作用仍走既有逐动作审批)。exec_limits 出资源上限(timeout/max_output)。接入 repl._run_shell_cmd:启用沙箱时执行前裁决,恶意直接拒不跑,timeout 取策略值;沙箱异常/未启用不阻断(既有 _DANGEROUS_RE + 人工审批仍兜底)。",
+      "dependencies": [
+        "feat-125"
+      ],
+      "status": "done",
+      "evidence": "tests/test_sandbox.py +8(科研意图放行/fork 炸弹拒/curl|sh 拒/shell=True 注入面拒/读 shadow 拒/灰区放行/资源上限读策略/rm 标志变体 regex 命中)。全量 pytest → 1746 passed;eval 28/28。"
     }
   ]
 }
