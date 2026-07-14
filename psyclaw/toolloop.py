@@ -266,11 +266,70 @@ def build_tools(project_dir: str = ".") -> dict:
         merge_webbridge_tools(tools)
     except Exception:  # noqa: BLE001
         pass
+
+    # feat-113:按需展开——目录里未展开的扩展组,模型先查这个再调用。
+    # 闭包引用同一 tools dict(上面的 MCP/WebBridge 合并结果都看得见)。
+    def _tool_help(a):
+        pat = str(a.get("prefix") or a.get("name") or "").strip()
+        if not pat:
+            return "用法:tool_help({'prefix': 'web__'}) 或 {'name': '工具名'}"
+        hits = {n: t for n, t in tools.items()
+                if n.startswith(pat) or pat in n}
+        if not hits:
+            return f"无匹配工具:{pat}(现有前缀:" + ", ".join(sorted(
+                {g for n in tools if (g := _tool_group(n))})) + ")"
+        return "\n".join(_tool_line(n, t) for n, t in list(hits.items())[:40])
+    _t("tool_help", "取工具/工具组的完整参数说明(目录中未展开的组先查这个)",
+       "prefix:str 或 name:str", _tool_help)
     return tools
 
 
-def render_tool_catalog(tools: dict) -> str:
-    """工具目录 + 调用约定,拼进 system 提示。"""
+# feat-113:工具目录路由——实测 agent 模式工具目录占 system 79%(8.7k 字符)
+# 且随 MCP/WebBridge 集成线性增长,与教训卡同病(全量常驻),同方治理:
+# 内置工具常驻详情;扩展组(mcp__<server>__ / web__)按当前消息意图命中才展开,
+# 未命中收成一行索引,模型可用 tool_help 按需取完整说明。
+_EXT_PREFIXES = ("mcp__", "web__")
+_GROUP_INTENTS: dict[str, tuple] = {
+    "web__": ("浏览器", "网页", "网站", "页面", "打开", "登录", "知网", "万方",
+              "browser", "url", "http", "点击", "截图", "标签", "webbridge"),
+    "mcp__browser__": ("浏览器", "网页", "网站", "页面", "打开", "登录", "知网",
+                       "browser", "url", "http", "点击", "截图"),
+    "mcp__pystat__": ("统计", "检验", "ttest", "anova", "回归", "相关分析", "中介",
+                      "效应量", "描述统计", "方差", "pystat", "pingouin"),
+    "mcp__mne__": ("eeg", "erp", "脑电", "事件相关", "mne"),
+}
+
+
+def _tool_group(name: str) -> str | None:
+    """扩展工具的组前缀(mcp__<server>__ / web__);内置工具返回 None。"""
+    if name.startswith("web__"):
+        return "web__"
+    if name.startswith("mcp__"):
+        parts = name.split("__")
+        if len(parts) >= 3:
+            return f"mcp__{parts[1]}__"
+    return None
+
+
+def _intent_hit(group: str, task_text: str) -> bool:
+    low = (task_text or "").lower()
+    kws = _GROUP_INTENTS.get(group)
+    if kws is None:                      # 未登记的组:server 名出现即展开
+        kws = (group.strip("_").split("__")[-1],)
+    return any(k in low for k in kws)
+
+
+def _tool_line(name: str, t: dict) -> str:
+    se = " [副作用·需批准]" if t["side_effect"] else ""
+    return f"- {name}({t['args']}){se} — {t['desc']}"
+
+
+def render_tool_catalog(tools: dict, task_text: str | None = None) -> str:
+    """工具目录 + 调用约定,拼进 system 提示。
+
+    task_text 给定时启用意图路由(feat-113):扩展组未命中只给一行索引,
+    附 tool_help 取详情的指引;None 保持全量(向后兼容)。
+    """
     lines = [
         "\n# 工具(可自主多步调用)",
         "要调用工具时,在回复里输出一个或多个 JSON 块(可与说明文字并存):",
@@ -281,9 +340,27 @@ def render_tool_catalog(tools: dict) -> str:
         "**得到最终答案时,直接正常回复、不要再输出 tool 块。**",
         "可用工具:",
     ]
+    if task_text is None:
+        for name, t in tools.items():
+            lines.append(_tool_line(name, t))
+        return "\n".join(lines)
+
+    indexed: dict[str, list[str]] = {}
     for name, t in tools.items():
-        se = " [副作用·需批准]" if t["side_effect"] else ""
-        lines.append(f"- {name}({t['args']}){se} — {t['desc']}")
+        group = _tool_group(name)
+        if group is None or _intent_hit(group, task_text):
+            lines.append(_tool_line(name, t))
+        else:
+            indexed.setdefault(group, []).append(name)
+    if indexed:
+        lines.append("其他工具组(与当前任务弱相关,未展开参数):")
+        for group, names in indexed.items():
+            head = tools[names[0]]["desc"].split("]")[0].lstrip("[") \
+                if tools[names[0]]["desc"].startswith("[") else group
+            lines.append(f"- {group}*({len(names)} 个,{head}):"
+                         + " ".join(n.removeprefix(group) for n in names[:12]))
+        lines.append('要用未展开的组:先调 {"name":"tool_help","args":{"prefix":"<组前缀>"}} '
+                     "取完整参数说明,再按说明调用。")
     return "\n".join(lines)
 
 
@@ -459,7 +536,10 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
     并累积在返回的 lessons 里,由调用方(REPL/CLI)落会话记忆与跨会话待确认卡。
     """
     tools = tools if tools is not None else build_tools(project_dir)
-    full_system = system + "\n" + render_tool_catalog(tools)
+    # feat-113:目录按当前任务意图路由(最后一条用户消息),弱相关扩展组收索引
+    task_text = next((m.get("content", "") for m in reversed(messages)
+                      if m.get("role") == "user"), "")
+    full_system = system + "\n" + render_tool_catalog(tools, task_text)
     convo = [dict(m) for m in messages]
     base_len = len(convo)   # 修剪只动此后循环追加的消息,不碰调用方原始历史
     trace: list[dict] = []

@@ -1136,6 +1136,17 @@
       ],
       "status": "done",
       "evidence": "tests/test_context.py +1(预算棘轮),既有 TestLeanCore 全部语义断言(统计外移/反杜撰/边缘显著/不造数关键短语)压缩后原样通过。全量 pytest → 1669 passed。活体探针:压缩后重喂「手写 Welch t」话术——模型引用编号拒绝(「这条约束(#③统计计算一律外移)…核心拒绝点不会松动:我不会手写 t 统计量的任何公式,也不会手算 p 值」),改走 scipy.stats.ttest_ind 脚本,约束零松动。"
+    },
+    {
+      "id": "feat-113",
+      "name": "工具目录意图路由 + tool_help 按需展开",
+      "description": "上下文实测:agent 模式工具目录 8.8k 字符占 system 79%,随 MCP/WebBridge 集成线性增长,与教训卡同病(全量常驻)。治理:①内置工具常驻详情;②扩展组(mcp__<server>__/web__)按当前任务文本意图命中才展开(_GROUP_INTENTS 组关键词,未登记组按 server 名兜底);③未命中组收成一行索引(组前缀+个数+工具名列表),附 tool_help 指引;④tool_help 元工具按前缀/名字取完整参数说明(闭包引用合并后的 tools,MCP/WebBridge 都可查);⑤run_tool_loop 按最后一条用户消息路由;render_tool_catalog(tools) 无 task_text 保持全量向后兼容。",
+      "dependencies": [
+        "feat-040",
+        "feat-111"
+      ],
+      "status": "done",
+      "evidence": "tests/test_toolloop.py +6(统计意图展开 pystat 收 web/浏览器意图反向/无意图全收索引/向后兼容全量/tool_help 命中与无匹配/未登记组 server 名兜底)。全量 pytest → 1675 passed;eval 28/28。活体量测:全量 8839 字符 → 统计意图 2033(-77%)· 纯写作 1256(-86%)· 浏览器意图 7749(该任务真需要全套浏览器工具,合理)。"
     }
   ]
 }
