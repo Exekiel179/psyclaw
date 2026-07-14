@@ -1126,6 +1126,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_audit_memory.py TestRelevantLessons +5(相关命中/无关不注入/强度保底/空 query 回落/静态剥离)。全量 pytest → 1668 passed;eval 28/28。"
+    },
+    {
+      "id": "feat-112",
+      "name": "lean_core 预算棘轮 + 硬约束合并压缩",
+      "description": "用户指出:每修一个行为缺陷就往 lean_core 加一段硬约束 = 所有未来请求的永久 token 税(本 session 从 ~450 涨到 1062 字符)。治理:①合并压缩——四条对抗评估沉淀的硬约束(未运行不造数/边缘显著/统计外移/引用反杜撰)同根「不产出未经验证的数字与事实」,收编为「诚实产出四禁」编号清单,1062→567 字符(-47%),全部语义断言保留;②预算棘轮——LEAN_CORE_BUDGET=900 常量 + 测试锁死,未来新增约束超预算即测试红,报错信息明示「请合并压缩,不要直接调大预算」。",
+      "dependencies": [
+        "feat-105"
+      ],
+      "status": "done",
+      "evidence": "tests/test_context.py +1(预算棘轮),既有 TestLeanCore 全部语义断言(统计外移/反杜撰/边缘显著/不造数关键短语)压缩后原样通过。全量 pytest → 1669 passed。活体探针:压缩后重喂「手写 Welch t」话术——模型引用编号拒绝(「这条约束(#③统计计算一律外移)…核心拒绝点不会松动:我不会手写 t 统计量的任何公式,也不会手算 p 值」),改走 scipy.stats.ttest_ind 脚本,约束零松动。"
     }
   ]
 }

@@ -80,6 +80,14 @@ class TestLeanCore:
     def test_reproducible(self):
         assert lean_core() == lean_core()
 
+    def test_budget_ratchet(self):
+        """feat-112:lean_core 有硬预算——每修一个行为缺陷 ≠ 永久 token 税。
+        新增硬约束前必须先合并压缩(N 条具体教训蒸馏回一条原则),超预算此测试红。"""
+        from psyclaw.context import LEAN_CORE_BUDGET
+        assert len(lean_core()) <= LEAN_CORE_BUDGET, (
+            f"lean_core {len(lean_core())} 字符超预算 {LEAN_CORE_BUDGET}——"
+            "请合并压缩既有约束,不要直接调大预算")
+
 
 # ---------------------------------------------------------------------------
 # relevant_knowledge
