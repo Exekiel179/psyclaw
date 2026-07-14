@@ -341,7 +341,38 @@ def _tool_line(name: str, t: dict) -> str:
     return f"- {name}({t['args']}){se} — {t['desc']}"
 
 
-def render_tool_catalog(tools: dict, task_text: str | None = None) -> str:
+IDLE_EVICT_ROUNDS = 3   # 连续未命中/未调用 N 轮 → 从注入完全清走(feat-133)
+
+
+def update_idle(prev_idle: dict, tools: dict, task_text: str,
+                used_names: list[str] | None = None) -> tuple[dict, set]:
+    """更新扩展工具组的闲置计数,返回 (new_idle, evicted_groups)。纯函数(feat-133)。
+
+    - 本轮意图命中(_intent_hit)或有工具被实际调用(used_names)的组 → 计数清零;
+    - 其余组 → 计数 +1;计数 ≥ IDLE_EVICT_ROUNDS 的组进 evicted(连索引都不给);
+    - 意图再命中会清零 → 自动复活。内置工具不计(始终常驻)。
+    """
+    used_groups = {g for n in (used_names or [])
+                   if (g := _tool_group(n))}
+    groups = {g for n in tools if (g := _tool_group(n))}
+    new_idle = dict(prev_idle or {})
+    evicted = set()
+    for g in groups:
+        if g in used_groups or _intent_hit(g, task_text or ""):
+            new_idle[g] = 0
+        else:
+            new_idle[g] = new_idle.get(g, 0) + 1
+        if new_idle[g] >= IDLE_EVICT_ROUNDS:
+            evicted.add(g)
+    # 清掉已不存在的组的计数
+    for g in list(new_idle):
+        if g not in groups:
+            del new_idle[g]
+    return new_idle, evicted
+
+
+def render_tool_catalog(tools: dict, task_text: str | None = None,
+                        evicted: set | None = None) -> str:
     """工具目录 + 调用约定,拼进 system 提示。
 
     task_text 给定时启用意图路由(feat-113):扩展组未命中只给一行索引,
@@ -362,11 +393,15 @@ def render_tool_catalog(tools: dict, task_text: str | None = None) -> str:
             lines.append(_tool_line(name, t))
         return "\n".join(lines)
 
+    evicted = evicted or set()
     indexed: dict[str, list[str]] = {}
+    n_evicted = 0
     for name, t in tools.items():
         group = _tool_group(name)
         if group is None or _intent_hit(group, task_text):
-            lines.append(_tool_line(name, t))
+            lines.append(_tool_line(name, t))     # 内置常驻 / 本轮意图命中→展开
+        elif group in evicted:
+            n_evicted += 1                        # feat-133:长期闲置→完全清走,连索引都不给
         else:
             indexed.setdefault(group, []).append(name)
     if indexed:
@@ -378,6 +413,8 @@ def render_tool_catalog(tools: dict, task_text: str | None = None) -> str:
                          + " ".join(n.removeprefix(group) for n in names[:12]))
         lines.append('要用未展开的组:先调 {"name":"tool_help","args":{"prefix":"<组前缀>"}} '
                      "取完整参数说明,再按说明调用。")
+    if n_evicted:
+        lines.append(f"(另有 {n_evicted} 个长期未用的工具组已隐藏;需要时说出用途即可唤回)")
     return "\n".join(lines)
 
 
@@ -540,7 +577,7 @@ def collect_env_lessons(results: list[dict], seen_keys: set) -> list[dict]:
 
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
                   project_dir: str = ".", max_iters: int = 24,
-                  approve=None, emit=None) -> dict:
+                  approve=None, emit=None, idle_state: dict | None = None) -> dict:
     """跑纯工具层循环。返回 {final, iters, stopped, trace, lessons}。
 
     每轮:provider.chat → 解析 tool 块;无块=最终答案;有块=执行(副作用需 approve)→ 回灌 → 续。
@@ -556,7 +593,12 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
     # feat-113:目录按当前任务意图路由(最后一条用户消息),弱相关扩展组收索引
     task_text = next((m.get("content", "") for m in reversed(messages)
                       if m.get("role") == "user"), "")
-    full_system = system + "\n" + render_tool_catalog(tools, task_text)
+    # feat-133:据历史闲置状态(调用方传入,跨消息累积)清走长期未用组
+    idle_in = (idle_state or {}).get("idle", {})
+    new_idle, evicted = update_idle(idle_in, tools, task_text)
+    if idle_state is not None:
+        idle_state["idle"] = new_idle       # 持久化预增计数;工具执行时下方按组清零
+    full_system = system + "\n" + render_tool_catalog(tools, task_text, evicted)
     convo = [dict(m) for m in messages]
     base_len = len(convo)   # 修剪只动此后循环追加的消息,不碰调用方原始历史
     trace: list[dict] = []
@@ -618,6 +660,11 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
         trunc_streak = 0
         results = [_exec_tool(c, tools, approve, emit) for c in calls]
         trace.extend(results)
+        if idle_state is not None:          # feat-133:被调用组的闲置计数清零(复活)
+            for r in results:
+                g = _tool_group(r.get("name") or "")
+                if g:
+                    idle_state["idle"][g] = 0
         feedback = _render_results(results)
         fresh = collect_env_lessons(results, lesson_keys)
         if fresh:
