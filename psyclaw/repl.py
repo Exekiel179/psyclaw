@@ -240,10 +240,22 @@ def _run_psyclaw_cmd(cmd: str) -> str:
 def _run_shell_cmd(cmd: str) -> str:
     """交系统 shell 跑一条命令,捕获输出(带超时)。"""
     import subprocess
+    # feat-127:启用沙箱时,执行前过代码执行面裁决(恶意硬拒,快速失败)
+    timeout = _RUN_TIMEOUT
+    try:
+        from psyclaw import sandbox as _sb
+        pol = _sb.load_policy(".")
+        if pol.get("enabled"):
+            v = _sb.sandbox_check("exec", "run", {"cmd": cmd}, project_dir=".")
+            if not v["allow"]:
+                return f"$ {cmd}\n[沙箱拒绝执行:{v['reason']}]"
+            timeout = _sb.exec_limits(pol)["timeout_s"]
+    except Exception:  # noqa: BLE001  # 沙箱异常不阻断(既有 _DANGEROUS_RE 仍兜底)
+        pass
     try:
         res = subprocess.run(cmd, shell=True, capture_output=True, text=True,
                              encoding="utf-8", errors="replace",
-                             timeout=_RUN_TIMEOUT)
+                             timeout=timeout)
         out = (res.stdout or "") + (("\n" + res.stderr) if res.stderr else "")
         return f"$ {cmd}\n(rc={res.returncode})\n{out}"
     except subprocess.TimeoutExpired:
