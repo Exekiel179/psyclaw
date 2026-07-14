@@ -1310,6 +1310,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_toolloop.py +4(闲置累积到阈值清走/意图复活/实际调用复活/catalog 隐藏 evicted 组但告知唤回)。全量 pytest → 1780 passed;eval 28/28。"
+    },
+    {
+      "id": "feat-117",
+      "name": "发散检索(创新任务的远距联想)——类人记忆蓝图收官",
+      "description": "docs/MEMORY.md §五。recall_facts 加 mode=diverge:创新/发散任务(设计/头脑风暴)在高相关命中之外,额外确定性采样 diverge_k 条中等相关卡(top_k 之后、命中>0,按分数间隔跳选不引随机——保 Date.now/random 禁用契约),给远距联想材料(REM 期远距联想促进创造性重组的工程对应);常规任务 focused 不启用(噪音)。render_fact_block 把远距卡单独标「远距联想(可能相关,未必直接适用)」,不与确证记忆混淆。is_divergent_task 据关键词(头脑风暴/创新/研究设计/换个角度…)判定,REPL 按任务类型自动选 mode。至此类人记忆蓝图四机制(遗忘/睡眠/发散/冲突)全部落地。",
+      "dependencies": [
+        "feat-114"
+      ],
+      "status": "done",
+      "evidence": "tests/test_audit_memory.py TestDivergentRetrieval +4(意图判定/focused 无远距/diverge 采入中等相关/render 单独标注)。全量 pytest → 1784 passed;eval 28/28。"
     }
   ]
 }

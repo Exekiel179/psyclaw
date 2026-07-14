@@ -356,8 +356,23 @@ def record_fact(concept: str, statement: str, scope: str = "project",
     return {"status": "created", "card": card}
 
 
-def recall_facts(query: str, top_k: int = 4) -> list[dict]:
-    """按当前消息检索语义卡(关键词覆盖,与教训卡同方);命中即取用刷新。"""
+def is_divergent_task(text: str) -> bool:
+    """任务是否偏创新/发散(设计/头脑风暴)——触发 diverge 检索(feat-117)。"""
+    low = (text or "").lower()
+    kws = ("头脑风暴", "brainstorm", "创新", "新思路", "新点子", "设计一个",
+           "有什么办法", "还能怎么", "拓展", "联想", "假设生成", "novel",
+           "研究设计", "新方向", "换个角度", "有没有别的")
+    return any(k in low for k in kws)
+
+
+def recall_facts(query: str, top_k: int = 4, mode: str = "focused",
+                 diverge_k: int = 2) -> list[dict]:
+    """按当前消息检索语义卡(关键词覆盖,与教训卡同方);命中即取用刷新。
+
+    mode="diverge"(feat-117,创新任务):高相关命中之外,额外采样 diverge_k 条
+    **中等相关**(命中 >0 但非最高分档)的卡——给设计/头脑风暴制造远距联想
+    材料(REM 期远距联想促进创造性重组的工程对应);常规任务不启用(噪音)。
+    """
     data = _load("facts")
     cards = data.get("facts", [])
     if not cards or not (query or "").strip():
@@ -374,6 +389,14 @@ def recall_facts(query: str, top_k: int = 4) -> list[dict]:
             scored.append((hit, c))
     scored.sort(key=lambda x: (-x[0], -float(x[1].get("confidence", 0))))
     hits = [c for _, c in scored[:top_k]]
+    if mode == "diverge" and len(scored) > top_k:
+        # 中等相关档(top_k 之后、命中>0)——确定性取样(按分数间隔跳选,不引随机)
+        tail = scored[top_k:]
+        step = max(1, len(tail) // max(1, diverge_k))
+        picks = [tail[i][1] for i in range(0, len(tail), step)][:diverge_k]
+        for c in picks:
+            c["_diverge"] = True                # 标记:注入时提示「远距联想」
+        hits = hits + picks
     if hits:                                   # 取用即强化(遗忘机制的输入信号)
         now = _now_iso()
         for c in hits:
@@ -388,13 +411,19 @@ def render_fact_block(cards: list[dict]) -> str:
     if not cards:
         return ""
     lines = ["# 研究语境记忆(语义卡,按相关性检索注入)"]
-    for c in cards:
+    diverge = [c for c in cards if c.get("_diverge")]
+    focused = [c for c in cards if not c.get("_diverge")]
+    for c in focused:
         lines.append(f"- {c['concept']}:{c['statement']}"
                      f"(置信 {float(c.get('confidence', 0.7)):.0%})")
         if c.get("conflicted") and c.get("history"):
             old = c["history"][-1]
             lines.append(f"  ⚠ 曾有不同说法:「{old['statement']}」"
                          "——如与当前任务相关,请向用户确认后以确认为准")
+    if diverge:                                # feat-117:远距联想材料,单独标注
+        lines.append("## 远距联想(可能相关的其他记忆,供发散/创新参考,未必直接适用)")
+        for c in diverge:
+            lines.append(f"- {c['concept']}:{c['statement']}")
     return "\n".join(lines)
 
 
