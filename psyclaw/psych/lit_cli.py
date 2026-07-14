@@ -9,16 +9,17 @@ from pathlib import Path
 def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
             year_from: int | None = None, fulltext_doi: str | None = None,
             zotero_doi: str | None = None, synthesize: bool = False,
-            project_dir: str = ".") -> int:
+            download: bool = False, project_dir: str = ".") -> int:
     from psyclaw import ui
     from psyclaw.psych import litsearch, zotero_client
 
-    # 模式 A:取某 DOI 的全文(合规优先级)
+    pdf_dir = str(Path(project_dir) / "outputs" / "pdfs")
+
+    # 模式 A:取某 DOI 的全文(合规优先级;feat-109:OA PDF 真下载+规范命名)
     if fulltext_doi:
         print(ui.title(f"全文获取 — {fulltext_doi}"))
         print(ui.rule())
-        res = litsearch.get_fulltext({"doi": fulltext_doi},
-                                     out_dir=str(Path(project_dir) / "outputs" / "fulltext"))
+        res = litsearch.fetch_and_save({"doi": fulltext_doi}, out_dir=pdf_dir)
         _print_fulltext(res, ui)
         return 0
 
@@ -53,8 +54,30 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
         print(f"   {ui.dim(au)} ({p.get('year','?')}) · {badge} · {p['source']}"
               + (f" · doi:{p['doi']}" if p["doi"] else ""))
     print(ui.dim(f"\n开放获取 {oa_n}/{len(r['results'][:limit])} 篇可直接取全文"))
-    print(ui.dim("取全文:psyclaw lit --fulltext <DOI>(走合法 OA);"
-                 "付费墙的用 --zotero <DOI> 从你自己文库取。"))
+    if download:                          # feat-109:OA PDF 批量真下载,规范命名落盘
+        print()
+        got = failed = 0
+        for p in r["results"][:limit]:
+            if p.get("oa_status") not in ("gold", "green", "hybrid", "bronze") \
+                    and not p.get("arxiv_id") and not p.get("pmcid"):
+                continue
+            res = litsearch.fetch_and_save(p, out_dir=pdf_dir)
+            dl = res.get("downloaded") or {}
+            if dl.get("ok"):
+                got += 1
+                print(ui.ok(f"  ⬇ {Path(dl['path']).name}"
+                            f"({dl['bytes'] // 1024} KB)"))
+            elif res.get("status") == "fulltext" and res.get("saved"):
+                got += 1
+                print(ui.ok(f"  ⬇ {Path(res['saved']).name}(全文文本)"))
+            else:
+                failed += 1
+                print(ui.warn(f"  ✗ {p['title'][:46]}:"
+                              f"{(dl.get('note') or res.get('note', ''))[:60]}"))
+        print(ui.dim(f"  下载 {got} 篇 → {pdf_dir};失败 {failed} 篇(如实标注,不假装)"))
+    else:
+        print(ui.dim("取全文:psyclaw lit --fulltext <DOI>(走合法 OA);"
+                     "--download 批量下载本次 OA 命中;付费墙用 --zotero <DOI>。"))
 
     # PRISMA 计数落盘(对接 LIT.prisma 质量检查)
     notes = Path(project_dir) / "notes"
@@ -140,11 +163,14 @@ def lit_cli_argv(argv: list[str], project_dir: str = ".") -> int:
     sources, limit, year_from = "openalex,europepmc", 10, None
     fulltext_doi = zotero_doi = None
     synthesize = False
+    download = False
     i = 0
     while i < len(argv):
         a = argv[i]
         if a in ("--synthesize", "-s"):
             synthesize = True
+        elif a in ("--download", "-d"):
+            download = True
         elif a == "--limit" and i + 1 < len(argv):
             i += 1
             try:
@@ -172,7 +198,7 @@ def lit_cli_argv(argv: list[str], project_dir: str = ".") -> int:
     return lit_cli(query=" ".join(query_parts), sources=sources, limit=limit,
                    year_from=year_from, fulltext_doi=fulltext_doi,
                    zotero_doi=zotero_doi, synthesize=synthesize,
-                   project_dir=project_dir)
+                   download=download, project_dir=project_dir)
 
 
 def _print_fulltext(res: dict, ui) -> None:
@@ -187,6 +213,11 @@ def _print_fulltext(res: dict, ui) -> None:
         print(f"  {ui.accent(res['pdf_url'])}")
         print(ui.dim(f"  {res['note']}"
                      + (f" · 许可:{res.get('license')}" if res.get('license') else "")))
+        dl = res.get("downloaded") or {}     # feat-109:下载结果如实呈报
+        if dl.get("ok"):
+            print(ui.ok(f"  ⬇ 已下载:{dl['path']}({dl['bytes'] // 1024} KB)"))
+        elif dl:
+            print(ui.warn(f"  ✗ 未能保存:{dl.get('note', '')}"))
     elif st == "institutional":
         print(ui.ok(f"✓ {res['channel']} — 机构权限入口(合法)"))
         print(f"  {ui.accent(res['url'])}")
