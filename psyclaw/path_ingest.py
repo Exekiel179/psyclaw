@@ -179,20 +179,62 @@ def process_message(
     context_parts: list[str] = []
     errors: list[str] = []
 
+    # feat-126:私密门——启用沙箱时,@文件进上下文=externalize(跨信任边界)。
+    # 私密路径无编码表则拒注入;有编码表则脱敏后再入(sandbox_check 单一入口)。
+    def _private_gate(path) -> str | None:
+        try:
+            from psyclaw import sandbox as _sb
+            pol = _sb.load_policy(str(base))
+            if not pol.get("enabled"):
+                return None
+            rel = str(path)
+            try:
+                rel = str(path.relative_to(base))
+            except ValueError:
+                pass
+            r = _sb.sandbox_check("file", "externalize", {"path": rel},
+                                  project_dir=str(base))
+            if not r["allow"]:
+                return r["reason"]
+        except Exception:  # noqa: BLE001  # 沙箱异常不阻断(fail-safe:私密路径下面还有 data 分支兜底)
+            return None
+        return None
+
     for path in candidates:
         if not path.is_file():
             continue
+        gate = _private_gate(path)
+        if gate:
+            errors.append(f"  [私密数据未注入 {path.name}:{gate}]")
+            continue
+
+        def _maybe_redact(text: str) -> str:
+            """私密路径且有编码表:注入前按编码表脱敏(feat-126)。"""
+            try:
+                from psyclaw import sandbox as _sb
+                pol = _sb.load_policy(str(base))
+                if pol.get("enabled") and _sb.is_private_path(
+                        str(path.relative_to(base) if path.is_relative_to(base)
+                            else path), pol):
+                    red, n = _sb.redact(text, str(base))
+                    if n:
+                        print(f"  [编码表脱敏: {path.name} 替换 {n} 项真实值→代号]")
+                    return red
+            except Exception:  # noqa: BLE001
+                pass
+            return text
+
         kind = classify(path)
         if kind == "data":
             try:
-                meta = _data_metadata(path)
+                meta = _maybe_redact(_data_metadata(path))
                 context_parts.append(meta)
                 print(f"  [数据文件: {path.name} → 结构元数据注入上下文，原始数据受保护]")
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"  [无法读取 {path}: {exc}]")
         elif kind == "text":
             try:
-                excerpt = smart_excerpt(path)
+                excerpt = _maybe_redact(smart_excerpt(path))
                 context_parts.append(excerpt)
                 print(f"  [文本文件: {path.name}({len(excerpt)} 字符进上下文)]")
             except Exception as exc:  # noqa: BLE001
@@ -201,7 +243,7 @@ def process_message(
             size = path.stat().st_size
             if size < 500_000:
                 try:
-                    excerpt = smart_excerpt(path)
+                    excerpt = _maybe_redact(smart_excerpt(path))
                     context_parts.append(excerpt)
                     print(f"  [文件: {path.name}({len(excerpt)} 字符进上下文)]")
                 except Exception as exc:  # noqa: BLE001

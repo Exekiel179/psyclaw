@@ -118,8 +118,106 @@ def sandbox_check(face: str, action: str, args: dict | None = None,
                                 f"命中恶意模式「{pat}」(快速失败)")
         return _verdict(project_dir, face, action, args, True, "未命中恶意模式")
 
-    # file/tools/net:入口已通,判据待 feat-126~128 填;当前放行并审计(不回归)
+    if face == "file":
+        return _check_file(policy, project_dir, action, args)
+
+    # tools/net:入口已通,判据待 feat-127~128 填;当前放行并审计(不回归)
     return _verdict(project_dir, face, action, args, True, "该面判据待实现,暂放行")
+
+
+def is_private_path(path: str, policy: dict) -> bool:
+    """路径是否落在被标为私密的目录下(private_paths 前缀匹配,规范化后比较)。"""
+    from pathlib import PurePosixPath
+    norm = str(path).replace("\\", "/").lstrip("./")
+    for pref in policy.get("file", {}).get("private_paths", []):
+        p = str(pref).replace("\\", "/").strip("/")
+        if norm == p or norm.startswith(p + "/") or f"/{p}/" in f"/{norm}":
+            return True
+    return False
+
+
+def _check_file(policy: dict, project_dir: str, action: str, args: dict) -> dict:
+    """文件面裁决(feat-126)。action ∈ read | write | externalize。
+
+    - read/write:项目内相对路径且非 data/raw(既有铁律沿用,此处不放大);
+    - **externalize(跨信任边界:进 LLM 上下文 / 网络请求 / 写出项目)**——
+      这是私密保护的关键动作:目标是私密数据 → 必须有编码表(codebook),
+      有则要求 needs=codebook(调用方脱敏后再传),无则 fail-closed 拒绝并
+      提示先建。区别于「拒绝访问」:私密数据可**本地**处理,只是不许**原样外传**。
+    """
+    fp = str(args.get("path") or args.get("target") or "")
+    fcfg = policy.get("file", {})
+    if action == "externalize":
+        if is_private_path(fp, policy):
+            if not fcfg.get("require_codebook", True):
+                return _verdict(project_dir, "file", action, args, True,
+                                "私密路径但策略未强制编码表(用户已放开)")
+            if codebook_exists(project_dir):
+                r = _verdict(project_dir, "file", action, args, True,
+                             "私密数据外传:须经编码表脱敏后传出")
+                r["needs"] = "codebook"
+                return r
+            return _verdict(project_dir, "file", action, args, False,
+                            "私密数据禁止原样外传,且缺编码表 notes/codebook.yaml"
+                            "——先建编码表(真实值→代号)再脱敏传出")
+        return _verdict(project_dir, "file", action, args, True, "非私密路径,可外传")
+    if action == "write":
+        norm = fp.replace("\\", "/").lstrip("./")
+        for pref in fcfg.get("private_paths", []):
+            p = str(pref).replace("\\", "/").strip("/")
+            if norm == p or norm.startswith(p + "/"):
+                return _verdict(project_dir, "file", action, args, False,
+                                f"拒绝写入私密/受保护路径 {pref}")
+        allow = fcfg.get("write_allow", [])
+        if allow and not any(norm.startswith(str(a).strip("/")) for a in allow):
+            return _verdict(project_dir, "file", action, args, False,
+                            f"写入路径不在允许清单 {allow}(最小权限)")
+        return _verdict(project_dir, "file", action, args, True, "写入路径允许")
+    return _verdict(project_dir, "file", action, args, True, "读取放行(沿用既有守卫)")
+
+
+# ---------------------------------------------------------------------------
+# 编码表(codebook):私密数据脱敏的真实值→代号映射。notes/codebook.yaml
+# ---------------------------------------------------------------------------
+
+def _codebook_path(project_dir: str) -> Path:
+    return Path(project_dir) / "notes" / "codebook.yaml"
+
+
+def codebook_exists(project_dir: str) -> bool:
+    return _codebook_path(project_dir).is_file()
+
+
+def load_codebook(project_dir: str = ".") -> dict:
+    """读编码表 {真实值: 代号}(极简 YAML,map 结构);缺失/坏档返回 {}。"""
+    p = _codebook_path(project_dir)
+    if not p.is_file():
+        return {}
+    try:
+        data = _parse_yaml(p.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+    mapping = data.get("map", data)          # 支持顶层 map: 或直接键值
+    return {str(k): str(v) for k, v in mapping.items()
+            if not isinstance(v, (dict, list))}
+
+
+def redact(text: str, project_dir: str = ".") -> tuple[str, int]:
+    """按编码表把私密真实值替换成代号。返回 (脱敏文本, 替换次数)。
+
+    绝不"尽力":编码表里有的值才替换;编码表为空则原样返回 0 次(调用方据此
+    判定是否可外传——空表=没有脱敏能力,externalize 裁决会拒)。长值先替,
+    防短值是长值子串时误伤(如 id「1」不覆盖 id「10」)。
+    """
+    book = load_codebook(project_dir)
+    if not book or not text:
+        return text, 0
+    n = 0
+    for real in sorted(book, key=len, reverse=True):
+        if real and real in text:
+            text = text.replace(real, book[real])
+            n += 1
+    return text, n
 
 
 def _verdict(project_dir, face, action, args, allow, reason) -> dict:

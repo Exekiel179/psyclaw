@@ -81,3 +81,86 @@ def test_yaml_parse_dump_shapes():
     back = SB._parse_yaml(text)
     assert back["enabled"] is True
     assert back["net"]["allow_domains"] == ["a.com", "b.org"]
+def _write_codebook(tmp_path, mapping):
+    notes = tmp_path / "notes"
+    notes.mkdir(parents=True, exist_ok=True)
+    lines = ["map:"] + [f"  {k}: {v}" for k, v in mapping.items()]
+    (notes / "codebook.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+def test_private_path_detection(tmp_path):
+    _enable(tmp_path)
+    pol = SB.load_policy(str(tmp_path))
+    assert SB.is_private_path("data/raw/subjects.csv", pol) is True
+    assert SB.is_private_path("outputs/report.md", pol) is False
+def test_externalize_private_without_codebook_denied(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("file", "externalize",
+                         {"path": "data/raw/subjects.csv"}, str(tmp_path))
+    assert r["allow"] is False and "编码表" in r["reason"]
+def test_externalize_private_with_codebook_needs_redaction(tmp_path):
+    _enable(tmp_path)
+    _write_codebook(tmp_path, {"张三": "S01"})
+    r = SB.sandbox_check("file", "externalize",
+                         {"path": "data/raw/subjects.csv"}, str(tmp_path))
+    assert r["allow"] is True and r.get("needs") == "codebook"
+def test_externalize_nonprivate_allowed(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("file", "externalize",
+                         {"path": "outputs/report.md"}, str(tmp_path))
+    assert r["allow"] is True and "needs" not in r
+def test_write_to_data_raw_denied(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("file", "write",
+                         {"path": "data/raw/x.csv"}, str(tmp_path))
+    assert r["allow"] is False
+def test_write_outside_allowlist_denied(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("file", "write", {"path": "/etc/passwd"}, str(tmp_path))
+    assert r["allow"] is False and "允许清单" in r["reason"]
+def test_write_to_outputs_allowed(tmp_path):
+    _enable(tmp_path)
+    r = SB.sandbox_check("file", "write",
+                         {"path": "outputs/analysis.py"}, str(tmp_path))
+    assert r["allow"] is True
+def test_redact_replaces_by_codebook(tmp_path):
+    _write_codebook(tmp_path, {"张三": "S01", "李四": "S02"})
+    out, n = SB.redact("被试张三和李四完成了测试", str(tmp_path))
+    assert out == "被试S01和S02完成了测试" and n == 2
+def test_redact_longest_first_no_substring_bug(tmp_path):
+    _write_codebook(tmp_path, {"1": "A", "10": "B"})
+    out, n = SB.redact("id=10 id=1", str(tmp_path))
+    assert out == "id=B id=A"                 # 10 先替,不被 1 拆坏
+def test_redact_empty_codebook_no_change(tmp_path):
+    out, n = SB.redact("原样文本", str(tmp_path))
+    assert out == "原样文本" and n == 0       # 无表=无脱敏能力(externalize 会拒)
+def test_require_codebook_off_allows_raw(tmp_path):
+    _enable(tmp_path, file={"private_paths": ["data/raw/"], "require_codebook": False})
+    r = SB.sandbox_check("file", "externalize",
+                         {"path": "data/raw/x.csv"}, str(tmp_path))
+    assert r["allow"] is True                 # 用户显式放开强制脱敏
+def test_process_message_blocks_private_without_codebook(tmp_path):
+    _enable(tmp_path)
+    raw = tmp_path / "data" / "raw"
+    raw.mkdir(parents=True)
+    f = raw / "subjects.csv"
+    f.write_text("id,name\n1,张三\n", encoding="utf-8")
+    from psyclaw.path_ingest import process_message
+    ctx, errors = process_message(f"看看 {f} 的结构", cwd=tmp_path)
+    assert ctx == "" and any("私密数据未注入" in e for e in errors)
+def test_process_message_redacts_private_with_codebook(tmp_path):
+    _enable(tmp_path)
+    raw = tmp_path / "data" / "raw"
+    raw.mkdir(parents=True)
+    f = raw / "notes.txt"
+    f.write_text("被试张三完成了前测", encoding="utf-8")
+    _write_codebook(tmp_path, {"张三": "S01"})
+    from psyclaw.path_ingest import process_message
+    ctx, errors = process_message(f"读一下 {f}", cwd=tmp_path)
+    assert "S01" in ctx and "张三" not in ctx        # 脱敏后才进上下文
+def test_process_message_sandbox_off_unchanged(tmp_path):
+    raw = tmp_path / "data" / "raw"
+    raw.mkdir(parents=True)
+    f = raw / "notes.txt"
+    f.write_text("被试张三", encoding="utf-8")
+    from psyclaw.path_ingest import process_message
+    ctx, errors = process_message(f"读 {f}", cwd=tmp_path)   # 沙箱未启用
+    assert "张三" in ctx                              # 不启用=既有行为(不新增限制)

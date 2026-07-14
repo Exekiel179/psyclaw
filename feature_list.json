@@ -1205,6 +1205,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_sandbox.py 9 例(未启用放行/exec 恶意模式快速失败/正常科研码放行/未知面拒/审计落盘与参数摘要不落原文/策略往返与最小权限合并/坏档回默认/YAML 解析往返)。全量 pytest → 1724 passed;eval 28/28。"
+    },
+    {
+      "id": "feat-126",
+      "name": "沙箱文件面 + 私密数据/编码表脱敏",
+      "description": "docs/SANDBOX.md 文件面。sandbox_check(file, action) 落三类判据:read 沿用既有守卫;write 拒私密/受保护路径且须在 write_allow 清单(最小权限);externalize(跨信任边界=进 LLM 上下文/网络/写出项目)是私密保护关键——目标是 private_paths 数据时,有编码表 notes/codebook.yaml 则 needs=codebook(调用方脱敏后传),无编码表 fail-closed 拒绝并提示先建。区别于拒绝访问:私密数据可本地处理,只是不许原样外传。codebook 载入(极简 YAML,真实值→代号)+ redact(长值先替防子串误伤,空表返回 0 次=无脱敏能力)。接入 path_ingest.process_message:启用沙箱时 @文件即 externalize,私密无表拒注入、有表脱敏后再入(数据/文本/未知三注入点全包)。沙箱未启用=既有行为不新增限制。",
+      "dependencies": [
+        "feat-125"
+      ],
+      "status": "done",
+      "evidence": "tests/test_sandbox.py +14(私密识别/externalize 无表拒有表 needs/非私密放行/write 拒 data-raw 与越清单/redact 按表替换与长值优先与空表不变/require_codebook 关可放开/process_message 端到端拒注入与脱敏注入与未启用不变)。全量 pytest → 1738 passed;eval 28/28。"
     }
   ]
 }
