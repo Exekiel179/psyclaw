@@ -100,6 +100,38 @@ def _split_for_italic(text: str) -> list[tuple[str, bool]]:
     return parts or [(text, False)]
 
 
+# feat-143:行内 Markdown 强调解析。用户按 Markdown 习惯写稿(**粗体**/`代码`),
+# 此前 **粗体** 会被上面 `\*([^*]+)\*` 的单星规则错吃成「* + 斜体 + *」——
+# 星号漏进 Word 且语义错;Abstract/References 更是完全不解析、原样漏字面量。
+# `**` 必须排在 `*` 之前(alternation 按序尝试),否则双星仍被单星规则抢走。
+# 不处理嵌套(**粗*斜*体**)与转义(\*),APA 稿件罕见,YAGNI。
+_INLINE_RE = re.compile(r'\*\*(.+?)\*\*|\*([^*]+)\*|`([^`]+)`')
+
+
+def _split_inline(text: str) -> list[tuple[str, bool, bool, bool]]:
+    """把行内标记拆成 (片段, 粗体, 斜体, 等宽) 列表,供 docx run 生成。
+
+    纯函数。`_split_for_italic` 的超集,但契约不同(四元组),故另立函数——
+    既有调用方与测试锁定了旧签名,不动它。
+    """
+    parts: list[tuple[str, bool, bool, bool]] = []
+    last = 0
+    for m in _INLINE_RE.finditer(text):
+        if m.start() > last:
+            parts.append((text[last:m.start()], False, False, False))
+        bold, italic, code = m.group(1), m.group(2), m.group(3)
+        if bold is not None:
+            parts.append((bold, True, False, False))
+        elif italic is not None:
+            parts.append((italic, False, True, False))
+        else:
+            parts.append((code, False, False, True))
+        last = m.end()
+    if last < len(text):
+        parts.append((text[last:], False, False, False))
+    return parts or [(text, False, False, False)]
+
+
 # ---------------------------------------------------------------------------
 # 文档模型
 # ---------------------------------------------------------------------------
@@ -205,7 +237,7 @@ class APA7Document:
         # 摘要页
         if self.abstract:
             body.append(_p("Abstract", style="PCH1"))
-            body.append(_p(self.abstract, style="PCNoIndent"))
+            body.append(_p_stat(self.abstract, style="PCNoIndent"))  # feat-143
             if self.keywords:
                 body.append(_p_keywords(", ".join(self.keywords)))
             body.append(_page_break())
@@ -231,7 +263,7 @@ class APA7Document:
             body.append(_page_break())
             body.append(_p("References", style="PCH1"))
             for r in sorted(self.references, key=str.lower):
-                body.append(_p(r, style="PCRef"))
+                body.append(_p_stat(r, style="PCRef"))   # feat-143:期刊名斜体
 
         document = _DOCUMENT_XML.format(body="".join(body))
         doc_rels = _DOC_RELS.replace("</Relationships>",
@@ -386,20 +418,37 @@ def export_cli(argv: list) -> int:
 # OOXML 构件
 # ---------------------------------------------------------------------------
 
-def _run(text: str, italic: bool = False) -> str:
-    rpr = "<w:rPr><w:i/><w:iCs/></w:rPr>" if italic else ""
+def _run(text: str, italic: bool = False, bold: bool = False,
+         code: bool = False) -> str:
+    """一个 run;feat-143 起支持粗体与等宽(行内代码)。"""
+    props = ""
+    if bold:
+        props += "<w:b/><w:bCs/>"
+    if italic:
+        props += "<w:i/><w:iCs/>"
+    if code:                       # 行内代码:等宽字体(不改字号,免破坏行距)
+        props += ('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" '
+                  'w:cs="Courier New"/>')
+    rpr = f"<w:rPr>{props}</w:rPr>" if props else ""
     return f'<w:r>{rpr}<w:t xml:space="preserve">{escape(text)}</w:t></w:r>'
 
 
 def _p(text: str, style: str = "PCBody") -> str:
+    """段落,文本原样不解析行内标记(标题等已由样式承担强调的场合用)。"""
     runs = f'<w:r><w:t xml:space="preserve">{escape(text)}</w:t></w:r>' if text else ""
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{runs}</w:p>'
 
 
 def _p_stat(text: str, style: str = "PCBody") -> str:
-    """段落，自动对 *...* 标记的片段应用斜体 run。"""
-    parts = _split_for_italic(text)
-    runs = "".join(_run(t, italic=it) for t, it in parts)
+    """段落,解析行内 Markdown 强调(**粗体** / *斜体* / `代码`)。
+
+    feat-143:此前只走 _split_for_italic 认 *斜体*,**粗体** 被错吃成
+    「* + 斜体 + *」;现统一走 _split_inline。
+    """
+    if not text:
+        return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr></w:p>'
+    parts = _split_inline(text)
+    runs = "".join(_run(t, italic=i, bold=b, code=c) for t, b, i, c in parts)
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{runs}</w:p>'
 
 
