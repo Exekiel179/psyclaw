@@ -66,6 +66,27 @@ def load_config() -> dict:
     return conf
 
 
+def load_project_config(project_dir: str = ".") -> dict:
+    """项目级配置(./.psyclaw/config.yaml,如 target_journal)。不存在返回 {}。"""
+    return _parse_simple(Path(project_dir) / ".psyclaw" / "config.yaml")
+
+
+def set_project_config(key: str, value: str, project_dir: str = ".") -> bool:
+    """写/更新项目级配置的单个键(fail-safe:写不了返回 False 不抛)。"""
+    try:
+        path = Path(project_dir) / ".psyclaw" / "config.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lines = (path.read_text(encoding="utf-8").splitlines()
+                 if path.exists() else ["# PsyClaw project config"])
+        prefix = f"{key}:"
+        lines = [ln for ln in lines if not ln.strip().startswith(prefix)]
+        lines.append(f"{key}: {value}")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def run_config_wizard(non_interactive: bool = False) -> int:
     from psyclaw import ui
     from psyclaw.providers import PRESETS

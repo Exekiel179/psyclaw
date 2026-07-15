@@ -1350,6 +1350,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_mcp_agent_tools.py +7(provides 惰性登记零进程/首调起进程+全目录回填缓存/缓存全目录+args 优先/tools: 键优先于 provides/内置 registry 惰性真名/LAZY=0 回 eager/eager 回填缓存)。全量 pytest → 1803 passed;eval 28/28;gates ✓。活体:build_tools('.') 0.03s、18 个 mcp__ 工具全登记、_clients 空(零子进程);首调 pystat 起进程并回填 7 个真名工具目录。"
+  },
+  {
+   "id": "feat-139",
+   "name": "start 按目标期刊装载 AJS 期刊技能包",
+   "description": "psyclaw start 澄清出目标期刊后,从 Awesome Journal Skills mono-repo(brycewang-stanford/awesome-journal-skills,495 包)自动稀疏检出对应期刊技能包装进项目,兑现「零基础勾一下就全程按目标期刊来」;psyclaw 只编排/消费外部包,不重造期刊内容(与统计外移同源哲学)。组件:新 psyclaw/ajs.py——list_packs(GitHub git/trees API 小 JSON,进程缓存,离线 fail-safe)/resolve_pack 纯函数(归一化去 -Skills/连字符 + 英文缩写别名表 AER→American-Economic-Review + 中文刊别名 财经研究→Caijing-Yanjiu + difflib 近似候选,唯一命中才 match)/install_pack(git clone --filter=blob:none --no-checkout --depth 1 + sparse-checkout set 只下目标包;无 git/克隆失败给手动命令不抛;官方失败自动镜像重试);mirror.py 加 github_reachable/github_mirror_url/github_clone_url(gitclone.com 镜像,PSYCLAW_FORCE_MIRROR 兼容);loader 加 */skills/*/SKILL.md 三层 glob(既有两条不动);cli 新 journal install <刊名> [--global] 子命令(歧义列候选交互选,零命中提示 psyclaw 自有画像兜底)+ start 加目标期刊步(--journal/--global 免交互,回车跳过,失败不中断 start)+ config.py load/set_project_config,装完记 target_journal/target_journal_pack 进项目 .psyclaw/config.yaml,check 默认带 target_journal、export 命中 xinlixuebao/xinlikexue 时默认该刊格式(--journal 均可覆盖)。",
+   "dependencies": [
+    "feat-129",
+    "feat-136"
+   ],
+   "status": "done",
+   "evidence": "tests/test_ajs.py +23(resolve 精确/全名/缩写/中文/歧义/零命中近似/空名;list_packs mock 网络+离线 fail-safe;install_pack 稀疏检出成功/已存在跳过/无 git 手动命令/克隆失败不抛;mirror passthrough/强制镜像改写;loader 三层布局;CLI install 写 target_journal/--global/浏览不回归/start --journal/无 journal 属性不回归/装包失败不中断 start;check 默认 target_journal 且 --journal 覆盖)。全量 pytest → 1826 passed;eval 28/28;gates ✓。活体:真打 AJS 仓库 list_packs 495 包、resolve AAAI→AAAI-Skills、财经研究→Caijing-Yanjiu;journal install AAAI 真稀疏检出 → loader 认出 12 个子技能(project scope)→ target_journal: AAAI 落项目配置;journal install 空名 rc=2、journal 浏览目录不回归。"
   }
  ]
 }

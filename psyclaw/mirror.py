@@ -18,8 +18,11 @@ PIP_MIRRORS = ["https://pypi.tuna.tsinghua.edu.cn/simple",
                "https://mirrors.aliyun.com/pypi/simple/"]
 NPM_OFFICIAL = "https://registry.npmjs.org"
 NPM_MIRROR = "https://registry.npmmirror.com"
+GITHUB_OFFICIAL = "https://github.com"
+GITHUB_MIRRORS = ["https://gitclone.com/github.com"]
 
 _PROBE_URL = "https://pypi.org/simple/pip/"
+_GH_PROBE_URL = "https://github.com"
 _probe_cache: dict = {}
 
 
@@ -37,6 +40,34 @@ def official_reachable(timeout: float = 4.0) -> bool:
     except Exception:  # noqa: BLE001
         _probe_cache["ok"] = False
     return _probe_cache["ok"]
+
+
+def github_reachable(timeout: float = 4.0) -> bool:
+    """探测 github.com 是否可达(与 official_reachable 同款缓存/强制镜像模式)。"""
+    if os.environ.get("PSYCLAW_FORCE_MIRROR", "").strip() in ("1", "true", "yes"):
+        return False
+    if "gh_ok" in _probe_cache:
+        return _probe_cache["gh_ok"]
+    try:
+        req = urllib.request.Request(_GH_PROBE_URL, method="HEAD",
+                                     headers={"User-Agent": "psyclaw-probe"})
+        urllib.request.urlopen(req, timeout=timeout)
+        _probe_cache["gh_ok"] = True
+    except Exception:  # noqa: BLE001
+        _probe_cache["gh_ok"] = False
+    return _probe_cache["gh_ok"]
+
+
+def github_mirror_url(url: str) -> str:
+    """把 github.com 克隆 URL 无条件改写为镜像(供官方失败后的重试)。"""
+    if url.startswith(GITHUB_OFFICIAL + "/"):
+        return GITHUB_MIRRORS[0] + url[len(GITHUB_OFFICIAL):]
+    return url
+
+
+def github_clone_url(url: str) -> str:
+    """github 可达则原样返回,不可达改写为镜像(feat-139 AJS 稀疏检出用)。"""
+    return url if github_reachable() else github_mirror_url(url)
 
 
 def pip_index_args() -> list[str]:

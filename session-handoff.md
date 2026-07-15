@@ -4,10 +4,15 @@
 
 ## Current Objective
 
-- Goal: v0.14.0 发布(三轮对抗评估缺陷清零 + 文献查找全链)
-- Current status: **v0.14.0 已发布**——feat-090~110 done;110 个 feature 全 done
-- Branch / commit: master(待用户推送:`! git push origin master`;tag:`git tag v0.14.0 && git push origin v0.14.0`)
-- 待排期候选:feat-105(未跑先造示例数值)/feat-106(路径注入误报,低优先)
+- Goal: 开箱即用(feat-138 MCP 惰性化 + feat-139 AJS 期刊技能包安装)
+- Current status: **feat-138/139 均 done**——134 个 feature 全 done,无未完成项
+- Branch / commit: master(feat-138 = 4ca6c04;feat-139 本轮提交;待用户推送)
+- Verification: 全量 `uv run --python 3.12 --with pytest python -m pytest -q`
+  → **1826 passed**;`python -m psyclaw eval` 28/28;`python -m psyclaw gates` ✓
+- 下一轮候选(未立项):AJS 包更新/卸载(feat-139 边界外)、feat-017/018/020
+  技能生态三件套(017 与 139 部分重叠,立项前先核对)
+- 用法速记:`psyclaw journal install <刊名> [--global]`(缩写/中文名均可);
+  `psyclaw start --journal AER`;装完 check/export 默认带 target_journal
 
 ## Completed This Session
 - [x] 快进合并 feat/interaction-model-run-contracts(feat-076..078)进 master(先测后并:1495 绿)
