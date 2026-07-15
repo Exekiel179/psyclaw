@@ -1,6 +1,8 @@
 # PsyClaw MCP 服务器目录
 # 心理学研究工具的可插拔 MCP。由 `psyclaw config` 向导逐个询问启用并采集环境变量。
 # enable_when: always | env:<VAR> | detect:<binary>
+# provides = 能力标签(probe_capabilities/向导展示用);tools = 服务器真实工具名
+# (feat-138 惰性登记用;不写则退回 provides,再没有则 merge 时 eager list_tools)。
 servers:
   # stats-core = 主路径内置；stats-optional = 商业软件检测到才启用
   - name: pystat
@@ -9,6 +11,7 @@ servers:
     enable_when: always
     command: python -m psyclaw.mcp.servers.pystat_server
     provides: [pingouin, statsmodels, descriptive, t_test, anova, regression, mediation]
+    tools: [pystat_describe, pystat_ttest, pystat_correlation, pystat_anova, pystat_regression, pystat_meta, pystat_guidance]
 
   - name: r-mcp
     category: stats-core
@@ -22,6 +25,7 @@ servers:
     enable_when: detect:mplus       # 仅本机有 Mplus 才启用
     command: python -m psyclaw.mcp.servers.mplus_server
     provides: [cfa_syntax, sem_syntax, lgm_syntax, mixture_syntax, mplus_run]
+    tools: [mplus_syntax, mplus_run]
 
   - name: spss-mcp
     category: stats-commercial      # 可选商业软件集成
@@ -29,6 +33,7 @@ servers:
     enable_when: detect:statisticsb # 仅本机有 IBM Statistics Batch Facility 才启用
     command: python -m psyclaw.mcp.servers.spss_server
     provides: [syntax_gen, sav_run, reliability, factor, ancova]
+    tools: [spss_syntax, spss_run]
 
   - name: mne-mcp
     category: stats-builtin
@@ -36,6 +41,7 @@ servers:
     enable_when: always
     command: python -m psyclaw.mcp.servers.mne_server
     provides: [eeg_info, preprocess_plan, erp_components, cluster_stats]
+    tools: [mne_info, mne_preprocess_plan, mne_erp_components, mne_stats_guidance]
 
   - name: stata-mcp
     category: stats-commercial      # 可选商业软件集成
@@ -43,6 +49,7 @@ servers:
     enable_when: detect:stata       # 仅本机有 Stata 才启用
     command: python -m psyclaw.mcp.servers.stata_server
     provides: [dofile_gen, panel, iv, logistic, survival, poisson, stata_run]
+    tools: [stata_dofile, stata_run]
 
   - name: zotero-mcp
     category: literature
