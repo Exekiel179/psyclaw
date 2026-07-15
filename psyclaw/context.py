@@ -147,6 +147,8 @@ def lean_core() -> str:
         "(pip install \"psyclaw[stats]\");",
         "④引用反杜撰——凭记忆的文献条目一律标「⚠ 未核实」,哪怕确信存在;",
         "语料中没有的文献不补全条目,指引 psyclaw lit 先检索。",
+        "产物归位约定:成稿/导出→outputs/ 图→figures/ 脚本→scripts/ 笔记→notes/ "
+        "清洗数据→data/clean;用户显式指定路径时以用户为准。",
     ]
     return "\n".join(parts)
 

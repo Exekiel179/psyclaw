@@ -218,8 +218,16 @@ def build_tools(project_dir: str = ".") -> dict:
             {"path": raw, "content": str(a.get("content", ""))},
             confirm=lambda p: True)   # 副作用批准已在循环层做,此处允许覆盖
         tail = f"({r.get('chars')} 字符)" if r.get("chars") is not None else ""
-        return f"{r['status']} {r.get('path', '')} {tail}".strip()
-    _t("save_file", "保存文件到磁盘(仅项目根内;绝不写 data/raw/凭据路径;覆盖需批准)",
+        out = f"{r['status']} {r.get('path', '')} {tail}".strip()
+        # feat-140 归位软提示:裸文件名落根且类型明确才附一句约定;不搬文件不改路径
+        if Path(raw).parent == Path("."):
+            from psyclaw.scaffold import canonical_dir
+            hint_dir = canonical_dir(raw)
+            if hint_dir:
+                out += f"\n(归位约定:这类文件通常放 {hint_dir}/,下次可直接写入)"
+        return out
+    _t("save_file", "保存文件到磁盘(仅项目根内;绝不写 data/raw/凭据路径;覆盖需批准;"
+       "产物按归位约定目录存放,用户显式指定为准)",
        "path:str, content:str", _save, side_effect=True)
 
     def _kg(a):

@@ -1361,6 +1361,16 @@
    ],
    "status": "done",
    "evidence": "tests/test_ajs.py +23(resolve 精确/全名/缩写/中文/歧义/零命中近似/空名;list_packs mock 网络+离线 fail-safe;install_pack 稀疏检出成功/已存在跳过/无 git 手动命令/克隆失败不抛;mirror passthrough/强制镜像改写;loader 三层布局;CLI install 写 target_journal/--global/浏览不回归/start --journal/无 journal 属性不回归/装包失败不中断 start;check 默认 target_journal 且 --journal 覆盖)。全量 pytest → 1826 passed;eval 28/28;gates ✓。活体:真打 AJS 仓库 list_packs 495 包、resolve AAAI→AAAI-Skills、财经研究→Caijing-Yanjiu;journal install AAAI 真稀疏检出 → loader 认出 12 个子技能(project scope)→ target_journal: AAAI 落项目配置;journal install 空名 rc=2、journal 浏览目录不回归。"
+  },
+  {
+   "id": "feat-140",
+   "name": "产物文件归位软约定(引导不强制,chat 自行决定)",
+   "description": "用户设想:生成的文件自动按固定位置存放。与用户定稿方案:约定只引导、不强制——硬改路径会误搬 README 类根目录文件、且工具行为与模型心智不一致。落地三处:①scaffold.canonical_dir 纯函数(后缀→约定目录:图→figures/ 脚本→scripts/ docx→outputs/ csv→data/clean;.md 成稿/笔记二义返回 None 不武断);②lean_core 加一行产物归位约定(成稿/导出→outputs/ 图→figures/ 脚本→scripts/ 笔记→notes/ 清洗数据→data/clean,用户显式指定为准),预算 900 内;③save_file 工具描述带约定 + 回执软提示(仅裸文件名落根且类型明确时附一句「这类文件通常放 X/」,不搬文件不改路径;显式目录零打扰)。export 缺省输出「跟着稿件走」是既有确定性契约,不动。",
+   "dependencies": [
+    "feat-112"
+   ],
+   "status": "done",
+   "evidence": "tests/test_placement.py +7(canonical_dir 后缀映射/二义与未知返回 None/裸文件名回执带提示且文件不被搬/显式目录零打扰/二义类型不提示/lean_core 含约定且预算不破/工具描述带约定)。全量 pytest → 1833 passed。"
   }
  ]
 }
