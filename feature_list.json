@@ -1330,6 +1330,16 @@
       ],
       "status": "done",
       "evidence": "tests/test_taskstate.py 7 例(存读/append-only 保历史/摘要截断不落原文/list_tasks/recall 渲染/空召回/fail-safe)。全量 pytest → 1791 passed;eval 28/28;gates 通过。"
+    },
+    {
+      "id": "feat-137",
+      "name": "Word 导出图片嵌入 + 图表风格真生效(中文字体/色环)",
+      "description": "用户反馈:分析输出的 Word 感觉没经过统一美化(含图片可视化)。核查发现三缺口:①parse_md 完全忽略 ![](路径) 图片语法——图注文字留下但图片丢失,to_docx 不支持图片;②figures.apply_style 的 from matplotlib.cycler import cycler 在现代 matplotlib 不存在→try/except 静默降级,apa7 风格(字体/色环/去顶右框)从来没真正应用过;③中文字形缺失(字体表无 CJK,中文渲染成方框)。修复:①APA7Document.add_figure + _IMG_RE 解析 + to_docx 纯 stdlib OOXML DrawingML 真嵌 PNG(media 打包+关系+居中+APA 图注,PNG 头读尺寸按 6\" 上限等比缩放,图不存在文字占位不静默丢),export_cli 设 base_dir 解析相对路径;②cycler import 改 from cycler(独立包)+ rcsetup 兜底,风格恢复生效;③_detect_cjk_fonts 探测系统中文字体(PingFang/STHeiti/Microsoft YaHei/Noto…)前置进 sans-serif(matplotlib 整段单字体不逐字回退,必须前置)+ axes.unicode_minus=False。",
+      "dependencies": [
+        "feat-007"
+      ],
+      "status": "done",
+      "evidence": "tests/test_apa7_stat.py +6(图片语法解析/docx 真嵌 PNG+drawing+关系/图不存在占位不丢/markdown 往返/尺寸按上限缩放)。全量 pytest → 1796 passed。活体:export paper.md --docx → docx 内 media/image1.png+w:drawing+a:blip;apply_style('apa7') 中文字体 STHeiti 前置、OKABE_ITO 色环 #E69F00 生效、Glyph 缺失归零。"
     }
   ]
 }

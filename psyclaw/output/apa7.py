@@ -23,7 +23,9 @@ APA7(学生论文版)规格,全部落实在 styles.xml:
 
 from __future__ import annotations
 
+import os
 import re
+import struct
 import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -136,6 +138,14 @@ class APA7Document:
         """添加 APA7 三线统计表格（用于相关矩阵、ANOVA 表等）。"""
         self.blocks.append(("table", (caption, headers, rows)))
 
+    def add_figure(self, path: str, caption: str = "") -> None:
+        """添加图片(feat-137)。Markdown 里的 ![caption](path) 解析成此。
+
+        docx 导出时真嵌入 PNG(居中 + APA 图注);文件不存在则退化为文字占位,
+        绝不静默丢图(此前 parse_md 完全忽略图片语法,图注留下、图丢了)。
+        """
+        self.blocks.append(("figure", (str(path), caption.strip())))
+
     # -- Markdown 输出 -------------------------------------------------------
     def to_markdown(self) -> str:
         out = ["---",
@@ -163,6 +173,9 @@ class APA7Document:
                 for row in rows:
                     out += ["| " + " | ".join(str(v) for v in row) + " |"]
                 out += [""]
+            elif kind == "figure":
+                fpath, caption = content
+                out += [f"![{caption}]({fpath})", ""]
             else:
                 out += ["#" * (int(kind[1]) + 1) + " " + content, ""]
         if self.references:
@@ -198,12 +211,18 @@ class APA7Document:
             body.append(_page_break())
         # 正文(APA7:正文第一页顶部重复标题,加粗居中)
         body.append(_p(self.title, style="PCH1"))
+        media: list = []          # feat-137:待打包的图片 [(rid, arcname, bytes)]
+        extra_rels: list = []     # 图片关系条目
         for kind, content in self.blocks:
             if kind == "table":
                 caption, headers, rows = content
                 body.append(_table_three_line(headers, rows, caption=caption))
             elif kind == "p":
                 body.append(_p_stat(content, style="PCBody"))
+            elif kind == "figure":
+                fpath, caption = content
+                xml = self._figure_xml(fpath, caption, media, extra_rels)
+                body.append(xml)
             else:
                 style = {"h1": "PCH1", "h2": "PCH2", "h3": "PCH3"}[kind]
                 body.append(_p(content, style=style))
@@ -215,15 +234,48 @@ class APA7Document:
                 body.append(_p(r, style="PCRef"))
 
         document = _DOCUMENT_XML.format(body="".join(body))
+        doc_rels = _DOC_RELS.replace("</Relationships>",
+                                     "".join(extra_rels) + "</Relationships>")
+        content_types = _CONTENT_TYPES
+        if media and "image/png" not in content_types:
+            content_types = content_types.replace(
+                "</Types>",
+                '<Default Extension="png" ContentType="image/png"/></Types>')
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("[Content_Types].xml", _CONTENT_TYPES)
+            z.writestr("[Content_Types].xml", content_types)
             z.writestr("_rels/.rels", _RELS)
             z.writestr("word/document.xml", document)
             z.writestr("word/styles.xml", _STYLES_XML)
             z.writestr("word/header1.xml", _HEADER_XML)
-            z.writestr("word/_rels/document.xml.rels", _DOC_RELS)
+            z.writestr("word/_rels/document.xml.rels", doc_rels)
             z.writestr("docProps/core.xml", _CORE_XML.format(title=escape(self.title)))
+            for _rid, arc, data in media:
+                z.writestr(arc, data)
         return path
+
+    def _figure_xml(self, fpath: str, caption: str, media: list,
+                    extra_rels: list) -> str:
+        """图片 block → 居中 drawing + APA 图注;图不存在则文字占位(不静默丢)。"""
+        import os as _os
+        if not fpath or not _os.path.isfile(fpath):
+            note = f"[图片未找到:{fpath}]" + (f" {caption}" if caption else "")
+            return _p(note, style="PCNoIndent")
+        try:
+            data = open(fpath, "rb").read()
+            w_emu, h_emu = _png_size_emu(data)
+        except Exception:  # noqa: BLE001
+            return _p(f"[图片读取失败:{fpath}]", style="PCNoIndent")
+        idx = len(media) + 1
+        rid = f"rIdImg{idx}"
+        arc = f"word/media/image{idx}.png"
+        media.append((rid, arc, data))
+        extra_rels.append(
+            f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/'
+            f'officeDocument/2006/relationships/image" Target="media/image{idx}.png"/>')
+        parts = [_drawing_xml(rid, w_emu, h_emu, idx)]
+        if caption:                                  # APA 图注在图下方
+            parts.append(_p(caption, style="PCNoIndent"))
+        return "".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -286,9 +338,21 @@ def parse_md(text: str) -> APA7Document:
         elif section == "references":
             doc.add_reference(s.lstrip("- ").strip())
         else:
-            para_buf.append(s)
+            m = _IMG_RE.match(s)               # feat-137:![图注](路径) → 嵌图
+            if m:
+                flush()
+                base = getattr(parse_md, "_base_dir", None)
+                path = m.group(2).strip()
+                if base and not os.path.isabs(path):
+                    path = os.path.join(base, path)
+                doc.add_figure(path, m.group(1).strip())
+            else:
+                para_buf.append(s)
     flush()
     return doc
+
+
+_IMG_RE = re.compile(r"^!\[(.*?)\]\(([^)]+)\)\s*$")
 
 
 def export_cli(argv: list) -> int:
@@ -302,7 +366,9 @@ def export_cli(argv: list) -> int:
     if not src.exists():
         print(f"文件不存在:{src}")
         return 1
+    parse_md._base_dir = str(src.resolve().parent)   # feat-137:相对图片路径基于 md 目录
     doc = parse_md(src.read_text(encoding="utf-8"))
+    parse_md._base_dir = None
     docx_out = Path(argv[argv.index("--docx") + 1]) if "--docx" in argv \
         else src.with_suffix(".apa7.docx")
     md_out = Path(argv[argv.index("--md") + 1]) if "--md" in argv \
@@ -402,6 +468,48 @@ def _p_keywords(kw: str) -> str:
 
 def _page_break() -> str:
     return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
+
+
+# feat-137:图片嵌入(纯 stdlib OOXML DrawingML)。宽度上限 6",按 PNG 原比例缩放。
+_MAX_W_EMU = 6 * 914400          # 6 英寸(EMU:914400/inch),APA 正文宽度上限
+_DEFAULT_DPI = 96
+
+
+def _png_size_emu(data: bytes) -> tuple[int, int]:
+    """从 PNG 头读像素宽高 → EMU(按 96 dpi;超 6" 等比缩小)。非 PNG 回退默认。"""
+    w = h = 0
+    if data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR":
+        w, h = struct.unpack(">II", data[16:24])
+    if not w or not h:
+        w, h = 480, 360
+    w_emu = int(w / _DEFAULT_DPI * 914400)
+    h_emu = int(h / _DEFAULT_DPI * 914400)
+    if w_emu > _MAX_W_EMU:
+        h_emu = int(h_emu * _MAX_W_EMU / w_emu)
+        w_emu = _MAX_W_EMU
+    return w_emu, h_emu
+
+
+def _drawing_xml(rid: str, w_emu: int, h_emu: int, idx: int) -> str:
+    """居中的内联图片段落(DrawingML)。"""
+    return (
+        '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing>'
+        f'<wp:inline distT="0" distB="0" distL="0" distR="0" '
+        'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
+        f'<wp:extent cx="{w_emu}" cy="{h_emu}"/>'
+        '<wp:effectExtent l="0" t="0" r="0" b="0"/>'
+        f'<wp:docPr id="{idx}" name="Figure{idx}"/>'
+        '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+        '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        f'<pic:nvPicPr><pic:cNvPr id="{idx}" name="Figure{idx}"/><pic:cNvPicPr/></pic:nvPicPr>'
+        f'<pic:blipFill><a:blip r:embed="{rid}" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>'
+        '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+        '<pic:spPr><a:xfrm><a:off x="0" y="0"/>'
+        f'<a:ext cx="{w_emu}" cy="{h_emu}"/></a:xfrm>'
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+        '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>')
 
 
 _CONTENT_TYPES = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>

@@ -200,6 +200,29 @@ def list_styles() -> list[dict[str, str]]:
 # apply_style — matplotlib rcParams 上下文管理器
 # ---------------------------------------------------------------------------
 
+_CJK_CANDIDATES = [
+    "PingFang SC", "Heiti SC", "STHeiti", "Songti SC", "Arial Unicode MS",  # macOS
+    "Microsoft YaHei", "SimHei", "SimSun",                                   # Windows
+    "Noto Sans CJK SC", "Noto Sans CJK", "Source Han Sans SC",              # Linux/通用
+    "WenQuanYi Zen Hei", "WenQuanYi Micro Hei", "Droid Sans Fallback",
+]
+_cjk_cache: list | None = None
+
+
+def _detect_cjk_fonts(mpl) -> list:
+    """返回系统已安装的中文字体名(按候选优先级);本进程缓存。"""
+    global _cjk_cache
+    if _cjk_cache is not None:
+        return _cjk_cache
+    try:
+        from matplotlib import font_manager
+        installed = {f.name for f in font_manager.fontManager.ttflist}
+        _cjk_cache = [c for c in _CJK_CANDIDATES if c in installed]
+    except Exception:  # noqa: BLE001
+        _cjk_cache = []
+    return _cjk_cache
+
+
 @contextlib.contextmanager
 def apply_style(name: str | None = None) -> Iterator[None]:
     """应用指定风格的 matplotlib rcParams。
@@ -213,7 +236,10 @@ def apply_style(name: str | None = None) -> Iterator[None]:
     """
     try:
         import matplotlib as mpl
-        from matplotlib.cycler import cycler as mpl_cycler
+        try:
+            from cycler import cycler as mpl_cycler   # cycler 是独立包(matplotlib 依赖)
+        except ImportError:
+            from matplotlib.rcsetup import cycler as mpl_cycler   # 极老版本兜底
     except ImportError:  # matplotlib 未安装 → 静默降级
         yield
         return
@@ -223,9 +249,16 @@ def apply_style(name: str | None = None) -> Iterator[None]:
     fonts = spec.get("font_family", ["Arial", "Helvetica", "sans-serif"])
     font_size = spec.get("min_font_pt", 10)
 
+    # feat-137:CJK 字形——matplotlib 整段文本用**单一**字体、不逐字回退,
+    # 所以中文字体必须**前置**(否则 DejaVu 在前被选中,中文渲染成方框)。
+    # CJK 字体同样含拉丁字形,前置不影响英文;系统无中文字体则维持原样。
+    cjk = _detect_cjk_fonts(mpl)
+    fonts = cjk + [f for f in fonts if f not in cjk]
+
     rc: dict[str, Any] = {
         "font.family": "sans-serif",
         "font.sans-serif": fonts,
+        "axes.unicode_minus": False,          # 负号用 ASCII,防 CJK 字体缺 U+2212
         "font.size": font_size,
         "axes.labelsize": font_size,
         "xtick.labelsize": font_size,
