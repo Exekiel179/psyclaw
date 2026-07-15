@@ -1326,6 +1326,24 @@ def cmd_assist(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_annotate(args: argparse.Namespace) -> int:
+    """feat-142:给代码写注释(按 assist_level 定密度)/ --review 审查意见。"""
+    from psyclaw import ui
+    import psyclaw.annotate as AN
+    r = AN.run_annotate(getattr(args, "file", ""),
+                        review=getattr(args, "review", False),
+                        write=getattr(args, "write", False))
+    if not r["ok"]:
+        print(ui.err(f"  ✗ {r['note']}"))
+        if r.get("text"):
+            print(r["text"])
+        return 1
+    print(r["text"])
+    if r.get("note"):
+        print(ui.dim(f"  {r['note']}"))
+    return 0
+
+
 def cmd_sleep(args: argparse.Namespace) -> int:
     """睡眠整合(feat-116):重放蒸馏→合并→衰减结算。手动触发通道。"""
     from psyclaw import ui
@@ -1588,7 +1606,7 @@ COMMAND_CATEGORIES = [
                   "skills", "mcp", "plugins", "gates", "eval", "commands", "assist"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
                     "journal"]),
-    ("量表 / 数据准备", ["score"]),
+    ("量表 / 数据准备", ["score", "annotate"]),
     ("研究前规划 / 预注册", ["prepare", "clarify", "declare-test", "preregister", "jars", "cite-check",
                        "check"]),
     ("兼容 / 高级编排", ["repl", "agent", "auto-loop", "loop", "lit-loop", "meta-loop",
@@ -2118,6 +2136,14 @@ def build_parser() -> argparse.ArgumentParser:
     pas.add_argument("level", nargs="?", default=None,
                      help="留空查看;novice=多解释多注释 expert=精简")
     pas.set_defaults(func=cmd_assist)
+    pan2 = sub.add_parser("annotate",
+                          help="给代码写注释(密度随 assist 水平)/ --review 审查意见")
+    pan2.add_argument("file", help="代码文件(.py/.R 等)")
+    pan2.add_argument("--review", action="store_true",
+                      help="只输出审查意见(正确性/统计规范/风格),不改文件")
+    pan2.add_argument("--write", action="store_true",
+                      help="注释后写回原文件(先备份 .bak;默认只打印)")
+    pan2.set_defaults(func=cmd_annotate)
     pwb = sub.add_parser("webbridge",
                          help="Kimi WebBridge:驱动你已登录的真实浏览器(机构库检索路线 B)")
     pwb.add_argument("action", nargs="?", default="status",

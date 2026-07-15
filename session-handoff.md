@@ -4,11 +4,13 @@
 
 ## Current Objective
 
-- Goal: 开箱即用(feat-138 MCP 惰性化 + feat-139 AJS 期刊技能包安装)
-- Current status: **feat-138/139 均 done**——134 个 feature 全 done,无未完成项
-- Branch / commit: master(feat-138 = 4ca6c04;feat-139 本轮提交;待用户推送)
+- Goal: 开箱即用(feat-138/139)+ 协助体验三件套(feat-140/141/142,用户提议)
+- Current status: **feat-138~142 全 done**——137 个 feature 全 done,无未完成项
+- Branch / commit: master(138=4ca6c04·139=f0dd1ab 已推送;140/141/142 本轮提交)
 - Verification: 全量 `uv run --python 3.12 --with pytest python -m pytest -q`
-  → **1826 passed**;`python -m psyclaw eval` 28/28;`python -m psyclaw gates` ✓
+  → **1853 passed**;`python -m psyclaw eval` 28/28;`python -m psyclaw gates` ✓
+- 新命令速记:`psyclaw assist novice|standard|expert`(协助水平);
+  `psyclaw annotate <file> [--review] [--write]`(代码注释/审查)
 - 下一轮候选(未立项):AJS 包更新/卸载(feat-139 边界外)、feat-017/018/020
   技能生态三件套(017 与 139 部分重叠,立项前先核对)
 - 用法速记:`psyclaw journal install <刊名> [--global]`(缩写/中文名均可);
