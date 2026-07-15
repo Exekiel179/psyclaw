@@ -1379,6 +1379,16 @@
    "dependencies": [],
    "status": "done",
    "evidence": "tests/test_assist.py +9(档位注册/standard 空串零回归/novice 解释+注释+举例/expert 精简/未知 fail-safe/系统提示 novice 注入+standard 不变/CLI 设置落盘+查看/非法值拒绝不落盘)。全量 pytest → 1842 passed。活体:psyclaw assist 查看/设 novice/切回 standard 三态正常。"
+  },
+  {
+   "id": "feat-142",
+   "name": "annotate 命令:给代码写注释 + --review 审查",
+   "description": "用户提议:代码有审查、新增命令给代码写注释,注释密度随协助水平。psyclaw annotate <file>:按全局 assist_level 定注释密度(novice 逐段+解释统计概念/standard 关键步骤/expert 只注释非显然决策),默认只打印,--write 写回前先备份 .bak;--review 输出三面审查意见(正确性/统计规范——效应量+CI、硬编码统计量造数嫌疑、统计计算是否委托成熟库/可读性与可复现性),绝不改文件。保护:LLM 输出行数骤减(<原一半)拒绝写回防丢代码;围栏剥离容错;>60KB 拒注释防截断误导;mock provider 明确降级指路 psyclaw config;所有失败不抛。psyclaw/annotate.py(build_annotate_prompt 纯函数 + run_annotate)+ cli cmd_annotate + COMMAND_CATEGORIES 登记。",
+   "dependencies": [
+    "feat-141"
+   ],
+   "status": "done",
+   "evidence": "tests/test_annotate.py +11(novice/expert 密度提示/review 提示含统计面且声明不改写/注释返回+围栏剥离+默认不写回/--write 建 .bak/行数骤减拒写回原文件不动/mock 降级指路/缺文件/review 模式绝不动文件/CLI 接线/命令目录登记)。全量 pytest → 1853 passed。活体:真 LLM 注释 pingouin ttest 两行脚本,注释准确、默认未写回;缺文件 rc=1。"
   }
  ]
 }

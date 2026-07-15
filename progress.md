@@ -2,7 +2,8 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-15(feat-138/139 done:MCP 惰性化 + AJS 期刊技能包安装)
+**Last Updated:** 2026-07-15(feat-138~142 done:MCP 惰性化 + AJS 期刊包 +
+协助体验三件套[归位软约定/协助水平/annotate])
 
 ## 本轮(40):开箱即用双拼图 ——feat-138 MCP 惰性化 + feat-139 AJS 期刊包安装
 
