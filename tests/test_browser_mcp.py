@@ -35,7 +35,7 @@ def test_browser_health_ok_with_npx():
     assert h["ok"] is True
 
 
-def test_browser_tools_merge_into_agent_toolset(monkeypatch):
+def test_browser_tools_merge_into_agent_toolset(monkeypatch, tmp_path):
     """catalog 里 browser 健康时,其工具以 mcp__browser__ 前缀并入 agent 工具集,
     side_effect=True 走审批(外部进程,fail-closed)。用假客户端,不真起 npx。"""
     from psyclaw.mcp import agent_tools as AT
@@ -58,7 +58,7 @@ def test_browser_tools_merge_into_agent_toolset(monkeypatch):
             "enabled": True, "health": {"ok": True},
         }])
     tools: dict = {}
-    AT.merge_mcp_tools(tools)
+    AT.merge_mcp_tools(tools, str(tmp_path))
     assert "mcp__browser__navigate_page" in tools
     assert tools["mcp__browser__navigate_page"]["side_effect"] is True
     assert tools["mcp__browser__navigate_page"]["run"]({"url": "x"}) \

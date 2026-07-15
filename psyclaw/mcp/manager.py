@@ -201,6 +201,7 @@ def list_mcp_catalog(project_dir: str = ".") -> list:
             "enable_when": ew,
             "enabled": _is_enabled(ew),
             "provides": s.get("provides", ""),
+            "tools": s.get("tools", ""),
             "command": s.get("command", ""),
             "note": SERVER_NOTES.get(s.get("name", ""), ""),
         })
@@ -222,6 +223,7 @@ def list_mcp_catalog_with_health(project_dir: str = ".") -> list:
             "enable_when": ew,
             "enabled": enabled,
             "provides": s.get("provides", ""),
+            "tools": s.get("tools", ""),
             "command": s.get("command", ""),
             "note": SERVER_NOTES.get(s.get("name", ""), ""),
             "health": h,
