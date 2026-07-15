@@ -16,6 +16,21 @@ PROJECT_DIRS = [
     "notes", "outputs", "data/raw", "data/clean", "logs", "figures", "scripts",
 ]
 
+# feat-140:产物归位软约定——按后缀给出建议目录。只引导不强制:chat/用户显式
+# 指定路径时以其为准;二义类型(.md 可能是成稿也可能是笔记)返回 None 不武断。
+_PLACEMENT_BY_SUFFIX = {
+    ".png": "figures", ".jpg": "figures", ".jpeg": "figures", ".svg": "figures",
+    ".py": "scripts", ".r": "scripts", ".jl": "scripts", ".sh": "scripts",
+    ".docx": "outputs",
+    ".csv": "data/clean", ".tsv": "data/clean",
+}
+
+
+def canonical_dir(filename: str) -> str | None:
+    """文件名 → 约定目录(纯函数)。无法确定/二义返回 None。"""
+    suffix = Path(str(filename or "")).suffix.lower()
+    return _PLACEMENT_BY_SUFFIX.get(suffix)
+
 # 研究准备项 sid → 概览里的短字段名
 _LABELS = {
     "research_question": "研究问题", "theory_base": "理论框架", "novelty": "增量贡献",
