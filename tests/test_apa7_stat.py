@@ -285,3 +285,55 @@ if __name__ == "__main__":
             print(f"  ✗ {name}: {type(exc).__name__}: {exc}")
     print(f"\n{len(fns) - failed}/{len(fns)} passed")
     sys.exit(1 if failed else 0)
+def _png_1x1():
+    """最小合法 PNG(1x1),供嵌入测试。"""
+    import base64
+    return base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+        "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+def test_parse_md_recognizes_image():
+    from psyclaw.output.apa7 import parse_md
+    doc = parse_md("---\ntitle: T\n---\n\n# 结果\n\n![图 1 两组对比](fig.png)\n")
+    kinds = [b[0] for b in doc.blocks]
+    assert "figure" in kinds
+    fig = next(c for k, c in doc.blocks if k == "figure")
+    assert fig[0].endswith("fig.png") and fig[1] == "图 1 两组对比"
+def test_docx_embeds_png(tmp_path):
+    import zipfile
+    from psyclaw.output.apa7 import APA7Document
+    img = tmp_path / "f.png"
+    img.write_bytes(_png_1x1())
+    doc = APA7Document(title="T", authors="张三")
+    doc.add_figure(str(img), "图 1 焦虑得分")
+    out = tmp_path / "o.docx"
+    doc.to_docx(out)
+    z = zipfile.ZipFile(out)
+    assert any("media/image" in n for n in z.namelist())      # PNG 真打包
+    docx = z.read("word/document.xml").decode()
+    assert "w:drawing" in docx and "a:blip" in docx           # 有绘图
+    assert "图 1 焦虑得分" in docx                             # 图注在
+    rels = z.read("word/_rels/document.xml.rels").decode()
+    assert "image1.png" in rels                               # 关系挂上
+def test_docx_missing_image_placeholder_not_dropped(tmp_path):
+    """图不存在→文字占位,绝不静默丢(此前图注留下、图丢了)。"""
+    import zipfile
+    from psyclaw.output.apa7 import APA7Document
+    doc = APA7Document(title="T")
+    doc.add_figure("不存在.png", "图 1")
+    out = tmp_path / "o.docx"
+    doc.to_docx(out)
+    docx = zipfile.ZipFile(out).read("word/document.xml").decode()
+    assert "图片未找到" in docx and "不存在.png" in docx
+def test_markdown_roundtrips_figure(tmp_path):
+    from psyclaw.output.apa7 import APA7Document, parse_md
+    doc = APA7Document(title="T")
+    doc.add_figure("a/b.png", "图 2")
+    md = doc.to_markdown()
+    assert "![图 2](a/b.png)" in md
+    assert any(k == "figure" for k, _ in parse_md(md).blocks)
+def test_png_size_scales_to_max_width():
+    from psyclaw.output.apa7 import _png_size_emu, _MAX_W_EMU
+    import struct
+    head = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\x0dIHDR" + struct.pack(">II", 2000, 1000)
+    w, h = _png_size_emu(head)
+    assert w == _MAX_W_EMU and h < w      # 超 6" 等比缩小,比例保持
