@@ -111,8 +111,12 @@ def cmd_plugins(args: argparse.Namespace) -> int:
 def cmd_check(args: argparse.Namespace) -> int:
     """投稿前一键质检:JARS + 引用保真(+期刊风格)+ 复现溯源 + KG 溯源,一屏汇总。"""
     from psyclaw.checkup import print_check, run_check
+    journal = getattr(args, "journal", None)
+    if not journal:                          # feat-139:默认带项目目标期刊
+        from psyclaw.config import load_project_config
+        journal = load_project_config(".").get("target_journal") or None
     res = run_check(draft=getattr(args, "draft", None),
-                    journal=getattr(args, "journal", None),
+                    journal=journal,
                     project_dir=".",
                     research_type=getattr(args, "research_type", "quant"))
     print_check(res)
@@ -746,8 +750,66 @@ def cmd_method(args: argparse.Namespace) -> int:
 
 
 def cmd_journal(args: argparse.Namespace) -> int:
+    if getattr(args, "journal_id", None) == "install":     # feat-139
+        name = " ".join(getattr(args, "name", None) or []).strip()
+        return _journal_install(name,
+                                global_install=getattr(args, "global_install", False))
     from psyclaw.psych.journals import print_journal
     print_journal(getattr(args, "journal_id", None))
+    return 0
+
+
+def _journal_install(name: str, global_install: bool = False,
+                     project_dir: str = ".") -> int:
+    """feat-139:按刊名从 AJS mono-repo 稀疏检出对应期刊技能包装进项目/全局。
+
+    错误出路(无网/歧义/零命中/克隆失败)均给明确提示并返回非零,不抛——
+    start 向导调用时失败不中断开工。
+    """
+    from pathlib import Path
+    from psyclaw import ajs, ui
+    if not name:
+        print(ui.err("  用法:psyclaw journal install <刊名> [--global]"))
+        return 2
+    lp = ajs.list_packs()
+    if not lp["ok"]:
+        print(ui.warn(f"  ⚠ {lp['note']}"))
+        print(ui.dim("    离线/受限网络可手动稀疏检出(报准确包目录名):\n"
+                     + ajs._manual_cmds(ajs.AJS_REPO_URL, "<包目录>", ".claude/skills")))
+        return 1
+    r = ajs.resolve_pack(name, lp["packs"])
+    pack = r["match"]
+    if not pack and r["candidates"]:
+        print(ui.accent(f"  「{name}」有多个候选:"))
+        for i, c in enumerate(r["candidates"], 1):
+            print(f"    {i}. {c}")
+        try:
+            sel = input("  选择序号(回车取消): ").strip()
+        except (EOFError, OSError):
+            sel = ""
+        if sel.isdigit() and 1 <= int(sel) <= len(r["candidates"]):
+            pack = r["candidates"][int(sel) - 1]
+        else:
+            print(ui.dim("  已取消(可 psyclaw journal install <准确包名> 重试)"))
+            return 1
+    if not pack:
+        print(ui.warn(f"  ⚠ AJS 未收录「{name}」(或名字差异过大)"))
+        from psyclaw.psych.journals import get_journal
+        if get_journal(name):
+            print(ui.dim("    psyclaw 自带该刊画像:check/export --journal 仍按其规范定制"))
+        return 1
+    dest = (Path.home() if global_install else Path(project_dir).resolve()) \
+        / ".claude" / "skills"
+    res = ajs.install_pack(pack, dest)
+    if not res["ok"]:
+        print(ui.err(f"  ✗ {res['note']}"))
+        return 1
+    print(ui.ok(f"  ✓ {pack} → {res['path']}") + ui.dim(f" ({res['note']})"))
+    from psyclaw.config import set_project_config
+    set_project_config("target_journal", name, project_dir)
+    set_project_config("target_journal_pack", pack, project_dir)
+    print(ui.dim("    已记 target_journal;包内技能 psyclaw skills 可见,"
+                 "check/export 默认按该刊(--journal 可覆盖)"))
     return 0
 
 
@@ -777,7 +839,13 @@ def cmd_cite(args: argparse.Namespace) -> int:
 
 
 def cmd_export(args: argparse.Namespace) -> int:
-    journal = getattr(args, "journal", "apa7") or "apa7"
+    journal = getattr(args, "journal", None)
+    if not journal:                          # feat-139:目标期刊命中已支持格式则默认之
+        from psyclaw.config import load_project_config
+        from psyclaw.psych.journals import get_journal
+        prof = get_journal(load_project_config(".").get("target_journal"))
+        jid = (prof or {}).get("id")
+        journal = jid if jid in ("xinlixuebao", "xinlikexue") else "apa7"
     if journal != "apa7":
         from psyclaw.output.cn_journal import cn_journal_cli
         argv = [args.file, "--journal", journal]
@@ -1122,8 +1190,8 @@ def _setup_global(args, online: bool, ni: bool) -> int:
             print(ui.dim(f"  {m} MCP:装依赖后自动启用(pip install {m};"
                          "psyclaw mcp 看状态)"))
         elif kinds.get(m) == "skill":
-            print(ui.dim(f"  {m} skill:psyclaw journal 看已收录期刊;"
-                         "目标期刊专属规范随 check/export 生效"))
+            print(ui.dim(f"  {m} skill:psyclaw journal install <刊名> 装目标期刊"
+                         " AJS 技能包(start 向导也会问);psyclaw journal 看自带画像"))
     print(ui.ok("\n  全局配置完成。开工:psyclaw start(项目级意图向导)"))
     return 0
 
@@ -1189,6 +1257,17 @@ def cmd_start(args: argparse.Namespace) -> int:
                      "恶意代码硬拒。审计 → .psyclaw/sandbox_audit.jsonl"))
     else:
         print(ui.warn("  沙箱未启用(各面沿用既有守卫;可随时 psyclaw start 重配)"))
+
+    # feat-139:目标期刊 → 装对应 AJS 技能包(回车/留空跳过;失败不中断 start)
+    journal = getattr(args, "journal", None)
+    if journal is None:
+        try:
+            journal = input("  目标期刊?(装对应 AJS 写作/投稿技能包;回车跳过): ").strip()
+        except (EOFError, OSError):
+            journal = ""
+    if journal:
+        _journal_install(journal,
+                         global_install=getattr(args, "journal_global", False))
 
     # feat-130:start 收尾引导进流程——与 setup(一次性装依赖/建目录)划清界限:
     # start = 每次开工的意图向导,自然衔接三种工作方式;缺依赖时才回指 setup。
@@ -1765,8 +1844,14 @@ def build_parser() -> argparse.ArgumentParser:
     pd.set_defaults(func=cmd_design)
 
     pj = sub.add_parser("journal",
-                        help="期刊画像(心理学报/心理科学/Psych Science/JPSP/Psych Bulletin…引用风格/报告标准/退稿红线)")
-    pj.add_argument("journal_id", nargs="?", default=None, help="期刊 id,留空列出全部")
+                        help="期刊画像(心理学报/心理科学/Psych Science/JPSP/Psych Bulletin…引用风格/报告标准/退稿红线);"
+                             "journal install <刊名> 装 AJS 期刊技能包")
+    pj.add_argument("journal_id", nargs="?", default=None,
+                    help="期刊 id(留空列出全部);或子命令 install")
+    pj.add_argument("name", nargs="*", default=[],
+                    help="install 用:目标刊名(支持缩写/中文名,如 AER/财经研究)")
+    pj.add_argument("--global", dest="global_install", action="store_true",
+                    help="install 用:装到全局 ~/.claude/skills(默认项目级)")
     pj.set_defaults(func=cmd_journal)
 
     ppr = sub.add_parser("preregister",
@@ -1795,8 +1880,9 @@ def build_parser() -> argparse.ArgumentParser:
     pex.add_argument(
         "--journal", "-j",
         choices=["apa7", "xinlixuebao", "xinlikexue"],
-        default="apa7",
-        help="目标格式: apa7(默认) / xinlixuebao(心理学报) / xinlikexue(心理科学)",
+        default=None,
+        help="目标格式: apa7(默认;项目 target_journal 命中时默认该刊) / "
+             "xinlixuebao(心理学报) / xinlikexue(心理科学)",
     )
     pex.set_defaults(func=cmd_export)
 
@@ -1990,6 +2076,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="免交互:直接启用沙箱")
     pstart.add_argument("--no-sandbox", dest="sandbox", action="store_false",
                         help="免交互:不启用沙箱")
+    pstart.add_argument("--journal", default=None,
+                        help="目标期刊(装对应 AJS 技能包并记 target_journal;免交互)")
+    pstart.add_argument("--global", dest="journal_global", action="store_true",
+                        help="期刊技能包装到全局 ~/.claude/skills(默认项目级)")
     pstart.set_defaults(func=cmd_start)
     pwb = sub.add_parser("webbridge",
                          help="Kimi WebBridge:驱动你已登录的真实浏览器(机构库检索路线 B)")

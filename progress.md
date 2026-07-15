@@ -2,7 +2,26 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-14(**v0.14.0 发布**:三轮评估清零 + 文献查找全链)
+**Last Updated:** 2026-07-15(feat-138/139 done:MCP 惰性化 + AJS 期刊技能包安装)
+
+## 本轮(40):开箱即用双拼图 ——feat-138 MCP 惰性化 + feat-139 AJS 期刊包安装
+
+- feat-138 MCP 工具目录惰性化:merge_mcp_tools 不再在 /agent on 时逐服务器
+  冷启子进程 list_tools(npx 系拖首响应到分钟级);按磁盘缓存
+  (.psyclaw/mcp_tools_cache.json)或 registry 新增 tools: 键(服务器真实
+  工具名;活体发现 provides 是能力标签≠工具名,5 个内置 python 服务器补齐)
+  惰性登记,首次真调用才起进程并回填全目录缓存;无缓存无 tools/provides
+  的用户服务器保持 eager 不回归;PSYCLAW_MCP_LAZY=0 退回。
+  活体:build_tools('.') 0.03s、18 个 mcp__ 工具全登记、零子进程。
+- feat-139 AJS 目标期刊技能包安装(spec 已定稿后实现):psyclaw/ajs.py
+  (list_packs 495 包 / resolve_pack 纯函数缩写+中文别名+近似候选 /
+  install_pack git 稀疏检出 fail-safe+镜像重试)+ mirror github 回退 +
+  loader 三层 glob + cli journal install & start --journal 步 +
+  target_journal 落项目配置,check/export 默认带该刊。
+  活体:journal install AAAI 真检出 → loader 认出 12 子技能 → 配置落盘。
+- 全量 1826 passed;eval 28/28;gates 通过。134 个 feature 全 done。
+
+---
 
 ## 本轮(39):v0.14.0 发布 ——三轮评估清零 + 文献查找全链(feat-101~110)
 

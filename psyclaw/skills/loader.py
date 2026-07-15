@@ -94,8 +94,9 @@ def list_skills(project_dir: str = ".", include_external: bool = True,
                 include_legacy: bool = False) -> list[dict]:
     """列出技能包(内置 + 外部)。按 name 去重,内置优先。
 
-    外部根下同时扫平铺 ``<skill>/SKILL.md`` 与一层分类嵌套 ``<domain>/<skill>/SKILL.md``
-    (AcademicForge 按学科分组,两种布局都能吃到)。
+    外部根下同时扫平铺 ``<skill>/SKILL.md``、一层分类嵌套 ``<domain>/<skill>/SKILL.md``
+    (AcademicForge 按学科分组)与 AJS 期刊包三层布局 ``<包>/skills/<技能>/SKILL.md``
+    (feat-139 journal install 装入的包)。
     """
     out: list[dict] = []
     seen: set[str] = set()
@@ -114,6 +115,7 @@ def list_skills(project_dir: str = ".", include_external: bool = True,
             found: list[Path] = []
             found += sorted(root.glob("*/SKILL.md"))
             found += sorted(root.glob("*/*/SKILL.md"))
+            found += sorted(root.glob("*/skills/*/SKILL.md"))
             for skill_md in found:
                 s = _read_skill(skill_md, str(root), scope=scope)
                 if s["name"] not in seen:
