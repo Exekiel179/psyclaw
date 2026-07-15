@@ -1371,6 +1371,14 @@
    ],
    "status": "done",
    "evidence": "tests/test_placement.py +7(canonical_dir 后缀映射/二义与未知返回 None/裸文件名回执带提示且文件不被搬/显式目录零打扰/二义类型不提示/lean_core 含约定且预算不破/工具描述带约定)。全量 pytest → 1833 passed。"
+  },
+  {
+   "id": "feat-141",
+   "name": "协助水平 assist level(novice/standard/expert)",
+   "description": "用户提议:按水平协助——协助多则专业词汇解释和代码注释更多。一处设置三处生效:psyclaw assist <novice|standard|expert>(留空查看,写全局 config assist_level,非法值不落盘 rc=2);context.assist_directives 纯函数(novice=术语全白话+举例+生成代码逐段注释并解释统计概念;expert=术语直用不展开+只注释非显然决策+输出精简;standard/未知返回空串——默认档系统提示零字符变化,fail-safe);repl._build_system_prompt 注入(load_config 异常降级 standard);COMMAND_CATEGORIES 登记。annotate 命令的注释详细度复用同一 assist_level(feat-142)。",
+   "dependencies": [],
+   "status": "done",
+   "evidence": "tests/test_assist.py +9(档位注册/standard 空串零回归/novice 解释+注释+举例/expert 精简/未知 fail-safe/系统提示 novice 注入+standard 不变/CLI 设置落盘+查看/非法值拒绝不落盘)。全量 pytest → 1842 passed。活体:psyclaw assist 查看/设 novice/切回 standard 三态正常。"
   }
  ]
 }

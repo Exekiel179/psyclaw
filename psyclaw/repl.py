@@ -704,8 +704,15 @@ def _is_exit_word(line: str) -> bool:
 
 def _build_system_prompt() -> str:
     """瘦核心系统提示(长上下文优化:知识库改为按消息动态注入)。"""
-    from psyclaw.context import lean_core
+    from psyclaw.context import assist_directives, lean_core
     parts = [lean_core()]
+    try:                                   # feat-141:协助水平附加指令(standard 空)
+        from psyclaw.config import load_config
+        directives = assist_directives(load_config().get("assist_level", "standard"))
+    except Exception:  # noqa: BLE001
+        directives = ""
+    if directives:
+        parts.append("\n" + directives)
     parts.append(
         "\n# 研究准备规则\n正式研究开始前必须完成研究准备清单(17 个研究准备项,/prepare)。"
         "用户提出研究想法时,你的第一动作是 grill-me 式逐项澄清(一次一个问题,"

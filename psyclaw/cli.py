@@ -1294,6 +1294,38 @@ def _start_next_step(intent: str, skills: list[str]) -> None:
         print(ui.dim("  提示:首次使用先 psyclaw setup 装依赖/建目录、psyclaw config 配 API key"))
 
 
+_ASSIST_DESC = {
+    "novice": "新手——术语全白话解释+举例,生成代码逐段注释并解释统计概念",
+    "standard": "标准(默认)——首现术语随手解释,代码关键步骤注释",
+    "expert": "专家——术语直用不展开,代码只注释非显然决策,输出精简",
+}
+
+
+def cmd_assist(args: argparse.Namespace) -> int:
+    """feat-141:查看/设置协助水平(全局 assist_level,一处设置三处生效:
+    对话术语解释 · 生成代码注释密度 · annotate 注释详细度)。"""
+    from psyclaw import ui
+    from psyclaw.config import _write_config, load_config
+    from psyclaw.context import ASSIST_LEVELS
+    level = getattr(args, "level", None)
+    conf = load_config()
+    cur = str(conf.get("assist_level", "standard")).strip().lower()
+    if not level:
+        print(ui.title("协助水平") + ui.dim("  psyclaw assist <novice|standard|expert>"))
+        for lv in ASSIST_LEVELS:
+            mark = "●" if lv == cur else "○"
+            print(f"  {mark} {lv:<9} {ui.dim(_ASSIST_DESC[lv])}")
+        return 0
+    level = level.strip().lower()
+    if level not in ASSIST_LEVELS:
+        print(ui.err(f"  未知水平「{level}」;可用:{' / '.join(ASSIST_LEVELS)}"))
+        return 2
+    conf["assist_level"] = level
+    _write_config({k: v for k, v in conf.items() if not k.startswith("_")}, {})
+    print(ui.ok(f"  ✓ 协助水平 → {level}") + ui.dim(f"  {_ASSIST_DESC[level]}"))
+    return 0
+
+
 def cmd_sleep(args: argparse.Namespace) -> int:
     """睡眠整合(feat-116):重放蒸馏→合并→衰减结算。手动触发通道。"""
     from psyclaw import ui
@@ -1553,7 +1585,7 @@ CORE_COMMANDS = {
 COMMAND_CATEGORIES = [
     ("三种交互入口", ["chat", "run", "auto"]),
     ("环境 / 系统", ["help", "guide", "status", "version", "doctor", "config", "setup",
-                  "skills", "mcp", "plugins", "gates", "eval", "commands"]),
+                  "skills", "mcp", "plugins", "gates", "eval", "commands", "assist"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score"]),
@@ -2081,6 +2113,11 @@ def build_parser() -> argparse.ArgumentParser:
     pstart.add_argument("--global", dest="journal_global", action="store_true",
                         help="期刊技能包装到全局 ~/.claude/skills(默认项目级)")
     pstart.set_defaults(func=cmd_start)
+    pas = sub.add_parser("assist",
+                         help="协助水平(novice/standard/expert):术语解释与代码注释密度")
+    pas.add_argument("level", nargs="?", default=None,
+                     help="留空查看;novice=多解释多注释 expert=精简")
+    pas.set_defaults(func=cmd_assist)
     pwb = sub.add_parser("webbridge",
                          help="Kimi WebBridge:驱动你已登录的真实浏览器(机构库检索路线 B)")
     pwb.add_argument("action", nargs="?", default="status",
