@@ -1389,6 +1389,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_annotate.py +11(novice/expert 密度提示/review 提示含统计面且声明不改写/注释返回+围栏剥离+默认不写回/--write 建 .bak/行数骤减拒写回原文件不动/mock 降级指路/缺文件/review 模式绝不动文件/CLI 接线/命令目录登记)。全量 pytest → 1853 passed。活体:真 LLM 注释 pingouin ttest 两行脚本,注释准确、默认未写回;缺文件 rc=1。"
+  },
+  {
+   "id": "feat-143",
+   "name": "export 行内 Markdown 强调解析(**粗体**/*斜体*/`代码`)",
+   "description": "活体交付 docx 时实锤两个缺陷:①正文段落走 _split_for_italic 的 `\\*([^*]+)\\*` 单星规则,**粗体** 被错吃成「* + 斜体内容 + *」——星号字面量漏进 Word 且语义错(粗体渲染成斜体);②Abstract 与 References 走 _p 完全不解析行内标记,`**背景**` 原样漏出。用户按 Markdown 习惯写稿,交付品就带垃圾字符。修复:新增 _split_inline 纯函数(单一正则 alternation,`**` 排在 `*` 前否则双星被单星规则抢走;返回 (片段,粗体,斜体,等宽) 四元组)+ _run 扩展 bold/code 关键字参数(<w:b/><w:bCs/> 与 Courier New rFonts,不改字号免破坏行距)+ _p_stat 改走 _split_inline + Abstract/References 由 _p 改 _p_stat(APA 参考文献期刊名需斜体)。标题保持 _p 不解析——样式已承担强调,避免双重语义。既有 _split_for_italic 签名与三个测试锁定的契约原样保留(另立函数不动它);不处理嵌套与转义(YAGNI)。",
+   "dependencies": [
+    "feat-007",
+    "feat-137"
+   ],
+   "status": "done",
+   "evidence": "tests/test_apa7_inline.py +14(粗体无星号残留/斜体不回归/粗体不再被误当斜体的回归钉/代码等宽/三者混合/纯文本不动/空串/APA 统计串主用途不回归/_split_for_italic 契约不破/正文 <w:b/> 端到端/Abstract 解析/References 期刊名斜体/标题不解析/parse_md 端到端)。全量 pytest → 1867 passed;eval 28/28;gates ✓。活体:演示报告 md 源 12 处 ** → docx 6 处 <w:b/> 真加粗 + 3 处 Courier New 等宽,** 与反引号字面量残留均为 0;Quick Look 渲染确认 Abstract 背景/方法/结果/结论 四标签真加粗、脚本路径等宽。"
   }
  ]
 }
