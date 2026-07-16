@@ -71,8 +71,38 @@ COMMANDS = {
     "/search": "全文检索历史对话(/search <词>)",
     "/dump": "导出当前对话为 Markdown(--full 连同不展示的隐藏上下文一并导出)",
     "/img": "在终端内联渲染图片(/img <路径>;iTerm2/WezTerm/VSCode/Warp/kitty;命令出图会自动显示)",
+    "/plan": "规划模式:只规划不执行,末尾自动抽任务(/plan on|off|<目标>)",
+    "/audit": "逐轮审计:每轮回答后 auditor 评分、低分草拟教训卡(/audit on|off|log)",
+    "/research": "研究流水线编排(analysis|meta|literature|qualitative)",
     "/exit": "退出",
 }
+
+# 识别但不进主帮助/联想:兼容别名 + 既有 streamline 决策刻意隐藏的高级/遗留命令
+# (test_primary_repl_commands_hide_legacy_modes 锁定 /agent 等须隐藏)。
+# _suggest_command 仍认这些,免得用户打 /agent、/yolo 被判「无效」。
+_ALIAS_COMMANDS = frozenset({
+    "/quit", "/q", "/clarify", "/prereg", "/show", "/yolo", "/safemode",
+    "/research-loop", "/agent",
+})
+
+
+def _suggest_command(cmd: str, commands: dict) -> str | None:
+    """打错的斜杠命令 → 最接近的有效命令(纯函数)。无够近的返回 None。
+
+    优先前缀(/expo→/export),再按编辑距离(/agnet→/agent)。别名/隐藏命令也是有效目标。
+    """
+    import difflib
+    cmd = (cmd or "").strip().lower()
+    if not cmd.startswith("/"):
+        return None
+    pool = list(commands) + list(_ALIAS_COMMANDS)
+    if cmd in pool:
+        return cmd
+    prefix = [c for c in pool if c.startswith(cmd) and len(cmd) >= 2]
+    if prefix:
+        return sorted(prefix, key=len)[0]
+    near = difflib.get_close_matches(cmd, pool, n=1, cutoff=0.6)
+    return near[0] if near else None
 
 
 # 「天然」保存文件:提示模型用约定块输出,REPL 每轮自动扫描并落盘(对齐 _capture_plan 套路)。
@@ -1576,7 +1606,9 @@ class ReplSession:
             except Exception as exc:  # noqa: BLE001
                 print(ui.err(f"  [插件命令 {cmd} 出错] {exc}"))
         else:
-            print(f"  未知命令 {cmd},输入 /help 查看可用命令")
+            guess = _suggest_command(cmd, COMMANDS)
+            hint = f"你是不是想输入 {ui.accent(guess)}?" if guess else "输入 /help 查看可用命令"
+            print(f"  未知命令 {cmd}——{hint}")
         return True
 
     def _cmd_plugins(self) -> None:
