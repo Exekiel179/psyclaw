@@ -198,6 +198,34 @@ def capability_map() -> str:
         "拿不准有没有现成能力,先想 psyclaw 命令,再考虑手写。")
 
 
+# feat-150:结构化软拦截。capability_map(feat-144)是提示层「别手搓」,对弱指令
+# 模型不够硬;这里在模型**真手搓**(save 了重造轮子的脚本)时当场检测,回执软
+# 提示 + 喂回让它改用现成能力。只检测、不阻断落盘(延续 feat-140 软约定哲学)。
+_REINVENT_DOCX = ("检测到你保存的脚本在手搓 python-docx 拼 Word。psyclaw 有现成的"
+                  "`psyclaw export <稿.md> --docx <出.docx>`(APA7 版式+中文字体+"
+                  "图片真嵌入),改用它,别自己拼 OOXML/python-docx。")
+_REINVENT_FIGSTYLE = ("检测到脚本用 matplotlib 却没 apply_style('apa7'),中文会渲染成"
+                      "豆腐块方框。开头加 `from psyclaw.figures import apply_style`,"
+                      "并在 `with apply_style('apa7'):` 块内作图(中文字体前置)。")
+
+
+def detect_reinvention(path: str, content: str):
+    """检测保存的脚本是否在重造 psyclaw 已有能力。纯函数。
+
+    返回 (key, 纠偏提示) 或 None。key 用于按类去重(同类只纠偏一次)。
+    只看 .py/.r 等脚本;稿件/笔记正文里提到 docx/matplotlib 不算手搓(避免误伤)。
+    """
+    p = (path or "").lower()
+    if not p.endswith((".py", ".r", ".jl")):
+        return None
+    c = content or ""
+    if "import docx" in c or "from docx" in c:      # python-docx 手搓 Word
+        return ("docx", _REINVENT_DOCX)
+    if "matplotlib" in c and "apply_style" not in c:  # 裸 matplotlib → 豆腐块风险
+        return ("figstyle", _REINVENT_FIGSTYLE)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # 2. 滚动压缩
 # ---------------------------------------------------------------------------

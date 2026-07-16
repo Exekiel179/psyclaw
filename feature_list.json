@@ -1457,6 +1457,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_ui_palette.py +7(256 码注册且格式对/paint 256 出 ANSI/bold+256 合法组合 1;38;5;/info+label 助手/禁用时纯文本/run_output 独立着色/run_output 禁用时结构在无色码)。全量 pytest → 1904 passed。活体:teal=38;5;80、label=1;38;5;141、run_output=38;5;103 slate,组合正确。"
+  },
+  {
+   "id": "feat-150",
+   "name": "结构化软拦截:检测手搓轮子当场纠偏(feat-144 加强)",
+   "description": "feat-144 的能力地图是提示层「别手搓」,对弱指令模型(deepseek-v4-flash)不够硬——真实事故里模型无视提示仍手搓 md_to_docx.py、裸 matplotlib 出豆腐块。本层在模型真手搓(save 了重造轮子的脚本)时当场检测并纠偏。context.detect_reinvention 纯函数:只看 .py/.r/.jl 脚本(稿件正文提到 docx/matplotlib 不误伤),import docx/from docx → 提示改用 psyclaw export --docx;matplotlib 无 apply_style → 提示改用 figures.apply_style('apa7')(否则中文豆腐块);docx 优先于 figstyle。repl._capture_saves 落盘后检测,回执 ui.warn 软提示 + 返回纠偏列表(按 key 去重,同类每会话只纠偏一次防啰嗦);ask() 在无更高优跟进(读文件/命令结果)时把纠偏喂回模型让它改用现成能力重做。**不阻断落盘**(延续 feat-140 软约定哲学),受既有 _auto_depth/no-progress 兜底约束防循环。",
+   "dependencies": [
+    "feat-144",
+    "feat-140"
+   ],
+   "status": "done",
+   "evidence": "tests/test_reinvent.py +11(docx 两种 import/裸 matplotlib/有 apply_style 放行/docx 优先/非 py 不误伤/纯 pandas 不误伤/空输入;_capture_saves 返回纠偏且仍落盘/同类去重/干净脚本无纠偏)。全量 pytest → 1915 passed。活体:复刻真实事故 md_to_docx.py 手搓 python-docx → 落盘成功 + 黄字软提示 + 纠偏喂回模型,文件不阻断。"
   }
  ]
 }

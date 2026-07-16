@@ -1059,7 +1059,7 @@ class ReplSession:
         self.chars_out += len(reply)
         if self.plan_mode:
             self._capture_plan(reply)
-        self._capture_saves(reply)   # 「天然」落盘:扫描 ```save 块并写文件(带护栏)
+        save_nudges = self._capture_saves(reply)   # 「天然」落盘 + feat-150 手搓检测
         # 全量储存本轮上下文(写入失败不阻塞对话)
         try:
             self.archive.record(self.session_id, text, reply)
@@ -1073,7 +1073,12 @@ class ReplSession:
             result = run_audit(auditor_p, text, reply)
             print(render_verdict(result))
         # 自动跟进:模型请求读文件(开放模式自动读)/ 给出选项(弹键盘选择器)→ 回传续聊
-        follow = self._recover_empty_reply(reply, internal, self._auto_followup(reply))
+        auto = self._auto_followup(reply)
+        if auto is None and save_nudges:      # feat-150:无更高优跟进时,喂手搓纠偏让其改用
+            auto = ("你刚保存了脚本,但可以直接用 psyclaw 现成能力做得更好:\n- "
+                    + "\n- ".join(save_nudges)
+                    + "\n请改用上述 psyclaw 能力重做这一步,不要用手搓的脚本。")
+        follow = self._recover_empty_reply(reply, internal, auto)
         if follow:
             self._auto_depth += 1
             try:
@@ -1366,27 +1371,41 @@ class ReplSession:
             [res["final"]] + [str(t.get("output", "")) for t in res["trace"]]))
         return res["final"]
 
-    def _capture_saves(self, reply: str) -> None:
-        """扫描回复里的 ```save 块并写盘(护栏:拒 data/raw、覆盖前交互确认)。"""
+    def _capture_saves(self, reply: str) -> list[str]:
+        """扫描回复里的 ```save 块并写盘(护栏:拒 data/raw、覆盖前交互确认)。
+
+        feat-150:落盘后检测手搓轮子(python-docx/裸 matplotlib),返回纠偏提示
+        列表(按类去重,同类每会话只纠偏一次)——不阻断落盘,由 ask() 喂回模型。
+        """
+        from psyclaw.context import detect_reinvention
         blocks = parse_save_blocks(reply)
         if not blocks:
-            return
+            return []
 
         def _confirm(p: Path) -> bool:
             # YOLO 自动覆盖(data/raw 另有硬拒);否则 fail-closed 人工确认(非 TTY/EOF 不覆盖)
             return self._side_effect_ok(str(p), label="覆盖已存在文件")
 
+        if not hasattr(self, "_reinvent_nudged"):
+            self._reinvent_nudged = set()
+        nudges: list[str] = []
         for blk in blocks:
             r = apply_save_block(blk, confirm=_confirm)
             st = r["status"]
             if st == "saved":
                 print(ui.ok(f"  ✓ 已保存 {r['path']}({r['chars']} 字符)"))
+                hit = detect_reinvention(blk.get("path", ""), blk.get("content", ""))
+                if hit and hit[0] not in self._reinvent_nudged:
+                    self._reinvent_nudged.add(hit[0])
+                    print(ui.warn(f"  ⚠ {hit[1]}"))
+                    nudges.append(hit[1])
             elif st == "refused-raw":
                 print(ui.err(f"  ✗ 拒绝写入受保护的 data/raw:{r['path']}"))
             elif st == "skipped-exists":
                 print(ui.dim(f"  已跳过(未覆盖):{r['path']}"))
             else:
                 print(ui.err(f"  ✗ 写入失败 {r['path']}:{r.get('error')}"))
+        return nudges
 
     def _capture_plan(self, reply: str) -> None:
         """规划模式产物落盘:存 notes/plan.md 并自动抽任务(auto-write task)。"""
