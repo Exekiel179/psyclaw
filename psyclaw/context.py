@@ -179,6 +179,25 @@ def assist_directives(level: str) -> str:
     return _ASSIST_DIRECTIVES.get((level or "").strip().lower(), "")
 
 
+# feat-144:能力自知。真实事故——模型不知 psyclaw 自带能力,手搓 md_to_docx.py
+# (无视 export --docx)、自己 import matplotlib(满图豆腐块,无视 apply_style)、
+# 手写 pandas 统计(无视 pystat)。提示只说过「没有 describe/stat」(有什么没说),
+# 143 个 feature 的能力模型一个都不知道。这里给一张「要 X 就用 Y,别手搓」的地图。
+def capability_map() -> str:
+    """psyclaw 自带能力清单——要什么用什么,不要重造轮子。每轮注入。"""
+    return (
+        "\n# psyclaw 自带能力(要用现成的,不要自己手搓重造)\n"
+        "产出 Word/docx:命令块跑 `psyclaw export <稿.md> --docx <出.docx>`"
+        "(APA7 版式+中文字体+图片真嵌入)——不要自己写 python-docx 脚本;\n"
+        "画图配色/中文字体:脚本里 `from psyclaw.figures import apply_style` 并"
+        "`with apply_style('apa7'):` 内作图(中文字体前置,免豆腐块)——不要裸 matplotlib;\n"
+        "投稿前质检:`psyclaw check <稿.md>`(JARS+效应量+引用+选择性报告)——"
+        "下结论/交付前先跑,别把没核过的结论写进报告;\n"
+        "统计计算:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
+        "文献/量表/预注册:psyclaw lit / scale / preregister。\n"
+        "拿不准有没有现成能力,先想 psyclaw 命令,再考虑手写。")
+
+
 # ---------------------------------------------------------------------------
 # 2. 滚动压缩
 # ---------------------------------------------------------------------------

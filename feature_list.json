@@ -1400,6 +1400,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_apa7_inline.py +14(粗体无星号残留/斜体不回归/粗体不再被误当斜体的回归钉/代码等宽/三者混合/纯文本不动/空串/APA 统计串主用途不回归/_split_for_italic 契约不破/正文 <w:b/> 端到端/Abstract 解析/References 期刊名斜体/标题不解析/parse_md 端到端)。全量 pytest → 1867 passed;eval 28/28;gates ✓。活体:演示报告 md 源 12 处 ** → docx 6 处 <w:b/> 真加粗 + 3 处 Courier New 等宽,** 与反引号字面量残留均为 0;Quick Look 渲染确认 Abstract 背景/方法/结果/结论 四标签真加粗、脚本路径等宽。"
+  },
+  {
+   "id": "feat-144",
+   "name": "能力自知:系统提示给 psyclaw 能力地图,禁止重造轮子",
+   "description": "真实事故(profile/outputs/chat_20260716-013723.md):用户说「word 格式,发表水平」,模型自己手搓 md_to_docx.py(python-docx)无视 psyclaw export --docx(APA7+中文字体+图片真嵌入);画图裸 import matplotlib → 满图豆腐块,无视 figures.apply_style('apa7')(中文字体前置早修好);统计手写 pandas 无视 pystat;全程没跑过 check——导致把与数据矛盾的结论(称世界杯期间搜索峰值,实则 Top8 峰值零个在世界杯窗口)写进「发表级」报告。根因:提示只说过「没有 describe/stat 内置命令」(有什么从没说),143 个 feature 能力模型一个都不知道。修复:context.capability_map() 纯函数给一张「要 docx→export、要图→apply_style、要质检→check、要统计→pystat/scipy、文献→lit」的能力地图并明确「不要自己手搓重造」,repl._build_system_prompt 每轮注入(agent 一次性路径同源覆盖)。458 字符,预算内。",
+   "dependencies": [
+    "feat-137",
+    "feat-143"
+   ],
+   "status": "done",
+   "evidence": "tests/test_capability_map.py +7(覆盖 docx export/figure apply_style apa7/check/明确禁止重造/统计外移/非空且<=700 预算/系统提示真含 export+apply_style)。全量 pytest → 1874 passed。活体:_build_system_prompt() 真含能力地图段,总长 1420 字符。"
   }
  ]
 }

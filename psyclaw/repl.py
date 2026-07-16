@@ -704,8 +704,8 @@ def _is_exit_word(line: str) -> bool:
 
 def _build_system_prompt() -> str:
     """瘦核心系统提示(长上下文优化:知识库改为按消息动态注入)。"""
-    from psyclaw.context import assist_directives, lean_core
-    parts = [lean_core()]
+    from psyclaw.context import assist_directives, capability_map, lean_core
+    parts = [lean_core(), capability_map()]   # feat-144:能力自知,不重造轮子
     try:                                   # feat-141:协助水平附加指令(standard 空)
         from psyclaw.config import load_config
         directives = assist_directives(load_config().get("assist_level", "standard"))
