@@ -25,6 +25,11 @@ _CODES = {
     "brred": "91", "brgreen": "92", "bryellow": "93",
     "brblue": "94", "brmagenta": "95", "brcyan": "96",
     "bgblue": "44", "bgmagenta": "45", "bgcyan": "46",
+    # feat-147:精炼 256 色调(比 16 色 br* 柔和)——只在支持 256 色的终端出彩,
+    # 不支持的终端 SGR 会忽略未知参数,退化为普通色/无色,不会乱码。单个 38;5;N
+    # 可与 bold 组合(1;38;5;N),但两个 256 前景色不要叠加(会拼出非法序列)。
+    "teal": "38;5;80", "violet": "38;5;141", "slate": "38;5;103",
+    "peach": "38;5;216", "mint": "38;5;114", "gold": "38;5;179",
 }
 
 
@@ -58,6 +63,22 @@ def title(text: str) -> str:
 
 def dim(text: str) -> str:
     return paint(text, "dim")
+
+
+# feat-147:精炼语义色——比全 br* 单调的旧配色柔和、可分辨用途。
+def info(text: str) -> str:
+    """信息/召回/提示类(柔和青)。"""
+    return paint(text, "teal")
+
+
+def label(text: str) -> str:
+    """字段名/小标签(柔和紫,加粗)。"""
+    return paint(text, "bold", "violet")
+
+
+def run_output(text: str) -> str:
+    """命令实时输出行(feat-145):独立柔灰蓝,与模型正文一眼可分。"""
+    return "  " + paint("│ ", "slate") + paint(text, "slate")
 
 
 def rule(width: int = 56, char: str = "─") -> str:

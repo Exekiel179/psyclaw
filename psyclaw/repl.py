@@ -330,7 +330,7 @@ def _run_shell_cmd(cmd: str) -> str:
         if line is None:
             break
         lines.append(line)
-        print(ui.dim("  │ " + line.rstrip("\n")))   # 实时可见,缩进标为命令输出
+        print(ui.run_output(line.rstrip("\n")))   # feat-147:命令输出独立着色,一眼可分
     body = "".join(lines)
     if timed_out:
         try:
