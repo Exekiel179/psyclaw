@@ -1429,6 +1429,16 @@
    "dependencies": [],
    "status": "done",
    "evidence": "tests/test_slash_ux.py +7(联想完整性 handled⊆COMMANDS∪别名/plan-audit-research 现可联想/agent 遵契约隐藏但可建议/typo 前缀+编辑距离/gibberish 返回 None/未知命令输出含建议)。既有 test_primary_repl_commands_hide_legacy_modes 契约不破。全量 pytest → 1888 passed。活体:/agnet→/agent /expo→/export /plna→/plan /reserach→/research /xqzwptv→None。"
+  },
+  {
+   "id": "feat-148",
+   "name": "提示强化:主动读/跑(第一人称「我来」)+ 一次只问一个问题",
+   "description": "真实事故(profile 对话 chat_20260716-013723)三处反模式:①模型写「请你手动查看 data/exploration/test_output.csv,并回复关键日期的 value 值」——把自己能做的读文件甩给用户;②写「请运行这个修复后的命令」——命令块本会自动执行,措辞却让用户以为要手动跑;③写「为确保紧凑,我将以上问题整合为一次回答」——多个问题挤进一次。既有提示只弱弱说「不要说无法读取」,弱指令模型(deepseek-v4-flash)照样甩锅。修复(强化三段 system 提示):_READ_OPEN_SYSTEM 改第一人称「我来读」+ 当场输出 read 块 + 明确「绝不让用户手动打开文件/用 Excel 查看/粘贴内容/替你报数字」;_RUN_SYSTEM 改「我来跑」+「绝不写请你运行把命令甩给用户手动跑(本就自动执行)」;_CHOICES_SYSTEM 加「一次只问一个问题,绝不把多个问题合并进一次选项、绝不说为紧凑整合为一次回答」。",
+   "dependencies": [
+    "feat-144"
+   ],
+   "status": "done",
+   "evidence": "tests/test_prompt_proactive.py +4(read 禁止甩用户/run 第一人称非请你运行/choices 禁多问/_standing_conventions 携带主动指令)。全量 pytest → 1892 passed。"
   }
  ]
 }
