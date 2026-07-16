@@ -403,8 +403,10 @@ class TestStreamBlockSmoke:
             blk = _ui.StreamBlock.__new__(_ui.StreamBlock)
             blk._out = captured
             blk.color = "brcyan"
+            blk.title = "PsyClaw"
             blk._buf = ""
             blk._indicator = False
+            blk._header_shown = False
             # Simulate streaming
             blk._buf += "**bold** result\n- item one\n"
             blk.close()
@@ -428,8 +430,10 @@ class TestStreamBlockSmoke:
             blk = _ui.StreamBlock.__new__(_ui.StreamBlock)
             blk._out = captured
             blk.color = "brcyan"
+            blk.title = "PsyClaw"
             blk._buf = ""
             blk._indicator = False
+            blk._header_shown = False
             blk.write("chunk1 ")
             blk.write("chunk2")
             assert blk._buf == "chunk1 chunk2"

@@ -1439,6 +1439,14 @@
    ],
    "status": "done",
    "evidence": "tests/test_prompt_proactive.py +4(read 禁止甩用户/run 第一人称非请你运行/choices 禁多问/_standing_conventions 携带主动指令)。全量 pytest → 1892 passed。"
+  },
+  {
+   "id": "feat-149",
+   "name": "空回复:不渲染丑空框 + deepseek reasoning_content 兜底",
+   "description": "用户反馈(profile 对话):回复为空时终端显示一个空白边框方框 + 「(模型回复为空,自动恢复 1/2)」,confusing。根因二:①ui.StreamBlock 在 __init__ 就打表头,空回复→留下 ╭─…─╮ │ (空) ╰──╯ 空框;②openai_compat 只 yield delta.content,deepseek-v4-flash 把内容放 reasoning_content 时整条回复看着是空。修复:①StreamBlock 表头延迟到首个非空 chunk(_show_header),close() 空缓冲直接 return 不打任何框,零噪音;有内容照常成框(既有 __new__ 手构测试补 title/_header_shown 字段);②openai_compat 流式中 content 优先 yield 并记 saw_content,reasoning_content 缓冲;整段无 content 时末尾用缓冲的 reasoning 兜底,避免整条空回复(有正文时不掺 reasoning)。既有有限自愈重试(_recover_empty_reply)不动。",
+   "dependencies": [],
+   "status": "done",
+   "evidence": "tests/test_empty_reply.py +5(空块不渲染框/有内容照常成框/表头延迟到首写/reasoning 兜底/content 优先不掺 reasoning)。既有 test_ui_markdown StreamBlock 手构测试补字段后仍绿。全量 pytest → 1897 passed。活体:空回复输出 0 字符(无空框);reasoning_content='推理得出结论 X' 被兜底 yield。"
   }
  ]
 }
