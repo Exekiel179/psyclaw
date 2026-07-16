@@ -238,8 +238,19 @@ def _run_psyclaw_cmd(cmd: str) -> str:
 
 
 def _run_shell_cmd(cmd: str) -> str:
-    """交系统 shell 跑一条命令,捕获输出(带超时)。"""
+    """交系统 shell 跑一条命令,**边跑边把输出打到终端**(feat-145 消灭空屏焦虑),
+    完整输出仍回传模型(契约不变)。
+
+    此前 capture_output=True 全吞——一个「每请求隔 30 秒、预计 40 分钟」的抓取
+    脚本会让用户盯 40 分钟空屏不知死活。改流式:后台读线程逐行入队(同 MCP
+    client 模式),主循环按剩余超时取行、实时打印并累积;进程久挂无输出也能按
+    wall-clock 超时杀掉。
+    """
+    import queue
     import subprocess
+    import threading
+    import time as _time
+    from psyclaw import ui
     # feat-127:启用沙箱时,执行前过代码执行面裁决(恶意硬拒,快速失败)
     timeout = _RUN_TIMEOUT
     try:
@@ -253,15 +264,51 @@ def _run_shell_cmd(cmd: str) -> str:
     except Exception:  # noqa: BLE001  # 沙箱异常不阻断(既有 _DANGEROUS_RE 仍兜底)
         pass
     try:
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True,
-                             encoding="utf-8", errors="replace",
-                             timeout=timeout)
-        out = (res.stdout or "") + (("\n" + res.stderr) if res.stderr else "")
-        return f"$ {cmd}\n(rc={res.returncode})\n{out}"
-    except subprocess.TimeoutExpired:
-        return f"$ {cmd}\n[超时:>{_RUN_TIMEOUT}s,已终止]"
+        proc = subprocess.Popen(               # stderr 并入 stdout,统一按序流式
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", bufsize=1)
     except OSError as exc:
         return f"$ {cmd}\n[无法执行:{exc}]"
+
+    q: queue.Queue = queue.Queue()
+
+    def _pump() -> None:
+        try:
+            for line in proc.stdout:           # 逐行(bufsize=1 行缓冲)
+                q.put(line)
+        except (OSError, ValueError):
+            pass
+        q.put(None)                            # EOF 哨兵
+
+    threading.Thread(target=_pump, daemon=True).start()
+    lines: list[str] = []
+    deadline = _time.monotonic() + timeout
+    timed_out = False
+    while True:
+        remaining = deadline - _time.monotonic()
+        if remaining <= 0:
+            timed_out = True
+            break
+        try:
+            line = q.get(timeout=min(remaining, 0.5))
+        except queue.Empty:
+            continue                           # 无输出也回到循环查超时
+        if line is None:
+            break
+        lines.append(line)
+        print(ui.dim("  │ " + line.rstrip("\n")))   # 实时可见,缩进标为命令输出
+    body = "".join(lines)
+    if timed_out:
+        try:
+            proc.kill()
+        except OSError:
+            pass
+        return f"$ {cmd}\n[超时:>{_RUN_TIMEOUT}s,已终止]\n{body}"
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+    return f"$ {cmd}\n(rc={proc.returncode})\n{body}"
 
 
 def run_commands(reqs: list[dict], confirm=None,

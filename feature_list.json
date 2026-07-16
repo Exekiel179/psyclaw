@@ -1411,6 +1411,16 @@
    ],
    "status": "done",
    "evidence": "tests/test_capability_map.py +7(覆盖 docx export/figure apply_style apa7/check/明确禁止重造/统计外移/非空且<=700 预算/系统提示真含 export+apply_style)。全量 pytest → 1874 passed。活体:_build_system_prompt() 真含能力地图段,总长 1420 字符。"
+  },
+  {
+   "id": "feat-145",
+   "name": "命令实时输出——长脚本边跑边显示,消灭空屏焦虑",
+   "description": "真实事故(profile 对话 chat_20260716-013723):模型建议「每请求隔 30 秒、预计 40 分钟」的抓取脚本,_run_shell_cmd 用 subprocess.run(capture_output=True) 全吞输出,用户 40 分钟盯空屏不知死活。改流式:subprocess.Popen(stderr 并入 stdout)+ 后台读线程逐行入队(同 mcp/client.py 模式),主循环按剩余 wall-clock 超时从队列取行、实时打印(缩进 │ 标为命令输出)并累积;进程久挂无输出也能按 deadline 杀掉。完整输出仍以 $ cmd/(rc=N)/body 回传模型(契约不变)。沙箱裁决/超时/OSError 路径不变。",
+   "dependencies": [
+    "feat-127"
+   ],
+   "status": "done",
+   "evidence": "tests/test_run_stream.py +7(回传全输出契约不回归/实时打印到终端 capsys 可见/非零退出码/stderr 捕获/多行顺序保留/超时仍生效/坏命令不抛)。全量 pytest → 1881 passed。活体:4 行进度脚本(每行隔 0.3s)逐行实时出现(│ 前缀),总耗时 1.2s,模型仍拿到完整输出。"
   }
  ]
 }
