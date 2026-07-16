@@ -270,24 +270,39 @@ class StreamBlock:
         import sys as _sys
         self._out = _sys.stdout
         self.color = color
+        self.title = title
         self._buf = ""
+        # feat-149:表头延迟到首个 chunk 才打——空回复(deepseek 常见)不再留下
+        # 丑陋空框「╭─ …─╮ │ (空) ╰──╯」+「自动恢复」的迷惑组合。
+        self._header_shown = False
+        self._indicator = False
+
+    def _show_header(self) -> None:
+        if self._header_shown:
+            return
+        self._header_shown = True
         w = term_width() - 2
-        head = paint("╭─ ", color) + paint(title, color, "bold") + " " \
-            + paint("─" * max(0, w - len(title) - 4), color)
+        head = paint("╭─ ", self.color) + paint(self.title, self.color, "bold") + " " \
+            + paint("─" * max(0, w - len(self.title) - 4), self.color)
         self._out.write(head + "\n")
         if _ENABLED:
             # 生成期间显示进度指示符;close() 时用 ANSI 光标上移覆盖
-            self._out.write(paint("│ ", color) + dim("▪ 正在生成…") + "\n")
+            self._out.write(paint("│ ", self.color) + dim("▪ 正在生成…") + "\n")
         self._indicator = _ENABLED
         self._out.flush()
 
     def write(self, chunk: str) -> None:
-        """缓冲流式 chunk;不直接输出,避免 Markdown 标记被截断。"""
+        """缓冲流式 chunk;不直接输出,避免 Markdown 标记被截断。首个 chunk 才打表头。"""
+        if chunk:
+            self._show_header()
         self._buf += chunk
 
     def close(self) -> None:
-        """渲染缓冲内容并关闭面板。"""
+        """渲染缓冲内容并关闭面板。空缓冲(从未 write)→ 不打任何框,零噪音。"""
         from psyclaw.md_render import render_md
+        if not self._buf.strip():
+            return                              # feat-149:空回复不渲染空框
+        self._show_header()                     # 兜底:有内容但还没打过表头
         if self._indicator:
             # 光标上移一行 + 清屏到末尾(覆盖「▪ 正在生成…」行)
             self._out.write("\033[1A\033[J")

@@ -50,17 +50,28 @@ class OpenAICompatProvider(Provider):
         payload = {"model": model, "stream": True, "messages": msgs}
         headers = {"Authorization": f"Bearer {self.api_key}"}
         self.last_stop_reason = ""
+        saw_content = False
+        reasoning_buf: list[str] = []       # feat-149:content 全空时的兜底
         for data in self._post_sse(self._endpoint(), headers, payload):
             try:
                 ev = json.loads(data)
             except json.JSONDecodeError:
                 continue
             for choice in ev.get("choices", []):
-                text = choice.get("delta", {}).get("content")
+                delta = choice.get("delta", {}) or {}
+                text = delta.get("content")
                 if text:
+                    saw_content = True
                     yield text
+                else:
+                    # deepseek 等把推理放 reasoning_content;正文为空时整条回复看着是空
+                    rc = delta.get("reasoning_content")
+                    if rc:
+                        reasoning_buf.append(rc)
                 # 捕获停止原因并归一化(OpenAI 系 "length"=截断 → 统一记 "max_tokens")
                 reason = choice.get("finish_reason")
                 if reason:
                     self.last_stop_reason = ("max_tokens" if reason == "length"
                                              else str(reason))
+        if not saw_content and reasoning_buf:   # 正文全空 → 用推理内容兜底,避免空回复
+            yield "".join(reasoning_buf)
