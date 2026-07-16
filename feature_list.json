@@ -1447,6 +1447,16 @@
    "dependencies": [],
    "status": "done",
    "evidence": "tests/test_empty_reply.py +5(空块不渲染框/有内容照常成框/表头延迟到首写/reasoning 兜底/content 优先不掺 reasoning)。既有 test_ui_markdown StreamBlock 手构测试补字段后仍绿。全量 pytest → 1897 passed。活体:空回复输出 0 字符(无空框);reasoning_content='推理得出结论 X' 被兜底 yield。"
+  },
+  {
+   "id": "feat-147",
+   "name": "输出配色美化:256 精炼色调 + 语义色 + 命令输出独立着色",
+   "description": "用户反馈:输出框色彩单调不美观(旧配色全是 16 色 br* + dim,监色调)。修复:①_CODES 加 6 个 256 色前景(teal/violet/slate/peach/mint/gold,比 br* 柔和;单个 38;5;N 可与 bold 组合成 1;38;5;N,两个 256 前景不叠加),不支持 256 色的终端 SGR 忽略未知参数自然退化;②新语义色 info(柔和青,信息/召回)、label(柔和紫加粗,字段名);③run_output 命令实时输出行独立柔灰蓝(slate),与模型正文一眼可分——接入 feat-145 的 │ 流式行(原来是灰 dim,与其他次要文本混同)。NO_COLOR/非 TTY 全部退化纯文本(_ENABLED 既有通路)。",
+   "dependencies": [
+    "feat-145"
+   ],
+   "status": "done",
+   "evidence": "tests/test_ui_palette.py +7(256 码注册且格式对/paint 256 出 ANSI/bold+256 合法组合 1;38;5;/info+label 助手/禁用时纯文本/run_output 独立着色/run_output 禁用时结构在无色码)。全量 pytest → 1904 passed。活体:teal=38;5;80、label=1;38;5;141、run_output=38;5;103 slate,组合正确。"
   }
  ]
 }
