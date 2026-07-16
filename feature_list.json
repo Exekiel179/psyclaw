@@ -1421,6 +1421,14 @@
    ],
    "status": "done",
    "evidence": "tests/test_run_stream.py +7(回传全输出契约不回归/实时打印到终端 capsys 可见/非零退出码/stderr 捕获/多行顺序保留/超时仍生效/坏命令不抛)。全量 pytest → 1881 passed。活体:4 行进度脚本(每行隔 0.3s)逐行实时出现(│ 前缀),总耗时 1.2s,模型仍拿到完整输出。"
+  },
+  {
+   "id": "feat-146",
+   "name": "斜杠命令联想完整性 + 打错给「你是不是想输入」",
+   "description": "用户反馈:斜杠命令后要有显示(分辨是否生效)、输入 / 要弹联想。实查发现 /plan /audit /research 三个被处理的命令不在 COMMANDS → 从来不联想(补进);打错命令只回冷冰冰「未知命令」。修复:①COMMANDS 补 /plan /audit /research(/agent /research-loop /yolo /safemode 遵既有 streamline 契约 test_primary_repl_commands_hide_legacy_modes 保持隐藏);②新增 _suggest_command 纯函数(前缀优先 /expo→/export,再 difflib 编辑距离 /agnet→/agent;pool 含隐藏命令与别名,故 /agent /yolo 打错也能建议不判无效);③未知命令分支从「未知命令 X」改「未知命令 X——你是不是想输入 /Y?」。autocomplete 基建(_slash_completions/prompt_toolkit/readline 补全)本已存在,此轮补全命令覆盖面。",
+   "dependencies": [],
+   "status": "done",
+   "evidence": "tests/test_slash_ux.py +7(联想完整性 handled⊆COMMANDS∪别名/plan-audit-research 现可联想/agent 遵契约隐藏但可建议/typo 前缀+编辑距离/gibberish 返回 None/未知命令输出含建议)。既有 test_primary_repl_commands_hide_legacy_modes 契约不破。全量 pytest → 1888 passed。活体:/agnet→/agent /expo→/export /plna→/plan /reserach→/research /xqzwptv→None。"
   }
  ]
 }
