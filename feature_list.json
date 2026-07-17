@@ -1519,6 +1519,18 @@
    ],
    "status": "done",
    "evidence": "tests/test_token_meter.py +11(ASCII 估算/中文重于英文/空串/累计 in-out-turns/压缩真实省量/total/朴素基线大于瘦核心/详细页含轮数+输入输出/基线诚实标注估算且无友商名/趣味换算页数/空会话不崩)。全量 pytest → 1951 passed。活体:40 轮会话页面渲染,实测 47,920 tok、压缩省 7,200、相关性路由省估算(基线透明)、≈159.7 页 A4。"
+  },
+  {
+   "id": "feat-156",
+   "name": "系统提示静态前缀:重排为缓存友好,同样效果省 token",
+   "description": "用户问固定约定块(271 tok/轮)能否在同样效果下再精简。诊断:删字会伤指令遵循(feat-148 刚加的强化措辞对弱模型 deepseek 必要),不满足同样效果;真正无损的省法是 prompt caching,而 psyclaw 有排序 bug 正好破坏它——_CHOICES/_READ/_RUN 静态约定块被排在动态知识/项目感知/召回之后,中间内容每轮一变就打断 provider 的缓存前缀,约定块每轮全价重算。修复:抽 _static_system() 汇集所有会话内稳定内容(self.system 瘦核心+能力地图+保存/画像 + 选择/读/跑约定 + 插件 system)作缓存前缀,ask() 重排为【静态前缀 + 动态后缀(goal/memo/教训/facts/知识/项目感知/plan/召回)】。模型看到的完整指令一字不变(同样效果),仅顺序调整为缓存友好——DeepSeek/OpenAI 自动缓存稳定前缀命中打折(实测静态前缀 ≈1040 tok,40 轮重复注入 ≈40560 tok 缓存后 ≈4056 tok)。Anthropic 需显式 cache_control(要改 provider 接口传静态/动态边界),留作后续。",
+   "dependencies": [
+    "feat-112",
+    "feat-144",
+    "feat-148"
+   ],
+   "status": "done",
+   "evidence": "tests/test_static_prefix.py +6(前缀跨轮字节一致/含约定块/以核心开头/无动态标记/safe 档变但仍稳定/约定块在动态之前)。全量 pytest → 1957 passed(重排不改内容,repl 全测不回归)。活体:静态前缀 ≈1040 tok(含约定块 397 tok 从动态区救回缓存),DeepSeek 缓存 0.1x 计,40 轮省 ≈36500 tok,同样效果。"
   }
  ]
 }

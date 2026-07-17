@@ -1001,6 +1001,24 @@ class ReplSession:
             out_parts.append(token)
         return " ".join(out_parts)
 
+    def _static_system(self) -> str:
+        """会话内**稳定**的系统提示前缀(feat-156):瘦核心+能力地图+保存/画像记忆
+        (self.system)+ 键盘选择/读文件/跑命令约定 + 插件 system 片段。
+
+        不含任何随消息变化的内容——故跨轮字节一致,provider(DeepSeek/OpenAI)可缓存
+        这段前缀,重复注入的约定块几乎免费。file_access(/access 切换)会改读/跑约定,
+        属会话内罕见事件,失效一次可接受。
+        """
+        s = self.system
+        s += "\n" + _CHOICES_SYSTEM
+        s += "\n" + (_READ_SAFE_SYSTEM if self.file_access == "safe"
+                     else _READ_OPEN_SYSTEM)
+        s += "\n" + _RUN_SYSTEM + ("" if self.file_access != "safe"
+                                   else "\n" + _RUN_SAFE_NOTE)
+        if self.plugins and self.plugins.systems:
+            s += "\n\n" + "\n\n".join(self.plugins.systems)
+        return s
+
     # -- 对话 --------------------------------------------------------------
     def ask(self, text: str, internal: bool = False) -> None:
         from psyclaw.context import compact_history, relevant_knowledge, render_memo
@@ -1027,12 +1045,16 @@ class ReplSession:
         _dropped = _pre_chars - sum(len(m["content"]) for m in self.messages)
         if _dropped > 0:
             self.meter.record_compaction(_dropped)   # feat-155:压缩真实省量
-        # 动态系统提示:瘦核心 + 决策备忘 + 按需知识
-        system = self.system
-        # `/goal` 是持久状态,不是只写盘的旁路。每轮都注入,让“继续”也能承接完整任务。
+        # feat-156:系统提示排成【静态前缀(会话内稳定)+ 动态后缀(每轮变)】——
+        # 让 provider 的 prompt 缓存命中稳定前缀(DeepSeek/OpenAI 自动缓存前缀,
+        # 命中部分计费打折)。此前 _CHOICES/_READ/_RUN 静态约定块被排在动态知识
+        # 之后,中间内容每轮一变就打断缓存前缀,271 tok/轮 白白全价重算。
+        # 模型看到的完整指令一字不变(同样效果),仅顺序调整为缓存友好。
+        system = self._static_system()
+        # —— 动态后缀:每轮随消息/状态变化 ——
         try:
             from psyclaw.tasks import get_goal
-            goal_part = _goal_context(get_goal())
+            goal_part = _goal_context(get_goal())   # /goal 持久状态,每轮注入承接任务
             if goal_part:
                 system += "\n\n" + goal_part
         except Exception:  # noqa: BLE001  # 目标读取失败不阻断对话
@@ -1078,14 +1100,6 @@ class ReplSession:
         if self.plan_mode:
             from psyclaw.tasks import PLAN_MODE_SYSTEM
             system += "\n\n" + PLAN_MODE_SYSTEM
-        # 键盘选择器约定 + 文件读取权限(随 /access 动态切换)+ 直接跑命令
-        system += "\n" + _CHOICES_SYSTEM
-        system += "\n" + (_READ_SAFE_SYSTEM if self.file_access == "safe"
-                          else _READ_OPEN_SYSTEM)
-        system += "\n" + _RUN_SYSTEM + ("" if self.file_access != "safe"
-                                        else "\n" + _RUN_SAFE_NOTE)
-        if self.plugins and self.plugins.systems:
-            system += "\n\n" + "\n\n".join(self.plugins.systems)
         # 历史上下文召回:关键词定位 + 相关度门控(不达标不注入)
         try:
             from psyclaw.recall import render_recall
