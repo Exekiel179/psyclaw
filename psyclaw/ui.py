@@ -303,8 +303,10 @@ class StreamBlock:
             return
         self._header_shown = True
         w = term_width() - 2
+        # feat-157:闭合右上角 ╮——此前只有 ╭ 左角、右侧开口,看着像半个框。
+        dashes = max(0, w - 5 - display_width(self.title))
         head = paint("╭─ ", self.color) + paint(self.title, self.color, "bold") + " " \
-            + paint("─" * max(0, w - len(self.title) - 4), self.color)
+            + paint("─" * dashes + "╮", self.color)
         self._out.write(head + "\n")
         if _ENABLED:
             # 生成期间显示进度指示符;close() 时用 ANSI 光标上移覆盖
@@ -328,13 +330,16 @@ class StreamBlock:
             # 光标上移一行 + 清屏到末尾(覆盖「▪ 正在生成…」行)
             self._out.write("\033[1A\033[J")
         rendered = render_md(self._buf)
+        w = term_width() - 2
         prefix = paint("│ ", self.color)
-        inner = max(1, term_width() - 4)   # "│ " 前缀 2 列 + 右侧留白
+        rborder = paint("│", self.color)        # feat-157:右边框收口
+        inner = max(1, w - 4)                    # "│ " 左(2)+ 内容 + " │" 右(2)
         for ln in (rendered.splitlines() if rendered else [""]):
             for seg in wrap_display(ln, inner) or [""]:
-                self._out.write(prefix + seg + "\n")
-        w = term_width() - 2
-        self._out.write(paint("╰" + "─" * max(0, w - 1), self.color) + "\n")
+                pad = " " * max(0, inner - display_width(seg))
+                reset = RESET if _ENABLED else ""   # 防内容尾色染到填充/右框
+                self._out.write(prefix + seg + reset + pad + " " + rborder + "\n")
+        self._out.write(paint("╰" + "─" * max(0, w - 2) + "╯", self.color) + "\n")
         self._out.flush()
 
 
