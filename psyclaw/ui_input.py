@@ -425,6 +425,48 @@ def _fallback_input(prompt: str) -> str:
     return input(prompt).strip()
 
 
+def input_backend(is_tty: bool | None = None) -> str:
+    """当前实际输入 backend:ptk | readline | raw | plain(feat-153)。
+
+    与 read_line 的分派同口径——诚实告知用户能用到哪种联想,不过度承诺。
+    """
+    if is_tty is None:
+        is_tty = sys.stdin.isatty() and sys.stdout.isatty()
+    if not is_tty:
+        return "plain"
+    if _PTK_AVAILABLE:
+        return "ptk"
+    try:
+        import readline  # noqa: F401
+        return "readline"
+    except ImportError:
+        return "raw"
+
+
+_HINTS = {
+    # ptk / raw 有实时联想下拉;readline 只 Tab 补全(↑↓ 是历史不是选择,别过度承诺)
+    "ptk": "输入 / 弹出命令联想下拉(↑↓ 选择 · Tab 补全) · /exit 退出 · @<文件> 引用",
+    "raw": "输入 / 弹出命令联想(↑↓ 选择) · /exit 退出 · @<文件> 引用",
+    "readline": "输入 / 后按 Tab 补全命令 · ↑↓ 翻历史 · /exit 退出 · @<文件> 引用",
+    "plain": "/exit 退出 · @<文件> 引用",
+}
+
+
+def input_hint(backend: str | None = None) -> str:
+    """据实际 backend 给行输入提示(feat-153:不再写死过度承诺 ↑↓ 下拉)。"""
+    return _HINTS.get(backend or input_backend(), _HINTS["plain"])
+
+
+def ptk_install_nudge(backend: str | None = None) -> str:
+    """TTY 但无 ptk(readline/raw)时,一句引导:装 prompt_toolkit 得实时下拉。
+
+    ptk 已用 / 非 TTY(plain)→ 空串(不打扰)。
+    """
+    if (backend or input_backend()) in ("readline", "raw"):
+        return "想要输入 / 时实时弹出命令联想下拉?装 prompt_toolkit 即可:pip install prompt_toolkit"
+    return ""
+
+
 def read_line(prompt: str, commands: dict) -> str:
     """带 slash 联想的行输入。commands: {"/cmd": "描述"}。
 

@@ -1490,6 +1490,14 @@
    ],
    "status": "done",
    "evidence": "tests/test_reinvent.py +3(axis-off+箭头=概念图命中 graphviz/mermaid/概念图优先于 figstyle/正常数据图保留坐标轴不误伤)。capability_map 555 字符仍在 700 预算内。全量 pytest → 1926 passed。活体:真实 fig_bjw_framework.py 面条图脚本 → 命中 concept_diagram 并给布局引擎纠偏。"
+  },
+  {
+   "id": "feat-153",
+   "name": "命令联想诚实化:提示随 backend 自适应 + 引导装 prompt_toolkit",
+   "description": "真实事故(chat_20260717-003855):用户 uv 环境没装 prompt_toolkit(实时 ↑↓ 下拉全靠它),实际走 readline——只 Tab 补全、无实时下拉;但启动提示写死「输入 / 弹出命令联想(↑↓选择 Tab补全)」,过度承诺,用户以为功能坏了。修复:ui_input.input_backend() 与 read_line 同口径判 ptk|readline|raw|plain;input_hint() 据实际 backend 说实话(ptk/raw 有实时下拉说↑↓选择;readline 只说 Tab 补全+↑↓翻历史,不承诺弹窗下拉;plain 极简);ptk_install_nudge() 在 readline/raw(TTY 无 ptk)时给一句「装 prompt_toolkit 得实时下拉:pip install prompt_toolkit」,ptk 已用/非 TTY 空串不打扰;repl 启动横幅改用这三者。注:纯 stdlib 核铁律不加 ptk 硬依赖,故实时下拉保持 opt-in,提示诚实告知而非假装已有。",
+   "dependencies": [],
+   "status": "done",
+   "evidence": "tests/test_input_backend.py +10(backend 判定 plain/ptk/readline/raw;提示 ptk 承诺下拉、readline 只 Tab 不过度承诺、raw 有↑↓、plain 极简;ptk 引导仅 readline/raw 出现、ptk/plain 空串)。全量 pytest → 1936 passed。活体:uv 环境(无 ptk)启动显示『输入 / 后按 Tab 补全命令 · ↑↓ 翻历史』+『装 prompt_toolkit 即可』。"
   }
  ]
 }
