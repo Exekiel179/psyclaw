@@ -10,6 +10,7 @@
     --shadow-sm:0 1px 2px rgba(21,33,31,.04);
     --shadow:0 1px 3px rgba(21,33,31,.04), 0 14px 40px -26px rgba(21,33,31,.20);
     --maxw:1140px;
+    --user-fg:#ffffff;
     --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,"Liberation Mono",monospace;
     --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"PingFang SC","Microsoft YaHei","Noto Sans SC","Hiragino Sans GB",sans-serif;
   }
@@ -21,6 +22,7 @@
       --accent:#37c4b9; --accent-2:#5bd3c9;
       --accent-soft:rgba(55,196,185,.11);
       --pass:#54b181; --attention:#d9a441;
+      --user-fg:#06100f;
       --shadow-sm:0 1px 2px rgba(0,0,0,.4);
       --shadow:0 1px 3px rgba(0,0,0,.5), 0 22px 50px -30px rgba(0,0,0,.8);
     }
@@ -32,6 +34,7 @@
     --accent:#37c4b9; --accent-2:#5bd3c9;
     --accent-soft:rgba(55,196,185,.11);
     --pass:#54b181; --attention:#d9a441;
+    --user-fg:#06100f;
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow:0 1px 3px rgba(0,0,0,.5), 0 22px 50px -30px rgba(0,0,0,.8);
   }
@@ -42,28 +45,21 @@
     --accent:#0b6d6a; --accent-2:#0a5c59;
     --accent-soft:rgba(11,109,106,.07);
     --pass:#2f7d57; --attention:#a9761f;
+    --user-fg:#ffffff;
     --shadow-sm:0 1px 2px rgba(21,33,31,.04);
     --shadow:0 1px 3px rgba(21,33,31,.04), 0 14px 40px -26px rgba(21,33,31,.20);
   }
-
   * { box-sizing:border-box; }
   html { scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
   @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
-  body {
-    margin:0; background:var(--ground); color:var(--ink);
-    font-family:var(--sans); line-height:1.62; font-size:16px;
-    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-  }
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--sans);
+    line-height:1.62; font-size:16px; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
   .wrap { max-width:var(--maxw); margin:0 auto; padding:0 32px; }
   @media (max-width:640px){ .wrap { padding:0 20px; } }
   a { color:inherit; }
   ::selection { background:var(--accent-soft); color:var(--ink); }
-
-  .eyebrow {
-    font-family:var(--mono); font-size:.71rem; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--accent); font-weight:600;
-    display:inline-flex; align-items:center; gap:.6em;
-  }
+  .eyebrow { font-family:var(--mono); font-size:.71rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--accent); font-weight:600; display:inline-flex; align-items:center; gap:.6em; }
   .eyebrow .p { opacity:.55; }
   h2 { font-size:clamp(1.55rem,3vw,2.15rem); line-height:1.16; letter-spacing:-.017em;
        margin:.55rem 0 .5rem; text-wrap:balance; font-weight:640; }
@@ -71,71 +67,46 @@
   .lead b { color:var(--ink); font-weight:600; }
   section { padding:clamp(60px,8.5vw,110px) 0; border-top:1px solid var(--hair); }
   .num { font-variant-numeric:tabular-nums; }
-
-  header.bar {
-    position:sticky; top:0; z-index:30;
-    backdrop-filter:saturate(1.3) blur(14px);
+  .ic { font-family:var(--mono); font-size:.79rem; color:var(--accent); background:var(--accent-soft);
+    padding:.13em .5em; border-radius:5px; }
+  header.bar { position:sticky; top:0; z-index:30; backdrop-filter:saturate(1.3) blur(14px);
     -webkit-backdrop-filter:saturate(1.3) blur(14px);
-    background:color-mix(in srgb, var(--ground) 78%, transparent);
-    border-bottom:1px solid var(--hair);
-  }
+    background:color-mix(in srgb, var(--ground) 78%, transparent); border-bottom:1px solid var(--hair); }
   .bar .wrap { display:flex; align-items:center; justify-content:space-between; height:62px; }
-  .brand { font-family:var(--mono); font-weight:650; letter-spacing:-.01em;
-    display:flex; align-items:center; gap:.55ch; font-size:.96rem; }
+  .brand { font-family:var(--mono); font-weight:650; letter-spacing:-.01em; display:flex; align-items:center; gap:.55ch; font-size:.96rem; }
   .brand .caret { color:var(--accent); font-weight:700; }
   .bar nav { display:flex; align-items:center; gap:24px; }
   .bar nav a { font-size:.86rem; color:var(--muted); text-decoration:none; transition:color .15s; }
   .bar nav a:hover { color:var(--ink); }
-  .toggle {
-    font-family:var(--mono); font-size:.76rem; color:var(--muted);
-    background:transparent; border:1px solid var(--hair-strong); border-radius:7px;
-    padding:6px 11px; cursor:pointer; letter-spacing:.02em; transition:all .15s;
-  }
+  .toggle { font-family:var(--mono); font-size:.76rem; color:var(--muted); background:transparent;
+    border:1px solid var(--hair-strong); border-radius:7px; padding:6px 11px; cursor:pointer; letter-spacing:.02em; transition:all .15s; }
   .toggle:hover { border-color:var(--accent); color:var(--accent); }
   @media (max-width:760px){ .bar nav .lnk { display:none; } }
-
   .hero { padding:clamp(70px,10vw,120px) 0 clamp(46px,6vw,74px); border-top:0; }
   .hero .grid { display:grid; grid-template-columns:1.04fr .96fr; gap:clamp(30px,4.5vw,64px); align-items:center; }
   @media (max-width:920px){ .hero .grid { grid-template-columns:1fr; gap:38px; } }
-  .wordmark {
-    font-family:var(--mono); font-weight:700; letter-spacing:-.035em;
-    font-size:clamp(3rem,8.2vw,5.1rem); line-height:.94; margin:.7rem 0 .05rem;
-  }
+  .wordmark { font-family:var(--mono); font-weight:700; letter-spacing:-.035em;
+    font-size:clamp(3rem,8.2vw,5.1rem); line-height:.94; margin:.7rem 0 .05rem; }
   .wordmark .caret { color:var(--accent); }
-  .hero h1 {
-    font-size:clamp(1.3rem,3vw,1.85rem); line-height:1.24; font-weight:560;
-    letter-spacing:-.012em; margin:.55rem 0 .8rem; text-wrap:balance; max-width:21ch;
-    color:var(--ink);
-  }
-  .hero h1 em { font-style:normal; color:var(--accent);
-    background:linear-gradient(transparent 62%, var(--accent-soft) 62%); padding:0 .05em; }
+  .hero h1 { font-size:clamp(1.3rem,3vw,1.85rem); line-height:1.24; font-weight:560; letter-spacing:-.012em;
+    margin:.55rem 0 .8rem; text-wrap:balance; max-width:21ch; color:var(--ink); }
+  .hero h1 em { font-style:normal; color:var(--accent); background:linear-gradient(transparent 62%, var(--accent-soft) 62%); padding:0 .05em; }
   .hero p.thesis { color:var(--muted); max-width:50ch; font-size:1.06rem; line-height:1.62; }
   .hero p.thesis b { color:var(--ink); font-weight:600; }
   .cta-row { display:flex; flex-wrap:wrap; gap:12px; margin-top:28px; }
-  .btn {
-    font-size:.9rem; text-decoration:none; padding:12px 20px; border-radius:9px;
-    display:inline-flex; align-items:center; gap:.55ch; border:1px solid transparent;
-    font-weight:520; transition:transform .13s ease, background .2s, border-color .2s, color .2s;
-  }
+  .btn { font-size:.9rem; text-decoration:none; padding:12px 20px; border-radius:9px; display:inline-flex;
+    align-items:center; gap:.55ch; border:1px solid transparent; font-weight:520;
+    transition:transform .13s ease, background .2s, border-color .2s, color .2s; }
   .btn .m { font-family:var(--mono); }
-  .btn.primary { background:var(--accent); color:#fff; font-weight:560; }
-  :root[data-theme="dark"] .btn.primary { color:#06100f; }
-  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .btn.primary { color:#06100f; } }
+  .btn.primary { background:var(--accent); color:var(--user-fg); font-weight:560; }
   .btn.primary:hover { transform:translateY(-1px); background:var(--accent-2); }
   .btn.ghost { border-color:var(--hair-strong); color:var(--ink); background:var(--surface); }
   .btn.ghost:hover { border-color:var(--accent); color:var(--accent); }
-
-  .term {
-    background:var(--surface); border:1px solid var(--hair); border-radius:14px;
-    box-shadow:var(--shadow); overflow:hidden; font-family:var(--mono);
-  }
-  .term.sm { border-radius:12px; box-shadow:var(--shadow-sm); }
-  .term .top { display:flex; align-items:center; gap:8px; padding:12px 15px;
-    border-bottom:1px solid var(--hair); background:var(--surface-2); }
+  .term { background:var(--surface); border:1px solid var(--hair); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; font-family:var(--mono); }
+  .term .top { display:flex; align-items:center; gap:8px; padding:12px 15px; border-bottom:1px solid var(--hair); background:var(--surface-2); }
   .term .top .dot { width:9px; height:9px; border-radius:50%; background:var(--hair-strong); }
   .term .top .name { margin-left:8px; font-size:.72rem; color:var(--faint); letter-spacing:.03em; }
   .term .body { padding:17px 17px 19px; font-size:.81rem; line-height:1.82; overflow-x:auto; }
-  .term.sm .body { font-size:.785rem; line-height:1.75; padding:15px 15px 16px; }
   .term .ln { white-space:pre; }
   .term .cmd .u { color:var(--accent); font-weight:600; }
   .term .cmd { color:var(--ink); }
@@ -143,90 +114,62 @@
   .term .out .ok { color:var(--pass); font-weight:600; }
   .term .out .hl { color:var(--ink); }
   .term .cm { color:var(--faint); }
-  .cursor { display:inline-block; width:.55ch; height:1.02em; vertical-align:-.15em;
-    background:var(--accent); margin-left:1px; animation:blink 1.05s steps(1) infinite; }
+  .cursor { display:inline-block; width:.55ch; height:1.02em; vertical-align:-.15em; background:var(--accent); margin-left:1px; animation:blink 1.05s steps(1) infinite; }
   @keyframes blink { 50% { opacity:0; } }
   @media (prefers-reduced-motion: reduce){ .cursor{ animation:none; } }
-
   .modes { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:34px; }
   @media (max-width:800px){ .modes { grid-template-columns:1fr; } }
-  .card { background:var(--surface); border:1px solid var(--hair); border-radius:14px;
-    box-shadow:var(--shadow-sm); transition:border-color .2s, transform .2s, box-shadow .2s; }
+  .card { background:var(--surface); border:1px solid var(--hair); border-radius:14px; box-shadow:var(--shadow-sm); transition:border-color .2s, transform .2s, box-shadow .2s; }
   .card:hover { border-color:var(--hair-strong); transform:translateY(-2px); box-shadow:var(--shadow); }
   .mode { padding:26px 24px; }
-  .mode .k { font-family:var(--mono); color:var(--accent); font-weight:680; font-size:1.02rem;
-    display:flex; align-items:baseline; gap:.5ch; }
-  .mode .k .who { font-family:var(--sans); font-size:.67rem; color:var(--faint); font-weight:500;
-    letter-spacing:.07em; text-transform:uppercase; margin-left:auto; }
+  .mode .k { font-family:var(--mono); color:var(--accent); font-weight:680; font-size:1.02rem; display:flex; align-items:baseline; gap:.5ch; }
+  .mode .k .who { font-family:var(--sans); font-size:.67rem; color:var(--faint); font-weight:500; letter-spacing:.07em; text-transform:uppercase; margin-left:auto; }
   .mode h3 { margin:.85rem 0 .4rem; font-size:1.04rem; font-weight:600; letter-spacing:-.01em; }
   .mode p { margin:0; color:var(--muted); font-size:.92rem; line-height:1.58; }
-
   .pipe { margin-top:36px; }
-  .stage {
-    display:grid; grid-template-columns:56px 1fr auto; gap:22px; align-items:start;
-    padding:22px 0; border-top:1px solid var(--hair); position:relative;
-  }
+  .stage { display:grid; grid-template-columns:56px 1fr auto; gap:22px; align-items:start; padding:22px 0; border-top:1px solid var(--hair); position:relative; }
   .stage:first-child { border-top:0; }
   .stage .rail { position:absolute; left:21px; top:0; bottom:0; width:1px; background:var(--hair); z-index:0; }
   .stage:first-child .rail { top:34px; }
   .stage:last-child .rail { bottom:auto; height:34px; }
-  .stage .idx {
-    font-family:var(--mono); font-size:.8rem; font-weight:680; color:var(--accent);
-    width:44px; height:44px; display:grid; place-items:center; border-radius:11px;
-    border:1px solid var(--hair-strong); background:var(--surface);
-    position:relative; z-index:2; box-shadow:var(--shadow-sm);
-  }
+  .stage .idx { font-family:var(--mono); font-size:.8rem; font-weight:680; color:var(--accent); width:44px; height:44px;
+    display:grid; place-items:center; border-radius:11px; border:1px solid var(--hair-strong); background:var(--surface); position:relative; z-index:2; box-shadow:var(--shadow-sm); }
   .stage .mid .t { font-weight:620; font-size:1.06rem; letter-spacing:-.008em; }
-  .stage .mid .t small { font-family:var(--mono); color:var(--faint); font-weight:500;
-    font-size:.7rem; letter-spacing:.05em; margin-left:.7ch; text-transform:uppercase; }
+  .stage .mid .t small { font-family:var(--mono); color:var(--faint); font-weight:500; font-size:.7rem; letter-spacing:.05em; margin-left:.7ch; text-transform:uppercase; }
   .stage .mid .d { color:var(--muted); font-size:.93rem; margin-top:.25rem; max-width:56ch; line-height:1.55; }
-  .stage .mid code, .ic { font-family:var(--mono); font-size:.79rem; color:var(--accent);
-    background:var(--accent-soft); padding:.13em .5em; border-radius:5px; }
   .stage .mid .d b { color:var(--ink); font-weight:600; }
-  .gate {
-    font-family:var(--mono); font-size:.71rem; white-space:nowrap; align-self:center;
-    color:var(--pass); border:1px solid color-mix(in srgb, var(--pass) 32%, transparent);
-    background:color-mix(in srgb, var(--pass) 8%, transparent);
-    padding:6px 11px; border-radius:20px; letter-spacing:.015em; font-weight:500;
-  }
+  .gate { font-family:var(--mono); font-size:.71rem; white-space:nowrap; align-self:center; color:var(--pass);
+    border:1px solid color-mix(in srgb, var(--pass) 32%, transparent); background:color-mix(in srgb, var(--pass) 8%, transparent);
+    padding:6px 11px; border-radius:20px; letter-spacing:.015em; font-weight:500; }
   .gate .g { opacity:.6; }
-  @media (max-width:760px){
-    .stage { grid-template-columns:44px 1fr; gap:18px; }
-    .stage .rail { left:21px; }
-    .stage .gate { grid-column:2; justify-self:start; margin-top:10px; }
-  }
-
-  .guide-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:18px; margin-top:36px; }
-  @media (max-width:820px){ .guide-grid { grid-template-columns:1fr; } }
-  .task { padding:24px 24px 22px; }
-  .task .th { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:4px; }
-  .task h3 { margin:0; font-size:1.1rem; font-weight:620; letter-spacing:-.01em; }
-  .task .badge { font-family:var(--mono); font-size:.66rem; letter-spacing:.09em; text-transform:uppercase;
-    color:var(--accent); border:1px solid var(--hair-strong); border-radius:5px; padding:3px 7px; white-space:nowrap; }
-  .task .desc { color:var(--muted); font-size:.9rem; margin:0 0 16px; line-height:1.55; }
-  .task .desc .ic { font-size:.82rem; }
-  .flow { font-family:var(--mono); font-size:.8rem; line-height:1.95; }
-  .flow .r { display:block; white-space:pre-wrap; }
-  .flow .u { color:var(--accent); font-weight:600; }
-  .flow .a { color:var(--ink); }
-  .flow .c { color:var(--faint); }
-  .flow .o { color:var(--muted); }
-
-  .cheat { margin-top:22px; border:1px solid var(--hair); border-radius:14px; overflow:hidden; box-shadow:var(--shadow-sm); }
-  .cheat .row { display:grid; grid-template-columns:minmax(200px,.85fr) 1.15fr;
-    border-top:1px solid var(--hair); background:var(--surface); }
-  .cheat .row:first-child { border-top:0; }
-  .cheat .row:hover { background:var(--surface-2); }
-  .cheat .cmd { font-family:var(--mono); font-size:.83rem; color:var(--accent); padding:13px 20px;
-    border-right:1px solid var(--hair); }
-  .cheat .desc { padding:13px 20px; color:var(--muted); font-size:.9rem; }
-  .cheat .desc b { color:var(--ink); font-weight:600; }
-  @media (max-width:600px){
-    .cheat .row { grid-template-columns:1fr; }
-    .cheat .cmd { border-right:0; border-bottom:1px solid var(--hair); padding-bottom:4px; }
-    .cheat .desc { padding-top:8px; }
-  }
-
+  @media (max-width:760px){ .stage { grid-template-columns:44px 1fr; gap:18px; } .stage .rail { left:21px; } .stage .gate { grid-column:2; justify-self:start; margin-top:10px; } }
+  .demo { margin-top:34px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:9px; margin-bottom:20px; }
+  .tab { font-family:var(--mono); font-size:.8rem; padding:9px 15px; border-radius:9px; border:1px solid var(--hair-strong);
+    background:var(--surface); color:var(--muted); cursor:pointer; transition:all .15s; letter-spacing:.01em; }
+  .tab:hover { color:var(--ink); border-color:var(--accent); }
+  .tab.active { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); font-weight:600; }
+  .chat { background:var(--surface); border:1px solid var(--hair); border-radius:16px; box-shadow:var(--shadow); overflow:hidden; }
+  .chat .head { display:flex; align-items:center; gap:8px; padding:13px 18px; border-bottom:1px solid var(--hair); background:var(--surface-2); }
+  .chat .head .dot { width:9px; height:9px; border-radius:50%; background:var(--hair-strong); }
+  .chat .head .name { margin-left:8px; font-family:var(--mono); font-size:.73rem; color:var(--faint); letter-spacing:.03em; }
+  .scene { padding:24px 22px 26px; display:flex; flex-direction:column; gap:16px; }
+  .scene[hidden] { display:none; }
+  .msg { display:flex; gap:11px; align-items:flex-start; }
+  .msg.user { justify-content:flex-end; }
+  .msg .who { font-family:var(--mono); font-weight:700; color:var(--accent); font-size:.85rem; flex:0 0 auto; padding-top:9px; opacity:.85; }
+  .b { padding:12px 16px; border-radius:15px; font-size:.945rem; line-height:1.62; max-width:82%; }
+  .msg.bot .b { background:var(--surface-2); border:1px solid var(--hair); color:var(--ink); border-top-left-radius:5px; }
+  .msg.user .b { background:var(--accent); color:var(--user-fg); border-top-right-radius:5px; font-weight:450; }
+  .b code { font-family:var(--mono); font-size:.85em; padding:.08em .4em; border-radius:5px; }
+  .msg.bot .b code { color:var(--accent); background:var(--accent-soft); }
+  .msg.user .b code { color:var(--user-fg); background:rgba(255,255,255,.16); }
+  .b .ok { color:var(--pass); font-weight:600; }
+  .msg.bot .b b { color:var(--ink); font-weight:640; }
+  .b .warn { color:var(--attention); font-weight:600; }
+  @media (max-width:560px){ .b { max-width:88%; } .msg .who { display:none; } }
+  .more { margin-top:20px; color:var(--muted); font-size:.92rem; }
+  .more b { color:var(--ink); font-weight:600; }
   .principles { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:36px; }
   @media (max-width:900px){ .principles { grid-template-columns:repeat(2,1fr); } }
   @media (max-width:600px){ .principles { grid-template-columns:1fr; } }
@@ -235,15 +178,12 @@
   .pr h3 { margin:.55rem 0 0; font-size:1.06rem; font-weight:620; letter-spacing:-.01em; }
   .pr p { color:var(--muted); font-size:.91rem; margin:.6rem 0 0; line-height:1.56; }
   .pr p b { color:var(--ink); font-weight:600; }
-
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--hair);
-    border:1px solid var(--hair); border-radius:14px; overflow:hidden; margin-top:44px; box-shadow:var(--shadow-sm); }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--hair); border:1px solid var(--hair);
+    border-radius:14px; overflow:hidden; margin-top:44px; box-shadow:var(--shadow-sm); }
   @media (max-width:640px){ .stats { grid-template-columns:repeat(2,1fr); } }
   .stat { background:var(--surface); padding:26px 22px; }
-  .stat .v { font-family:var(--mono); font-size:1.85rem; font-weight:680; letter-spacing:-.03em;
-    font-variant-numeric:tabular-nums; line-height:1; }
+  .stat .v { font-family:var(--mono); font-size:1.85rem; font-weight:680; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:1; }
   .stat .l { color:var(--muted); font-size:.8rem; margin-top:.5rem; }
-
   footer { border-top:1px solid var(--hair); padding:44px 0 60px; color:var(--muted); }
   footer .row { display:flex; flex-wrap:wrap; gap:18px 32px; align-items:center; justify-content:space-between; }
   footer .brand { color:var(--ink); font-family:var(--mono); font-weight:650; }
@@ -252,7 +192,6 @@
   footer .meta .sep { opacity:.5; }
   footer a.gh { color:var(--accent); text-decoration:none; font-family:var(--mono); font-size:.82rem; }
   footer a.gh:hover { text-decoration:underline; }
-
   .reveal { opacity:0; transform:translateY(16px); transition:opacity .65s cubic-bezier(.2,.6,.2,1), transform .65s cubic-bezier(.2,.6,.2,1); }
   .reveal.in { opacity:1; transform:none; }
   @media (prefers-reduced-motion: reduce){ .reveal { opacity:1; transform:none; transition:none; } }
@@ -265,7 +204,7 @@
     <nav>
       <a class="lnk" href="#mental">心智模型</a>
       <a class="lnk" href="#pipeline">研究流水线</a>
-      <a class="lnk" href="#guide">使用指南</a>
+      <a class="lnk" href="#guide">对话示例</a>
       <a class="lnk" href="#principles">设计哲学</a>
       <button class="toggle" id="themeBtn" aria-label="切换明暗主题">◐&nbsp;theme</button>
     </nav>
@@ -280,29 +219,26 @@
           <span class="eyebrow"><span class="p">&gt;_</span> psychology research · orchestration agent</span>
           <div class="wordmark"><span class="caret">&gt;_</span> PsyClaw</div>
           <h1>把一项心理学研究，<em>编排</em>成可复现、可审计的流程。</h1>
-          <p class="thesis">不是会聊天的统计包，而是<b>研究编排 Agent</b>——陪你把研究问题走完「从问题到可投稿产物」的全过程。统计计算交给成熟工具，PsyClaw 守着流程、规范、记忆与质量门。纯 Python、stdlib 零硬依赖核，处处能跑。</p>
+          <p class="thesis">不是会聊天的统计包，而是<b>研究编排 Agent</b>——像跟研究助理说话一样，陪你把研究问题走完「从问题到可投稿产物」的全程。统计交给成熟工具，PsyClaw 守着流程、规范、记忆与质量门。纯 Python、stdlib 零硬依赖核，处处能跑。</p>
           <div class="cta-row">
-            <a class="btn primary" href="#guide"><span class="m">&gt;_</span>&nbsp;怎么用</a>
+            <a class="btn primary" href="#guide"><span class="m">&gt;_</span>&nbsp;看对话示例</a>
             <a class="btn ghost" href="https://github.com/Exekiel179/psyclaw" target="_blank" rel="noopener">GitHub&nbsp;↗</a>
           </div>
         </div>
         <div class="term">
-          <div class="top">
-            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-            <span class="name">psyclaw · deepseek</span>
-          </div>
+          <div class="top"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="name">psyclaw · deepseek</span></div>
           <div class="body" id="termBody">
             <div class="ln cmd" id="typeLine"><span class="u">$</span> </div>
             <div class="rest" style="display:none">
 <div class="ln out">  <span class="ok">✓</span> 新分析已建 → <span class="hl">公正世界信念研究/</span></div>
-<div class="ln cmd"><span class="u">$</span> psyclaw lit --plan "公正世界信念与心理健康"</div>
-<div class="ln out">  <span class="ok">✓</span> 检索计划 → <span class="hl">notes/search_plan.md</span></div>
-<div class="ln cmd"><span class="u">$</span> psyclaw run analysis data/clean/bjw.csv</div>
-<div class="ln out">  → <span class="hl">outputs/report.md</span>  <span class="cm">效应量 + 95% CI · 稳健性 ≥2 类</span></div>
-<div class="ln cmd"><span class="u">$</span> psyclaw export outputs/report.md --docx</div>
-<div class="ln out">  → APA7 Word <span class="cm">中文字体前置 · 图真嵌入</span></div>
-<div class="ln cmd"><span class="u">$</span> psyclaw check</div>
-<div class="ln out">  <span class="ok">✓</span> JARS · 引用保真 · 复现溯源 — <span class="hl">门禁全过</span></div>
+<div class="ln cmd"><span class="u">psyclaw ❯</span> 帮我出个检索计划</div>
+<div class="ln out">  <span class="ok">✓</span> 中英布尔式 + 纳排标准 → <span class="hl">notes/search_plan.md</span></div>
+<div class="ln cmd"><span class="u">psyclaw ❯</span> @data/clean/bjw.csv 跑相关和回归</div>
+<div class="ln out">  → <span class="hl">outputs/report.md</span>  <span class="cm">效应量 + 95% CI · 委托 pingouin</span></div>
+<div class="ln cmd"><span class="u">psyclaw ❯</span> 导成 APA 的 Word</div>
+<div class="ln out">  → APA7 Word <span class="cm">中文字体 · 图真嵌入</span></div>
+<div class="ln cmd"><span class="u">psyclaw ❯</span> 能投稿吗</div>
+<div class="ln out">  <span class="ok">✓</span> JARS · 引用保真 · 溯源 — <span class="hl">门禁全过</span></div>
             </div>
           </div>
         </div>
@@ -314,23 +250,11 @@
     <div class="wrap">
       <span class="eyebrow"><span class="p">&gt;_</span> mental model · 你在跟什么对话</span>
       <h2>同一个 PsyClaw，三种工作方式</h2>
-      <p class="lead">区别只在一件事：<b>谁来决定下一步</b>。从你主导到它自主，是一条滑杆。不确定用哪个，就 <span class="ic">psyclaw start</span> 走意图向导，或直接 <span class="ic">psyclaw</span> 进对话。</p>
+      <p class="lead">区别只在一件事：<b>谁来决定下一步</b>。从你主导到它自主，是一条滑杆。多数时候直接 <span class="ic">psyclaw</span> 进对话说人话就行。</p>
       <div class="modes">
-        <div class="card mode reveal">
-          <div class="k">chat <span class="who">你主导</span></div>
-          <h3>边聊边推进</h3>
-          <p>讨论 + 工具按需调用、逐条批准。适合探索、还不确定下一步——决定权在你，它给建议。</p>
-        </div>
-        <div class="card mode reveal">
-          <div class="k">run <span class="who">明确流程</span></div>
-          <h3>一次跑通某类流程</h3>
-          <p>说「跑通 analysis / literature / meta / qualitative」，一次执行完、产出落盘。明确知道要做什么时用它。</p>
-        </div>
-        <div class="card mode reveal">
-          <div class="k">auto <span class="who">它自主</span></div>
-          <h3>Ralph 式自循环</h3>
-          <p>读状态 → 选任务 → 执行 → 独立验收 → 记录，循环推进。强制检查与不可逆决策仍会 fail-closed 暂停等你。</p>
-        </div>
+        <div class="card mode reveal"><div class="k">chat <span class="who">你主导</span></div><h3>边聊边推进</h3><p>讨论 + 工具按需调用、逐条批准。适合探索、还不确定下一步——决定权在你，它给建议。</p></div>
+        <div class="card mode reveal"><div class="k">run <span class="who">明确流程</span></div><h3>一次跑通某类流程</h3><p>说「跑通 analysis / literature / meta / qualitative」，一次执行完、产出落盘。明确知道要做什么时用它。</p></div>
+        <div class="card mode reveal"><div class="k">auto <span class="who">它自主</span></div><h3>Ralph 式自循环</h3><p>读状态 → 选任务 → 执行 → 独立验收 → 记录，循环推进。强制检查与不可逆决策仍会 fail-closed 暂停等你。</p></div>
       </div>
     </div>
   </section>
@@ -339,122 +263,62 @@
     <div class="wrap">
       <span class="eyebrow"><span class="p">&gt;_</span> research lifecycle · 它怎么看待「做研究」</span>
       <h2>七个阶段，每阶段一道门</h2>
-      <p class="lead">一个阶段「完成」的标志不是<b>跑完了</b>，而是<b>过了那道 gate</b>。PsyClaw 在每阶段结束告诉你：过了没、缺什么、下一步命令是什么。</p>
+      <p class="lead">一个阶段「完成」的标志不是<b>跑完了</b>，而是<b>过了那道 gate</b>。PsyClaw 在每阶段结束告诉你：过了没、缺什么、下一步该干嘛。</p>
       <div class="pipe">
-        <div class="stage reveal"><span class="rail"></span>
-          <div class="idx">01</div>
-          <div class="mid"><div class="t">澄清 <small>clarify · prepare</small></div>
-            <div class="d">研究问题 → 17 项研究准备清单。用 <code>psyclaw prepare</code> 逐项 grill 式敲定。</div></div>
-          <div class="gate"><span class="g">gate ·</span> 问题明确、变量可测</div>
-        </div>
-        <div class="stage reveal"><span class="rail"></span>
-          <div class="idx">02</div>
-          <div class="mid"><div class="t">设计 <small>design · method</small></div>
-            <div class="d">选设计与分析方法，每个决策给文献背书。<code>psyclaw design</code> / <code>method</code> 速查。</div></div>
-          <div class="gate"><span class="g">gate ·</span> 设计能答问题</div>
-        </div>
-        <div class="stage reveal"><span class="rail"></span>
-          <div class="idx">03</div>
-          <div class="mid"><div class="t">预注册 <small>preregister</small></div>
-            <div class="d">锁定假设与分析计划。<code>psyclaw preregister</code> 出 OSF / AsPredicted 双格式。</div></div>
-          <div class="gate"><span class="g">gate ·</span> 探索 / 确证分明</div>
-        </div>
-        <div class="stage reveal"><span class="rail"></span>
-          <div class="idx">04</div>
-          <div class="mid"><div class="t">文献 <small>lit</small></div>
-            <div class="d">检索 → 筛选 → 矩阵 → 综述。<code>lit --plan</code> 出检索计划，公开 API 直检或机构库浏览器桥接。</div></div>
-          <div class="gate"><span class="g">gate ·</span> 引用可核实</div>
-        </div>
-        <div class="stage reveal"><span class="rail"></span>
-          <div class="idx">05</div>
-          <div class="mid"><div class="t">分析 <small>run analysis</small></div>
-            <div class="d">数据质量 → 描述 → 主分析 → 诊断 → 稳健性。<b>统计外移</b>：生成委托 scipy / pingouin 的脚本再跑。</div></div>
-          <div class="gate"><span class="g">gate ·</span> 效应量 + CI、诊断齐</div>
-        </div>
-        <div class="stage reveal"><span class="rail"></span>
-          <div class="idx">06</div>
-          <div class="mid"><div class="t">写作 <small>export</small></div>
-            <div class="d">结构化草稿 → APA7 Word。<code>export --docx</code>，中文字体前置、图真嵌入、行内标记正确。</div></div>
-          <div class="gate"><span class="g">gate ·</span> JARS 报告完整</div>
-        </div>
-        <div class="stage reveal"><span class="rail"></span>
-          <div class="idx">07</div>
-          <div class="mid"><div class="t">质检 <small>check · review</small></div>
-            <div class="d">投稿前一键质检 + 模拟评审（EIC + 三审稿人 + Devil's Advocate）。<code>psyclaw check</code>。</div></div>
-          <div class="gate"><span class="g">gate ·</span> 门禁全过</div>
-        </div>
+        <div class="stage reveal"><span class="rail"></span><div class="idx">01</div><div class="mid"><div class="t">澄清 <small>clarify</small></div><div class="d">研究问题 → 17 项研究准备清单，逐项 grill 式敲定。</div></div><div class="gate"><span class="g">gate ·</span> 问题明确、变量可测</div></div>
+        <div class="stage reveal"><span class="rail"></span><div class="idx">02</div><div class="mid"><div class="t">设计 <small>design</small></div><div class="d">选设计与分析方法，每个决策给文献背书。</div></div><div class="gate"><span class="g">gate ·</span> 设计能答问题</div></div>
+        <div class="stage reveal"><span class="rail"></span><div class="idx">03</div><div class="mid"><div class="t">预注册 <small>preregister</small></div><div class="d">锁定假设与分析计划，出 OSF / AsPredicted 双格式。</div></div><div class="gate"><span class="g">gate ·</span> 探索 / 确证分明</div></div>
+        <div class="stage reveal"><span class="rail"></span><div class="idx">04</div><div class="mid"><div class="t">文献 <small>literature</small></div><div class="d">检索 → 筛选 → 矩阵 → 综述。公开 API 直检或机构库浏览器桥接。</div></div><div class="gate"><span class="g">gate ·</span> 引用可核实</div></div>
+        <div class="stage reveal"><span class="rail"></span><div class="idx">05</div><div class="mid"><div class="t">分析 <small>analysis</small></div><div class="d">数据质量 → 描述 → 主分析 → 诊断 → 稳健性。<b>统计外移</b>：委托 scipy / pingouin 跑。</div></div><div class="gate"><span class="g">gate ·</span> 效应量 + CI、诊断齐</div></div>
+        <div class="stage reveal"><span class="rail"></span><div class="idx">06</div><div class="mid"><div class="t">写作 <small>writing</small></div><div class="d">结构化草稿 → APA7 Word，中文字体前置、图真嵌入。</div></div><div class="gate"><span class="g">gate ·</span> JARS 报告完整</div></div>
+        <div class="stage reveal"><span class="rail"></span><div class="idx">07</div><div class="mid"><div class="t">质检 <small>check</small></div><div class="d">投稿前一键质检 + 模拟评审（EIC + 三审稿人 + Devil's Advocate）。</div></div><div class="gate"><span class="g">gate ·</span> 门禁全过</div></div>
       </div>
     </div>
   </section>
 
   <section id="guide">
     <div class="wrap">
-      <span class="eyebrow"><span class="p">&gt;_</span> how to · 常见任务照着敲</span>
-      <h2>使用指南</h2>
-      <p class="lead">先装上 <span class="ic">pip install psyclaw</span>，再 <span class="ic">python -m psyclaw</span>（或直接 <span class="ic">psyclaw</span>）。<b>一个分析 = 一个文件夹</b>——每件事先 <span class="ic">psyclaw new</span> 开个隔离目录，状态各自独立。</p>
-
-      <div class="guide-grid">
-        <div class="card task reveal">
-          <div class="th"><h3>文献调研</h3><span class="badge">lit</span></div>
-          <p class="desc">从检索计划到可核实的综述；公开 API 直检，或机构库浏览器桥接。</p>
-          <div class="flow">
-<span class="r"><span class="u">$</span> <span class="a">psyclaw new bjw --goal "公正世界信念…"</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw lit --plan "主题"</span>   <span class="c"># 检索式+纳排</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw lit "检索式" --download</span> <span class="c"># OA 全文</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw lit --matrix</span>          <span class="c"># 文献矩阵</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw lit -s</span>                <span class="c"># 结构化综述</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw cite-check</span>            <span class="c"># 引用防杜撰</span></span>
+      <span class="eyebrow"><span class="p">&gt;_</span> how to · 直接说人话</span>
+      <h2>对话示例</h2>
+      <p class="lead">不用记命令、不用记 <span class="ic">--flag</span>——像跟研究助理说话一样告诉它你要什么，命令和文件它自己处理。切换看几个真实场景：</p>
+      <div class="demo">
+        <div class="tabs" role="tablist" id="tabs">
+          <button class="tab active" data-s="0" type="button">开题 · 文献</button>
+          <button class="tab" data-s="1" type="button">数据分析</button>
+          <button class="tab" data-s="2" type="button">写作 · 投稿</button>
+          <button class="tab" data-s="3" type="button">规范守门</button>
+          <button class="tab" data-s="4" type="button">随手请教</button>
+        </div>
+        <div class="chat">
+          <div class="head"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="name">psyclaw · 对话</span></div>
+          <div class="scene" data-s="0">
+            <div class="msg user"><div class="b">我想研究公正世界信念对大学生心理健康的影响，帮我起个头。</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b">正式开工前我先跟你确认两点，免得后面返工——① 这是<b>探索性</b>研究，还是有明确假设的<b>确证性</b>研究？② 心理健康用哪个量表测（生活满意度 SWLS？抑郁 CES-D？）。定了我帮你建独立分析文件夹、出检索计划。</div></div>
+            <div class="msg user"><div class="b">确证性，结局用 SWLS 和抑郁。</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b"><span class="ok">✓</span> 已建 <code>bjw_study/</code>，检索计划写好了（中英布尔式 + 纳入/排除标准 → <code>notes/search_plan.md</code>）。公开学术库我可以直接检索；知网/万方要登录的，我能驱动你已登录的浏览器去检，登录环节你来。先跑哪个？</div></div>
+          </div>
+          <div class="scene" data-s="1" hidden>
+            <div class="msg user"><div class="b">@data/clean/bjw.csv 这份数据能做什么分析？</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b">读到了——124 行，变量有组别、PBJW、GBJW、SWLS、抑郁，加年龄/性别。适合做 PBJW / GBJW 对 SWLS 和抑郁的<b>回归</b>，控制人口学变量。统计我不自己算，生成一个委托 <code>pingouin</code> 的脚本跑相关 + 分层回归，报效应量和 95% CI。要现在跑吗？</div></div>
+            <div class="msg user"><div class="b">跑。</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b">→ <code>outputs/report.md</code>。PBJW → SWLS <b>β = .34, 95% CI [.18, .50]</b>；正态与方差诊断齐，换 Spearman 复验结论一致。<span class="warn">提醒</span>：这是横断数据，只能说关联，别写成因果。</div></div>
+          </div>
+          <div class="scene" data-s="2" hidden>
+            <div class="msg user"><div class="b">帮我把结果导成 Word，APA 格式，顺便看看能不能投。</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b"><span class="ok">✓</span> → <code>outputs/report.apa7.docx</code>：TNR 双倍行距、<b>中文字体前置</b>（不会豆腐块）、两张图真嵌进去、参考文献悬挂缩进。质检也跑了 → JARS 报告完整、效应量 + CI 齐、引用都可核实。<span class="warn">一点提醒</span>：样本量偏小，讨论里建议补一句功效说明再投。</div></div>
+          </div>
+          <div class="scene" data-s="3" hidden>
+            <div class="msg user"><div class="b">我这个结果 p = .048，能说公正世界信念显著提升了幸福感吧？</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b">统计上 p &lt; .05 算显著，但两处得改：① 这是横断相关数据，「<b>提升</b>」是因果说法，换成「<b>与幸福感正相关</b>」更准；② 光报 p 不够，要带<b>效应量和置信区间</b>。还有 .048 很贴边界，如实报精确 p 就好——「边缘显著」这类话术我不会帮你写。</div></div>
+          </div>
+          <div class="scene" data-s="4" hidden>
+            <div class="msg user"><div class="b">PHQ-9 多少分算中度抑郁？</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b">PHQ-9 总分 0–27，常用切分：5–9 轻度、10–14 中度、15–19 中重度、20+ 重度——所以 <b>10 分起</b>算中度。要我把条目和中国样本常模也调出来吗？</div></div>
+            <div class="msg user"><div class="b">顺便，做中介效应该用什么方法？</div></div>
+            <div class="msg bot"><div class="who">&gt;_</div><div class="b">首选 <b>bootstrap 法</b>（偏差校正，5000 次）算间接效应的置信区间，别只看 Sobel。要做的话我按你的自变量 / 中介 / 因变量生成分析脚本。</div></div>
           </div>
         </div>
-
-        <div class="card task reveal">
-          <div class="th"><h3>数据分析</h3><span class="badge">run analysis</span></div>
-          <p class="desc">数据放 <span class="ic">data/clean/</span>，一条命令走完描述→主分析→诊断→稳健性；统计外移，跑成熟库。</p>
-          <div class="flow">
-<span class="r"><span class="c"># 清洗好的数据 → data/clean/bjw.csv</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw run analysis data/clean/bjw.csv</span></span>
-<span class="r">  <span class="o">→ outputs/report.md</span></span>
-<span class="r">  <span class="o">效应量 + 95% CI · 诊断齐 · 稳健性 ≥2 类</span></span>
-<span class="r"><span class="c"># 或对话里边聊边跑,委托 scipy/pingouin</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw</span>  <span class="c"># “用 bjw.csv 跑相关+回归”</span></span>
-          </div>
-        </div>
-
-        <div class="card task reveal">
-          <div class="th"><h3>写作与投稿</h3><span class="badge">export · check</span></div>
-          <p class="desc">草稿 → APA7 Word（中文字体、图真嵌入），投稿前一键质检 + 模拟评审。</p>
-          <div class="flow">
-<span class="r"><span class="u">$</span> <span class="a">psyclaw export outputs/report.md --docx</span></span>
-<span class="r">  <span class="o">→ APA7 Word · 中文字体 · 图嵌入</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw check</span>   <span class="c"># JARS/效应量/引用/溯源</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw review</span>  <span class="c"># EIC+3审稿人+DA 评审</span></span>
-          </div>
-        </div>
-
-        <div class="card task reveal">
-          <div class="th"><h3>日常对话与自主</h3><span class="badge">chat · auto</span></div>
-          <p class="desc">直接对话最自由；<span class="ic">@file</span> 引用文件，<span class="ic">/</span> 敲斜杠命令，放手就 <span class="ic">auto</span>。</p>
-          <div class="flow">
-<span class="r"><span class="u">$</span> <span class="a">psyclaw</span>            <span class="c"># 进对话</span></span>
-<span class="r"><span class="u">psyclaw ❯</span> <span class="a">@data/clean/x.csv 看看结构</span></span>
-<span class="r"><span class="u">psyclaw ❯</span> <span class="a">/cost</span>     <span class="c"># token 消耗详细页</span></span>
-<span class="r"><span class="u">psyclaw ❯</span> <span class="a">/agent on</span> <span class="c"># 多步自主调用工具</span></span>
-<span class="r"><span class="u">$</span> <span class="a">psyclaw auto</span>       <span class="c"># 无人值守推进</span></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="cheat reveal">
-        <div class="row"><div class="cmd">psyclaw new &lt;名&gt; --goal</div><div class="desc">新建<b>独立分析文件夹</b>（脚手架 + 引导 README，状态不继承）</div></div>
-        <div class="row"><div class="cmd">psyclaw start</div><div class="desc">开工<b>意图向导</b>：说要做什么 → 选能力 → 配沙箱</div></div>
-        <div class="row"><div class="cmd">psyclaw prepare</div><div class="desc">17 项<b>研究准备清单</b>，逐项 grill 式敲定</div></div>
-        <div class="row"><div class="cmd">psyclaw lit --plan / -s</div><div class="desc"><b>文献</b>：检索计划 · 矩阵 · 综述 · 全文下载</div></div>
-        <div class="row"><div class="cmd">psyclaw run &lt;kind&gt;</div><div class="desc">跑<b>流程</b>：analysis · meta · literature · qualitative</div></div>
-        <div class="row"><div class="cmd">psyclaw export --docx</div><div class="desc"><b>APA7 Word</b> 导出：中文字体 + 图真嵌入</div></div>
-        <div class="row"><div class="cmd">psyclaw check / review</div><div class="desc"><b>投稿前质检</b> + 模拟评审</div></div>
-        <div class="row"><div class="cmd">psyclaw scale / method / cite</div><div class="desc"><b>知识速查</b>：量表 · 方法 · 设计 · 文献背书</div></div>
-        <div class="row"><div class="cmd">psyclaw assist &lt;水平&gt;</div><div class="desc"><b>协助水平</b> novice / standard / expert：解释与注释密度</div></div>
-        <div class="row"><div class="cmd">psyclaw auto</div><div class="desc"><b>自主推进</b>：读状态派发流程、独立验收、记录</div></div>
+        <p class="more">这些都能直接说：<b>量表查询 · 方法建议 · 实验设计 · 预注册 · 投稿评审 · 文献检索</b>——想不起来怎么开口，就一句「<span class="ic">psyclaw start</span>」，它带你走一遍。</p>
       </div>
     </div>
   </section>
@@ -465,18 +329,12 @@
       <h2>克制，是这套工具的性格</h2>
       <p class="lead">这些不是功能，是刻意的架构选择——决定了 PsyClaw 该做什么、绝不做什么。</p>
       <div class="principles">
-        <div class="card pr reveal"><span class="tag">externalized</span><h3>统计外移</h3>
-          <p>核里<b>不实现任何统计算法</b>。成熟库经同行审查、可复现——生成委托 scipy / pingouin / statsmodels 的脚本，或走 MCP，把「算」交给最合适的工具。</p></div>
-        <div class="card pr reveal"><span class="tag">stdlib core</span><h3>纯 stdlib 核</h3>
-          <p>核心<b>零第三方硬依赖</b>，处处能跑。统计、浏览器、文献等重能力全外挂成 MCP，缺失时优雅降级。</p></div>
-        <div class="card pr reveal"><span class="tag">integrity</span><h3>学术诚信不可妥协</h3>
-          <p>效应量 + CI 必报、<b>相关 ≠ 因果</b>、区分探索 / 确证、不 p-hacking、不杜撰引用——产出与门禁都照规范把关。</p></div>
-        <div class="card pr reveal"><span class="tag">ralph loop</span><h3>Ralph 自循环</h3>
-          <p>auto 模式与开发流程同构：<b>磁盘是记忆、上下文可抛弃</b>，每轮从盘上重推待办、只做一件、拿真实产物验收、记状态、再来。</p></div>
-        <div class="card pr reveal"><span class="tag">memory</span><h3>三层记忆</h3>
-          <p>对话上下文 / 会话状态（<span class="ic">notes/</span>，跟文件夹走）/ 长期画像与教训卡。用得越久越懂你，靠相关性路由 + 衰减防上下文膨胀。</p></div>
-        <div class="card pr reveal"><span class="tag">capable</span><h3>能力自知</h3>
-          <p>它知道自己有 <span class="ic">export</span> / <span class="ic">apply_style</span> / <span class="ic">check</span> 这些现成能力，<b>不重造轮子</b>；手搓 docx / 裸 matplotlib 会被当场纠偏。</p></div>
+        <div class="card pr reveal"><span class="tag">externalized</span><h3>统计外移</h3><p>核里<b>不实现任何统计算法</b>。成熟库经同行审查、可复现——生成委托 scipy / pingouin / statsmodels 的脚本，或走 MCP，把「算」交给最合适的工具。</p></div>
+        <div class="card pr reveal"><span class="tag">stdlib core</span><h3>纯 stdlib 核</h3><p>核心<b>零第三方硬依赖</b>，处处能跑。统计、浏览器、文献等重能力全外挂成 MCP，缺失时优雅降级。</p></div>
+        <div class="card pr reveal"><span class="tag">integrity</span><h3>学术诚信不可妥协</h3><p>效应量 + CI 必报、<b>相关 ≠ 因果</b>、区分探索 / 确证、不 p-hacking、不杜撰引用——产出与门禁都照规范把关。</p></div>
+        <div class="card pr reveal"><span class="tag">ralph loop</span><h3>Ralph 自循环</h3><p>auto 模式与开发流程同构：<b>磁盘是记忆、上下文可抛弃</b>，每轮从盘上重推待办、只做一件、拿真实产物验收、记状态、再来。</p></div>
+        <div class="card pr reveal"><span class="tag">memory</span><h3>三层记忆</h3><p>对话上下文 / 会话状态（<span class="ic">notes/</span>，跟文件夹走）/ 长期画像与教训卡。用得越久越懂你，靠相关性路由 + 衰减防上下文膨胀。</p></div>
+        <div class="card pr reveal"><span class="tag">capable</span><h3>能力自知</h3><p>它知道自己有导出、APA7 图表、质检这些现成能力，<b>不重造轮子</b>；手搓 docx / 裸 matplotlib 会被当场纠偏。</p></div>
       </div>
       <div class="stats">
         <div class="stat"><div class="v num">155</div><div class="l">features 全部 done</div></div>
@@ -491,49 +349,42 @@
 <footer>
   <div class="wrap row">
     <div class="brand"><span class="caret">&gt;_</span>&nbsp;PsyClaw</div>
-    <div class="meta">
-      <span>psychology research orchestration</span><span class="sep">·</span>
-      <span>python -m psyclaw</span><span class="sep">·</span>
-      <span>stdlib core · MCP ecosystem</span>
-    </div>
+    <div class="meta"><span>psychology research orchestration</span><span class="sep">·</span><span>python -m psyclaw</span><span class="sep">·</span><span>stdlib core · MCP ecosystem</span></div>
     <a class="gh" href="https://github.com/Exekiel179/psyclaw" target="_blank" rel="noopener">github.com/Exekiel179/psyclaw&nbsp;↗</a>
   </div>
 </footer>
 
 <script>
   (function(){
-    var root = document.documentElement;
-    var btn = document.getElementById('themeBtn');
-    function cur(){ return root.getAttribute('data-theme') ||
-      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
+    var root = document.documentElement, btn = document.getElementById('themeBtn');
+    function cur(){ return root.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
     btn.addEventListener('click', function(){
       var next = cur()==='dark' ? 'light' : 'dark';
       root.setAttribute('data-theme', next);
       btn.textContent = (next==='dark' ? '☀ ' : '☾ ') + 'theme';
     });
-
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+    var scenes = Array.prototype.slice.call(document.querySelectorAll('.scene'));
+    tabs.forEach(function(t){
+      t.addEventListener('click', function(){
+        var s = t.getAttribute('data-s');
+        tabs.forEach(function(x){ x.classList.toggle('active', x===t); });
+        scenes.forEach(function(sc){ if (sc.getAttribute('data-s')===s) sc.removeAttribute('hidden'); else sc.setAttribute('hidden',''); });
+      });
+    });
     var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var line = document.getElementById('typeLine');
-    var rest = document.querySelector('#termBody .rest');
-    var full = 'psyclaw new 公正世界信念研究 --goal "公正世界信念与心理健康"';
+    var line = document.getElementById('typeLine'), rest = document.querySelector('#termBody .rest');
+    var full = '你好,想研究公正世界信念对心理健康的影响';
     function reveal(){ if(rest) rest.style.display='block'; }
-    if (reduce || !line){
-      if(line) line.innerHTML = '<span class="u">$</span> ' + full;
-      reveal();
-    } else {
-      var i=0;
-      line.innerHTML = '<span class="u">$</span> <span class="cursor"></span>';
-      var iv = setInterval(function(){
-        i++;
-        line.innerHTML = '<span class="u">$</span> ' + full.slice(0,i) +
-          (i<full.length ? '<span class="cursor"></span>' : '');
+    if (reduce || !line){ if(line) line.innerHTML = '<span class="u">$</span> ' + full; reveal(); }
+    else {
+      var i=0; line.innerHTML = '<span class="u">$</span> <span class="cursor"></span>';
+      var iv = setInterval(function(){ i++;
+        line.innerHTML = '<span class="u">$</span> ' + full.slice(0,i) + (i<full.length ? '<span class="cursor"></span>' : '');
         if(i>=full.length){ clearInterval(iv); setTimeout(reveal, 240); }
-      }, 32);
+      }, 46);
     }
-
-    var obs = new IntersectionObserver(function(es){
-      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); obs.unobserve(e.target); } });
-    }, {threshold:.1});
+    var obs = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); obs.unobserve(e.target); } }); }, {threshold:.1});
     document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
   })();
 </script>
