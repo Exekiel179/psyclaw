@@ -1479,6 +1479,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_run_env.py +8(python/pip→3 归一/保留 python3/python 存在时不改/只动首 token/PYTHONPATH 含 psyclaw 根/保留既有 PYTHONPATH/端到端脚本 import psyclaw 成功/python 命令归一后能跑)。全量 pytest → 1923 passed。活体:复刻事故 python3 scripts/fig.py 内 import psyclaw.figures + apply_style → 跑通,零 ModuleNotFoundError,无需用户任何设置。"
+  },
+  {
+   "id": "feat-152",
+   "name": "概念/框架图别用 matplotlib 手画:引导 + 检测器扩展",
+   "description": "真实事故(chat_20260717-003855)生成的公正世界信念框架图:模型用裸 matplotlib 逐根 annotate 画箭头 + patches 画 box + axis('off'),左右两列固定 y 坐标 → 长距离箭头全交叉成一团面条,难看(中文字体倒正常,apply_style 生效所以 feat-150 figstyle 不抓)。根因:matplotlib 是画数据图的,不是画概念图的。修复:①capability_map 加引导「概念/框架/路径图用 graphviz(dot)或 mermaid 让布局引擎排版,不要 matplotlib 逐根画箭头必然交叉;matplotlib 只画数据图」;②detect_reinvention 扩展 _is_concept_diagram 检测(matplotlib + 关坐标轴 axis('off')/set_axis_off + 画箭头 arrowprops/annotate(''/FancyArrow —— 数据图从不关坐标轴,低误伤),命中给 concept_diagram 纠偏(建议 graphviz/mermaid;没 dot 就让节点严格分层同层等距箭头只连相邻层),优先级在 figstyle 之前(比加 apply_style 更根本)。",
+   "dependencies": [
+    "feat-144",
+    "feat-150"
+   ],
+   "status": "done",
+   "evidence": "tests/test_reinvent.py +3(axis-off+箭头=概念图命中 graphviz/mermaid/概念图优先于 figstyle/正常数据图保留坐标轴不误伤)。capability_map 555 字符仍在 700 预算内。全量 pytest → 1926 passed。活体:真实 fig_bjw_framework.py 面条图脚本 → 命中 concept_diagram 并给布局引擎纠偏。"
   }
  ]
 }

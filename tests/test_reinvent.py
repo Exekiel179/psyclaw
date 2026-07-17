@@ -62,6 +62,42 @@ def test_empty_inputs():
     assert detect_reinvention("x.py", "") is None
 
 
+# ---- feat-152:概念/框架图别用 matplotlib 手画(线条交叉面条) -----------------
+
+def test_concept_diagram_axisoff_plus_arrows():
+    """axis('off') + annotate 箭头 = 手画概念图,matplotlib 是错工具。"""
+    code = ("import matplotlib.pyplot as plt\n"
+            "from psyclaw.figures import apply_style\n"
+            "with apply_style('apa7'):\n"
+            "    fig, ax = plt.subplots()\n"
+            "    ax.axis('off')\n"
+            "    ax.annotate('', xy=(7,4), xytext=(3,5), arrowprops=dict(arrowstyle='->'))\n")
+    r = detect_reinvention("scripts/fig_framework.py", code)
+    assert r is not None
+    key, msg = r
+    assert key == "concept_diagram"
+    assert "graphviz" in msg or "mermaid" in msg
+
+
+def test_concept_diagram_beats_figstyle():
+    """既是概念图又没 apply_style → 给概念图建议(别用 matplotlib),不是加 style。"""
+    code = ("import matplotlib.pyplot as plt\n"
+            "ax.set_axis_off()\n"
+            "ax.annotate('', xy=(1,1), xytext=(0,0), arrowprops=dict(arrowstyle='->'))\n")
+    r = detect_reinvention("x.py", code)
+    assert r and r[0] == "concept_diagram"
+
+
+def test_data_plot_with_axes_not_flagged_as_concept():
+    """正常数据图(保留坐标轴)不算概念图。"""
+    code = ("from psyclaw.figures import apply_style\n"
+            "import matplotlib.pyplot as plt\n"
+            "with apply_style('apa7'):\n"
+            "    ax.scatter(x, y)\n"
+            "    ax.annotate('峰值', xy=(3,9))\n")   # 有文字标注但坐标轴在
+    assert detect_reinvention("x.py", code) is None
+
+
 # ---- _capture_saves 集成:检测 + 去重 + 返回纠偏 -------------------------------
 
 def _session(tmp_path, monkeypatch):

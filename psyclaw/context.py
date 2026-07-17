@@ -191,6 +191,8 @@ def capability_map() -> str:
         "(APA7 版式+中文字体+图片真嵌入)——不要自己写 python-docx 脚本;\n"
         "画图配色/中文字体:脚本里 `from psyclaw.figures import apply_style` 并"
         "`with apply_style('apa7'):` 内作图(中文字体前置,免豆腐块)——不要裸 matplotlib;\n"
+        "概念/框架/路径图:用 graphviz(dot)或 mermaid 让布局引擎排版,不要用 matplotlib "
+        "逐根画箭头(布点固定必然线条交叉成面条);matplotlib 只画数据图;\n"
         "投稿前质检:`psyclaw check <稿.md>`(JARS+效应量+引用+选择性报告)——"
         "下结论/交付前先跑,别把没核过的结论写进报告;\n"
         "统计计算:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
@@ -207,10 +209,23 @@ _REINVENT_DOCX = ("检测到你保存的脚本在手搓 python-docx 拼 Word。p
 _REINVENT_FIGSTYLE = ("检测到脚本用 matplotlib 却没 apply_style('apa7'),中文会渲染成"
                       "豆腐块方框。开头加 `from psyclaw.figures import apply_style`,"
                       "并在 `with apply_style('apa7'):` 块内作图(中文字体前置)。")
+_REINVENT_CONCEPT = ("检测到你在用 matplotlib 逐根画概念/框架/路径图(box+箭头,关了"
+                     "坐标轴)——这样布点固定、长距离箭头必然交叉成面条,难看。改用"
+                     "布局引擎:写 graphviz .dot 用 `dot -Tpng` 渲染(自动分层排版无"
+                     "交叉),或 mermaid 流程/关系图;没有 dot 就退而让节点严格分层、"
+                     "同层等距、箭头只连相邻层。matplotlib 只用来画数据图。")
+
+
+def _is_concept_diagram(c: str) -> bool:
+    """matplotlib 关了坐标轴又在画箭头 = 手画概念图(数据图从不关坐标轴)。"""
+    axis_off = "axis('off')" in c or 'axis("off")' in c or "set_axis_off" in c
+    arrows = ("arrowprops" in c or "annotate(''" in c or 'annotate("")' in c
+              or "annotate('', " in c or 'FancyArrow' in c)
+    return "matplotlib" in c and axis_off and arrows
 
 
 def detect_reinvention(path: str, content: str):
-    """检测保存的脚本是否在重造 psyclaw 已有能力。纯函数。
+    """检测保存的脚本是否在重造 psyclaw 已有能力 / 用错工具。纯函数。
 
     返回 (key, 纠偏提示) 或 None。key 用于按类去重(同类只纠偏一次)。
     只看 .py/.r 等脚本;稿件/笔记正文里提到 docx/matplotlib 不算手搓(避免误伤)。
@@ -221,6 +236,8 @@ def detect_reinvention(path: str, content: str):
     c = content or ""
     if "import docx" in c or "from docx" in c:      # python-docx 手搓 Word
         return ("docx", _REINVENT_DOCX)
+    if _is_concept_diagram(c):                        # 手画概念图 → 用布局引擎(比 figstyle 更根本)
+        return ("concept_diagram", _REINVENT_CONCEPT)
     if "matplotlib" in c and "apply_style" not in c:  # 裸 matplotlib → 豆腐块风险
         return ("figstyle", _REINVENT_FIGSTYLE)
     return None
