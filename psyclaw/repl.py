@@ -1914,7 +1914,13 @@ class ReplSession:
                 self._reprobe_env_lessons(include_slow=False)
             except Exception:  # noqa: BLE001  # 再验证失败绝不阻塞启动
                 pass
-        print("  " + ui.dim("输入 / 弹出命令联想(↑↓选择 Tab补全) · /exit 退出 · @<文件> 引用") + "\n")
+        from psyclaw.ui_input import input_backend, input_hint, ptk_install_nudge
+        _backend = input_backend()               # feat-153:提示随实际 backend 说实话
+        print("  " + ui.dim(input_hint(_backend)))
+        _nudge = ptk_install_nudge(_backend)
+        if _nudge:                                # 无 ptk 时一句引导(装了才有实时下拉)
+            print("  " + ui.dim(_nudge))
+        print()
         while True:
             base = ui.paint("psyclaw", "brcyan", "bold")
             if self.session_name:
