@@ -1508,6 +1508,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_run_env.py +4(win python3→python/win python 存在不动/win pip3→pip/win 仅 py launcher 时 python3→py)+ 既有 posix 归一测试不回归。全量 pytest → 1940 passed。活体:posix python→python3、win python3→python 双向自适配正确,各保留本机已有的。"
+  },
+  {
+   "id": "feat-155",
+   "name": "token 计量:CJK 感知估算 + 每轮显示 + 详细页 + 诚实省量",
+   "description": "用户要 token 消耗显示 + 详细页 + 好玩的省量展示(相较主流同样效果)。诚实纪律:不编造跨产品实测数字,只展示有据数据。新 psyclaw/token_meter.py:estimate_tokens CJK 感知启发式(汉字 0.6 tok/字、ASCII 0.25/字——字符/4 严重低估中文);TokenMeter 累计 in/out/turns,record_compaction 记滚动压缩真实丢弃的历史(真实省量);naive_baseline_tokens 量完整知识库(psych/*.json ~10.5K tok)——psyclaw 靠相关性路由(feat-111/112/113)只注瘦核心+按需项避免这份全量,是「省下多少」的诚实上界口径明确标注非友商实测;render_token_report 详细页(本会话实测/压缩真实省量/相较朴素全量注入估算含基线构成/趣味换算 A4 页数+够再聊几轮/估算免责声明)。repl:TokenMeter 每轮 record + 压缩省量记录 + 每轮回复后 token 增量提示(非内部跟进轮)+ /cost 升级详细页(/tokens 别名)。",
+   "dependencies": [
+    "feat-112",
+    "feat-147"
+   ],
+   "status": "done",
+   "evidence": "tests/test_token_meter.py +11(ASCII 估算/中文重于英文/空串/累计 in-out-turns/压缩真实省量/total/朴素基线大于瘦核心/详细页含轮数+输入输出/基线诚实标注估算且无友商名/趣味换算页数/空会话不崩)。全量 pytest → 1951 passed。活体:40 轮会话页面渲染,实测 47,920 tok、压缩省 7,200、相关性路由省估算(基线透明)、≈159.7 页 A4。"
   }
  ]
 }
