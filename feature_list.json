@@ -1561,6 +1561,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_new_analysis.py +9(建标准目录/新分析不继承父 goal/--goal 写入新文件夹/已存在非空拒/空目录可复用/拒路径穿越/拒空名/CLI 接线引导 cd/失败 rc=1)。全量 pytest → 1975 passed。活体:父目录有旧 goal 时 new 拖延与学业倦怠 → 新文件夹 goal 独立、与父目录旧 goal 完全隔离。"
+  },
+  {
+   "id": "feat-160",
+   "name": "new 脚手架带研究流程引导 README(心智模型+代表性命令流)",
+   "description": "用户要 new 把文件框架搭配好,并问现在的心智模型是什么样(比如做文献调研用哪些命令)。诊断:new 的目录脚手架本已够用,真正缺口是打开文件夹不知道怎么走。实走验证文献调研流程(lit --plan → notes/search_plan.md+screening_criteria.json → 路线A公开API检索/路线B机构库桥接 → lit --matrix → lit -s → cite-check)后,scaffold._analysis_readme 生成引导 README 落在新分析文件夹:心智模型(chat/run/auto 三种工作方式)+ 目录用途(notes/data raw-clean/scripts/outputs/figures/logs 各归其位)+ 三条代表性流程的真实命令(文献调研/数据分析 run analysis/写作 export+check),含研究前 prepare/preregister 可选步。命令全部按实走验证,不含任何不存在的内置统计命令(统计外移铁律),README 用分析名+目标个性化。",
+   "dependencies": [
+    "feat-159",
+    "feat-103"
+   ],
+   "status": "done",
+   "evidence": "tests/test_analysis_readme.py +8(README 生成/含心智模型 chat-run-auto/文献流程真命令 lit --plan+lit -s+cite-check/数据分析 run analysis+data-clean/写作 export+docx+check/目录说明齐全/用分析名/无杜撰统计命令)。全量 pytest → 1983 passed。活体:new 公正世界信念研究 → 文件夹含 README+notes/goal.md+标准目录,README 心智模型+文献调研五步命令流准确。"
   }
  ]
 }
