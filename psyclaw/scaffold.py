@@ -77,7 +77,57 @@ def create_analysis(name: str, goal: str = "", base_dir: str | Path = ".") -> di
     if goal.strip():
         from psyclaw.tasks import set_goal
         set_goal(goal.strip(), project_dir=str(root))
+    try:                                          # feat-160:引导 README,打开即知怎么走
+        (root / "README.md").write_text(_analysis_readme(nm, goal.strip()),
+                                        encoding="utf-8")
+    except OSError:
+        pass
     return {"ok": True, "path": str(root), "created": created, "note": "已创建"}
+
+
+def _analysis_readme(name: str, goal: str = "") -> str:
+    """新分析文件夹的引导 README:心智模型 + 目录用途 + 代表性流程的**真实**命令。
+
+    命令均按实走验证(lit --plan → 检索 → matrix → 综述 → cite-check 等),
+    不含任何不存在的内置统计命令(统计外移铁律)。
+    """
+    goal_line = f"\n> 研究目标:{goal}\n" if goal else ""
+    return f"""# {name}
+{goal_line}
+研究分析工作目录。三种工作方式:**chat**(边聊边做,最自由)· **run**(跑通某类
+明确流程)· **auto**(按状态自动巡航)。不确定先做什么就 `psyclaw start` 走意图向导,
+或直接 `psyclaw` 对话说你要做什么。
+
+## 目录怎么放(产物各归其位)
+- `notes/`    计划 / 综述 / 文献矩阵 / 研究准备 / 决策记录
+- `data/raw`  原始数据(只读,psyclaw 绝不改)· `data/clean` 清洗后的数据
+- `scripts/`  分析脚本(统计走脚本 + 成熟库 scipy/pingouin)
+- `outputs/`  报告与导出(report.md / docx / pdfs)· `figures/` 图 · `logs/` 日志
+
+## 常见流程(照着命令走)
+
+### 一、文献调研
+1. `psyclaw lit --plan "你的主题"` → `notes/search_plan.md` + 纳入/排除标准
+2. 检索取文献,二选一:
+   - 路线 A 公开 API:`psyclaw lit "检索式" --limit 10 --download` → 命中 + `outputs/pdfs/`
+   - 路线 B 机构库:`psyclaw webbridge install`,再 `psyclaw` 对话 `/agent on`
+     说「按 notes/search_plan.md 路线 B 执行」,拿到结果 `psyclaw lit --import <表>`
+3. `psyclaw lit --matrix` → `notes/lit_matrix.md`(文献矩阵)
+4. `psyclaw lit -s` → `notes/lit_review.md`(结构化综述)
+5. `psyclaw cite-check` → 引用保真核查(防杜撰)
+
+### 二、数据分析
+1. 清洗好的数据放 `data/clean/`
+2. `psyclaw run analysis data/clean/你的.csv` → `outputs/report.md` + 图
+   (或直接 `psyclaw` 对话边聊边跑;**统计一律生成脚本 + 成熟库跑**,无内置统计命令)
+
+### 三、写作与投稿
+1. `psyclaw export outputs/report.md --docx` → APA7 Word(中文字体 + 图真嵌入)
+2. `psyclaw check` → 投稿前一键质检(JARS / 效应量+CI / 引用 / 复现溯源)
+
+## 研究前(可选但推荐)
+`psyclaw prepare` 完成研究准备清单(问题/变量/设计/理论…),再 `psyclaw preregister` 预注册。
+"""
 
 
 def _read_clarify(project_dir: str | Path) -> dict:
