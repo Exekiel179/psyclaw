@@ -59,7 +59,7 @@ COMMANDS = {
     "/mcp": "MCP 目录与启用状态",
     "/model": "查看/切换模型",
     "/provider": "查看/切换 provider",
-    "/cost": "本会话成本粗估",
+    "/cost": "本会话 token 消耗详细页(CJK 感知估算 + 省量 + 趣味换算;/tokens 同)",
     "/clear": "清空上下文",
     "/compact": "压缩上下文",
     "/config": "配置向导",
@@ -82,7 +82,7 @@ COMMANDS = {
 # _suggest_command 仍认这些,免得用户打 /agent、/yolo 被判「无效」。
 _ALIAS_COMMANDS = frozenset({
     "/quit", "/q", "/clarify", "/prereg", "/show", "/yolo", "/safemode",
-    "/research-loop", "/agent",
+    "/research-loop", "/agent", "/tokens",
 })
 
 
@@ -932,6 +932,8 @@ class ReplSession:
         self.resume_id = resume_id           # 启动时续接的会话(feat-013)
         self.chars_in = 0
         self.chars_out = 0
+        from psyclaw.token_meter import TokenMeter
+        self.meter = TokenMeter()            # feat-155:CJK 感知 token 计量
         try:                                 # 插件(用户项目/全局;坏插件不拖垮 REPL)
             from psyclaw.plugins import load_plugins
             self.plugins = load_plugins(".")
@@ -1019,8 +1021,12 @@ class ReplSession:
                 text = path_ctx + "\n\n用户问题：" + text
         self.messages.append({"role": "user", "content": text})
         # feat-041:传 provider 做结构化 LLM 蒸馏(无 key/异常自动回落规则蒸馏)
+        _pre_chars = sum(len(m["content"]) for m in self.messages)   # feat-155
         self.messages, self.memo = compact_history(self.messages, self.memo,
                                                    provider=self.provider)
+        _dropped = _pre_chars - sum(len(m["content"]) for m in self.messages)
+        if _dropped > 0:
+            self.meter.record_compaction(_dropped)   # feat-155:压缩真实省量
         # 动态系统提示:瘦核心 + 决策备忘 + 按需知识
         system = self.system
         # `/goal` 是持久状态,不是只写盘的旁路。每轮都注入,让“继续”也能承接完整任务。
@@ -1122,6 +1128,14 @@ class ReplSession:
             reply = "".join(reply_parts)
         self.messages.append({"role": "assistant", "content": reply})
         self.chars_out += len(reply)
+        # feat-155:token 计量(CJK 感知)+ 每轮增量显示(非内部自动跟进轮才提示)
+        self.meter.record_turn(system=system, user=text, reply=reply)
+        if not internal:
+            from psyclaw.token_meter import estimate_tokens
+            _t_in = estimate_tokens(system) + estimate_tokens(text)
+            _t_out = estimate_tokens(reply)
+            print(ui.dim(f"  [token 本轮 ≈+{_t_in} in / +{_t_out} out · "
+                         f"累计 ≈{self.meter.total_tokens:,} · /cost 看详细]"))
         if self.plan_mode:
             self._capture_plan(reply)
         save_nudges = self._capture_saves(reply)   # 「天然」落盘 + feat-150 手搓检测
@@ -1651,9 +1665,9 @@ class ReplSession:
             dropped = len(self.messages) - len(keep)
             self.messages = keep
             print(f"  [已压缩:丢弃 {max(dropped, 0)} 条早期消息,保留最近 {len(keep)} 条]")
-        elif cmd == "/cost":
-            tok_in, tok_out = self.chars_in // 4, self.chars_out // 4
-            print(f"  约 {tok_in} input tokens / {tok_out} output tokens(按字符/4 粗估)")
+        elif cmd in ("/cost", "/tokens"):
+            from psyclaw.token_meter import render_token_report
+            print(render_token_report(self.meter, project_dir="."))
         elif cmd == "/config":
             cfg.run_config_wizard()
             self.conf = cfg.load_config()
