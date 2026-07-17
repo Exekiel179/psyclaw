@@ -1213,6 +1213,25 @@ def _route_skills_by_intent(intent: str) -> list[str]:
     return picks or ["run-stats-mcp"]     # 兜底:研究默认涉及统计
 
 
+def cmd_new(args: argparse.Namespace) -> int:
+    """feat-159:psyclaw new <名> —— 新建独立分析文件夹(标准脚手架 + 全新状态)。
+
+    分析基于文件夹组织:每个分析一个目录,状态各自隔离,不继承别处旧 goal。
+    """
+    from psyclaw import ui
+    from psyclaw.scaffold import create_analysis
+    r = create_analysis(getattr(args, "name", ""), goal=getattr(args, "goal", None) or "")
+    if not r["ok"]:
+        print(ui.err(f"  ✗ {r['note']}"))
+        return 1
+    name = getattr(args, "name").strip()
+    print(ui.ok(f"  ✓ 新分析已建 → {r['path']}/") + ui.dim(f"(标准目录 {len(r['created'])} 个)"))
+    print(ui.dim("    notes/ outputs/ figures/ scripts/ data/{raw,clean} logs/ —— 状态隔离,不继承别处"))
+    print(ui.accent(f"  下一步:") + f" cd {name} && psyclaw"
+          + ui.dim("  (在分析目录内开工,goal/tasks 各自独立)"))
+    return 0
+
+
 def cmd_start(args: argparse.Namespace) -> int:
     """psyclaw start(feat-129):澄清意图 → 选 skill → 询问是否启用沙箱 →
     按 skill 能力清单配最小权限策略。非交互(--intent + --sandbox/--no-sandbox)可脚本化。"""
@@ -1613,7 +1632,7 @@ COMMAND_CATEGORIES = [
                       "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
     ("检索 / 知识图谱", ["search", "kg", "lit", "webbridge"]),
-    ("记忆 / 消息 / IO", ["memory", "sleep", "start", "session", "resume", "serve", "notify", "auth",
+    ("记忆 / 消息 / IO", ["memory", "sleep", "new", "start", "session", "resume", "serve", "notify", "auth",
                        "export", "figures", "provenance"]),
 ]
 
@@ -2120,6 +2139,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("sleep", help="睡眠整合:情景重放蒸馏候选记忆→教训合并→衰减结算"
                    ).set_defaults(func=cmd_sleep)
+    pnew = sub.add_parser("new", help="【新建分析】建独立分析文件夹(标准脚手架+全新状态,不继承旧目标)")
+    pnew.add_argument("name", help="分析名(将建为同名文件夹)")
+    pnew.add_argument("--goal", default=None, help="顺带写入该分析的研究目标(可选)")
+    pnew.set_defaults(func=cmd_new)
     pstart = sub.add_parser("start", help="【每次开工】意图向导:说要做什么→选能力→配沙箱→引导进流程")
     pstart.add_argument("--intent", default=None, help="研究意图(免交互;脚本化用)")
     pstart.add_argument("--sandbox", dest="sandbox", action="store_true", default=None,

@@ -55,6 +55,31 @@ def ensure_dirs(project_dir: str | Path = ".") -> list[str]:
     return created
 
 
+def create_analysis(name: str, goal: str = "", base_dir: str | Path = ".") -> dict:
+    """feat-159:在 base_dir 下新建一个**独立分析文件夹**(标准脚手架 + 全新状态)。
+
+    分析基于文件夹组织:每个分析一个目录,状态(goal/tasks/clarify)都在各自
+    目录内,天然隔离——不继承别处(如 psyclaw repo 根)的旧 goal。返回
+    {"ok", "path", "created", "note"};名称非法/已存在非空 → ok=False,不动盘。
+    """
+    nm = (name or "").strip()
+    if not nm:
+        return {"ok": False, "path": "", "created": [], "note": "名称为空"}
+    # 安全:只允许 base_dir 下的相对子目录,拒绝 .. 逃逸与绝对路径
+    if nm.startswith(("/", "\\")) or ".." in Path(nm).parts or Path(nm).is_absolute():
+        return {"ok": False, "path": "", "created": [],
+                "note": f"名称非法(不可含 .. 或绝对路径):{name}"}
+    root = Path(base_dir) / nm
+    if root.exists() and any(root.iterdir()):
+        return {"ok": False, "path": str(root), "created": [],
+                "note": f"目录已存在且非空:{root}(换个名字,或直接 cd 进去开工)"}
+    created = ensure_dirs(root)
+    if goal.strip():
+        from psyclaw.tasks import set_goal
+        set_goal(goal.strip(), project_dir=str(root))
+    return {"ok": True, "path": str(root), "created": created, "note": "已创建"}
+
+
 def _read_clarify(project_dir: str | Path) -> dict:
     """读并解析研究准备清单;无清单/无已完成内容 → 空 dict。"""
     from psyclaw.psych.clarify import CARD_NAME
