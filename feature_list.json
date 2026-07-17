@@ -1468,6 +1468,17 @@
    ],
    "status": "done",
    "evidence": "tests/test_reinvent.py +11(docx 两种 import/裸 matplotlib/有 apply_style 放行/docx 优先/非 py 不误伤/纯 pandas 不误伤/空输入;_capture_saves 返回纠偏且仍落盘/同类去重/干净脚本无纠偏)。全量 pytest → 1915 passed。活体:复刻真实事故 md_to_docx.py 手搓 python-docx → 落盘成功 + 黄字软提示 + 纠偏喂回模型,文件不阻断。"
+  },
+  {
+   "id": "feat-151",
+   "name": "跑脚本环境修复:注入 PYTHONPATH(psyclaw 可导入)+ python→python3 归一",
+   "description": "真实事故(chat_20260717-003855)两个环境坑:①feat-144 让模型写 from psyclaw.figures import apply_style,但 python3 scripts/x.py 跑时 psyclaw 不可导入(系统 python3 没 pip 装它 + 跑脚本时 sys.path[0]=scripts/ 非项目根)→ ModuleNotFoundError,模型折腾 8 轮才自己发现要设 PYTHONPATH,还差点手搓 pip install;②_RUN_SYSTEM 提示示例写 python outputs/analysis.py(裸 python),模型照抄,本机只有 python3 → command not found。修复:_run_env() 把 psyclaw 包父目录(项目根)前置进子进程 PYTHONPATH(保留既有),_run_shell_cmd 用它起 Popen——生成脚本直接 import psyclaw 不必用户 pip 装/手设;_normalize_interpreter() 命令首 token 是 python/pip 但本机无该二进制时换 python3/pip3(只动首 token,中缝字样不碰),_run_shell_cmd 执行前归一;_RUN_SYSTEM 示例改 python3 并注明脚本可直接 import psyclaw。",
+   "dependencies": [
+    "feat-144",
+    "feat-145"
+   ],
+   "status": "done",
+   "evidence": "tests/test_run_env.py +8(python/pip→3 归一/保留 python3/python 存在时不改/只动首 token/PYTHONPATH 含 psyclaw 根/保留既有 PYTHONPATH/端到端脚本 import psyclaw 成功/python 命令归一后能跑)。全量 pytest → 1923 passed。活体:复刻事故 python3 scripts/fig.py 内 import psyclaw.figures + apply_style → 跑通,零 ModuleNotFoundError,无需用户任何设置。"
   }
  ]
 }
