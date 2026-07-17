@@ -135,7 +135,8 @@ _RUN_SYSTEM = (
     "那样只会让用户困惑):\n"
     "```psyclaw\nrun analysis data/clean/x.csv\n```\n"
     "```shell\npython3 outputs/analysis.py\n```\n"
-    "(用 python3 不是 python;脚本可直接 `import psyclaw`,PYTHONPATH 已配好)\n"
+    "(python3/python 都行,psyclaw 自动适配本机解释器;脚本可直接 `import psyclaw`,"
+    "PYTHONPATH 已配好)\n"
     "注意:**没有** describe/stat 等内置统计命令(统计已外移)——统计请生成脚本再用 shell 跑。"
     "不要输出命令块之后就当作已完成;结果会回传,等结果再下结论。")
 _RUN_SAFE_NOTE = "(当前安全模式:命令块不会自动执行,会提示用户手动跑。)"
@@ -272,20 +273,47 @@ def _run_psyclaw_cmd(cmd: str) -> str:
     return f"$ psyclaw {' '.join(argv)}\n(rc={rc})\n{buf.getvalue()}"
 
 
-def _normalize_interpreter(cmd: str) -> str:
-    """feat-151:命令首 token 是 python/pip 但本机没有该二进制时,换成 python3/pip3。
+_PY_NAMES = ("python", "python3", "py")
+_PIP_NAMES = ("pip", "pip3", "pip3.exe")
 
-    真实事故:系统提示示例写 `python …`,模型照抄,本机只有 python3 → command not
-    found。只动**首 token**(中缝/参数里的 python 字样不碰),且仅在裸名不存在时改。
+
+def _resolve_tool(order: tuple) -> str | None:
+    """按优先级返回本机第一个实际可用的解释器/工具名。"""
+    import shutil
+    for name in order:
+        if shutil.which(name):
+            return name
+    return None
+
+
+def _normalize_interpreter(cmd: str) -> str:
+    """feat-151/154:命令首 token 是 python/pip 家族但本机无该名时,换成本机**实际
+    可用**的那个——**按平台**定优先级,而非硬编码。
+
+    真实坑:①mac 常只有 python3(无 python);②Windows 官方装的是 python.exe/py.exe,
+    往往**没有 python3**。硬编码任一方向都会坑另一平台。故:首 token 本身能跑就不动;
+    否则 Windows 优先 python→py→python3、POSIX 优先 python3→python,取第一个存在的。
+    只动**首 token**(中缝/参数里的 python 字样不碰)。
     """
+    import os
     import shutil
     parts = (cmd or "").lstrip().split(None, 1)
     if not parts:
         return cmd
-    alt = {"python": "python3", "pip": "pip3", "py": "python3"}.get(parts[0])
-    if alt and shutil.which(parts[0]) is None and shutil.which(alt):
+    tok = parts[0]
+    if shutil.which(tok):                    # 首 token 本身可跑 → 不动(含 win 的 python)
+        return cmd
+    win = os.name == "nt"
+    if tok in _PY_NAMES:
+        order = ("python", "py", "python3") if win else ("python3", "python")
+    elif tok in ("pip", "pip3"):
+        order = ("pip", "pip3") if win else ("pip3", "pip")
+    else:
+        return cmd
+    real = _resolve_tool(order)
+    if real and real != tok:
         rest = parts[1] if len(parts) > 1 else ""
-        return f"{alt} {rest}".rstrip()
+        return f"{real} {rest}".rstrip()
     return cmd
 
 
