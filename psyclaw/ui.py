@@ -193,9 +193,14 @@ def _agent_row(key: str, value: str, width: int) -> str:
     return body + " " * max(0, width - display_width(body) - 1) + paint("│", "brcyan")
 
 
-def kv(label: str, value: str, width: int = 10) -> str:
-    """Compact aligned label/value row."""
-    return dim(f"{label:<{width}}") + value
+def kv(label: str, value: str, width: int = 12) -> str:
+    """Compact aligned label/value row.
+
+    feat-158:宽度容纳最长标签(Preparation=11),且保证标签与值间恒有间隔——
+    否则超宽标签(f-string 不截断)会与值挤成「Preparationnot started」。
+    """
+    pad = max(width, len(label) + 1)          # 至少 1 空格分隔,不被超宽标签黏住
+    return dim(f"{label:<{pad}}") + value
 
 
 def _startup_status_lines(status: dict | None, provider: str | None = None,

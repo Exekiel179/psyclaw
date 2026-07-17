@@ -97,3 +97,11 @@ class Provider:
     def describe(self) -> str:
         key = "已配置" if self.api_key else "无"
         return f"{self.name} · model={self.model} · base_url={self.base_url or '(默认)'} · key={key}"
+
+    def describe_short(self) -> str:
+        """feat-158:横幅用短形态——只 name·model·key,不带冗长 base_url
+
+        (横幅宽度有限,base_url 被截成「h…」无用;完整信息用 /model 看)。
+        """
+        key = "✓" if self.api_key else "✗"
+        return f"{self.name} · {self.model} · key {key}"
