@@ -1531,6 +1531,16 @@
    ],
    "status": "done",
    "evidence": "tests/test_static_prefix.py +6(前缀跨轮字节一致/含约定块/以核心开头/无动态标记/safe 档变但仍稳定/约定块在动态之前)。全量 pytest → 1957 passed(重排不改内容,repl 全测不回归)。活体:静态前缀 ≈1040 tok(含约定块 397 tok 从动态区救回缓存),DeepSeek 缓存 0.1x 计,40 轮省 ≈36500 tok,同样效果。"
+  },
+  {
+   "id": "feat-157",
+   "name": "输出框闭合:补右边框成完整圆角框",
+   "description": "用户反馈:输出框左侧包圆(╭╰ 圆角)、右侧却没有框,左闭右开看着怪异像半个框。修复 ui.StreamBlock:_show_header 顶部补右上角 ╮,close 每行内容按 display_width(CJK 感知,中日韩按 2 列)右填充对齐后加 ' │' 右边框、底部 ╰──╯ 补右下角——成完整圆角闭框。内容尾部补 RESET 防末色染到填充/右框;宽度口径 w=term_width()-2,内容区 inner=w-4(左 '│ ' 2 列 + 右 ' │' 2 列)。feat-149 空回复不渲染框不回归。",
+   "dependencies": [
+    "feat-149"
+   ],
+   "status": "done",
+   "evidence": "tests/test_streamblock_box.py +5(四角齐全/内容行有右边框/多行右边框列对齐/中英混排上下边框等宽/空回复仍不渲染框)+ 既有 empty_reply/ui_markdown 不回归。全量 pytest → 1962 passed。活体:中英混排框右边框竖直对齐,四圆角闭合。"
   }
  ]
 }
