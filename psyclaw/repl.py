@@ -134,7 +134,8 @@ _RUN_SYSTEM = (
     "**绝不要写「请你运行」「请在终端执行」把命令甩给用户手动跑**(它本就会自动执行,"
     "那样只会让用户困惑):\n"
     "```psyclaw\nrun analysis data/clean/x.csv\n```\n"
-    "```shell\npython outputs/analysis.py\n```\n"
+    "```shell\npython3 outputs/analysis.py\n```\n"
+    "(用 python3 不是 python;脚本可直接 `import psyclaw`,PYTHONPATH 已配好)\n"
     "注意:**没有** describe/stat 等内置统计命令(统计已外移)——统计请生成脚本再用 shell 跑。"
     "不要输出命令块之后就当作已完成;结果会回传,等结果再下结论。")
 _RUN_SAFE_NOTE = "(当前安全模式:命令块不会自动执行,会提示用户手动跑。)"
@@ -271,6 +272,40 @@ def _run_psyclaw_cmd(cmd: str) -> str:
     return f"$ psyclaw {' '.join(argv)}\n(rc={rc})\n{buf.getvalue()}"
 
 
+def _normalize_interpreter(cmd: str) -> str:
+    """feat-151:命令首 token 是 python/pip 但本机没有该二进制时,换成 python3/pip3。
+
+    真实事故:系统提示示例写 `python …`,模型照抄,本机只有 python3 → command not
+    found。只动**首 token**(中缝/参数里的 python 字样不碰),且仅在裸名不存在时改。
+    """
+    import shutil
+    parts = (cmd or "").lstrip().split(None, 1)
+    if not parts:
+        return cmd
+    alt = {"python": "python3", "pip": "pip3", "py": "python3"}.get(parts[0])
+    if alt and shutil.which(parts[0]) is None and shutil.which(alt):
+        rest = parts[1] if len(parts) > 1 else ""
+        return f"{alt} {rest}".rstrip()
+    return cmd
+
+
+def _run_env() -> dict:
+    """feat-151:给子进程注入 PYTHONPATH,让生成的脚本 `import psyclaw` 可用。
+
+    根因:psyclaw 常以源码/uv 方式跑,系统 python3 没 pip 装它;且 `python3
+    scripts/x.py` 把 sys.path[0] 设成 scripts/ 而非项目根——feat-144 让模型
+    `from psyclaw.figures import apply_style` 就必然 ModuleNotFoundError。把 psyclaw
+    包的父目录(项目根)前置进 PYTHONPATH,脚本即可导入,不必用户 pip 装或手设。
+    """
+    import os
+    from pathlib import Path
+    env = dict(os.environ)
+    root = str(Path(__file__).resolve().parent.parent)
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = root + (os.pathsep + existing if existing else "")
+    return env
+
+
 def _run_shell_cmd(cmd: str) -> str:
     """交系统 shell 跑一条命令,**边跑边把输出打到终端**(feat-145 消灭空屏焦虑),
     完整输出仍回传模型(契约不变)。
@@ -285,6 +320,7 @@ def _run_shell_cmd(cmd: str) -> str:
     import threading
     import time as _time
     from psyclaw import ui
+    cmd = _normalize_interpreter(cmd)      # feat-151:python→python3(本机无 python 时)
     # feat-127:启用沙箱时,执行前过代码执行面裁决(恶意硬拒,快速失败)
     timeout = _RUN_TIMEOUT
     try:
@@ -300,7 +336,8 @@ def _run_shell_cmd(cmd: str) -> str:
     try:
         proc = subprocess.Popen(               # stderr 并入 stdout,统一按序流式
             cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, encoding="utf-8", errors="replace", bufsize=1)
+            text=True, encoding="utf-8", errors="replace", bufsize=1,
+            env=_run_env())                    # feat-151:注入 PYTHONPATH,脚本可 import psyclaw
     except OSError as exc:
         return f"$ {cmd}\n[无法执行:{exc}]"
 
