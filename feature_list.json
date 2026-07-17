@@ -1541,6 +1541,16 @@
    ],
    "status": "done",
    "evidence": "tests/test_streamblock_box.py +5(四角齐全/内容行有右边框/多行右边框列对齐/中英混排上下边框等宽/空回复仍不渲染框)+ 既有 empty_reply/ui_markdown 不回归。全量 pytest → 1962 passed。活体:中英混排框右边框竖直对齐,四圆角闭合。"
+  },
+  {
+   "id": "feat-158",
+   "name": "启动横幅美化:修 Preparation 挤字 + 清理 base_url 截断",
+   "description": "用户反馈启动框可美化。两个缺陷:①kv 默认宽 10 但标签 Preparation 是 11 字,f-string 不截断 → 溢出与值黏成「Preparationnot started」;②provider 行传 describe() 全串被 _clip(48) 截成「base_url=h…」无用残片。修:kv 默认宽 12(容纳最长标签 Preparation)+ pad=max(width,len(label)+1) 保证标签与值间恒有间隔不被超宽标签黏住,所有状态行标签对齐同列;Provider.describe_short() 短形态只 name·model·key ✓(不带冗长 base_url,完整信息用 /model 看),repl 横幅改用 describe_short。",
+   "dependencies": [
+    "feat-091"
+   ],
+   "status": "done",
+   "evidence": "tests/test_startup_banner.py +4(Preparation 不黏值/标签值列对齐/provider 无 base_url=h 残片/describe_short 不带 URL)。全量 pytest → 1966 passed。活体:横幅 Preparation 对齐、Provider 显 deepseek · deepseek-v4-flash · key ✓ 干净。"
   }
  ]
 }
