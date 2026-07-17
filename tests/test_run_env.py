@@ -43,6 +43,45 @@ def test_normalize_only_leading_token(monkeypatch):
     assert "print('python is here')" in out
 
 
+# ---- 跨平台:Windows 上 python3 常不存在,应归一到 python(feat-154) ----------
+
+def test_normalize_python3_to_python_on_windows(monkeypatch):
+    import os
+    import shutil
+    monkeypatch.setattr(os, "name", "nt")
+    # win 典型:有 python.exe / py.exe,无 python3
+    monkeypatch.setattr(shutil, "which",
+                        lambda b: None if b == "python3" else r"C:\\Py\\" + b)
+    assert _normalize_interpreter("python3 scripts/x.py").startswith("python ")
+
+
+def test_normalize_keeps_python_on_windows(monkeypatch):
+    import os
+    import shutil
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(shutil, "which", lambda b: r"C:\\Py\\" + b)  # python 存在
+    assert _normalize_interpreter("python x.py") == "python x.py"    # 不动
+
+
+def test_normalize_pip3_to_pip_on_windows(monkeypatch):
+    import os
+    import shutil
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(shutil, "which",
+                        lambda b: None if b == "pip3" else r"C:\\Py\\" + b)
+    assert _normalize_interpreter("pip3 install foo").startswith("pip ")
+
+
+def test_normalize_falls_back_to_py_launcher_on_windows(monkeypatch):
+    import os
+    import shutil
+    monkeypatch.setattr(os, "name", "nt")
+    # 只有 py launcher,无 python/python3
+    monkeypatch.setattr(shutil, "which",
+                        lambda b: r"C:\\Py\\py.exe" if b == "py" else None)
+    assert _normalize_interpreter("python3 x.py").startswith("py ")
+
+
 # ---- PYTHONPATH 注入 ----------------------------------------------------------
 
 def test_run_env_has_psyclaw_root():

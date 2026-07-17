@@ -1498,6 +1498,16 @@
    "dependencies": [],
    "status": "done",
    "evidence": "tests/test_input_backend.py +10(backend 判定 plain/ptk/readline/raw;提示 ptk 承诺下拉、readline 只 Tab 不过度承诺、raw 有↑↓、plain 极简;ptk 引导仅 readline/raw 出现、ptk/plain 空串)。全量 pytest → 1936 passed。活体:uv 环境(无 ptk)启动显示『输入 / 后按 Tab 补全命令 · ↑↓ 翻历史』+『装 prompt_toolkit 即可』。"
+  },
+  {
+   "id": "feat-154",
+   "name": "解释器归一跨平台化:检测本机可用而非硬编码 python3",
+   "description": "用户指出 feat-151 硬编码 python→python3 对 Windows 是反向坑:Windows 官方装的是 python.exe/py.exe,往往没有 python3,硬映射到 python3 反而 command not found。改为不硬编码任一方向,而是首 token 本身能跑就不动、否则按平台优先级取本机第一个实际可用的:Windows 优先 python→py→python3,POSIX 优先 python3→python;pip 同理(win pip→pip3,posix pip3→pip)。_resolve_tool 按 order 探 shutil.which 取首个存在名。只动首 token(中缝 python 字样不碰)。_RUN_SYSTEM 提示示例注明「python3/python 都行,psyclaw 自动适配本机解释器」不误导 win 用户。这才是真正的 mac/win 分别优化——自适应而非硬编码。",
+   "dependencies": [
+    "feat-151"
+   ],
+   "status": "done",
+   "evidence": "tests/test_run_env.py +4(win python3→python/win python 存在不动/win pip3→pip/win 仅 py launcher 时 python3→py)+ 既有 posix 归一测试不回归。全量 pytest → 1940 passed。活体:posix python→python3、win python3→python 双向自适配正确,各保留本机已有的。"
   }
  ]
 }
