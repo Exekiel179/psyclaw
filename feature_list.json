@@ -1551,6 +1551,16 @@
    ],
    "status": "done",
    "evidence": "tests/test_startup_banner.py +4(Preparation 不黏值/标签值列对齐/provider 无 base_url=h 残片/describe_short 不带 URL)。全量 pytest → 1966 passed。活体:横幅 Preparation 对齐、Provider 显 deepseek · deepseek-v4-flash · key ✓ 干净。"
+  },
+  {
+   "id": "feat-159",
+   "name": "psyclaw new <名>:文件夹组织的新建分析(状态隔离)",
+   "description": "用户在 psyclaw repo 目录跑,启动横幅读到上次会话遗留的旧 goal(公正世界信念)——因为状态(goal/tasks/clarify)都存 cwd 的 notes/。用户希望分析基于文件夹组织、能 new 一个干净的。scaffold.create_analysis(name, goal, base_dir):在 base_dir 下建同名独立文件夹 + 标准脚手架(ensure_dirs:notes/outputs/figures/scripts/data/{raw,clean}/logs),可选 --goal 写入该文件夹的 notes/goal.md;每个分析目录状态各自隔离,天然不继承别处旧 goal;名称安全(拒 ..逃逸/绝对路径/空名),目录已存在且非空则拒不动盘、空目录可复用。cli new 子命令 + COMMAND_CATEGORIES 登记,回执引导 cd <名> && psyclaw 进目录开工。",
+   "dependencies": [
+    "feat-129"
+   ],
+   "status": "done",
+   "evidence": "tests/test_new_analysis.py +9(建标准目录/新分析不继承父 goal/--goal 写入新文件夹/已存在非空拒/空目录可复用/拒路径穿越/拒空名/CLI 接线引导 cd/失败 rc=1)。全量 pytest → 1975 passed。活体:父目录有旧 goal 时 new 拖延与学业倦怠 → 新文件夹 goal 独立、与父目录旧 goal 完全隔离。"
   }
  ]
 }
