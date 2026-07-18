@@ -811,6 +811,45 @@ def cmd_method(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_update(args: argparse.Namespace) -> int:
+    """自更新到最新:形态自适应(source/uv-tool/pip)+ 国内镜像;默认要确认。"""
+    import sys as _sys
+    from psyclaw import __version__, ui, update as up
+    kind, repo = up.detect_install_kind()
+    mirror = up.should_mirror(getattr(args, "mirror", None))
+    ref = getattr(args, "ref", None) or up.DEFAULT_REF
+    cmd = up.upgrade_command(kind, repo, mirror, ref)
+    print(ui.title("psyclaw 自更新"))
+    print(ui.dim(f"  当前 v{__version__} · 形态 {kind}"
+                 + ("  · 国内镜像" if mirror else "") + f"  · ref {ref}"))
+    print(ui.dim(f"  将执行:{' '.join(cmd)}"))
+    if getattr(args, "check", False):
+        print(ui.dim("  (--check:只看不执行)"))
+        return 0
+    is_tty = _sys.stdin.isatty()
+    if not getattr(args, "yes", False):
+        if not is_tty:
+            print(ui.warn("  非交互环境:加 --yes 才执行,或手动跑上面的命令。"))
+            return 0
+        try:
+            ans = input("  执行更新?[Y/n] ").strip().lower()
+        except (EOFError, OSError):
+            ans = "n"
+        if ans not in ("", "y", "yes", "是"):
+            print(ui.dim("  已取消。"))
+            return 0
+    print(ui.dim("  更新中(可能要几十秒)…"))
+    res = up.run_update(kind, repo, mirror, ref)
+    tail = "\n".join((res.get("out") or "").splitlines()[-6:]).strip()
+    if res["ok"]:
+        print(ui.ok("  ✓ 更新完成。重开 psyclaw 生效。"))
+    else:
+        print(ui.err("  ✗ 更新失败(可手动跑上面的命令):"))
+    if tail:
+        print(ui.dim("  " + tail.replace("\n", "\n  ")))
+    return 0 if res["ok"] else 1
+
+
 def cmd_journal(args: argparse.Namespace) -> int:
     if getattr(args, "journal_id", None) == "install":     # feat-139
         name = " ".join(getattr(args, "name", None) or []).strip()
@@ -1723,7 +1762,7 @@ CORE_COMMANDS = {
 COMMAND_CATEGORIES = [
     ("三种交互入口", ["chat", "run", "auto"]),
     ("环境 / 系统", ["help", "guide", "status", "version", "doctor", "config", "setup",
-                  "skills", "mcp", "plugins", "gates", "eval", "commands", "assist"]),
+                  "skills", "mcp", "plugins", "gates", "eval", "commands", "assist", "update"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score", "annotate"]),
@@ -2252,6 +2291,15 @@ def build_parser() -> argparse.ArgumentParser:
                       help="指定机构库(逗号分隔:知网/万方/维普 或 cnki,wanfang,vip);"
                            "默认按查询语言自动选(中文→三库)")
     plit.set_defaults(func=cmd_lit)
+
+    pup = sub.add_parser("update", help="自更新到最新(source/uv-tool/pip 自适应 + 国内镜像)")
+    pup.add_argument("--check", action="store_true", help="只看将执行的命令,不更新")
+    pup.add_argument("--yes", "-y", action="store_true", help="免确认直接更新")
+    pup.add_argument("--mirror", dest="mirror", action="store_true", default=None,
+                     help="强制走国内镜像(gitclone + aliyun)")
+    pup.add_argument("--no-mirror", dest="mirror", action="store_false", help="强制官方源")
+    pup.add_argument("--ref", default=None, help="更新到指定 ref(默认 master 最新;可填 tag)")
+    pup.set_defaults(func=cmd_update)
 
     sub.add_parser("sleep", help="睡眠整合:情景重放蒸馏候选记忆→教训合并→衰减结算"
                    ).set_defaults(func=cmd_sleep)
