@@ -1612,6 +1612,14 @@
    "dependencies": "['feat-163', 'feat-164']",
    "status": "done",
    "evidence": "tests/test_reference.py +1 · tests/test_method_skills.py +1;全量 pytest → 2045 passed。活体:'Does it work?' → 单标点;'empower the team' → None、'power analysis' → sample-size。"
+  },
+  {
+   "id": "feat-166",
+   "name": "一键安装脚本(镜像感知,国内可用)+ README 安装节",
+   "description": "用户要类似 Claude Code/Codex 的一键安装、国内可下。docs/install.sh(macOS/Linux)与 docs/install.ps1(Windows)托管到 GitHub Pages:curl|sh / irm|iex 一行装。探测 GitHub 可达性,不通则切 gitclone.com + aliyun PyPI 镜像(复用 mirror.py 同款源),用 uv 装(自带管理 Python,免先装 3.11);官方源失败自动回退镜像。环境变量 PSYCLAW_CN/EXTRAS/VERSION 可控。README 增安装节(一键 + 手动 uv/pip)。",
+   "dependencies": "[]",
+   "status": "done",
+   "evidence": "docs/install.sh · docs/install.ps1(sh -n / bash -n 通过;spec 构造离线验证 git+URL@tag 与 psyclaw[stats]@... 正确)· README.md 安装节。托管 URL 待 push 后生效。"
   }
  ]
 }

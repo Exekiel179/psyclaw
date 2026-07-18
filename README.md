@@ -11,13 +11,43 @@ PsyClaw 不替你算统计,而是帮你**把研究流程跑顺**:按研究类型
 
 ---
 
+## 安装(一键)
+
+需要 Python ≥ 3.11。装完得到 `psyclaw` 命令。
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
+```
+
+**Windows(PowerShell):**
+
+```powershell
+irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
+```
+
+脚本自动探测 GitHub 是否可达,**国内不通时切 gitclone.com + aliyun 镜像**;用 uv 装(自带管理 Python,无需先装好 3.11)。可选环境变量:`PSYCLAW_CN=1` 强制国内镜像、`PSYCLAW_EXTRAS=[stats]` 顺带装本机统计栈、`PSYCLAW_VERSION=v0.15.0` 指定版本。
+
+<details><summary>手动安装(uv / pip)</summary>
+
+```bash
+# uv(推荐):
+uv tool install --python 3.12 "git+https://github.com/Exekiel179/psyclaw.git@v0.15.0"
+# 国内:把 URL 换成 https://gitclone.com/github.com/Exekiel179/psyclaw.git,并加 UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/
+# pip:
+pip install "git+https://github.com/Exekiel179/psyclaw.git@v0.15.0"
+# 带统计栈:...在包名后加 [stats]
+```
+</details>
+
 ## 30 秒上手
 
 ```bash
-python -m psyclaw guide       # 只需记住 chat / run / auto
-python -m psyclaw setup       # 项目脚手架与能力依赖
-python -m psyclaw             # chat:边讨论边推进
-python -m psyclaw run literature "正念干预能否降低大学生焦虑"
+psyclaw config                # 配 LLM provider / API key
+psyclaw new 我的研究           # 建一个按文件夹组织的分析,cd 进去开聊
+psyclaw guide                 # 只需记住 chat / run / auto
+psyclaw run literature "正念干预能否降低大学生焦虑"
 ```
 
 无 API key 也能跑(provider 自动降级 mock);装统计栈用 `psyclaw setup --online` 或 `pip install "psyclaw[stats]"`。
