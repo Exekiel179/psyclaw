@@ -10,9 +10,19 @@ psyclaw 只发现/匹配/呈现 skill,不执行、不算统计(样本量走 powe
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from psyclaw.skills.loader import list_skills
+
+
+def _alias_hit(alias: str, q: str) -> bool:
+    """别名命中 q。纯 ASCII 别名要求词边界(避免 power 命中 empower);
+    含中文的别名用子串(中文无词边界)。"""
+    a = alias.lower()
+    if a.isascii():
+        return re.search(r"\b" + re.escape(a) + r"\b", q) is not None
+    return a in q
 
 # 意图别名:用户可能的说法 → skill 名。匹配时按最长别名优先,避免"控制变量"误入样本量。
 _ALIASES: dict[str, tuple[str, ...]] = {
@@ -53,7 +63,7 @@ def match_method_skill(query: str, project_dir: str = ".") -> dict | None:
         if name not in skills:
             continue
         for a in aliases:
-            if a.lower() in q:
+            if _alias_hit(a, q):
                 hits.append((len(a), name))
     if hits:
         hits.sort(reverse=True)

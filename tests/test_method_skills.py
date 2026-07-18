@@ -33,6 +33,13 @@ def test_match_none_for_unrelated():
     assert match_method_skill("今天天气", ".") is None
 
 
+def test_ascii_alias_word_boundary_no_false_match():
+    # feat-165 修:power 是 empower 的子串,不该误路由到 sample-size
+    assert match_method_skill("empower the team", ".") is None
+    # 但独立的 power 词仍命中
+    assert match_method_skill("run a power analysis", ".")["name"] == "sample-size"
+
+
 def test_skill_procedure_returns_body():
     body = skill_procedure("sample-size", ".")
     assert "功效分析" in body and "红线" in body

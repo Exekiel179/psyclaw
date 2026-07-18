@@ -1604,6 +1604,14 @@
    "dependencies": "['feat-162']",
    "status": "done",
    "evidence": "tests/test_reference.py +14;commit 7c0509a;全量 pytest → 2043 passed。活体:cite --make 双条 → 3 作者 et al./单作者/en dash 页码/doi URL/按姓字母序,均正确;无参给用法 rc=2。"
+  },
+  {
+   "id": "feat-165",
+   "name": "发行自检修复:参考文献题名标点 + method 别名词边界",
+   "description": "打包前自检发现两处缺陷并修:(1) reference.format_reference 对以 ?/! 结尾的题名会补出双标点(Does it work?.),按 APA7 改为已带句末标点则不补;(2) method_skills 纯 ASCII 别名用子串匹配导致 power 命中 empower 误路由到 sample-size,改为 ASCII 别名要求词边界(\\b),中文别名仍子串。",
+   "dependencies": "['feat-163', 'feat-164']",
+   "status": "done",
+   "evidence": "tests/test_reference.py +1 · tests/test_method_skills.py +1;全量 pytest → 2045 passed。活体:'Does it work?' → 单标点;'empower the team' → None、'power analysis' → sample-size。"
   }
  ]
 }

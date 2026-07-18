@@ -80,6 +80,20 @@ def test_reference_missing_optional_fields_graceful():
     assert ref.endswith(".") or ref.endswith("Journal.")   # 无卷期页也收尾干净
 
 
+def test_title_ending_question_no_double_punct():
+    # feat-165 修:题名以 ?/! 结尾不再补句点(APA7)
+    r1 = format_reference({"authors": ["Jane Public"], "year": "2020",
+                           "title": "Does it work?", "journal": "J"})
+    assert "Does it work? J" in r1 and "work?." not in r1
+    r2 = format_reference({"authors": ["Jane Public"], "year": "2020",
+                           "title": "Amazing!", "journal": "J"})
+    assert "Amazing! J" in r2 and "Amazing!." not in r2
+    # 普通题名仍补句点
+    r3 = format_reference({"authors": ["Jane Public"], "year": "2020",
+                           "title": "A plain title", "journal": "J"})
+    assert "A plain title. J" in r3
+
+
 def test_no_stats_import_in_module():
     import inspect
     import psyclaw.psych.reference as M
