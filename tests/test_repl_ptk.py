@@ -122,7 +122,7 @@ class TestReadLinePtkDispatch:
         """_PTK_AVAILABLE=True + TTY → 调用 _ptk_read_line。"""
         called = []
 
-        def _fake_ptk(p, c):
+        def _fake_ptk(p, c, bt=None):
             called.append((p, c))
             return "result"
 
@@ -141,7 +141,7 @@ class TestReadLinePtkDispatch:
         """_ptk_read_line 收到正确 prompt 和 commands。"""
         received = {}
 
-        def _fake_ptk(p, c):
+        def _fake_ptk(p, c, bt=None):
             received["p"] = p
             received["c"] = c
             return "ok"
@@ -159,7 +159,7 @@ class TestReadLinePtkDispatch:
 
     def test_ptk_keyboard_interrupt_propagates(self):
         """prompt_toolkit KeyboardInterrupt 应穿透，不被吞掉。"""
-        def _raise(p, c):
+        def _raise(p, c, bt=None):
             raise KeyboardInterrupt
 
         with patch.object(uin, "_PTK_AVAILABLE", True), \
@@ -176,7 +176,7 @@ class TestReadLinePtkDispatch:
 
     def test_ptk_eof_error_propagates(self):
         """prompt_toolkit EOFError 应穿透。"""
-        def _raise(p, c):
+        def _raise(p, c, bt=None):
             raise EOFError
 
         with patch.object(uin, "_PTK_AVAILABLE", True), \
@@ -193,7 +193,7 @@ class TestReadLinePtkDispatch:
 
     def test_ptk_generic_exception_falls_back_to_stdlib(self):
         """ptk 抛出普通异常时，降级 stdlib 路径（非 TTY → input）。"""
-        def _raise(p, c):
+        def _raise(p, c, bt=None):
             raise RuntimeError("terminal broken")
 
         with patch.object(uin, "_PTK_AVAILABLE", True), \
@@ -211,7 +211,7 @@ class TestReadLinePtkDispatch:
         """_PTK_AVAILABLE=False 时不调用 _ptk_read_line。"""
         ptk_calls = []
 
-        def _fake_ptk(p, c):
+        def _fake_ptk(p, c, bt=None):
             ptk_calls.append(True)
             return "ptk"
 

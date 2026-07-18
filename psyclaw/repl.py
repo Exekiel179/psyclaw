@@ -1966,6 +1966,32 @@ class ReplSession:
         if not full:
             print(ui.dim("    /dump --full 连同 system 提示/决策备忘等不展示的上下文一并导出"))
 
+    def _statusline(self) -> str:
+        """Codex 风底部状态行:模型 · 模式 · 当前目录。ptk 后端固定底栏渲染。"""
+        import os
+        from psyclaw import ui
+        try:
+            model = self.provider.describe_short()
+        except Exception:  # noqa: BLE001 — 底栏取 model 失败不该打断输入
+            model = "psyclaw"
+        cwd = os.getcwd()
+        home = os.path.expanduser("~")
+        if cwd.startswith(home):
+            cwd = "~" + cwd[len(home):]
+        if len(cwd) > 46:
+            cwd = "…" + cwd[-45:]
+        flags = []
+        if self.session_name:
+            flags.append(self.session_name[:12])
+        flags.append("auto" if self.yolo else ("plan" if self.plan_mode else "chat"))
+        if self.agent_mode:
+            flags.append("advanced")
+        if self.file_access == "safe":
+            flags.append("access:safe")
+        sep = ui.paint("·", "teal")
+        return (" " + ui.dim(model) + f"  {sep}  " + ui.dim(" ".join(flags))
+                + f"  {sep}  " + ui.dim(cwd) + " ")
+
     # -- 主循环 --------------------------------------------------------------
     def run(self) -> int:
         if self.resume_id:
@@ -1994,19 +2020,13 @@ class ReplSession:
             print("  " + ui.warn(_nudge))
         print()
         while True:
-            base = ui.paint("psyclaw", "brcyan", "bold")
-            if self.session_name:
-                base += ui.dim(f"·{self.session_name[:12]}")
-            modes = ("" if not self.plan_mode else ui.warn(" plan")) \
-                + ("" if not self.agent_mode else ui.accent(" advanced")) \
-                + ("" if self.file_access != "safe" else ui.warn(" access:safe")) \
-                + ("" if not self.yolo else ui.err(" approval:auto"))
-            prompt = base + modes + ui.dim(" ❯ ")
+            # Codex 风:极简 › 提示符 + 底部固定状态行(模型 · 模式 · 目录)
+            prompt = ui.paint("›", "teal", "bold") + " "
             cmds = dict(COMMANDS)
             if self.plugins:
                 cmds.update({k: v["desc"] for k, v in self.plugins.commands.items()})
             try:
-                line = read_line(prompt, cmds).strip()
+                line = read_line(prompt, cmds, bottom_toolbar=self._statusline).strip()
             except (EOFError, KeyboardInterrupt):
                 print()
                 break
