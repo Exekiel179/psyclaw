@@ -1636,6 +1636,14 @@
    "dependencies": "['feat-108','feat-153']",
    "status": "done",
    "evidence": "tests/test_lit_institutional_hint.py +3;commit(本次);全量 pytest → 2056 passed。"
+  },
+  {
+   "id": "feat-169",
+   "name": "lit 自动驱动 WebBridge 进机构库(知网)补检合并",
+   "description": "lit 只打公开 API 检不到知网/万方;litbridge 让 psyclaw 自己驱动 Kimi WebBridge(用户真实登录浏览器)navigate 知网检索→evaluate 抽取→归一 lit schema→去重合并进结果/缓存/PRISMA。lit --bridge/--no-bridge,默认可用即自动、不可用静默降级。全 fail-safe,仓内零浏览器逻辑(经 webbridge.call 外移)。知网 DOM 选择器 best-effort,失效降级人工/lit --import。",
+   "dependencies": "['feat-108','feat-168']",
+   "status": "done",
+   "evidence": "tests/test_litbridge.py +17;commit(本次);全量 pytest → 2070 passed。URL/JS 生成活体正常,--bridge/--no-bridge 解析正确。"
   }
  ]
 }
