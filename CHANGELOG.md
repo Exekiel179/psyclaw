@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.15.0(2026-07-18)
+
+> 主题:**三命令重定位(cite/scale/method)统计全外移 + 对话体验缺陷两轮清零 +
+> 开箱即用(MCP 惰性化/AJS 期刊包/new 建项)**。核心是把 cite/scale/method 从"静态
+> 知识词典"改造成"编排 + 格式化 + skill 路由"——凡统计一律外移到成熟库/MCP,
+> psyclaw 只生成可复现脚本、不内联算。feat-138~165 全部落地,测试 1853→2045 绿。
+
+### 三命令重定位(feat-161~165,用户拍板定义)
+- **cite = 引用文章 + 引文核查**:
+  - `cite --make <json>`(feat-164):文献元数据 → 规范 APA7 参考文献 + 文内引用
+    (1/2/3+ 作者 et al./页码 en dash/>20 作者省略),纯字符串无网络无统计;
+  - `cite <稿件>`(feat-162):引文核查(反杜撰),并删除方法学背书静态库
+    evidence.json(不全/会过时/与"可核实"矛盾)——文献支撑改走真实检索 `lit`。
+- **scale = 量表分析(虚伪作答检查 + 信效度)**(feat-161):`score` 加虚伪作答体检
+  (longstring/漏答率/直入式,纯计数零统计,跑原始应答不被反向计分掩盖)+
+  `score --reliability` 生成委托 pingouin 的 Cronbach α 脚本;α/ω/CFA/马氏距离外移。
+- **method = 方法学 skill 路由**(feat-163):从方法词典改成路由到结构化 skill——
+  `method 样本量` → sample-size(功效分析,委托 statsmodels 解 N + 敏感性)、
+  `method 无关变量控制` → confound-control(区分真混淆/中介/对撞,纯设计);
+  未命中退回 methods.json 词条(定义型保留)。
+- **发行自检修复**(feat-165):参考文献题名以 ?/! 结尾的双标点、method 纯 ASCII
+  别名子串误匹配(power 命中 empower)两处缺陷修复。
+
+### 对话体验缺陷清零(feat-143~153,两轮真实会话复盘)
+- **能力自知与反重造**(feat-144/150/152):系统提示注入 psyclaw 能力地图并禁止
+  手搓轮子;检测 save 的脚本手搓 python-docx/裸 matplotlib/手画概念图 → 落盘后
+  软提示纠偏(改用 export/apply_style/graphviz)。
+- **主动执行与诚实**(feat-145/148/153):长脚本边跑边流式显示(消灭空屏);第一人称
+  「我来读/我来跑」+ 一次只问一个问题;命令联想随实际 input backend 说实话。
+- **输出观感**(feat-143/146/147/149/157/158):行内 Markdown 强调解析进 Word、
+  斜杠命令联想 + 打错给建议、256 色语义配色、空回复不渲染空框、输出框圆角闭合、
+  启动横幅对齐修复。
+- **跑脚本环境**(feat-151/154):注入 PYTHONPATH 让生成脚本可 import psyclaw;
+  解释器按平台检测本机可用(win python→py→python3,posix 反向)而非硬编码。
+
+### 开箱即用与项目组织(feat-138~142/155/156/159/160)
+- **MCP 惰性化**(feat-138):`/agent on` 不再逐服务器冷启子进程 list_tools
+  (npx 系拖到分钟级);按缓存/registry tools 键惰性登记,首调才起进程。
+- **AJS 期刊技能包**(feat-139):`journal install <刊名>` 与 `start --journal` 从
+  AJS mono-repo 稀疏检出目标期刊包(缩写/中文名/近似候选),装完 check/export 默认带刊。
+- **协助水平与注释**(feat-140/141/142):产物归位软约定;`assist novice|standard|
+  expert`;`annotate <file> [--review]` 按协助水平定注释密度 + 三面审查。
+- **new 建项**(feat-159/160):`psyclaw new <名>` 以文件夹组织新建分析(状态隔离)+
+  引导 README(研究流程心智模型 + 代表性命令流)。
+- **token 计量与省量**(feat-155/156):CJK 感知 token 估算 + 每轮显示 + 详细页;
+  系统提示静态前缀重排为缓存友好,同效果省 token。
+
 ## v0.14.0(2026-07-14)
 
 > 主题:**三轮对抗评估缺陷清零 + 文献查找全链(检索计划→浏览器桥→PDF 落盘)**。
