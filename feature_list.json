@@ -1572,6 +1572,38 @@
    ],
    "status": "done",
    "evidence": "tests/test_analysis_readme.py +8(README 生成/含心智模型 chat-run-auto/文献流程真命令 lit --plan+lit -s+cite-check/数据分析 run analysis+data-clean/写作 export+docx+check/目录说明齐全/用分析名/无杜撰统计命令)。全量 pytest → 1983 passed。活体:new 公正世界信念研究 → 文件夹含 README+notes/goal.md+标准目录,README 心智模型+文献调研五步命令流准确。"
+  },
+  {
+   "id": "feat-161",
+   "name": "scale 重定位:虚伪作答检查 + 信度脚本外移",
+   "description": "用户定义 scale = 量表分析(虚伪作答检查 + 信效度),统计外移。careless.py 纯数据体检(longstring/漏答率/直入式,零统计)接入 score 且跑原始应答(反向计分会掩盖直入式);reliability_script 生成委托 pingouin 的 Cronbach α 脚本(score --reliability),α/ω/CFA 一律外移。",
+   "dependencies": "['feat-076']",
+   "status": "done",
+   "evidence": "tests/test_careless.py +11 · tests/test_scale_careless.py +5 · tests/test_reliability_script.py +8;commits 4d59eb8/90695b6/0f30caf;全量 pytest → 2007 passed。活体:score --scale rses 报直入式作答体检;--reliability 生成含正确条目/反向/量程的合法脚本。"
+  },
+  {
+   "id": "feat-162",
+   "name": "cite 重定位:删方法学背书静态库 + 引文核查",
+   "description": "用户判断静态背书库(evidence.json)不现实(不全、会过时、与可核实矛盾)——删除,文献依据走真实检索(psyclaw lit)。cite 从「查背书库」重定位为引文核查(反杜撰参考文献,复用 citations.run_citation_audit);knowledge.print_evidence 移除,context 每轮背书注入删除(方法/设计条目不动)。",
+   "dependencies": "['feat-097']",
+   "status": "done",
+   "evidence": "tests/test_cite_redefine.py +6;commit 46cae2c;全量 pytest → 2013 passed。evidence.json 已删、print_evidence 移除、去背书后按需知识仍正常、cite 指向审计并能跑。"
+  },
+  {
+   "id": "feat-163",
+   "name": "method 重定位:功效脚本外移 + 方法学 skill 路由",
+   "description": "用户判断静态方法词典对更专业的用户无价值;method 改成路由到结构化 skill,让宿主模型按 skill 既定流程办事,比裸输出规范。先做样本量(sample-size skill + power_script 委托 statsmodels 解 N,统计外移)与无关变量控制(confound-control skill,纯设计);method_skills 复用 loader 发现 category:method 加意图别名匹配;cmd_method 命中 skill 打印流程,未命中退回 methods.json 词条。",
+   "dependencies": "['feat-018', 'feat-076']",
+   "status": "done",
+   "evidence": "tests/test_power_script.py +8 · tests/test_method_skills.py +8;commits 794a85d/78cb15b;全量 pytest → 2029 passed。活体:method 样本量→sample-size 流程、无关变量控制→confound-control、空参列目录,均正常。"
+  },
+  {
+   "id": "feat-164",
+   "name": "cite 引用文章:元数据→APA7 参考文献 + 文内引用",
+   "description": "补齐 cite 的引用文章半:给作者/年/题/刊/卷期页/doi,产出可直接粘进参考文献表的 APA7 条目 + 夹注/叙述式文内引用(1/2/3+ et al. 规则,页码 en dash,>20 作者省略)。纯字符串处理,无网络无统计;DOI 在线检索交外部。cite 改双模:--make <json> 引用文章、否则引文核查。",
+   "dependencies": "['feat-162']",
+   "status": "done",
+   "evidence": "tests/test_reference.py +14;commit 7c0509a;全量 pytest → 2043 passed。活体:cite --make 双条 → 3 作者 et al./单作者/en dash 页码/doi URL/按姓字母序,均正确;无参给用法 rc=2。"
   }
  ]
 }

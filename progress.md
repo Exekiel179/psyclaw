@@ -2,8 +2,32 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-15(feat-138~142 done:MCP 惰性化 + AJS 期刊包 +
-协助体验三件套[归位软约定/协助水平/annotate])
+**Last Updated:** 2026-07-18(cite/scale/method 重定位三部曲 feat-161~164 done:
+统计全外移,harness 层做编排/格式化/skill 路由)
+
+## 本轮:cite/scale/method 重定位三部曲(feat-161~164)
+
+用户拍板三命令定义:**cite** = 引用文章 + 引文核查;**scale** = 量表分析(虚伪作答
+检查 + 信效度);**method** = 方法学 skill 路由。统计一律外移到成熟库/MCP(守铁律)。
+
+- feat-161 **scale**:careless.py 虚伪作答体检(longstring/漏答/直入式,纯计数零统计,
+  跑原始应答——反向计分会掩盖直入式)接入 score;reliability_script 生成委托 pingouin
+  的 Cronbach α 脚本(score --reliability);马氏距离/IRV/α/ω/CFA 全走外移脚本。
+- feat-162 **cite·核查**:删方法学背书静态库 evidence.json(不全/过时/与可核实矛盾),
+  cite 重定位为引文核查(反杜撰,复用 citations.run_citation_audit);背书注入移除。
+- feat-163 **method**:从方法词典改成方法学 skill 路由——sample-size(功效分析,
+  power_script 委托 statsmodels 解 N + 敏感性)+ confound-control(无关变量控制,纯设计);
+  意图别名匹配,未命中退回 methods.json 词条(定义型保留)。
+- feat-164 **cite·引用文章**:元数据→APA7 参考文献 + 文内引用(1/2/3+ et al./en dash/
+  >20 省略),纯字符串无统计;cite 双模 `--make <json>` 生成 / 否则核查。
+
+**验证**:全量 `uv run --python 3.12 --with pytest python -m pytest -q` → **2043 passed**;
+`python -m psyclaw gates` ✓。commits:4d59eb8/90695b6/0f30caf/46cae2c/794a85d/78cb15b/7c0509a。
+feature_list.json 补录 feat-161~164(159 features 全 done)。
+
+---
+
+## 历史:2026-07-15(feat-138~142:MCP 惰性化 + AJS 期刊包 + 协助体验三件套)
 
 ## 本轮(40):开箱即用双拼图 ——feat-138 MCP 惰性化 + feat-139 AJS 期刊包安装
 
