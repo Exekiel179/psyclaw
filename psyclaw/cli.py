@@ -866,10 +866,7 @@ def cmd_clarify(args: argparse.Namespace) -> int:
     return run_clarify_interactive()
 
 
-def cmd_cite(args: argparse.Namespace) -> int:
-    from psyclaw.psych.knowledge import print_evidence
-    print_evidence(args.topic_id)
-    return 0
+# cmd_cite 已并入引用保真核查(cmd_cite_check):cite 子命令直接指向它,背书库已删。
 
 
 def cmd_export(args: argparse.Namespace) -> int:
@@ -1657,11 +1654,11 @@ COMMAND_CATEGORIES = [
     ("三种交互入口", ["chat", "run", "auto"]),
     ("环境 / 系统", ["help", "guide", "status", "version", "doctor", "config", "setup",
                   "skills", "mcp", "plugins", "gates", "eval", "commands", "assist"]),
-    ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "cite", "ethics",
+    ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score", "annotate"]),
-    ("研究前规划 / 预注册", ["prepare", "clarify", "declare-test", "preregister", "jars", "cite-check",
-                       "check"]),
+    ("研究前规划 / 预注册", ["prepare", "clarify", "declare-test", "preregister", "jars", "cite",
+                       "cite-check", "check"]),
     ("兼容 / 高级编排", ["repl", "agent", "auto-loop", "loop", "lit-loop", "meta-loop",
                       "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
@@ -1974,9 +1971,11 @@ def build_parser() -> argparse.ArgumentParser:
     pcl.add_argument("--status", action="store_true", help="只看研究准备进度")
     pcl.set_defaults(func=cmd_clarify)
 
-    pci = sub.add_parser("cite", help="方法学背书库(每个设计决策的文献支撑)")
-    pci.add_argument("topic_id", nargs="?", default=None, help="决策主题,留空列出全部")
-    pci.set_defaults(func=cmd_cite)
+    pci = sub.add_parser("cite", help="引用保真核查:文内引用是否都溯源到检索命中(反杜撰参考文献)")
+    pci.add_argument("manuscript", help="稿件 Markdown(如 notes/lit_review.md)")
+    pci.add_argument("--project", default=".", help="项目目录(默认当前)")
+    pci.add_argument("--journal", default=None, help="按期刊定制引用风格核对")
+    pci.set_defaults(func=cmd_cite_check)
 
     pex = sub.add_parser("export", help="格式化输出(APA7 / 心理学报 / 心理科学,确定性模板)")
     pex.add_argument("file", help="结构化 Markdown 草稿")

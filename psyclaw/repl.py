@@ -51,7 +51,7 @@ COMMANDS = {
     "/assume": "前提假设知识库(16 检验族)",
     "/method": "复杂方法目录(SEM/MLM/LPA/网络…)",
     "/design": "实验设计目录(12 设计卡)",
-    "/cite": "方法学背书库(决策→文献)",
+    "/cite": "引用保真核查(文内引用是否溯源到检索命中,反杜撰)",
     "/export": "APA7 输出(Word docx + Markdown)",
     "/memory": "三层记忆(画像/惯性/教训卡);/memory verify 再验证环境教训、已恢复的自动失效",
     "/gates": "研究质量检查",
@@ -863,7 +863,7 @@ def _build_system_prompt() -> str:
     parts.append(
         "\n# 研究准备规则\n正式研究开始前必须完成研究准备清单(17 个研究准备项,/prepare)。"
         "用户提出研究想法时,你的第一动作是 grill-me 式逐项澄清(一次一个问题,"
-        "带推荐答案),而不是直接给方案。设计决策必须给文献背书(/cite 查背书库)。")
+        "带推荐答案),而不是直接给方案。设计决策的文献支撑走真实检索(psyclaw lit),不编造。")
     parts.append(_SAVE_SYSTEM)
     from psyclaw.memory import memory_prompt
     mem = memory_prompt(include_lessons=False)   # feat-111:教训改逐消息相关性注入
@@ -1568,8 +1568,18 @@ class ReplSession:
             from psyclaw.psych.preregister import preregister_cli
             preregister_cli(arg.split() if arg else [])
         elif cmd == "/cite":
-            from psyclaw.psych.knowledge import print_evidence
-            print_evidence(arg or None)
+            if not arg:
+                print("  用法:/cite <稿件.md> —— 引用保真核查(文内引用是否溯源到检索命中)")
+            else:
+                from psyclaw.psych.citations import run_citation_audit
+                a = run_citation_audit(arg, project_dir=".")
+                orphan = a.get("orphan_n", 0)
+                if orphan:
+                    print(ui.err(f"  ✗ 孤儿引用 {orphan} 条(疑似杜撰):"))
+                    for o in a.get("orphan", []):
+                        print(ui.warn(f"     · {o['raw']}"))
+                else:
+                    print(ui.ok(f"  ✓ 引用核查:{a.get('method', '')}"))
         elif cmd == "/export":
             from psyclaw.output.apa7 import export_cli
             if not arg:

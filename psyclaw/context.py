@@ -68,14 +68,7 @@ def _load_entries() -> list:
                 f"[设计·{d['name']}] 威胁:{d.get('threats', '')};实践:{d.get('key_practices', '')}")
     except Exception:  # noqa: BLE001
         pass
-    try:
-        data = json.loads((_PSYCH_DIR / "evidence.json").read_text(encoding="utf-8"))
-        for t in data.get("topics", []):
-            add(t["id"] + " " + t["decision"],
-                f"[背书·{t['decision']}] {t['citation'].split('.')[0]} 等;要点:{t['gist']}")
-    except Exception:  # noqa: BLE001
-        pass
-
+    # 方法学背书静态库(evidence.json)已删除:文献支撑走真实检索(psyclaw lit),不内置。
     _ENTRIES_CACHE = out
     return out
 
