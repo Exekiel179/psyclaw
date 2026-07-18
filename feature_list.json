@@ -1676,6 +1676,14 @@
    "dependencies": "['feat-171']",
    "status": "done",
    "evidence": "tests/test_litbridge.py 四态(Y装/N给命令/已问过不追问/非TTY不问);全量 2083 passed。"
+  },
+  {
+   "id": "feat-174",
+   "name": "启动界面重做成 landing page hero 风格",
+   "description": "启动界面模仿网页 hero:ANSI Shadow 巨型 PSYCLAW wordmark(teal,矩形对齐,窄终端降级单行)+ eyebrow 小大写标签 + thesis 一句主张 + teal accent 状态卡。呼应 docs/index.html 的等宽大字 hero 与青绿配色。",
+   "dependencies": "['feat-158']",
+   "status": "done",
+   "evidence": "tests/test_startup_hero.py +4;commit(本次);宽/窄终端预览正常;全量 2087 passed。"
   }
  ]
 }
