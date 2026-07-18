@@ -1684,6 +1684,14 @@
    "dependencies": "['feat-158']",
    "status": "done",
    "evidence": "tests/test_startup_hero.py +4;commit(本次);宽/窄终端预览正常;全量 2087 passed。"
+  },
+  {
+   "id": "feat-176",
+   "name": "Codex 风 REPL:极简 › 提示符 + 底部状态行",
+   "description": "移植 Codex 界面标志性元素:prompt 改极简 › (teal);prompt_toolkit bottom_toolbar 做固定底部状态行(模型·模式+flags·当前目录)。仅 ptk 后端,其他忽略不回归;底栏求值 fail-safe。",
+   "dependencies": "['feat-170','feat-174']",
+   "status": "done",
+   "evidence": "tests/test_codex_ui.py +3;commit(本次);底栏活体渲染正常;全量 2101 passed。"
   }
  ]
 }
