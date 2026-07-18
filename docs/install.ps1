@@ -28,12 +28,12 @@ switch ($Cn) {
   default { $UseMirror = $false }
 }
 if ($UseMirror) {
-  Say "使用国内镜像(gitclone.com + aliyun PyPI)"
+  Write-Host "▸ GitHub 不可达,改用第三方镜像 gitclone.com(非官方,代码完整性不保证);Python 依赖走 aliyun PyPI。" -ForegroundColor Yellow
+  Write-Host "  不放心可 Ctrl-C,改用官方源手动装(见 README)。" -ForegroundColor Yellow
   $GitUrl = "https://gitclone.com/github.com/$Repo.git"
   $env:UV_DEFAULT_INDEX = "https://mirrors.aliyun.com/pypi/simple/"
-  if (-not $env:UV_PYTHON_INSTALL_MIRROR) {
-    $env:UV_PYTHON_INSTALL_MIRROR = "https://ghproxy.net/https://github.com/astral-sh/python-build-standalone/releases/download"
-  }
+  # 注:不自动把 uv 的 Python 下载改道任何第三方代理——经不可信代理执行 interpreter
+  # 二进制是供应链风险。uv 拉不到 Python 时,自行装 Python 3.11+(见末尾提示)。
 } else {
   $GitUrl = "https://github.com/$Repo.git"
   $env:UV_DEFAULT_INDEX = "https://pypi.org/simple"
@@ -42,6 +42,7 @@ if ($UseMirror) {
 # 2. 确保 uv
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
   Say "安装 uv ..."
+  # 官方 uv 安装器(Astral 自有域名 https,与 rustup/Homebrew 同一信任模型)
   try { irm https://astral.sh/uv/install.ps1 | iex }
   catch {
     try { pip install -i $env:UV_DEFAULT_INDEX -q uv } catch { Die "uv 安装失败:请手动装 uv(https://docs.astral.sh/uv/)" }
@@ -55,17 +56,19 @@ Ok "uv 就绪"
 function Build-Spec($url) {
   if ($Extras) { "psyclaw$Extras @ git+$url@$Tag" } else { "git+$url@$Tag" }
 }
+# --python '>=3.11':优先复用本机已装的 3.11+,避免国内强制从 GitHub 拉 Python
+$PyReq = ">=3.11"
 Say "安装 psyclaw $Tag $(if($Extras){"(extras: $Extras)"}) ..."
 try {
-  uv tool install --python 3.12 --force (Build-Spec $GitUrl)
+  uv tool install --python $PyReq --force (Build-Spec $GitUrl)
   if ($LASTEXITCODE -ne 0) { throw "exit $LASTEXITCODE" }
 } catch {
   if (-not $UseMirror) {
-    Say "官方源失败,改用国内镜像重试 ..."
+    Write-Host "▸ 官方源失败,改用第三方镜像 gitclone.com(非官方,请自行评估信任)..." -ForegroundColor Yellow
     $env:UV_DEFAULT_INDEX = "https://mirrors.aliyun.com/pypi/simple/"
-    uv tool install --python 3.12 --force (Build-Spec "https://gitclone.com/github.com/$Repo.git")
-    if ($LASTEXITCODE -ne 0) { Die "安装失败。可手动:uv tool install `"git+$GitUrl@$Tag`"" }
-  } else { Die "安装失败。可手动:uv tool install `"git+$GitUrl@$Tag`"" }
+    uv tool install --python $PyReq --force (Build-Spec "https://gitclone.com/github.com/$Repo.git")
+    if ($LASTEXITCODE -ne 0) { Die "安装失败。若缺 Python:先自行装 Python 3.11+(官网/winget),再重试;或手动 uv tool install `"git+$GitUrl@$Tag`"" }
+  } else { Die "安装失败。若缺 Python:先自行装 Python 3.11+(官网/winget),再重试;或手动 uv tool install `"git+$GitUrl@$Tag`"" }
 }
 
 Ok "PsyClaw $Tag 安装完成"
