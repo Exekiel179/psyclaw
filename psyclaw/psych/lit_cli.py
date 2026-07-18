@@ -97,11 +97,35 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
     print(ui.dim(f"检索结果缓存 → {notes / 'lit_search.json'}"
                  "(下次 psyclaw research 将据此合成有据综述)"))
 
+    hint = institutional_hint(query)           # bug 修:公开 API 检不到知网/万方,主动指路桥接
+    if hint:
+        print(ui.warn(hint))
+
     if synthesize:
         _synthesize_review(query, r, project_dir, ui)
     else:
         print(ui.dim("一键生成结构化综述:加 --synthesize(据上述真实命中合成)。"))
     return 0
+
+
+def _has_cjk(s: str) -> bool:
+    return any("一" <= c <= "鿿" for c in (s or ""))
+
+
+def institutional_hint(query: str) -> str:
+    """检索后的机构库补全提示。纯函数,可单测。
+
+    lit 只打公开 API(OpenAlex/EuropePMC)——中文文献大量在知网/万方/维普,英文付费
+    文献也检不全。用户实测:搜「公正世界信念」以为会自动调 Kimi WebBridge,其实 lit
+    与 webbridge 是两条独立通道。主动指路:机构库检索走 lit --plan 生成桥接分步 +
+    浏览器桥(Kimi WebBridge)进真实库检索。中文主题时话更重(公开 API 覆盖尤其差)。
+    """
+    if _has_cjk(query):
+        return ("覆盖提醒:公开 API(OpenAlex/EuropePMC)检不到知网/万方/维普的中文文献。"
+                "要机构库全量检索,走浏览器桥:`psyclaw lit \"%s\" --plan` 生成桥接分步 → "
+                "`psyclaw webbridge`(Kimi WebBridge 驱动真实浏览器进知网检索)。" % query.strip())
+    return ("覆盖提醒:公开 API 检不全付费墙/机构库文献。要更全,走浏览器桥:"
+            "`psyclaw lit --plan` 生成桥接分步 → `psyclaw webbridge`(进 WoS/Scopus 等)。")
 
 
 def _synthesize_review(query: str, search_result: dict, project_dir: str, ui) -> None:
