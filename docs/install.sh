@@ -28,11 +28,12 @@ case "$CN" in
 esac
 
 if [ "$USE_MIRROR" = "1" ]; then
-  say "使用国内镜像(gitclone.com + aliyun PyPI)"
+  printf '\033[33m▸ GitHub 不可达,改用第三方镜像 gitclone.com(非官方,代码完整性不保证);\n'
+  printf '  Python 依赖走 aliyun PyPI。不放心可 Ctrl-C,改用官方源手动装(见 README)。\033[0m\n'
   GIT_URL="https://gitclone.com/github.com/${REPO}.git"
   PIP_INDEX="https://mirrors.aliyun.com/pypi/simple/"
-  # uv 拉取 Python 时也走镜像(best-effort;失败见末尾提示)
-  export UV_PYTHON_INSTALL_MIRROR="${UV_PYTHON_INSTALL_MIRROR:-https://ghproxy.net/https://github.com/astral-sh/python-build-standalone/releases/download}"
+  # 注:不自动把 uv 的 Python 下载改道任何第三方代理——interpreter 二进制经不可信
+  # 代理执行是供应链风险。uv 从官方拉不到时,见末尾提示自行装 Python 3.11+。
 else
   GIT_URL="https://github.com/${REPO}.git"
   PIP_INDEX="https://pypi.org/simple"
@@ -43,6 +44,7 @@ export UV_DEFAULT_INDEX="$PIP_INDEX"
 ensure_uv() {
   if command -v uv >/dev/null 2>&1; then ok "已检测到 uv"; return 0; fi
   say "安装 uv ..."
+  # 官方 uv 安装器(Astral 自有域名 https,与 rustup/Homebrew 同一信任模型)
   if curl -LsSf https://astral.sh/uv/install.sh 2>/dev/null | sh >/dev/null 2>&1; then :;
   else
     # 官方脚本不通 → 退回 pip 从镜像装 uv
@@ -63,17 +65,19 @@ build_spec() {
   else printf 'git+%s@%s' "$_url" "$TAG"; fi
 }
 
+# --python '>=3.11':优先复用本机已装的 3.11+,避免在国内强制从 GitHub 拉 Python
+PYREQ=">=3.11"
 say "安装 psyclaw ${TAG} ${EXTRAS:+(extras: $EXTRAS)} ..."
-if uv tool install --python 3.12 --force "$(build_spec "$GIT_URL")"; then
+if uv tool install --python "$PYREQ" --force "$(build_spec "$GIT_URL")"; then
   :
 elif [ "$USE_MIRROR" = "0" ]; then
-  say "官方源失败,改用国内镜像重试 ..."
+  printf '\033[33m▸ 官方源失败,改用第三方镜像 gitclone.com(非官方,请自行评估信任)...\033[0m\n'
   export UV_DEFAULT_INDEX="https://mirrors.aliyun.com/pypi/simple/"
-  uv tool install --python 3.12 --force \
+  uv tool install --python "$PYREQ" --force \
     "$(build_spec "https://gitclone.com/github.com/${REPO}.git")" \
-    || die "安装失败。可手动:uv tool install \"git+${GIT_URL}@${TAG}\""
+    || die "安装失败。若因缺 Python:先自行装 Python 3.11+(brew/apt/官网),再重试;或手动 uv tool install \"git+${GIT_URL}@${TAG}\""
 else
-  die "安装失败。可手动:uv tool install \"git+${GIT_URL}@${TAG}\""
+  die "安装失败。若因缺 Python:先自行装 Python 3.11+(brew/apt/官网),再重试;或手动 uv tool install \"git+${GIT_URL}@${TAG}\""
 fi
 
 # ── 4. 收尾 ───────────────────────────────────────────────────────────
