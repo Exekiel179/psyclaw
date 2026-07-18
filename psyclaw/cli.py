@@ -696,6 +696,21 @@ def cmd_score(args: argparse.Namespace) -> int:
             print(ui.warn(f"    行 {r['row']}: {' · '.join(flags) or '疑似'}"))
         print(ui.dim("  纯数据体检（连续相同/漏答/直入式）；马氏距离、IRV、信度 α 走外移脚本"))
 
+    # 信度分析:生成委托 pingouin 的脚本(统计外移;psyclaw 不直接算 α)
+    if getattr(args, "reliability", False):
+        from pathlib import Path
+        from psyclaw.psych.reliability_script import generate_reliability_script
+        script = generate_reliability_script(scale["id"], args.data,
+                                             prefix=args.prefix, suffix=args.suffix)
+        if script:
+            out_p = Path("scripts") / f"reliability_{scale['id']}.py"
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            out_p.write_text(script, encoding="utf-8")
+            print(ui.accent("\n信度分析（统计外移）"))
+            print(ui.ok(f"  ✓ 已生成委托 pingouin 的信度脚本 → {out_p}"))
+            print(ui.dim(f"    运行它算 Cronbach α: python {out_p}"
+                         "（先 pip install pandas pingouin）"))
+
     for w in result["warnings"]:
         print(ui.warn(f"\n{w}"))
 
@@ -1896,6 +1911,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help="子量表聚合方式：sum（默认）或 mean")
     psc.add_argument("--out", default=None, help="输出计分结果 CSV 路径（追加子量表/总分列）")
     psc.add_argument("--json", action="store_true", help="输出机器可读 JSON（含描述统计）")
+    psc.add_argument("--reliability", action="store_true",
+                     help="生成委托 pingouin 的信度脚本（Cronbach α，统计外移，psyclaw 不直接计算）")
     psc.set_defaults(func=cmd_score)
 
     pe = sub.add_parser("ethics",
