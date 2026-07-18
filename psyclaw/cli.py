@@ -1182,7 +1182,8 @@ def cmd_lit(args: argparse.Namespace) -> int:
                    year_from=args.year_from, fulltext_doi=args.fulltext,
                    zotero_doi=args.zotero, synthesize=getattr(args, "synthesize", False),
                    download=getattr(args, "download", False),
-                   bridge=getattr(args, "bridge", None))
+                   bridge=getattr(args, "bridge", None),
+                   dbs=getattr(args, "dbs", None))
 
 
 # feat-131/136:全局能力板块(setup 首配让用户勾选;写 ~/.psyclaw/config.yaml modules)。
@@ -2244,9 +2245,12 @@ def build_parser() -> argparse.ArgumentParser:
                       help="从检索语料生成文献矩阵骨架(notes/lit_matrix.md,"
                            "键与 cite-check 语料同源)")
     plit.add_argument("--bridge", dest="bridge", action="store_true", default=None,
-                      help="强制驱动 WebBridge 进机构库(知网)补检并合并(默认:可用时自动)")
+                      help="强制驱动 WebBridge 进机构库补检并合并(默认:可用时自动)")
     plit.add_argument("--no-bridge", dest="bridge", action="store_false",
                       help="关闭机构库自动桥接,只用公开 API")
+    plit.add_argument("--db", dest="dbs", default=None,
+                      help="指定机构库(逗号分隔:知网/万方/维普 或 cnki,wanfang,vip);"
+                           "默认按查询语言自动选(中文→三库)")
     plit.set_defaults(func=cmd_lit)
 
     sub.add_parser("sleep", help="睡眠整合:情景重放蒸馏候选记忆→教训合并→衰减结算"

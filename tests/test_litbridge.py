@@ -89,6 +89,102 @@ def test_bridge_search_returns_records():
     assert out["db"] == "cnki"
 
 
+def test_db_set_for_query_by_language():
+    assert litbridge.db_set_for_query("公正世界信念") == ["cnki", "wanfang", "vip"]
+    assert litbridge.db_set_for_query("belief in a just world") == []
+
+
+def test_resolve_dbs_aliases_and_unknown():
+    valid, unknown = litbridge.resolve_dbs("知网,wanfang,维普", "x")
+    assert valid == ["cnki", "wanfang", "vip"] and unknown == []
+    valid, unknown = litbridge.resolve_dbs("cnki,foobar", "x")
+    assert valid == ["cnki"] and unknown == ["foobar"]
+    # None → 按查询语言
+    assert litbridge.resolve_dbs(None, "公正世界信念")[0] == ["cnki", "wanfang", "vip"]
+    # 去重
+    assert litbridge.resolve_dbs("知网,cnki", "x")[0] == ["cnki"]
+
+
+def test_vip_profile_present_and_js_valid():
+    assert "vip" in litbridge._DB_PROFILES
+    js = litbridge._extract_js("vip")
+    assert "querySelectorAll" in js
+
+
+def test_lit_cli_multi_db_loops_all(tmp_path, monkeypatch, capsys):
+    from psyclaw.psych import litsearch, lit_cli as lc
+    monkeypatch.setattr(litsearch, "search", _fake_search)
+    monkeypatch.setattr(litbridge, "bridge_available", lambda **k: (True, ""))
+    calls = []
+
+    def _bs(q, db="cnki", **k):
+        calls.append(db)
+        return {"ok": True, "reason": "", "db": db, "name": litbridge._DB_PROFILES[db]["name"],
+                "records": [{"title": f"{db}命中文献", "doi": None, "authors": ["作者"],
+                             "year": "2020", "source": db, "oa_status": "unknown",
+                             "oa_url": None, "abstract": "", "pmid": None,
+                             "pmcid": None, "arxiv_id": None}]}
+    monkeypatch.setattr(litbridge, "bridge_search", _bs)
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10)
+    assert rc == 0
+    assert calls == ["cnki", "wanfang", "vip"]           # 三库都跑了
+    out = capsys.readouterr().out
+    assert "知网" in out and "万方" in out and "维普" in out
+
+
+# ---- 首次没装 → 交互一键装(feat-173)----------------------------------------
+
+def test_first_install_prompt_yes_installs(capsys):
+    from psyclaw.psych import lit_cli as lc
+    from psyclaw import ui
+    installed = {"done": False}
+    lc._first_install_nudge_or_hint(
+        "公正世界信念", "WebBridge 未安装(psyclaw webbridge install)", ui,
+        input_fn=lambda p: "y", is_tty=True, asked_fn=lambda: False,
+        mark_fn=lambda: None, install_fn=lambda ui_: installed.__setitem__("done", True))
+    assert installed["done"] is True
+
+
+def test_first_install_prompt_no_shows_command(capsys):
+    from psyclaw.psych import lit_cli as lc
+    from psyclaw import ui
+    called = {"install": False}
+    lc._first_install_nudge_or_hint(
+        "公正世界信念", "WebBridge 未安装(psyclaw webbridge install)", ui,
+        input_fn=lambda p: "n", is_tty=True, asked_fn=lambda: False,
+        mark_fn=lambda: None, install_fn=lambda ui_: called.__setitem__("install", True))
+    assert called["install"] is False
+    assert "webbridge install" in capsys.readouterr().out
+
+
+def test_second_time_no_prompt_just_hint(capsys):
+    from psyclaw.psych import lit_cli as lc
+    from psyclaw import ui
+    called = {"input": False}
+
+    def _inp(p):
+        called["input"] = True
+        return "y"
+    lc._first_install_nudge_or_hint(
+        "公正世界信念", "WebBridge 未安装(psyclaw webbridge install)", ui,
+        input_fn=_inp, is_tty=True, asked_fn=lambda: True,   # 已问过
+        mark_fn=lambda: None, install_fn=lambda ui_: None)
+    assert called["input"] is False                          # 不再追问
+    assert "一步开启" in capsys.readouterr().out
+
+
+def test_non_tty_never_prompts(capsys):
+    from psyclaw.psych import lit_cli as lc
+    from psyclaw import ui
+    called = {"input": False}
+    lc._first_install_nudge_or_hint(
+        "公正世界信念", "WebBridge 未安装(psyclaw webbridge install)", ui,
+        input_fn=lambda p: called.__setitem__("input", True) or "y",
+        is_tty=False, asked_fn=lambda: False, mark_fn=lambda: None,
+        install_fn=lambda ui_: None)
+    assert called["input"] is False                          # 非交互绝不阻塞问询
+
+
 def test_enable_command_maps_reason_to_step():
     assert litbridge.enable_command("WebBridge 未安装(psyclaw webbridge install)") \
         == "psyclaw webbridge install"
@@ -170,7 +266,7 @@ def test_extract_js_syntax_valid_all_dbs():
     if not shutil.which("node"):
         import pytest
         pytest.skip("需要 node 校验 JS 语法")
-    for db in ("cnki", "wanfang"):
+    for db in ("cnki", "wanfang", "vip"):
         js = litbridge._extract_js(db)
         assert "querySelectorAll" in js and js.strip().endswith(")")
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:

@@ -10,7 +10,7 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
             year_from: int | None = None, fulltext_doi: str | None = None,
             zotero_doi: str | None = None, synthesize: bool = False,
             download: bool = False, project_dir: str = ".",
-            bridge: bool | None = None) -> int:
+            bridge: bool | None = None, dbs=None) -> int:
     from psyclaw import ui
     from psyclaw.psych import litsearch, zotero_client
 
@@ -81,7 +81,7 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
                      "--download 批量下载本次 OA 命中;付费墙用 --zotero <DOI>。"))
 
     # 自动机构库桥接:公开 API 检不到知网/万方,驱动 WebBridge 补检并合并进结果与缓存
-    bridge_ran = _maybe_bridge(query, r, bridge, ui, limit)
+    bridge_ran = _maybe_bridge(query, r, bridge, ui, limit, dbs=dbs)
 
     # PRISMA 计数落盘(对接 LIT.prisma 质量检查)
     notes = Path(project_dir) / "notes"
@@ -115,10 +115,12 @@ def _has_cjk(s: str) -> bool:
     return any("一" <= c <= "鿿" for c in (s or ""))
 
 
-def _maybe_bridge(query: str, r: dict, bridge: bool | None, ui, limit: int) -> bool:
-    """自动驱动 WebBridge 进机构库补检并合并进 r。返回是否真的跑了桥接。
+def _maybe_bridge(query: str, r: dict, bridge: bool | None, ui, limit: int,
+                  dbs=None) -> bool:
+    """自动驱动 WebBridge 进(多个)机构库补检并合并进 r。返回是否真的处理了桥接。
 
-    bridge:None=自动(可用才跑,不可用静默降级)· True=强制(不可用也报原因)· False=关闭。
+    bridge:None=自动(可用即跑)· True=强制(不可用也报原因)· False=关闭。
+    dbs:None=按查询语言自动选库(中文→知网/万方/维普)· 字符串/列表=指定库。
     全程 fail-safe——litbridge 内部不抛,这里任何异常也吞掉,绝不中断 lit。
     """
     if bridge is False:
@@ -127,42 +129,112 @@ def _maybe_bridge(query: str, r: dict, bridge: bool | None, ui, limit: int) -> b
         from psyclaw.psych import litbridge
         ok, reason = litbridge.bridge_available()
         if not ok:
-            # 默认(auto)与强制(True)都精确指路:差哪一步、一条命令开启,而非泛化提示
-            print(ui.warn(institutional_hint(query)))
-            print(ui.dim(f"  一步开启机构库自动补检:{litbridge.enable_command(reason)}"
-                         f"({reason};开启后 lit 默认自动进知网,无需 --bridge)"))
-            return True                        # 已就桥接给足指引,外层不再重复
-        db = litbridge.DEFAULT_DB              # 目前默认知网(中文覆盖最差处)
-        name = litbridge._DB_PROFILES[db]["name"]
-        print(ui.dim(f"正在驱动浏览器进{name}检索(WebBridge,复用你的登录态,可能开新标签)…"))
-        out = litbridge.bridge_search(query, db=db, limit=limit)
-        if not out["ok"]:
-            print(ui.warn(f"  {name}桥接未成功:{out['reason']}"))
+            _first_install_nudge_or_hint(query, reason, ui)   # 首次没装可交互一键装(feat-173)
             return True
-        before = {(x.get("doi") or "").lower() or (x.get("title") or "").lower().strip()[:80]
-                  for x in r["results"]}
-        merged, added = litbridge.merge_results(r["results"], out["records"])
-        r["results"] = merged
-        r["n_deduped"] = len(merged)
-        r["n_raw"] = r.get("n_raw", 0) + len(out["records"])   # PRISMA identification 计入桥命中
-        r.setdefault("per_source", {})[name] = len(out["records"])
-        if out["records"]:
-            print(ui.ok(f"  ✓ {name}命中 {len(out['records'])} 条,新增 {added} 条(合并去重后共 {len(merged)}):"))
-            shown = 0
-            for p in out["records"]:
-                k = (p.get("doi") or "").lower() or (p.get("title") or "").lower().strip()[:80]
-                is_new = k not in before
-                au = ", ".join(p["authors"][:3]) + (" 等" if len(p["authors"]) > 3 else "")
-                tag = ui.accent("＋") if is_new else ui.dim("·")
-                print(f"   {tag} {p['title'][:80]} {ui.dim(au)} ({p.get('year') or '?'}) · {name}")
-                shown += 1
-                if shown >= limit:
-                    break
-        else:
-            print(ui.warn(f"  {out['reason'] or f'{name}未抽取到题录'}"))
+        target, unknown = litbridge.resolve_dbs(dbs, query)
+        if unknown:
+            print(ui.warn(f"  未识别的机构库:{', '.join(unknown)}"
+                          f"(支持:{', '.join(litbridge._DB_ALIASES)})"))
+        if not target:
+            print(ui.dim("  英文机构库(WoS/Scopus)需交互检索,暂不自动桥接;"
+                         "中文主题自动进知网/万方/维普。手动路线:lit --plan"))
+            return True
+        for db in target:
+            _bridge_one_db(query, r, db, ui, limit, litbridge)
         return True
     except Exception:  # noqa: BLE001 — 桥接任何异常都不影响 lit 主流程
         return False
+
+
+def _bridge_one_db(query: str, r: dict, db: str, ui, limit: int, litbridge) -> None:
+    """驱动单个机构库并把命中合并进 r(分库展示)。异常上抛由 _maybe_bridge 兜。"""
+    name = litbridge._DB_PROFILES[db]["name"]
+    print(ui.dim(f"正在驱动浏览器进{name}检索(WebBridge,复用你的登录态,可能开新标签)…"))
+    out = litbridge.bridge_search(query, db=db, limit=limit)
+    if not out["ok"]:
+        print(ui.warn(f"  {name}桥接未成功:{out['reason']}"))
+        return
+    before = {(x.get("doi") or "").lower() or (x.get("title") or "").lower().strip()[:80]
+              for x in r["results"]}
+    merged, added = litbridge.merge_results(r["results"], out["records"])
+    r["results"] = merged
+    r["n_deduped"] = len(merged)
+    r["n_raw"] = r.get("n_raw", 0) + len(out["records"])       # PRISMA identification 计入
+    r.setdefault("per_source", {})[name] = len(out["records"])
+    if out["records"]:
+        print(ui.ok(f"  ✓ {name}命中 {len(out['records'])} 条,新增 {added} 条(合并后共 {len(merged)}):"))
+        for p in out["records"][:limit]:
+            k = (p.get("doi") or "").lower() or (p.get("title") or "").lower().strip()[:80]
+            tag = ui.accent("＋") if k not in before else ui.dim("·")
+            au = ", ".join(p["authors"][:3]) + (" 等" if len(p["authors"]) > 3 else "")
+            print(f"   {tag} {p['title'][:80]} {ui.dim(au)} ({p.get('year') or '?'}) · {name}")
+    else:
+        print(ui.warn(f"  {out['reason'] or f'{name}未抽取到题录'}"))
+
+
+def _wb_ask_marker():
+    return Path.home() / ".psyclaw" / ".webbridge_install_asked"
+
+
+def _wb_asked() -> bool:
+    try:
+        return _wb_ask_marker().exists()
+    except OSError:
+        return False
+
+
+def _wb_mark_asked() -> None:
+    try:
+        m = _wb_ask_marker()
+        m.parent.mkdir(parents=True, exist_ok=True)
+        m.touch()
+    except OSError:
+        pass
+
+
+def _do_webbridge_install(ui) -> None:
+    """真装 WebBridge:下载二进制 → 起守护进程 → 打开扩展安装页。失败给手动命令,不抛。"""
+    from psyclaw import webbridge as wb
+    print(ui.dim("  下载 WebBridge 二进制(cdn.kimi.com,与官方 install.sh 同源)…"))
+    try:
+        wb.download_binary()
+    except Exception as e:  # noqa: BLE001
+        print(ui.err(f"  下载失败:{e};可手动 psyclaw webbridge install"))
+        return
+    wb.start_daemon()
+    print(ui.dim("  打开浏览器扩展安装页,装好点「添加」即连上…"))
+    wb.open_in_default_browser(wb.EXTENSION_STORE_URL)
+    print(ui.ok("  安装流程已启动。装好扩展并登录机构账号后,重跑 lit 即自动进机构库。"))
+
+
+def _first_install_nudge_or_hint(query: str, reason: str, ui, *, input_fn=None,
+                                 is_tty=None, asked_fn=None, mark_fn=None,
+                                 install_fn=None) -> None:
+    """桥不可用时的引导。首次(没问过)+ 未安装 + 交互 TTY → 直接问「现在装吗」并一键装;
+    否则给精确的一步开启指引。所有副作用可注入,离线单测。"""
+    from psyclaw.psych import litbridge
+    not_installed = "未安装" in (reason or "")
+    if is_tty is None:
+        import sys
+        is_tty = sys.stdin.isatty() and sys.stdout.isatty()
+    asked = (asked_fn or _wb_asked)()
+
+    if not_installed and is_tty and not asked:
+        (mark_fn or _wb_mark_asked)()                 # 问过一次即记,之后不再打扰
+        print(ui.warn(institutional_hint(query)))
+        try:
+            ans = (input_fn or input)("  现在安装 WebBridge 开启机构库(知网/万方/维普)自动检索?[Y/n] ")
+        except (EOFError, OSError):
+            ans = "n"
+        if ans.strip().lower() in ("", "y", "yes", "是"):
+            (install_fn or _do_webbridge_install)(ui)
+        else:
+            print(ui.dim(f"  好的。以后想开启:{litbridge.enable_command(reason)}"))
+        return
+
+    print(ui.warn(institutional_hint(query)))
+    print(ui.dim(f"  一步开启机构库自动补检:{litbridge.enable_command(reason)}"
+                 f"({reason};开启后 lit 默认自动进,无需 --bridge)"))
 
 
 def institutional_hint(query: str) -> str:

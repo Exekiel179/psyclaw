@@ -41,9 +41,61 @@ _DB_PROFILES: dict[str, dict] = {
         "source": [".periodical", ".source"],
         "date": [".year", ".date"],
     },
+    "vip": {
+        "name": "维普",
+        "search_url": "https://qikan.cqvip.com/Qikan/Search/Index?key=U%3D{q}&from=zk_search",
+        "row": [".simple-list .list-item", ".search-list .item", ".article-list li", "li.list-item"],
+        "title": [".title a", ".name a", "a.title", ".title"],
+        "author": [".author", ".writer", ".authors"],
+        "source": [".journal", ".periodical", ".source"],
+        "date": [".date", ".year"],
+    },
 }
 
 DEFAULT_DB = "cnki"
+# 中文机构库(需机构账号,登录态由用户真实浏览器提供);英文机构库(WoS/Scopus)需交互式
+# 检索,navigate-only 抓不到结果页,暂不自动桥接(走 lit --plan 手动)。
+_CN_DBS = ["cnki", "wanfang", "vip"]
+
+# 用户 --db 输入的别名归一(中英文/缩写 → 画像键)
+_DB_ALIASES = {
+    "知网": "cnki", "cnki": "cnki", "中国知网": "cnki", "kns": "cnki",
+    "万方": "wanfang", "wanfang": "wanfang", "wf": "wanfang",
+    "维普": "vip", "vip": "vip", "cqvip": "vip", "qikan": "vip",
+}
+
+
+def _has_cjk(s: str) -> bool:
+    return any("一" <= c <= "鿿" for c in (s or ""))
+
+
+def db_set_for_query(query: str) -> list:
+    """据查询语言自动选机构库集:中文 → 知网/万方/维普;纯英文 → 空(英文机构库需交互检索)。"""
+    return list(_CN_DBS) if _has_cjk(query) else []
+
+
+def resolve_dbs(spec, query: str) -> tuple[list, list]:
+    """把用户 --db 规格解析成有效画像键列表。
+
+    spec 为 None → 按查询语言自动选(db_set_for_query);为字符串(逗号分隔)→ 归一别名、
+    去重、剔除未知。返回 (有效键列表, 未识别的原始词列表)。
+    """
+    if spec is None:
+        return db_set_for_query(query), []
+    if isinstance(spec, str):
+        raw = [x.strip() for x in spec.split(",") if x.strip()]
+    else:
+        raw = list(spec)
+    valid, unknown, seen = [], [], set()
+    for r in raw:
+        key = _DB_ALIASES.get(r.lower().strip())
+        if key and key in _DB_PROFILES:
+            if key not in seen:
+                seen.add(key)
+                valid.append(key)
+        else:
+            unknown.append(r)
+    return valid, unknown
 
 
 def bridge_available(installed_fn=None, status_fn=None) -> tuple[bool, str]:
