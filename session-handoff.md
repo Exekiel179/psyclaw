@@ -4,17 +4,17 @@
 
 ## Current Objective
 
-- Goal: 开箱即用(feat-138/139)+ 协助体验三件套(feat-140/141/142,用户提议)
-- Current status: **feat-138~142 全 done**——137 个 feature 全 done,无未完成项
-- Branch / commit: master(138=4ca6c04·139=f0dd1ab 已推送;140/141/142 本轮提交)
+- Goal: cite/scale/method 重定位三部曲(用户拍板的三命令定义)——统计全外移
+- Current status: **feat-161~164 全 done**——159 个 feature 全 done,无未完成项
+- Branch / commit: master 本地(未推送);本轮 commits 4d59eb8→7c0509a(共 7 个)
 - Verification: 全量 `uv run --python 3.12 --with pytest python -m pytest -q`
-  → **1853 passed**;`python -m psyclaw eval` 28/28;`python -m psyclaw gates` ✓
-- 新命令速记:`psyclaw assist novice|standard|expert`(协助水平);
-  `psyclaw annotate <file> [--review] [--write]`(代码注释/审查)
-- 下一轮候选(未立项):AJS 包更新/卸载(feat-139 边界外)、feat-017/018/020
-  技能生态三件套(017 与 139 部分重叠,立项前先核对)
-- 用法速记:`psyclaw journal install <刊名> [--global]`(缩写/中文名均可);
-  `psyclaw start --journal AER`;装完 check/export 默认带 target_journal
+  → **2043 passed**;`python -m psyclaw gates` ✓;feature_list.json 补录 161~164
+- 新命令速记:
+  - `psyclaw cite <稿件>` 引文核查 / `psyclaw cite --make refs.json` 引用文章(生成 APA7 参考文献)
+  - `psyclaw score <data> --scale <id> [--reliability]` 量表分析(含虚伪作答体检 + 信度脚本)
+  - `psyclaw method <关键词>` 方法学 skill 路由(如「样本量」→功效分析、「无关变量控制」)
+- 下一轮候选(未立项):method 第三个 skill(操纵检查/操作化、信效度设计);
+  cite --make 支持中文期刊格式(现只 APA7);量表 careless 阈值可配
 
 ## Completed This Session
 - [x] 快进合并 feat/interaction-model-run-contracts(feat-076..078)进 master(先测后并:1495 绿)
