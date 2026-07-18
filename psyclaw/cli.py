@@ -677,6 +677,25 @@ def cmd_score(args: argparse.Namespace) -> int:
         print(f"  Total  M={ts['mean']:.2f}  SD={ts['sd']:.2f}"
               f"  range=[{ts['min']:.0f},{ts['max']:.0f}]  n={ts['n']}")
 
+    # 虚伪作答体检(基于原始应答;纯计数不算统计,守铁律)
+    from psyclaw.psych.careless import careless_report
+    crep = careless_report(result.get("raw_responses", []))
+    if crep["n_total"]:
+        print(ui.accent("\n虚伪作答体检（数据质量）"))
+        print(f"  疑似 {crep['n_suspect']}/{crep['n_total']} 名被试")
+        for r in crep["rows"]:
+            if not r["suspect"]:
+                continue
+            flags = []
+            if r["invariant"]:
+                flags.append("直入式作答")
+            if r["longstring"] >= 5:
+                flags.append(f"最长连续{r['longstring']}")
+            if r["missing_rate"] > 0.5:
+                flags.append(f"漏答{r['missing_rate']:.0%}")
+            print(ui.warn(f"    行 {r['row']}: {' · '.join(flags) or '疑似'}"))
+        print(ui.dim("  纯数据体检（连续相同/漏答/直入式）；马氏距离、IRV、信度 α 走外移脚本"))
+
     for w in result["warnings"]:
         print(ui.warn(f"\n{w}"))
 

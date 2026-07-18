@@ -352,6 +352,7 @@ def score_datafile(path: str, scale_id: str,
     missing_items_global = [i for i in range(1, n_items + 1) if i not in found_cols]
 
     participants: list[dict] = []
+    raw_responses: list[list] = []      # feat:原始应答(反向计分前),供虚伪作答标记
     for row in rows:
         item_values: dict[int, float] = {}
         for item_num, col in found_cols.items():
@@ -360,6 +361,8 @@ def score_datafile(path: str, scale_id: str,
                 item_values[item_num] = float(v)
             except ValueError:
                 pass
+        # 按条目序,缺失填 None——careless 须跑原始值(反向翻转会掩盖直入式作答)
+        raw_responses.append([item_values.get(i) for i in range(1, n_items + 1)])
         participants.append(score_participant(item_values, scale, method=method))
 
     # 子量表描述统计
@@ -399,6 +402,7 @@ def score_datafile(path: str, scale_id: str,
         "n": len(rows),
         "n_complete": sum(1 for p in participants if not p["missing_items"]),
         "participants": participants,
+        "raw_responses": raw_responses,
         "subscale_stats": subscale_stats,
         "total_stats": total_stats,
         "missing_items_global": missing_items_global,
