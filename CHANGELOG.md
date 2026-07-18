@@ -11,8 +11,9 @@
 - **lit 自动调 WebBridge**(feat-169):公开 API(OpenAlex/EuropePMC)检不到知网/万方的
   中文文献。新增 `litbridge`——psyclaw 自己驱动 Kimi WebBridge(复用用户已登录的真实
   浏览器):navigate 到知网检索 → evaluate 注入 JS 抽取题录 → 归一成 lit schema → 与
-  公开 API 结果按(doi|题名)去重合并,并入展示/缓存/PRISMA 计数。`lit --bridge` 强制、
-  `--no-bridge` 关闭,默认可用即自动、不可用静默降级。全 fail-safe,仓内零浏览器逻辑
+  公开 API 结果按(doi|题名)去重合并,并入展示/缓存/PRISMA 计数。**默认(auto)可用即自动
+  进知网(无需 --bridge);不可用则给一步开启指引(据缺哪一步:psyclaw webbridge
+  install/start/status)**。`lit --bridge` 强制、`--no-bridge` 关闭。全 fail-safe,仓内零浏览器逻辑
   (经 webbridge.call 外移)。**注:知网 DOM 选择器为 best-effort,集中在 _DB_PROFILES,
   失配时降级提示人工/lit --import,不中断 lit。**
 - **主动指路 + 诚实提示**(feat-168):桥不可用时主动提示机构库检索路径;prompt_toolkit

@@ -89,6 +89,29 @@ def test_bridge_search_returns_records():
     assert out["db"] == "cnki"
 
 
+def test_enable_command_maps_reason_to_step():
+    assert litbridge.enable_command("WebBridge 未安装(psyclaw webbridge install)") \
+        == "psyclaw webbridge install"
+    assert litbridge.enable_command("WebBridge 守护进程未运行(psyclaw webbridge start)") \
+        == "psyclaw webbridge start"
+    assert litbridge.enable_command("浏览器扩展未连接(psyclaw webbridge status 查看)") \
+        == "psyclaw webbridge status"
+    assert litbridge.enable_command("") == "psyclaw webbridge install"
+
+
+def test_lit_cli_auto_unavailable_gives_enable_step(tmp_path, monkeypatch, capsys):
+    """默认(auto)桥不可用时:给一步开启指引,而非静默/泛化。"""
+    from psyclaw.psych import litsearch, lit_cli as lc
+    monkeypatch.setattr(litsearch, "search", _fake_search)
+    monkeypatch.setattr(litbridge, "bridge_available",
+                        lambda **k: (False, "WebBridge 未安装(psyclaw webbridge install)"))
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10)   # 默认 auto
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "psyclaw webbridge install" in out
+    assert "无需 --bridge" in out
+
+
 def test_bridge_search_unavailable_graceful():
     out = litbridge.bridge_search("x", available_fn=lambda **k: (False, "扩展未连接"))
     assert out["ok"] is False and out["records"] == []

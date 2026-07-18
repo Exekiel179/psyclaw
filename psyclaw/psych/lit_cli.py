@@ -101,10 +101,8 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
     print(ui.dim(f"检索结果缓存 → {notes / 'lit_search.json'}"
                  "(下次 psyclaw research 将据此合成有据综述)"))
 
-    if not bridge_ran:                         # 桥没跑(不可用/关闭)才提示手动路径
-        hint = institutional_hint(query)
-        if hint:
-            print(ui.warn(hint))
+    # 机构库桥接的所有提示(可用即自动跑 / 不可用给一步开启指引)由 _maybe_bridge 内部负责;
+    # bridge_ran 为 False 仅当用户显式 --no-bridge——此时不再劝。
 
     if synthesize:
         _synthesize_review(query, r, project_dir, ui)
@@ -129,9 +127,11 @@ def _maybe_bridge(query: str, r: dict, bridge: bool | None, ui, limit: int) -> b
         from psyclaw.psych import litbridge
         ok, reason = litbridge.bridge_available()
         if not ok:
-            if bridge is True:                 # 用户显式要桥接却不可用 → 说清楚
-                print(ui.warn(f"机构库桥接不可用:{reason}"))
-            return False                       # 自动模式静默降级(交 institutional_hint)
+            # 默认(auto)与强制(True)都精确指路:差哪一步、一条命令开启,而非泛化提示
+            print(ui.warn(institutional_hint(query)))
+            print(ui.dim(f"  一步开启机构库自动补检:{litbridge.enable_command(reason)}"
+                         f"({reason};开启后 lit 默认自动进知网,无需 --bridge)"))
+            return True                        # 已就桥接给足指引,外层不再重复
         db = litbridge.DEFAULT_DB              # 目前默认知网(中文覆盖最差处)
         name = litbridge._DB_PROFILES[db]["name"]
         print(ui.dim(f"正在驱动浏览器进{name}检索(WebBridge,复用你的登录态,可能开新标签)…"))
