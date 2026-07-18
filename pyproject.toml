@@ -11,9 +11,12 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "PsyClaw" }]
 
-# 核心 = 纯 stdlib + 轻量可选依赖。统计计算已整体外移到成熟库/MCP——
-# psyclaw 自身不再 import 任何统计库;需在本机跑统计的用户按需装 [stats] extra 或走 MCP。
-dependencies = []
+# 核心 = stdlib 为主 + 唯一内置第三方:prompt_toolkit(交互基础设施:REPL 实时命令
+# 下拉 + 中文宽字符输入;缺失时代码自动降级 readline,故裸源码仍可跑)。
+# 统计计算仍整体外移到成熟库/MCP——psyclaw 自身不 import 任何统计库(铁律不变)。
+dependencies = [
+    "prompt_toolkit>=3.0",   # 交互基础设施(命令下拉+中文输入);非统计,按用户拍板内置
+]
 
 [project.optional-dependencies]
 stats = [  # 可选:在本机直接跑统计时安装的成熟库栈(psyclaw 不强制依赖)
@@ -21,7 +24,7 @@ stats = [  # 可选:在本机直接跑统计时安装的成熟库栈(psyclaw 不
     "statsmodels>=0.14", "lifelines>=0.27", "factor_analyzer>=0.4", "semopy>=2.3",
 ]
 viz = ["seaborn", "matplotlib"]
-full = ["pyyaml", "rich", "prompt_toolkit", "mcp"]
+full = ["pyyaml", "rich", "mcp"]   # prompt_toolkit 已提为核心依赖,不再列此
 embed = ["model2vec"]  # 本地语义嵌入(纯 numpy 静态模型);未装时召回用内置哈希向量兜底
 
 [project.scripts]

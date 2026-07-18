@@ -1,6 +1,8 @@
 # CLAUDE.md — PsyClaw 项目工作准则（保持精简，每个词都在烧 token）
 
-PsyClaw 是心理学研究**编排** Agent CLI，纯 Python、纯 stdlib 核（无第三方硬依赖）。
+PsyClaw 是心理学研究**编排** Agent CLI，纯 Python、stdlib 为主。唯一内置的第三方依赖是
+**prompt_toolkit**（REPL 命令下拉 + 中文宽字符输入的交互基础设施，缺失时降级 readline，故裸源码仍可跑）——
+这是交互基础设施、非统计库，经用户拍板内置；**统计库一律外移不内置**（见下铁律）。
 负责文献→设计→写作→评审→质量检查的研究流程编排 + 知识参考 + 澄清/预注册；
 **统计计算已整体外移到成熟库/MCP——psyclaw 自身不内置、不 import 任何统计库**。
 入口 `python -m psyclaw`，包根 `psyclaw/`，测试 `C:\Python314\python -m pytest -q`。
