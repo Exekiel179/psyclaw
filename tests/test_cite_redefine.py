@@ -27,11 +27,24 @@ def test_relevant_knowledge_ok_without_evidence():
 
 
 def test_cite_command_now_runs_audit():
-    """cite 子命令重定位到引用保真核查。"""
-    from psyclaw.cli import build_parser, cmd_cite_check
+    """cite 双模:给稿件走引文核查(引用文章走 --make,见 test_reference)。"""
+    import argparse
+    from psyclaw.cli import build_parser, cmd_cite
     p = build_parser()
     args = p.parse_args(["cite", "notes/lit_review.md"])
-    assert args.func is cmd_cite_check
+    assert args.func is cmd_cite               # 统一入口 cmd_cite 分派
+    assert args.make is None                    # 无 --make → 核查模式
+    # 分派到核查:给不存在的稿件,run_citation_audit 应被调用(核查语义保留)
+    import psyclaw.cli as cli
+    called = {}
+    orig = cli.cmd_cite_check
+    cli.cmd_cite_check = lambda a: called.setdefault("audit", True) or 0
+    try:
+        cli.cmd_cite(argparse.Namespace(make=None, manuscript="x.md",
+                                        project=".", journal=None))
+    finally:
+        cli.cmd_cite_check = orig
+    assert called.get("audit")
 
 
 def test_cite_audit_runs_on_draft(tmp_path, capsys):

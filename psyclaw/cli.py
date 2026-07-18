@@ -933,6 +933,46 @@ def cmd_jars(args: argparse.Namespace) -> int:
     return jars_cli(argv)
 
 
+def cmd_cite(args: argparse.Namespace) -> int:
+    """cite 双模:--make <json> 引用文章(生成参考文献);否则对稿件做引文核查。"""
+    if getattr(args, "make", None):
+        return cmd_cite_make(args)
+    if not getattr(args, "manuscript", None):
+        from psyclaw import ui
+        print(ui.warn("cite 需要一个稿件(引文核查)或 --make <元数据.json>(引用文章)。"))
+        print(ui.dim("  引文核查:psyclaw cite notes/lit_review.md"))
+        print(ui.dim('  引用文章:psyclaw cite --make refs.json  (JSON:单条或 [{...}] 列表)'))
+        return 2
+    return cmd_cite_check(args)
+
+
+def cmd_cite_make(args: argparse.Namespace) -> int:
+    """引用文章:读 JSON 文献元数据 → 规范 APA7 参考文献条目 + 文内引用。"""
+    import json
+    from psyclaw import ui
+    from psyclaw.psych.reference import render_references
+
+    path = args.make
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError) as e:
+        print(ui.err(f"读取元数据失败:{path} — {e}"))
+        print(ui.dim('  期望 JSON:单条 {"authors":["Ellen L. Hamaker"],"year":"2015",'
+                     '"title":"…","journal":"…","volume":"20","issue":"1",'
+                     '"pages":"102-116","doi":"10.1037/a0038889"} 或其列表。'))
+        return 2
+    entries = data if isinstance(data, list) else [data]
+    entries = [e for e in entries if isinstance(e, dict)]
+    if not entries:
+        print(ui.warn("元数据为空或格式不符(需对象或对象列表)。"))
+        return 2
+    print(ui.title("引用文章") + ui.dim(f"  {len(entries)} 条 · APA7"))
+    print(render_references(entries))
+    print(ui.dim("  提示:参考文献真伪/文内引用是否溯源,用 psyclaw cite <稿件> 核查。"))
+    return 0
+
+
 def cmd_cite_check(args: argparse.Namespace) -> int:
     """引用保真核查:稿件文内引用是否都溯源到检索命中(反杜撰参考文献)。"""
     from psyclaw import ui
@@ -2000,11 +2040,14 @@ def build_parser() -> argparse.ArgumentParser:
     pcl.add_argument("--status", action="store_true", help="只看研究准备进度")
     pcl.set_defaults(func=cmd_clarify)
 
-    pci = sub.add_parser("cite", help="引用保真核查:文内引用是否都溯源到检索命中(反杜撰参考文献)")
-    pci.add_argument("manuscript", help="稿件 Markdown(如 notes/lit_review.md)")
+    pci = sub.add_parser("cite", help="引用文章(元数据→规范参考文献)+ 引文核查(反杜撰)")
+    pci.add_argument("manuscript", nargs="?", default=None,
+                     help="稿件 Markdown(核查模式,如 notes/lit_review.md)")
+    pci.add_argument("--make", default=None,
+                     help="引用文章:JSON 元数据(单条或列表)→ 规范 APA7 参考文献 + 文内引用")
     pci.add_argument("--project", default=".", help="项目目录(默认当前)")
     pci.add_argument("--journal", default=None, help="按期刊定制引用风格核对")
-    pci.set_defaults(func=cmd_cite_check)
+    pci.set_defaults(func=cmd_cite)
 
     pex = sub.add_parser("export", help="格式化输出(APA7 / 心理学报 / 心理科学,确定性模板)")
     pex.add_argument("file", help="结构化 Markdown 草稿")
