@@ -322,16 +322,21 @@ def _render(prompt: str, buf: str, suggestions: list, sel: int,
     extra = max(prev_lines, n)
     if extra:
         out.write(f"\033[{extra}A")               # 光标回输入行
-    out.write("\r" + "\033[" + str(_visible_len(prompt) + len(buf)) + "C"
-              if (_visible_len(prompt) + len(buf)) else "\r")
+    # 光标右移列数按显示宽度算(prompt 与 buf 里的中文都占 2 列),否则中文后光标错位
+    col = _visible_len(prompt) + _visible_len(buf)
+    out.write("\r\033[" + str(col) + "C" if col else "\r")
     out.flush()
     return n
 
 
 def _visible_len(s: str) -> int:
-    """去掉 ANSI 后的长度(粗略,中文按 1 算——光标定位足够用)。"""
-    import re
-    return len(re.sub(r"\033\[[0-9;]*m", "", s))
+    """去掉 ANSI 后的**显示列宽**(中日韩按 2 列)。
+
+    bug 修:此前中文按 1 列算,导致自研 raw reader 在中文输入后 `\\033[nC` 光标右移
+    列数不足、重画时提示符被覆盖成乱码(用户实测「公yclaw ❯」)。改用 ui.display_width
+    的东亚宽度感知,与输出框(feat-157)同口径。
+    """
+    return ui.display_width(s)
 
 
 def _clear_suggestions(prev_lines: int) -> None:
