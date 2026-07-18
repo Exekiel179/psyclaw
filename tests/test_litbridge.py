@@ -1,0 +1,181 @@
+"""feat:lit 自动调 WebBridge 进机构库(知网)检索,合并进公开 API 结果。
+
+lit 只打公开 API(检不到知网/万方);此前只能提示用户手动走桥接。本模块让 psyclaw
+自己驱动 WebBridge(用户已登录的真实浏览器):navigate 到知网检索 → evaluate 抽取
+结果行 → 归一成 lit 题录 schema → 合并去重。全程 fail-safe:桥不可用/抽取失败都不抛,
+降级回公开 API 结果 + 指路,绝不中断 lit。call 可注入,离线单测。
+"""
+from __future__ import annotations
+
+from psyclaw.psych import litbridge
+
+
+# ---- 可用性判定 --------------------------------------------------------------
+
+def test_available_needs_binary_daemon_extension():
+    ok, _ = litbridge.bridge_available(installed_fn=lambda: False,
+                                       status_fn=lambda **k: None)
+    assert ok is False
+    ok, _ = litbridge.bridge_available(installed_fn=lambda: True,
+                                       status_fn=lambda **k: None)
+    assert ok is False                                   # 守护进程没起
+    ok, _ = litbridge.bridge_available(installed_fn=lambda: True,
+                                       status_fn=lambda **k: {"extension_connected": False})
+    assert ok is False                                   # 扩展没连
+    ok, reason = litbridge.bridge_available(installed_fn=lambda: True,
+                                            status_fn=lambda **k: {"extension_connected": True})
+    assert ok is True and reason == ""
+
+
+# ---- URL 构造 ----------------------------------------------------------------
+
+def test_cnki_search_url_encodes_query():
+    u = litbridge.db_search_url("cnki", "公正世界信念")
+    assert u.startswith("https://") and "cnki" in u
+    assert "%E5%85%AC" in u or "公正世界信念" in u        # 编码或原样含查询
+
+
+def test_unknown_db_url_empty():
+    assert litbridge.db_search_url("no-such-db", "x") == ""
+
+
+# ---- 结果解析 ----------------------------------------------------------------
+
+def test_parse_normalizes_records():
+    raw = [
+        {"title": "公正世界信念：概念、测量、及研究热点", "authors": "杜建政;祝振兵",
+         "year": "2007", "source": "心理科学进展"},
+        {"title": "  ", "authors": "", "year": ""},       # 空标题剔除
+    ]
+    recs = litbridge.parse_bridge_results(raw, source="知网")
+    assert len(recs) == 1
+    r = recs[0]
+    assert r["title"].startswith("公正世界信念")
+    assert r["authors"] == ["杜建政", "祝振兵"]            # 分号/逗号拆分
+    assert r["year"] == "2007"
+    assert r["source"] == "知网"
+    assert r["doi"] is None                               # 知网题录一般无 DOI
+    assert "oa_status" in r                                # 补齐 schema 键
+
+
+def test_parse_handles_wrapped_payload():
+    # daemon evaluate 返回可能包一层 {"result": [...]} 或 JSON 字符串
+    import json
+    wrapped = {"result": [{"title": "T", "authors": "A", "year": "2020"}]}
+    assert len(litbridge.parse_bridge_results(wrapped)) == 1
+    as_str = json.dumps([{"title": "T", "authors": "A", "year": "2020"}])
+    assert len(litbridge.parse_bridge_results(as_str)) == 1
+    assert litbridge.parse_bridge_results(None) == []
+
+
+# ---- 编排(注入 mock call)---------------------------------------------------
+
+def _mock_call_ok(action, args=None, **k):
+    if action == "navigate":
+        return {"success": True}
+    if action == "evaluate":
+        return {"success": True, "result": [
+            {"title": "公正世界信念研究", "authors": "张三;李四", "year": "2019",
+             "source": "心理学报"}]}
+    return {"success": True}
+
+
+def test_bridge_search_returns_records():
+    out = litbridge.bridge_search("公正世界信念", db="cnki", call=_mock_call_ok,
+                                  available_fn=lambda **k: (True, ""))
+    assert out["ok"] is True
+    assert len(out["records"]) == 1
+    assert out["records"][0]["source"]
+    assert out["db"] == "cnki"
+
+
+def test_bridge_search_unavailable_graceful():
+    out = litbridge.bridge_search("x", available_fn=lambda **k: (False, "扩展未连接"))
+    assert out["ok"] is False and out["records"] == []
+    assert "扩展" in out["reason"]
+
+
+def test_bridge_search_navigate_fails_graceful():
+    def _call(action, args=None, **k):
+        return {"success": False, "error": "boom"}
+    out = litbridge.bridge_search("x", call=_call, available_fn=lambda **k: (True, ""))
+    assert out["ok"] is False and out["records"] == []
+
+
+def test_bridge_search_empty_extraction_graceful():
+    def _call(action, args=None, **k):
+        if action == "evaluate":
+            return {"success": True, "result": []}
+        return {"success": True}
+    out = litbridge.bridge_search("x", call=_call, available_fn=lambda **k: (True, ""))
+    assert out["ok"] is True and out["records"] == []     # 空抽取不算失败,但无记录
+
+
+def test_bridge_search_never_raises():
+    def _boom(action, args=None, **k):
+        raise RuntimeError("network dead")
+    out = litbridge.bridge_search("x", call=_boom, available_fn=lambda **k: (True, ""))
+    assert out["ok"] is False and out["records"] == []
+
+
+# ---- 合并去重 ----------------------------------------------------------------
+
+def test_merge_dedups_by_title():
+    api = [{"title": "公正世界信念：概念、测量、及研究热点", "doi": None, "authors": [],
+            "year": "2007", "source": "OpenAlex"}]
+    bridge = [{"title": "公正世界信念：概念、测量、及研究热点", "doi": None, "authors": ["杜建政"],
+               "year": "2007", "source": "知网"}]
+    merged, added = litbridge.merge_results(api, bridge)
+    assert added == 0                                     # 同题去重
+    assert len(merged) == 1
+
+
+def test_merge_adds_new():
+    api = [{"title": "A", "doi": None, "authors": [], "year": "2020", "source": "OpenAlex"}]
+    bridge = [{"title": "B 全新中文文献", "doi": None, "authors": [], "year": "2021", "source": "知网"}]
+    merged, added = litbridge.merge_results(api, bridge)
+    assert added == 1 and len(merged) == 2
+
+
+# ---- lit_cli 集成(mock 检索 + mock 桥) --------------------------------------
+
+def _fake_search(query, sources=None, limit=10, year_from=None):
+    return {"query": query, "per_source": {"openalex": 1}, "n_raw": 1,
+            "n_deduped": 1, "n_duplicates": 0,
+            "results": [{"title": "英文命中", "doi": "10.1/x", "authors": ["A"],
+                         "year": "2020", "source": "OpenAlex", "oa_status": "gold",
+                         "oa_url": None, "abstract": "", "pmid": None,
+                         "pmcid": None, "arxiv_id": None}]}
+
+
+def test_lit_cli_auto_bridges_and_merges(tmp_path, monkeypatch, capsys):
+    from psyclaw.psych import litsearch, lit_cli as lc
+    monkeypatch.setattr(litsearch, "search", _fake_search)
+    monkeypatch.setattr(litbridge, "bridge_available", lambda **k: (True, ""))
+    monkeypatch.setattr(litbridge, "bridge_search",
+                        lambda q, **k: {"ok": True, "reason": "", "db": "cnki", "name": "知网",
+                                        "records": [{"title": "知网独有中文文献", "doi": None,
+                                                     "authors": ["杜建政"], "year": "2007",
+                                                     "source": "知网", "oa_status": "unknown",
+                                                     "oa_url": None, "abstract": "", "pmid": None,
+                                                     "pmcid": None, "arxiv_id": None}]})
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "知网" in out and "新增 1" in out
+    # 桥题录进了缓存
+    import json
+    cache = json.loads((tmp_path / "notes" / "lit_search.json").read_text(encoding="utf-8"))
+    titles = [r["title"] for r in cache["results"]]
+    assert "知网独有中文文献" in titles
+
+
+def test_lit_cli_no_bridge_flag_skips(tmp_path, monkeypatch, capsys):
+    from psyclaw.psych import litsearch, lit_cli as lc
+    monkeypatch.setattr(litsearch, "search", _fake_search)
+    called = {"bridged": False}
+    monkeypatch.setattr(litbridge, "bridge_available",
+                        lambda **k: called.__setitem__("bridged", True) or (True, ""))
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10, bridge=False)
+    assert rc == 0
+    assert called["bridged"] is False                    # 没探测桥,直接跳过
