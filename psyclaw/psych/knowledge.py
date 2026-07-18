@@ -60,28 +60,8 @@ def print_method(method_id: str | None = None) -> None:
     print(f"  常见坑  : {m['pitfalls']}")
 
 
-# -- 方法学背书库 -------------------------------------------------------------
-
-def print_evidence(topic_id: str | None = None) -> None:
-    topics = _load("evidence.json", "topics")
-    if not topic_id:
-        print("  方法学背书库(psyclaw cite <id>)— 每个决策都有文献撑腰:")
-        for t in topics:
-            print(f"    {t['id']:<24} {t['decision']}")
-        return
-    t = next((x for x in topics if x["id"] == topic_id.lower()), None)
-    if not t:
-        # 模糊匹配
-        hits = [x for x in topics if topic_id.lower() in x["id"]
-                or topic_id in x["decision"]]
-        if len(hits) == 1:
-            t = hits[0]
-        else:
-            print(f"  未找到 {topic_id}。" + (f"相近:{', '.join(h['id'] for h in hits)}" if hits else ""))
-            return
-    print(f"  决策: {t['decision']}")
-    print(f"  背书: {t['citation']}")
-    print(f"  要点: {t['gist']}")
+# 方法学背书库(evidence.json)已删除:静态映射既不全也会过时,且"文献支撑"应可核实
+# ——需要文献依据走真实检索(psyclaw lit),不再查内置静态库。cite 现做引用保真核查。
 
 
 # -- 实验设计 ----------------------------------------------------------------
