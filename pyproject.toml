@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psyclaw"
-version = "0.15.0"
+version = "0.16.0"
 description = "心理学研究编排 Agent CLI — 文献调研 · 实验设计 · 论文写作 · 同行评审，质量检查内置；统计交给成熟库/MCP"
 readme = "README.md"
 requires-python = ">=3.11"

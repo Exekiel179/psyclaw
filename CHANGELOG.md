@@ -1,5 +1,43 @@
 # Changelog
 
+## v0.16.0(2026-07-18)
+
+> 主题:**lit 自动驱动机构库桥接(知网)+ 交互基础设施内置(prompt_toolkit)+ 一键安装 +
+> 已知交互 bug 清零**。lit 从"只打公开 API"升级为"公开 API + 自动驱动用户真实浏览器进
+> 知网补检合并";prompt_toolkit 提为核心依赖,中文输入与命令下拉从根上好使。feat-166~170,
+> 测试 2045→2072 绿。
+
+### lit 自动机构库桥接(feat-168/169)
+- **lit 自动调 WebBridge**(feat-169):公开 API(OpenAlex/EuropePMC)检不到知网/万方的
+  中文文献。新增 `litbridge`——psyclaw 自己驱动 Kimi WebBridge(复用用户已登录的真实
+  浏览器):navigate 到知网检索 → evaluate 注入 JS 抽取题录 → 归一成 lit schema → 与
+  公开 API 结果按(doi|题名)去重合并,并入展示/缓存/PRISMA 计数。`lit --bridge` 强制、
+  `--no-bridge` 关闭,默认可用即自动、不可用静默降级。全 fail-safe,仓内零浏览器逻辑
+  (经 webbridge.call 外移)。**注:知网 DOM 选择器为 best-effort,集中在 _DB_PROFILES,
+  失配时降级提示人工/lit --import,不中断 lit。**
+- **主动指路 + 诚实提示**(feat-168):桥不可用时主动提示机构库检索路径;prompt_toolkit
+  引导改醒目 + 据安装方式给正确装法。
+
+### 交互体验根治(feat-167/170)
+- **prompt_toolkit 提为核心依赖**(feat-170,用户拍板):装 psyclaw 即自带,REPL 实时命令
+  下拉(↑↓ 选择)+ 中文宽字符输入根治;缺失降级 readline 路径保留。CLAUDE.md 铁律相应
+  更新(交互基础设施可内置,统计库仍一律外移)。
+- **内置 skill 不再对模型隐藏**(feat-167):capability_map 只列命令、从不告诉 chat 模型有
+  sample-size/confound-control/pingouin 等结构化 skill;skills_catalog 每轮注入内置 skill
+  目录,模型主动路由。
+- **中文输入光标乱码修复**(feat-167):自研 raw reader 的 _visible_len 中文按 1 列算致光标
+  错位、重画覆盖成「公yclaw ❯」;改用东亚宽度感知(中日韩 2 列),与输出框同口径。
+
+### 分发:一键安装(feat-166)
+- **镜像感知一键安装脚本**:`curl -fsSL .../install.sh | sh`(macOS/Linux)/
+  `irm .../install.ps1 | iex`(Windows)。探测 GitHub 可达性,不通切 gitclone.com +
+  aliyun PyPI 镜像,uv 装(自带管理 Python)。安全加固:不经第三方代理拉 Python 二进制、
+  第三方代码镜像用途显式披露、官方 uv 安装器标注可信来源。
+
+### 修复(发行自检,feat-165)
+- 参考文献题名以 ?/! 结尾的双标点(APA7 不补);method 纯 ASCII 别名子串误匹配
+  (power 命中 empower → 改词边界)。
+
 ## v0.15.0(2026-07-18)
 
 > 主题:**三命令重定位(cite/scale/method)统计全外移 + 对话体验缺陷两轮清零 +
