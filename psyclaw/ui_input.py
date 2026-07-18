@@ -462,13 +462,27 @@ def input_hint(backend: str | None = None) -> str:
     return _HINTS.get(backend or input_backend(), _HINTS["plain"])
 
 
-def ptk_install_nudge(backend: str | None = None) -> str:
-    """TTY 但无 ptk(readline/raw)时,一句引导:装 prompt_toolkit 得实时下拉。
+def _ptk_install_cmd() -> str:
+    """据 psyclaw 的安装方式给正确的装 prompt_toolkit 命令。
 
-    ptk 已用 / 非 TTY(plain)→ 空串(不打扰)。
+    uv tool 安装的 psyclaw 是隔离环境,`pip install` 进不去——要 `uv tool install --with`。
+    """
+    exe = (sys.executable or "").replace("\\", "/")
+    if "/tools/" in exe and "uv" in exe:      # uv tool 隔离环境
+        return ('uv tool install --with prompt_toolkit '
+                '"git+https://github.com/Exekiel179/psyclaw.git@v0.15.0"')
+    return "pip install prompt_toolkit"
+
+
+def ptk_install_nudge(backend: str | None = None) -> str:
+    """TTY 但无 ptk(readline/raw)时,一句引导:装 prompt_toolkit 得实时下拉 + 更稳的中文输入。
+
+    ptk 已用 / 非 TTY(plain)→ 空串(不打扰)。macOS 的 libedit 既做不出可下滑的命令
+    下拉、又对中文宽字符渲染不稳——prompt_toolkit 是这两点的根治办法。
     """
     if (backend or input_backend()) in ("readline", "raw"):
-        return "想要输入 / 时实时弹出命令联想下拉?装 prompt_toolkit 即可:pip install prompt_toolkit"
+        return ("想要 / 命令实时下拉(↑↓ 选择)且中文输入不乱码?装 prompt_toolkit:"
+                + _ptk_install_cmd())
     return ""
 
 

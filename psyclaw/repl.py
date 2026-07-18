@@ -1990,8 +1990,8 @@ class ReplSession:
         _backend = input_backend()               # feat-153:提示随实际 backend 说实话
         print("  " + ui.dim(input_hint(_backend)))
         _nudge = ptk_install_nudge(_backend)
-        if _nudge:                                # 无 ptk 时一句引导(装了才有实时下拉)
-            print("  " + ui.dim(_nudge))
+        if _nudge:                                # 无 ptk:醒目引导(下拉+中文输入的根治办法)
+            print("  " + ui.warn(_nudge))
         print()
         while True:
             base = ui.paint("psyclaw", "brcyan", "bold")
