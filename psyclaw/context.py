@@ -21,6 +21,8 @@ import io
 import json
 from pathlib import Path
 
+from psyclaw.skills.loader import list_skills
+
 CHAR_BUDGET_HISTORY = 60_000     # 历史预算(约 15k tokens)
 KEEP_RECENT_TURNS = 8            # 压缩时保留的最近消息数
 FILE_EXCERPT_CHARS = 6_000
@@ -191,6 +193,31 @@ def capability_map() -> str:
         "统计计算:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
         "文献/量表/预注册:psyclaw lit / scale / preregister。\n"
         "拿不准有没有现成能力,先想 psyclaw 命令,再考虑手写。")
+
+
+def skills_catalog(project_dir: str = ".") -> str:
+    """内置结构化 skill 目录——每轮注入,让模型知道有哪些 skill 可主动调用。
+
+    此前 capability_map 只列命令,从不告诉模型有 sample-size/confound-control/pingouin
+    等结构化 skill,模型自然不会路由到它们(用户实测:内置 skill 被「隐藏」)。修:列
+    出内置 skill(名 + 一句描述),并说明「按 skill 流程办事胜过裸输出」。发现失败返回
+    空串(系统提示零污染)。
+    """
+    try:
+        skills = list_skills(project_dir, include_external=False)
+    except Exception:  # noqa: BLE001 — 发现失败不污染系统提示
+        return ""
+    if not skills:
+        return ""
+    lines = ["\n# 内置 skill(结构化能力,按其流程办事胜过裸输出——命中场景就调用,别忽略)"]
+    for s in sorted(skills, key=lambda x: x.get("name", "")):
+        name = s.get("name", "")
+        desc = (s.get("description") or "").strip().replace("\n", " ")
+        if len(desc) > 64:
+            desc = desc[:64] + "…"
+        lines.append(f"- {name}:{desc}")
+    lines.append("调用方式:读对应 SKILL.md 按其步骤执行;`psyclaw skills` 或 `method <关键词>` 可路由。")
+    return "\n".join(lines)
 
 
 # feat-150:结构化软拦截。capability_map(feat-144)是提示层「别手搓」,对弱指令
