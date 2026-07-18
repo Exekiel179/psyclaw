@@ -137,6 +137,31 @@ def test_merge_adds_new():
     assert added == 1 and len(merged) == 2
 
 
+# ---- 抽取 JS 自测:语法合法(真实 DOM 匹配只能真机验证)-------------------------
+
+def test_extract_js_syntax_valid_all_dbs():
+    """生成的抽取 JS 在每个库画像上都语法合法(node --check)。无 node 则跳过。"""
+    import shutil
+    import subprocess
+    import tempfile
+    if not shutil.which("node"):
+        import pytest
+        pytest.skip("需要 node 校验 JS 语法")
+    for db in ("cnki", "wanfang"):
+        js = litbridge._extract_js(db)
+        assert "querySelectorAll" in js and js.strip().endswith(")")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
+            fh.write(js)
+            path = fh.name
+        try:
+            r = subprocess.run(["node", "--check", path],
+                               capture_output=True, text=True, timeout=15)
+            assert r.returncode == 0, f"{db} 抽取 JS 语法非法:{r.stderr}"
+        finally:
+            import os
+            os.unlink(path)
+
+
 # ---- lit_cli 集成(mock 检索 + mock 桥) --------------------------------------
 
 def _fake_search(query, sources=None, limit=10, year_from=None):
