@@ -778,8 +778,36 @@ def cmd_assume(args: argparse.Namespace) -> int:
 
 
 def cmd_method(args: argparse.Namespace) -> int:
+    # feat:method 重定位——先路由到结构化方法学 skill(样本量/无关变量控制…),
+    # 让宿主模型按 skill 既定流程做(比裸输出规范);匹配不到再退回 methods.json 词条。
     from psyclaw.psych.knowledge import print_method
-    print_method(args.method_id)
+    from psyclaw.psych.method_skills import (
+        list_method_skills, match_method_skill, skill_procedure,
+    )
+
+    query = getattr(args, "method_id", None)
+
+    if query:
+        hit = match_method_skill(query, ".")
+        if hit:
+            body = skill_procedure(hit["name"], ".")
+            print(f"◆ 方法学 skill：{hit['name']}")
+            print(f"  {hit.get('description', '')}\n")
+            print(body if body else "(skill 正文读取失败)")
+            print(f"\n（宿主模型请按上面的流程执行；对应 SKILL.md：{hit.get('path', '')}）")
+            return 0
+        # 未命中 skill → 退回旧方法词条查询
+        print_method(query)
+        return 0
+
+    # 无参数:先亮出方法学 skill,再列旧词条目录
+    skills = list_method_skills(".")
+    if skills:
+        print("◆ 方法学 skill（按流程办事，胜过裸输出）")
+        for s in skills:
+            print(f"  · {s['name']:<18} {s.get('description', '')}")
+        print("  用法：psyclaw method <关键词>（如「样本量」「无关变量控制」）\n")
+    print_method(None)
     return 0
 
 
@@ -1937,8 +1965,9 @@ def build_parser() -> argparse.ArgumentParser:
     pa.add_argument("test_id", nargs="?", default=None, help="检验 id,留空列出全部")
     pa.set_defaults(func=cmd_assume)
 
-    pm = sub.add_parser("method", help="复杂方法目录(SEM/MLM/LPA/网络/交叉滞后…)")
-    pm.add_argument("method_id", nargs="?", default=None, help="方法 id,留空列出全部")
+    pm = sub.add_parser("method", help="方法学 skill 路由(样本量/无关变量控制…)+ 方法词条")
+    pm.add_argument("method_id", nargs="?", default=None,
+                    help="关键词(如「样本量」「无关变量控制」)路由到 skill;留空列出全部")
     pm.set_defaults(func=cmd_method)
 
     pd = sub.add_parser("design", help="实验设计目录(被试间/内/混合/纵向/ESM…)")
