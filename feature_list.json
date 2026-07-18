@@ -1652,6 +1652,14 @@
    "dependencies": "['feat-153','feat-167']",
    "status": "done",
    "evidence": "tests/test_core_dependency.py +2;commit(本次);装 ptk 后 _PTK_AVAILABLE=True 活体验证;无 ptk 全量降级 2072 passed。"
+  },
+  {
+   "id": "feat-171",
+   "name": "lit 默认桥接体验:不可用时一步开启指引",
+   "description": "默认(bridge=None)本就 auto(WebBridge 就绪即自动进知网,无需 --bridge)。补短板:不可用时不再静默/泛化,而据缺哪一步给确切开启命令(install/start/status),点明开启后默认自动。litbridge.enable_command + lit_cli._maybe_bridge 统一负责提示。",
+   "dependencies": "['feat-169']",
+   "status": "done",
+   "evidence": "tests/test_litbridge.py +2;commit(本次);全量 pytest → 2075 passed。"
   }
  ]
 }
