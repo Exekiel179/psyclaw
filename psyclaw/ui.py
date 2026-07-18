@@ -85,10 +85,22 @@ def rule(width: int = 56, char: str = "─") -> str:
     return dim(char * width)
 
 
-BANNER_ART = r"""
-  PsyClaw
-  research orchestration workbench
-"""
+# 巨型 wordmark(ANSI Shadow「PSYCLAW」)——呼应 landing page 的等宽大字 hero。
+# 矩形对齐(每行 59 code-points);放在状态框外,不参与右边框对齐(box 字符在 CJK
+# 终端宽度有歧义)。窄终端(<63 列)降级为单行 >_ PsyClaw。
+BANNER_ART = (
+    "██████╗ ███████╗██╗   ██╗ ██████╗██╗      █████╗ ██╗    ██╗\n"
+    "██╔══██╗██╔════╝╚██╗ ██╔╝██╔════╝██║     ██╔══██╗██║    ██║\n"
+    "██████╔╝███████╗ ╚████╔╝ ██║     ██║     ███████║██║ █╗ ██║\n"
+    "██╔═══╝ ╚════██║  ╚██╔╝  ██║     ██║     ██╔══██║██║███╗██║\n"
+    "██║     ███████║   ██║   ╚██████╗███████╗██║  ██║╚███╔███╔╝\n"
+    "╚═╝     ╚══════╝   ╚═╝    ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝ "
+)
+
+
+def wordmark(color: str = "teal") -> str:
+    """巨型 block wordmark(每行左缩进 2),整体上色。"""
+    return "\n".join("  " + paint(ln, color, "bold") for ln in BANNER_ART.split("\n"))
 
 
 def term_width(default: int = 80) -> int:
@@ -247,38 +259,50 @@ def _startup_status_lines(status: dict | None, provider: str | None = None,
 
 def startup(version: str, status: dict | None = None, provider: str | None = None,
             approval: str | None = None) -> str:
-    """Startup workbench screen for CLI/REPL entry."""
-    w = max(68, min(term_width(), 92))
-    inner = w - 4
-    brand = paint(">_", "brgreen", "bold") + " " \
-        + paint("PsyClaw", "bold", "brcyan") + dim(f" v{version}")
+    """启动界面——呼应 landing page 的 hero:巨型 wordmark → eyebrow → thesis → 状态卡。"""
+    tw = term_width()
+    w = max(68, min(tw, 92))
+    edge = "teal"                              # 主色贴 landing page 的青绿 accent
+    out: list[str] = [""]
+
+    # ── hero:巨型 wordmark(宽终端)或单行(窄终端)────────────────────────
+    if tw >= 63:
+        out.append(wordmark(edge))
+    else:
+        out.append("  " + paint(">_", "mint", "bold") + " "
+                   + paint("PsyClaw", "bold", edge))
+    # eyebrow(mono 小大写标签感)+ thesis(一句话主张)
+    out.append("")
+    out.append("  " + paint("◆", edge) + " " + paint("PsyClaw", edge, "bold")
+               + paint("  ·  ", edge) + dim("研究编排工作台 · RESEARCH ORCHESTRATION")
+               + dim(f"   v{version}"))
+    out.append("  " + paint(">_", "mint", "bold")
+               + dim(" 文献 · 设计 · 写作 · 评审 · 质量检查")
+               + paint("   统计外移 · 编排为核", edge))
+    out.append("")
+
+    # ── 状态卡(保留 CJK 对齐的框;边框改青绿)──────────────────────────
     mode = paint("chat · run · auto", "bold", "white") + dim("  psychology workflow harness")
     status_lines = _startup_status_lines(status, provider, approval)
-    title = "─ " + brand + " "
-
-    lines = [
-        paint("╭" + title, "brcyan") +
-        paint("─" * max(0, w - display_width(title) - 2) + "╮", "brcyan"),
-        _agent_row("mode", mode, w),
-    ]
-
-    if status_lines:
-        for raw in status_lines:
-            lines.append(_agent_row("", raw, w))
-    lines.append(paint("├" + "─" * max(0, w - 2) + "┤", "brcyan"))
+    title = "─ " + paint("session", edge, "bold") + " "
+    out.append(paint("╭" + title, edge)
+               + paint("─" * max(0, w - display_width(title) - 2) + "╮", edge))
+    out.append(_agent_row("mode", mode, w))
+    for raw in (status_lines or []):
+        out.append(_agent_row("", raw, w))
+    out.append(paint("├" + "─" * max(0, w - 2) + "┤", edge))
 
     launch = [
-        _button("/goal", "current", "brcyan"),
-        _button("/run", "workflow", "brmagenta"),
-        _button("/auto", "next", "bryellow"),
-        _button("/help", "map", "brgreen"),
+        _button("/goal", "当前", edge),
+        _button("/run", "工作流", "brmagenta"),
+        _button("/auto", "下一步", "bryellow"),
+        _button("/help", "地图", "mint"),
     ]
-    lines.append(_agent_row("try", "   ".join(launch[:2]), w))
-    lines.append(_agent_row("", "   ".join(launch[2:]), w))
-
-    lines.append(_agent_row("input", dim("/ for commands  @file for context  Ctrl+C to exit"), w))
-    lines.append(paint("╰" + "─" * max(0, w - 2) + "╯", "brcyan"))
-    return "\n".join(lines)
+    out.append(_agent_row("try", "   ".join(launch[:2]), w))
+    out.append(_agent_row("", "   ".join(launch[2:]), w))
+    out.append(_agent_row("input", dim("/ 唤起命令 · @文件 引用 · Ctrl+C 退出"), w))
+    out.append(paint("╰" + "─" * max(0, w - 2) + "╯", edge))
+    return "\n".join(out)
 
 
 class StreamBlock:
