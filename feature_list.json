@@ -1644,6 +1644,14 @@
    "dependencies": "['feat-108','feat-168']",
    "status": "done",
    "evidence": "tests/test_litbridge.py +17;commit(本次);全量 pytest → 2070 passed。URL/JS 生成活体正常,--bridge/--no-bridge 解析正确。"
+  },
+  {
+   "id": "feat-170",
+   "name": "prompt_toolkit 提为核心依赖(交互基础设施内置)",
+   "description": "用户拍板 prompt_toolkit(交互基础设施非统计库)可内置。dependencies 从 [] → prompt_toolkit>=3.0,装 psyclaw 即自带实时命令下拉+中文输入,根治「/不能下滑」「中文乱码」两 bug;缺失降级 readline 路径保留。CLAUDE.md 铁律相应更新(统计库仍外移)。",
+   "dependencies": "['feat-153','feat-167']",
+   "status": "done",
+   "evidence": "tests/test_core_dependency.py +2;commit(本次);装 ptk 后 _PTK_AVAILABLE=True 活体验证;无 ptk 全量降级 2072 passed。"
   }
  ]
 }
