@@ -68,6 +68,18 @@ def bridge_available(installed_fn=None, status_fn=None) -> tuple[bool, str]:
         return False, "WebBridge 状态探测失败"
 
 
+def enable_command(reason: str) -> str:
+    """据 bridge_available 的不可用原因,给出一步开启机构库自动桥接的确切命令。"""
+    r = reason or ""
+    if "未安装" in r:
+        return "psyclaw webbridge install"
+    if "守护进程" in r:
+        return "psyclaw webbridge start"
+    if "扩展" in r:
+        return "psyclaw webbridge status"
+    return "psyclaw webbridge install"
+
+
 def _accepts_timeout(fn) -> bool:
     try:
         import inspect
