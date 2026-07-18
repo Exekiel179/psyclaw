@@ -9,7 +9,8 @@ from pathlib import Path
 def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
             year_from: int | None = None, fulltext_doi: str | None = None,
             zotero_doi: str | None = None, synthesize: bool = False,
-            download: bool = False, project_dir: str = ".") -> int:
+            download: bool = False, project_dir: str = ".",
+            bridge: bool | None = None) -> int:
     from psyclaw import ui
     from psyclaw.psych import litsearch, zotero_client
 
@@ -79,6 +80,9 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
         print(ui.dim("取全文:psyclaw lit --fulltext <DOI>(走合法 OA);"
                      "--download 批量下载本次 OA 命中;付费墙用 --zotero <DOI>。"))
 
+    # 自动机构库桥接:公开 API 检不到知网/万方,驱动 WebBridge 补检并合并进结果与缓存
+    bridge_ran = _maybe_bridge(query, r, bridge, ui, limit)
+
     # PRISMA 计数落盘(对接 LIT.prisma 质量检查)
     notes = Path(project_dir) / "notes"
     notes.mkdir(parents=True, exist_ok=True)
@@ -97,9 +101,10 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
     print(ui.dim(f"检索结果缓存 → {notes / 'lit_search.json'}"
                  "(下次 psyclaw research 将据此合成有据综述)"))
 
-    hint = institutional_hint(query)           # bug 修:公开 API 检不到知网/万方,主动指路桥接
-    if hint:
-        print(ui.warn(hint))
+    if not bridge_ran:                         # 桥没跑(不可用/关闭)才提示手动路径
+        hint = institutional_hint(query)
+        if hint:
+            print(ui.warn(hint))
 
     if synthesize:
         _synthesize_review(query, r, project_dir, ui)
@@ -110,6 +115,54 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
 
 def _has_cjk(s: str) -> bool:
     return any("一" <= c <= "鿿" for c in (s or ""))
+
+
+def _maybe_bridge(query: str, r: dict, bridge: bool | None, ui, limit: int) -> bool:
+    """自动驱动 WebBridge 进机构库补检并合并进 r。返回是否真的跑了桥接。
+
+    bridge:None=自动(可用才跑,不可用静默降级)· True=强制(不可用也报原因)· False=关闭。
+    全程 fail-safe——litbridge 内部不抛,这里任何异常也吞掉,绝不中断 lit。
+    """
+    if bridge is False:
+        return False
+    try:
+        from psyclaw.psych import litbridge
+        ok, reason = litbridge.bridge_available()
+        if not ok:
+            if bridge is True:                 # 用户显式要桥接却不可用 → 说清楚
+                print(ui.warn(f"机构库桥接不可用:{reason}"))
+            return False                       # 自动模式静默降级(交 institutional_hint)
+        db = litbridge.DEFAULT_DB              # 目前默认知网(中文覆盖最差处)
+        name = litbridge._DB_PROFILES[db]["name"]
+        print(ui.dim(f"正在驱动浏览器进{name}检索(WebBridge,复用你的登录态,可能开新标签)…"))
+        out = litbridge.bridge_search(query, db=db, limit=limit)
+        if not out["ok"]:
+            print(ui.warn(f"  {name}桥接未成功:{out['reason']}"))
+            return True
+        before = {(x.get("doi") or "").lower() or (x.get("title") or "").lower().strip()[:80]
+                  for x in r["results"]}
+        merged, added = litbridge.merge_results(r["results"], out["records"])
+        r["results"] = merged
+        r["n_deduped"] = len(merged)
+        r["n_raw"] = r.get("n_raw", 0) + len(out["records"])   # PRISMA identification 计入桥命中
+        r.setdefault("per_source", {})[name] = len(out["records"])
+        if out["records"]:
+            print(ui.ok(f"  ✓ {name}命中 {len(out['records'])} 条,新增 {added} 条(合并去重后共 {len(merged)}):"))
+            shown = 0
+            for p in out["records"]:
+                k = (p.get("doi") or "").lower() or (p.get("title") or "").lower().strip()[:80]
+                is_new = k not in before
+                au = ", ".join(p["authors"][:3]) + (" 等" if len(p["authors"]) > 3 else "")
+                tag = ui.accent("＋") if is_new else ui.dim("·")
+                print(f"   {tag} {p['title'][:80]} {ui.dim(au)} ({p.get('year') or '?'}) · {name}")
+                shown += 1
+                if shown >= limit:
+                    break
+        else:
+            print(ui.warn(f"  {out['reason'] or f'{name}未抽取到题录'}"))
+        return True
+    except Exception:  # noqa: BLE001 — 桥接任何异常都不影响 lit 主流程
+        return False
 
 
 def institutional_hint(query: str) -> str:
