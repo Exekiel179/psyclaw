@@ -1660,6 +1660,22 @@
    "dependencies": "['feat-169']",
    "status": "done",
    "evidence": "tests/test_litbridge.py +2;commit(本次);全量 pytest → 2075 passed。"
+  },
+  {
+   "id": "feat-172",
+   "name": "lit 多机构库(知网/万方/维普)+ --db 选库",
+   "description": "机构库桥接从单知网扩为中文三库(知网/万方/维普);db_set_for_query 按查询语言自动选库、resolve_dbs 解析 --db(别名/去重/未知);_maybe_bridge 多库循环分库合并展示。英文机构库需交互检索暂不自动。登录态靠用户真实浏览器,psyclaw 不碰账号。",
+   "dependencies": "['feat-171']",
+   "status": "done",
+   "evidence": "tests/test_litbridge.py 多库循环+resolve+vip 画像;全量 2083 passed。"
+  },
+  {
+   "id": "feat-173",
+   "name": "lit 首次没装 WebBridge 交互式一键安装",
+   "description": "首次(marker 未记)+未装+交互 TTY→直接问「现在装吗[Y/n]」,Y 走下载二进制/起守护/开扩展页,N 或已问过给精确开启命令,非 TTY 不阻塞。副作用可注入离线单测。",
+   "dependencies": "['feat-171']",
+   "status": "done",
+   "evidence": "tests/test_litbridge.py 四态(Y装/N给命令/已问过不追问/非TTY不问);全量 2083 passed。"
   }
  ]
 }
