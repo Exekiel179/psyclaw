@@ -1620,6 +1620,22 @@
    "dependencies": "[]",
    "status": "done",
    "evidence": "docs/install.sh · docs/install.ps1(sh -n / bash -n 通过;spec 构造离线验证 git+URL@tag 与 psyclaw[stats]@... 正确)· README.md 安装节。托管 URL 待 push 后生效。"
+  },
+  {
+   "id": "feat-167",
+   "name": "bug 修:内置 skill 对模型隐藏 + 中文输入光标乱码",
+   "description": "内置 skill 只在 /skills 可见、从不进系统提示 → chat 模型不知其存在不主动路由;context.skills_catalog 每轮注入内置 skill 目录(名+描述+调用方式),fail-safe。自研 raw reader 的 _visible_len 中文按 1 列算致 \\033[nC 光标右移不足、重画覆盖成「公yclaw ❯」;改用 ui.display_width 东亚宽度,_render 光标定位 prompt+buf 都按显示宽度。",
+   "dependencies": "['feat-144']",
+   "status": "done",
+   "evidence": "tests/test_skills_catalog.py +4 · tests/test_input_cjk_width.py +4;commit b3797e9;相关 272 测试绿。"
+  },
+  {
+   "id": "feat-168",
+   "name": "bug 修:lit 主动指路机构库桥接 + ptk 引导醒目化",
+   "description": "lit(公开 API)与 webbridge(机构库浏览器桥)是独立通道,用户以为搜中文会自动调 Kimi WebBridge;lit_cli.institutional_hint 检索后主动指路 lit --plan 桥接分步 + webbridge(中文→知网/万方,英文→WoS/Scopus)。可下滑命令下拉需 prompt_toolkit(libedit 做不到);readline/raw 的 ptk 引导改 warn 醒目 + 据安装方式给正确装法(uv tool → --with)。",
+   "dependencies": "['feat-108','feat-153']",
+   "status": "done",
+   "evidence": "tests/test_lit_institutional_hint.py +3;commit(本次);全量 pytest → 2056 passed。"
   }
  ]
 }
