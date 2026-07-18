@@ -102,7 +102,7 @@ def format_reference(meta: dict, style: str = "apa7") -> str:
     """
     authors = format_authors_ref(meta.get("authors") or [])
     year = str(meta.get("year", "") or "n.d.").strip()
-    title = str(meta.get("title", "") or "").strip().rstrip(".")
+    title = str(meta.get("title", "") or "").strip()
     journal = str(meta.get("journal", "") or "").strip()
     volume = str(meta.get("volume", "") or "").strip()
     issue = str(meta.get("issue", "") or "").strip()
@@ -115,7 +115,8 @@ def format_reference(meta: dict, style: str = "apa7") -> str:
     else:
         parts.append(f"({year}).")
     if title:
-        parts.append(f"{title}.")
+        # 题名已以句末标点(. ? !)结尾则不再补句点(APA7:Does it work? 不加点)
+        parts.append(title if title[-1] in ".?!" else f"{title}.")
 
     # 期刊 + 卷(期), 页. —— 只拼出现的段,避免「J, (), .」空壳
     if journal:
