@@ -4,11 +4,14 @@
 
 ## Current Objective
 
-- Goal: cite/scale/method 重定位三部曲(用户拍板的三命令定义)——统计全外移
-- Current status: **feat-161~164 全 done**——159 个 feature 全 done,无未完成项
-- Branch / commit: master 本地(未推送);本轮 commits 4d59eb8→7c0509a(共 7 个)
+- Goal: cite/scale/method 三命令重定位 + 发行自检 → 已打包 **v0.15.0**
+- Current status: **feat-161~165 全 done**——160 个 feature 全 done,无未完成项;
+  tag **v0.15.0** 已打(本地未推送——push 到 master 属危险操作,留用户定夺)
+- Branch / commit: master 本地;本轮 commits 4d59eb8→12093ab;release=12093ab
 - Verification: 全量 `uv run --python 3.12 --with pytest python -m pytest -q`
-  → **2043 passed**;`python -m psyclaw gates` ✓;feature_list.json 补录 161~164
+  → **2045 passed**;`python -m psyclaw gates` ✓;`eval` 28/28;compile ✓;
+  harness validator scope/lifecycle 全过;feature_list.json 补录 161~165
+- 发行自检修的两处:参考文献题名 ?/! 双标点、method ASCII 别名子串误匹配(feat-165)
 - 新命令速记:
   - `psyclaw cite <稿件>` 引文核查 / `psyclaw cite --make refs.json` 引用文章(生成 APA7 参考文献)
   - `psyclaw score <data> --scale <id> [--reliability]` 量表分析(含虚伪作答体检 + 信度脚本)
