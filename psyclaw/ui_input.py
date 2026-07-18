@@ -80,10 +80,18 @@ def _get_ptk_session(commands: dict):
     return _ptk_session
 
 
-def _ptk_read_line(prompt_str: str, commands: dict) -> str:
-    """使用 prompt_toolkit 读取一行（含历史/补全/键位）。"""
+def _ptk_read_line(prompt_str: str, commands: dict, bottom_toolbar=None) -> str:
+    """使用 prompt_toolkit 读取一行（含历史/补全/键位 + Codex 风底部状态行）。"""
     session = _get_ptk_session(commands)
-    result = session.prompt(_PtkANSI(prompt_str))
+    bt = None
+    if bottom_toolbar is not None:
+        def bt():                                  # 每次刷新求值,ANSI 上色
+            try:
+                txt = bottom_toolbar() if callable(bottom_toolbar) else bottom_toolbar
+            except Exception:  # noqa: BLE001 — 底栏求值失败不该打断输入
+                txt = ""
+            return _PtkANSI(txt) if txt else ""
+    result = session.prompt(_PtkANSI(prompt_str), bottom_toolbar=bt)
     return (result or "").strip()
 
 
@@ -486,18 +494,19 @@ def ptk_install_nudge(backend: str | None = None) -> str:
     return ""
 
 
-def read_line(prompt: str, commands: dict) -> str:
+def read_line(prompt: str, commands: dict, bottom_toolbar=None) -> str:
     """带 slash 联想的行输入。commands: {"/cmd": "描述"}。
 
-    路径优先级(v0.7 feat-047 起):
-      prompt_toolkit(若装了 [full] 且 TTY,实时联想下拉)
-      → **readline 后端**(非 ptk TTY 主路径:方向键/↑↓历史/←→光标/Ctrl-A-E-K + Tab 补全)
+    bottom_toolbar:str/callable → prompt_toolkit 底部固定状态行(Codex 风,如「模型 · 目录」);
+    其他后端忽略。路径优先级(v0.7 feat-047 起):
+      prompt_toolkit(内置,TTY:实时联想下拉 + 底部状态行)
+      → **readline 后端**(方向键/↑↓历史/←→光标/Ctrl-A-E-K + Tab 补全)
       → 自研 raw reader(readline 缺失如 Windows,保留 slash 联想菜单)
       → 裸 input()(非 TTY / 一切降级)。
     """
     if _PTK_AVAILABLE and sys.stdin.isatty() and sys.stdout.isatty():
         try:
-            return _ptk_read_line(prompt, commands)
+            return _ptk_read_line(prompt, commands, bottom_toolbar)
         except (KeyboardInterrupt, EOFError):
             raise
         except Exception:  # noqa: BLE001 — ptk 失败时降级 stdlib
