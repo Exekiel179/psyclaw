@@ -1217,6 +1217,26 @@ def cmd_lit(args: argparse.Namespace) -> int:
         print(ui.dim(f"  纳入/排除标准(检索前声明)→ {res['criteria_path']}"))
         print(ui.dim("  路线 A:公开 API 直检(命令见计划);路线 B:机构库浏览器桥接分步提示词"))
         return 0
+    if getattr(args, "snowball", None):        # 引用滚雪球:沿引用网络扩展(综述正道)
+        from psyclaw import ui
+        from psyclaw.psych import litsearch
+        doi = args.snowball
+        direction = getattr(args, "direction", None) or "citations"
+        arrow = {"citations": "往前(引用了它的新文献)", "references": "往回(它引用的经典)",
+                 "both": "双向"}.get(direction, direction)
+        print(ui.title(f"引用滚雪球 — {doi}") + ui.dim(f"  {arrow}"))
+        hits = litsearch.snowball(doi, direction=direction, limit=args.limit or 25)
+        if not hits:
+            print(ui.warn("  没拿到(DOI 不在 OpenAlex / 无引用数据 / 网络失败)。"))
+            return 0
+        for i, p in enumerate(hits, 1):
+            au = ", ".join(p["authors"][:3]) + (" 等" if len(p["authors"]) > 3 else "")
+            cit = f" · 被引 {p['citations']}" if p.get("citations") else ""
+            print(f"{ui.accent(str(i) + '.')} {p['title'][:88]}")
+            print(f"   {ui.dim(au)} ({p.get('year') or '?'}) · {p['source']}{cit}"
+                  + (f" · doi:{p['doi']}" if p['doi'] else ""))
+        print(ui.dim(f"\n共 {len(hits)} 条。--direction references 追源头 / both 双向。"))
+        return 0
     return lit_cli(query=args.query or "", sources=args.sources, limit=args.limit,
                    year_from=args.year_from, fulltext_doi=args.fulltext,
                    zotero_doi=args.zotero, synthesize=getattr(args, "synthesize", False),
@@ -2290,6 +2310,11 @@ def build_parser() -> argparse.ArgumentParser:
     plit.add_argument("--db", dest="dbs", default=None,
                       help="指定机构库(逗号分隔:知网/万方/维普 或 cnki,wanfang,vip);"
                            "默认按查询语言自动选(中文→三库)")
+    plit.add_argument("--snowball", default=None, metavar="DOI",
+                      help="引用滚雪球:从种子 DOI 沿引用网络扩展(综述正道,比关键词精准)")
+    plit.add_argument("--direction", default=None,
+                      choices=["citations", "references", "both"],
+                      help="滚雪球方向:citations 往前(默认)/ references 往回 / both 双向")
     plit.set_defaults(func=cmd_lit)
 
     pup = sub.add_parser("update", help="自更新到最新(source/uv-tool/pip 自适应 + 国内镜像)")
