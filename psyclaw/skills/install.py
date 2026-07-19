@@ -20,6 +20,11 @@ def install_skill_repo(url: str, dest_dir: str | None = None,
     name = repo_name(url)
     if not name:
         return {"ok": False, "path": "", "note": "无效的 repo url"}
+    # 安全:只接受 https:// url——挡 argv flag 注入(--upload-pack=… 等被 git 当选项执行)
+    # 与危险协议(ext:: / file: / ssh 命令走私)。下方 clone 再加 -- 哨兵双保险。
+    if not str(url).startswith("https://"):
+        return {"ok": False, "path": "",
+                "note": "只接受 https:// 的 GitHub skill url(拒绝其他协议/参数,防命令注入)"}
     dest = Path(dest_dir or ".claude/skills")
     target = dest / name
     if target.exists() and any(target.iterdir()):
@@ -35,15 +40,15 @@ def install_skill_repo(url: str, dest_dir: str | None = None,
     dest.mkdir(parents=True, exist_ok=True)
     runner = runner or subprocess.run
     try:
-        r = runner(["git", "clone", "--depth", "1", clone_url, str(target)],
+        r = runner(["git", "clone", "--depth", "1", "--", clone_url, str(target)],
                    capture_output=True, text=True, timeout=300)
         if r.returncode != 0:
             return {"ok": False, "path": str(target),
                     "note": f"clone 失败:{(r.stderr or '')[:160]};"
-                            f"手动:git clone {clone_url} {target}"}
+                            f"手动:git clone -- {clone_url} {target}"}
         return {"ok": True, "path": str(target), "note": f"已装 {name} → {target}"}
     except FileNotFoundError:
         return {"ok": False, "path": str(target),
-                "note": f"未装 git;手动:git clone {clone_url} {target}"}
+                "note": f"未装 git;手动:git clone -- {clone_url} {target}"}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "path": str(target), "note": f"安装失败:{exc}"}
