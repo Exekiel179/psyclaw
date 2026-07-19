@@ -1708,6 +1708,14 @@
    "dependencies": "['feat-109','feat-177']",
    "status": "done",
    "evidence": "tests/test_institutional_download.py +4;commit(本次);全量 2110 passed。"
+  },
+  {
+   "id": "feat-179",
+   "name": "文献能力做成对话原生工具(lit_search/snowball/download)",
+   "description": "用户以对话工作,能力做成模型可直接调的工具而非 CLI。build_tools 加 lit_search(多源检索)/lit_snowball(引用滚雪球)/lit_download(下载 OA+机构权限全文,side_effect 批准)。capability_map 引导直接调工具别甩 CLI。",
+   "dependencies": "['feat-177','feat-178']",
+   "status": "done",
+   "evidence": "tests/test_lit_tools.py +6;commit(本次);全量 2116 passed。"
   }
  ]
 }
