@@ -332,6 +332,12 @@ def build_tools(project_dir: str = ".") -> dict:
        "下载文献全文 PDF 到 outputs/pdfs(OA + 机构权限[LibKey/IP];给 query 批量检索下载 或 给 doi 下单篇;付费墙不绕过,如实跳过)",
        "query?:str, doi?:str, limit?:int", _lit_download, side_effect=True)
 
+    # 全部 CLI 命令自动工具化(goal:所有 cli 命令工具化)——从 argparse 自省,新命令自动覆盖。
+    try:
+        _register_cli_tools(tools, project_dir)
+    except Exception:  # noqa: BLE001 — 自动工具化失败不拖垮内置工具集
+        pass
+
     # 插件工具(用户项目/全局插件注册;内置同名优先,加载失败不拖垮工具集)
     try:
         from psyclaw.plugins import load_plugins, merge_plugin_tools
@@ -383,6 +389,78 @@ def build_tools(project_dir: str = ".") -> dict:
     _t("tool_help", "取工具/工具组的完整参数说明(目录中未展开的组先查这个)",
        "prefix:str 或 name:str", _tool_help)
     return tools
+
+
+# 全部 CLI 命令自动工具化(argparse 自省)——用户以对话工作,所有 cli 命令都当工具暴露给模型。
+_CLI_TOOL_SKIP = {
+    # 交互向导 / 系统运维 / REPL 自身 / 已手工优化(lit_* 等),不自动工具化
+    "repl", "chat", "setup", "doctor", "config", "update", "eval", "commands",
+    "help", "guide", "resume", "mcp", "plugins", "webbridge", "auth", "assist",
+    "start", "version", "status", "sleep", "init", "lit", "clarify",
+}
+_CLI_TOOL_SIDE_EFFECT = {
+    # 写盘 / 改状态 / 外部副作用 → 需批准(HITL)
+    "export", "score", "scale", "preregister", "declare-test", "provenance",
+    "journal", "memory", "kg", "new", "prepare", "jars", "run", "research",
+    "auto", "goal", "tasks", "sync", "annotate",
+}
+
+
+def _make_cli_run(sub, func):
+    """把一个 argparse 子命令包成工具 run:构造 Namespace(默认值+模型参数)→ 调 cmd_* → 捕获 stdout。"""
+    import argparse
+    import contextlib
+    import io
+
+    def _run(a):
+        ns = argparse.Namespace()
+        for act in sub._actions:                 # 先铺 parser 默认值
+            if act.dest and act.dest != "help":
+                setattr(ns, act.dest, act.default)
+        for k, v in (a or {}).items():           # 再用模型给的参数覆盖
+            setattr(ns, k, v)
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                func(ns)
+        except SystemExit:
+            pass
+        except (EOFError, OSError):
+            return (buf.getvalue()
+                    + "\n(该命令需交互输入,工具环境已跳过;请把所需参数直接传入)").strip()
+        except Exception as e:  # noqa: BLE001 — 单个工具执行失败回报模型,不崩循环
+            return (buf.getvalue() + f"\n(执行中断:{e})").strip()
+        return buf.getvalue().strip() or "(完成,无输出)"
+    return _run
+
+
+def _register_cli_tools(tools: dict, project_dir: str = ".") -> None:
+    """从 argparse 自省,把每个 CLI 子命令自动注册为对话工具(排除交互/系统类;不覆盖已有)。"""
+    import argparse
+    from psyclaw.cli import build_parser
+
+    parser = build_parser()
+    subs = next((act for act in parser._actions
+                 if isinstance(act, argparse._SubParsersAction)), None)
+    if subs is None:
+        return
+    helps = {ca.dest: (ca.help or "") for ca in subs._choices_actions}
+    for name, sub in subs.choices.items():
+        if name in _CLI_TOOL_SKIP or name in tools:      # 跳过排除 & 已手工工具化
+            continue
+        func = sub._defaults.get("func")
+        if func is None:
+            continue
+        pos, opt = [], []
+        for act in sub._actions:
+            if not act.dest or act.dest == "help":
+                continue
+            (opt if act.option_strings else pos).append(act.dest)
+        arg_desc = ", ".join([f"{p}:str" for p in pos] + [f"{o}?" for o in opt]) or "(无参数)"
+        desc = ((helps.get(name) or name).strip()[:110]) + "(CLI 工具)"
+        tools[name] = {"desc": desc, "args": arg_desc,
+                       "side_effect": name in _CLI_TOOL_SIDE_EFFECT,
+                       "run": _make_cli_run(sub, func)}
 
 
 # feat-113:工具目录路由——实测 agent 模式工具目录占 system 79%(8.7k 字符)
