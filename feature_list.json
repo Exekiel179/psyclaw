@@ -1692,6 +1692,14 @@
    "dependencies": "['feat-170','feat-174']",
    "status": "done",
    "evidence": "tests/test_codex_ui.py +3;commit(本次);底栏活体渲染正常;全量 2101 passed。"
+  },
+  {
+   "id": "feat-177",
+   "name": "更好的文献查找:Crossref + Semantic Scholar + 引用滚雪球",
+   "description": "网页桥不可靠(反爬/登录/DOM 易变);改用可靠公开 API:Crossref(中文核心 DOI 覆盖)+ Semantic Scholar(摘要/TL;DR/被引数)+ 引用滚雪球(种子 DOI 沿 OpenAlex 引用网络扩展,综述正道)。默认 sources 加 crossref;_paper 加 citations 字段;lit --snowball。",
+   "dependencies": "['feat-169']",
+   "status": "done",
+   "evidence": "tests/test_litsearch_sources.py +6;commit(本次);--snowball/--direction 解析正常;全量 2106 passed。"
   }
  ]
 }
