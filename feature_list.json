@@ -1724,6 +1724,14 @@
    "dependencies": "['feat-179']",
    "status": "done",
    "evidence": "tests/test_cli_toolify.py +7;commit(本次);活体 check/export/method/cite 等全自动成工具,总 79;全量 2123 passed。"
+  },
+  {
+   "id": "feat-181",
+   "name": "嵌入 nature-review 审稿 skill + 通用 skill install",
+   "description": "把 mumdark/nature-review-studio 作为审稿 skill 嵌入:内置提炼版 SKILL.md(12 关注类别/6 审稿人映射/21 回复策略/8 状态,review+respond 流程),loader 发现+系统提示注入,对话审稿可调。通用 skill install <github-url> 浅克隆外部 skill 到 .claude/skills(镜像感知 fail-safe)装全量。",
+   "dependencies": "['feat-167','feat-180']",
+   "status": "done",
+   "evidence": "tests/test_skill_install.py +7;commit(本次);nature-review 被 loader 发现+进 skills_catalog;skill 命令自动工具化;全量 2130 passed。"
   }
  ]
 }
