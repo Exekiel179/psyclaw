@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.17.0(2026-07-20)
+
+> 主题:**对话即能力——所有 CLI 命令自动工具化 + 文献检索/下载升级 + Codex 风界面 +
+> 自更新**。用户以对话形式工作,能力全部做成模型可直接调的工具;文献从"跟知网反爬对抗"
+> 转向"可靠公开 API + 引用滚雪球 + 机构权限下载"。feat-174~181,测试 2083→2132 绿。
+
+### 对话即能力(feat-179/180)
+- **所有 CLI 命令自动工具化**(feat-180):从 argparse 自省,把每个子命令(排除交互/系统类)
+  自动包成对话工具——check/export/method/cite/review/preregister/design/assume… 全成工具,
+  写盘类需批准、只读自动执行;**新增命令自动覆盖**,不用逐个手写。你在对话里说"把这稿导成
+  Word""投稿前查规范",模型直接做,不再甩命令。
+- **文献对话工具**(feat-179):lit_search(多源检索)/ lit_snowball(引用滚雪球)/ lit_download
+  (下载 OA+机构权限全文),手工优化的对话体验;系统提示引导"直接调工具、别甩 CLI"。
+
+### 文献检索 / 下载升级(feat-177/178)
+- **更好的文献查找**(feat-177):加 Crossref(中文核心期刊 DOI 覆盖)+ Semantic Scholar
+  (摘要/TL;DR/被引数)+ **引用滚雪球**(种子 DOI 沿引用网络扩展,综述正道)——替代脆弱的
+  网页桥;默认源加 crossref。
+- **全文下载打通机构权限**(feat-178):不只 OA,LibKey 全文直链 / 机构 IP 授权也真下载;
+  EZProxy 需会话的给浏览器链接;付费墙如实跳过(不绕过)。lit --download 覆盖所有命中。
+
+### 界面 / 分发(feat-174/175/176)
+- **Codex 风 REPL**(feat-176):极简 `›` 提示符 + prompt_toolkit 底部固定状态行
+  (模型 · 模式 · 目录)。
+- **启动界面 hero 风格**(feat-174):ANSI Shadow 巨型 wordmark + eyebrow + teal accent,
+  呼应 landing page;窄终端降级。
+- **psyclaw update 自更新**(feat-175):装了之后一条命令同步到最新,形态自适应
+  (source/uv-tool/pip)+ 国内镜像自动。
+
+### 审稿 skill(feat-181)
+- **嵌入 nature-review 审稿 skill**:mumdark/nature-review-studio(1287 篇 Nature 审稿报告
+  蒸馏)提炼版——12 关注类别 / 6 审稿人映射 / 21 回复策略 / 8 行动状态,review+respond 流程,
+  loader 自动发现、对话可调;通用 `skill install <github-url>` 装全量(git 浅克隆,镜像感知,
+  **强制 https + -- 哨兵挡 argv flag 注入**)。
+
 ## v0.16.0(2026-07-18)
 
 > 主题:**lit 自动驱动机构库桥接(知网)+ 交互基础设施内置(prompt_toolkit)+ 一键安装 +
