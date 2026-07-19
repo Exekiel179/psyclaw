@@ -1716,6 +1716,14 @@
    "dependencies": "['feat-177','feat-178']",
    "status": "done",
    "evidence": "tests/test_lit_tools.py +6;commit(本次);全量 2116 passed。"
+  },
+  {
+   "id": "feat-180",
+   "name": "所有 CLI 命令自动工具化(argparse 自省)",
+   "description": "goal:所有 cli 命令工具化。_register_cli_tools 从 build_parser 自省,把每个子命令(排除交互/系统/已手工)自动包成对话工具:_make_cli_run 构造 Namespace 调 cmd_* 捕获 stdout,fail-safe。写盘类 side_effect 需批准,只读自动。新命令自动覆盖,手工 lit_* 保留。",
+   "dependencies": "['feat-179']",
+   "status": "done",
+   "evidence": "tests/test_cli_toolify.py +7;commit(本次);活体 check/export/method/cite 等全自动成工具,总 79;全量 2123 passed。"
   }
  ]
 }
