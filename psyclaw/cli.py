@@ -811,6 +811,22 @@ def cmd_method(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_skill(args: argparse.Namespace) -> int:
+    """装外部 skill:psyclaw skill install <github-url> → .claude/skills(loader 自动发现)。"""
+    from psyclaw import ui
+    from psyclaw.skills.install import install_skill_repo
+    if getattr(args, "action", None) != "install" or not getattr(args, "url", None):
+        print(ui.warn("用法:psyclaw skill install <github-url>"))
+        print(ui.dim("  例:psyclaw skill install https://github.com/mumdark/nature-review-studio"))
+        return 2
+    print(ui.dim(f"装 skill:{args.url} …"))
+    r = install_skill_repo(args.url)
+    print((ui.ok if r["ok"] else ui.err)("  " + r["note"]))
+    if r["ok"]:
+        print(ui.dim("  重开 psyclaw 或 `psyclaw skills` 查看已发现的 skill。"))
+    return 0 if r["ok"] else 1
+
+
 def cmd_update(args: argparse.Namespace) -> int:
     """自更新到最新:形态自适应(source/uv-tool/pip)+ 国内镜像;默认要确认。"""
     import sys as _sys
@@ -1782,7 +1798,8 @@ CORE_COMMANDS = {
 COMMAND_CATEGORIES = [
     ("三种交互入口", ["chat", "run", "auto"]),
     ("环境 / 系统", ["help", "guide", "status", "version", "doctor", "config", "setup",
-                  "skills", "mcp", "plugins", "gates", "eval", "commands", "assist", "update"]),
+                  "skills", "mcp", "plugins", "gates", "eval", "commands", "assist", "update",
+                  "skill"]),
     ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "ethics",
                     "journal"]),
     ("量表 / 数据准备", ["score", "annotate"]),
@@ -2316,6 +2333,11 @@ def build_parser() -> argparse.ArgumentParser:
                       choices=["citations", "references", "both"],
                       help="滚雪球方向:citations 往前(默认)/ references 往回 / both 双向")
     plit.set_defaults(func=cmd_lit)
+
+    psk = sub.add_parser("skill", help="装外部 skill(GitHub repo → .claude/skills,loader 自动发现)")
+    psk.add_argument("action", nargs="?", choices=["install"], help="install")
+    psk.add_argument("url", nargs="?", help="GitHub skill repo url")
+    psk.set_defaults(func=cmd_skill)
 
     pup = sub.add_parser("update", help="自更新到最新(source/uv-tool/pip 自适应 + 国内镜像)")
     pup.add_argument("--check", action="store_true", help="只看将执行的命令,不更新")
