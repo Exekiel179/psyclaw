@@ -55,15 +55,30 @@ def _get(url: str, headers: dict | None = None) -> dict | str:
 
 def _paper(title="", authors=None, year=None, doi=None, abstract="",
            oa_status="unknown", oa_url=None, source="", pmid=None,
-           pmcid=None, arxiv_id=None) -> dict:
+           pmcid=None, arxiv_id=None, citations=None) -> dict:
     return {"title": title, "authors": authors or [], "year": year, "doi": doi,
             "abstract": abstract, "oa_status": oa_status, "oa_url": oa_url,
-            "source": source, "pmid": pmid, "pmcid": pmcid, "arxiv_id": arxiv_id}
+            "source": source, "pmid": pmid, "pmcid": pmcid, "arxiv_id": arxiv_id,
+            "citations": citations}   # citations:被引数(Semantic Scholar 给,影响力信号)
 
 
 # ---------------------------------------------------------------------------
 # OpenAlex(覆盖最广,自带 OA 状态)
 # ---------------------------------------------------------------------------
+
+def _paper_from_oa(w: dict) -> dict:
+    """OpenAlex work → 统一题录(检索与引用滚雪球共用)。"""
+    oa = w.get("open_access", {}) or {}
+    return _paper(
+        title=w.get("title", "") or "",
+        authors=[a.get("author", {}).get("display_name", "")
+                 for a in w.get("authorships", [])[:6]],
+        year=w.get("publication_year"),
+        doi=(w.get("doi") or "").replace("https://doi.org/", "") or None,
+        abstract=_reconstruct_abstract(w.get("abstract_inverted_index")),
+        oa_status=oa.get("oa_status", "unknown"), oa_url=oa.get("oa_url"),
+        source="OpenAlex", citations=w.get("cited_by_count"))
+
 
 def search_openalex(query: str, limit: int = 10, year_from: int | None = None) -> list:
     params = {"search": query, "per-page": min(limit, 25), "mailto": "psyclaw@example.org"}
@@ -71,21 +86,8 @@ def search_openalex(query: str, limit: int = 10, year_from: int | None = None) -
         params["filter"] = f"from_publication_date:{year_from}-01-01"
     url = "https://api.openalex.org/works?" + urllib.parse.urlencode(params)
     data = _get(url)
-    out = []
-    for w in (data.get("results", []) if isinstance(data, dict) else []):
-        oa = w.get("open_access", {})
-        out.append(_paper(
-            title=w.get("title", ""),
-            authors=[a.get("author", {}).get("display_name", "")
-                     for a in w.get("authorships", [])[:6]],
-            year=w.get("publication_year"),
-            doi=(w.get("doi") or "").replace("https://doi.org/", "") or None,
-            abstract=_reconstruct_abstract(w.get("abstract_inverted_index")),
-            oa_status=oa.get("oa_status", "unknown"),
-            oa_url=oa.get("oa_url"),
-            source="OpenAlex",
-        ))
-    return out
+    results = data.get("results", []) if isinstance(data, dict) else []
+    return [_paper_from_oa(w) for w in results]
 
 
 def _reconstruct_abstract(inv: dict | None) -> str:
@@ -158,17 +160,74 @@ def search_arxiv(query: str, limit: int = 10) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Crossref(DOI 元数据权威源;大量中文核心期刊有 DOI → 覆盖知网核心期刊那一块)
+# ---------------------------------------------------------------------------
+
+def search_crossref(query: str, limit: int = 10, year_from: int | None = None) -> list:
+    params = {"query": query, "rows": min(limit, 25),
+              "select": "DOI,title,author,issued,container-title,abstract"}
+    if year_from:
+        params["filter"] = f"from-pub-date:{year_from}-01-01"
+    url = "https://api.crossref.org/works?" + urllib.parse.urlencode(params)
+    data = _get(url)
+    items = (data.get("message", {}).get("items", []) if isinstance(data, dict) else [])
+    out = []
+    for it in items:
+        title = (it.get("title") or [""])[0]
+        if not title:
+            continue
+        parts = (it.get("issued", {}) or {}).get("date-parts", [[None]])
+        year = parts[0][0] if parts and parts[0] else None
+        authors = [f"{a.get('given', '')} {a.get('family', '')}".strip()
+                   for a in it.get("author", [])[:6]]
+        out.append(_paper(
+            title=title, authors=[a for a in authors if a], year=year,
+            doi=it.get("DOI"),
+            abstract=re.sub(r"<[^>]+>", "", it.get("abstract", "") or "")[:1500],
+            source="Crossref"))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Semantic Scholar(摘要 + TL;DR + 被引数 + 引用图谱;中英覆盖广,综述神器)
+# ---------------------------------------------------------------------------
+
+def search_semantic_scholar(query: str, limit: int = 10) -> list:
+    fields = "title,authors,year,abstract,externalIds,tldr,citationCount,openAccessPdf"
+    url = ("https://api.semanticscholar.org/graph/v1/paper/search?"
+           + urllib.parse.urlencode({"query": query, "limit": min(limit, 25), "fields": fields}))
+    data = _get(url)
+    out = []
+    for p in (data.get("data", []) if isinstance(data, dict) else []):
+        ext = p.get("externalIds") or {}
+        tldr = (p.get("tldr") or {}).get("text") or ""
+        abstract = p.get("abstract") or ""
+        if tldr:
+            abstract = f"TL;DR: {tldr}\n{abstract}".strip()
+        oa = p.get("openAccessPdf") or {}
+        out.append(_paper(
+            title=p.get("title", "") or "",
+            authors=[a.get("name", "") for a in (p.get("authors") or [])[:6]],
+            year=p.get("year"), doi=ext.get("DOI"), abstract=abstract[:1500],
+            oa_status="gold" if oa.get("url") else "unknown", oa_url=oa.get("url"),
+            source="SemanticScholar", citations=p.get("citationCount")))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # 多源检索 + 去重(PRISMA 第一步)
 # ---------------------------------------------------------------------------
 
 def search(query: str, sources: list | None = None, limit: int = 10,
            year_from: int | None = None) -> dict:
-    sources = sources or ["openalex", "europepmc"]
+    sources = sources or ["openalex", "crossref", "europepmc"]
     raw = []
     per_source = {}
     fn = {"openalex": lambda: search_openalex(query, limit, year_from),
           "europepmc": lambda: search_europepmc(query, limit),
-          "arxiv": lambda: search_arxiv(query, limit)}
+          "arxiv": lambda: search_arxiv(query, limit),
+          "crossref": lambda: search_crossref(query, limit, year_from),
+          "semanticscholar": lambda: search_semantic_scholar(query, limit)}
     for s in sources:
         if s in fn:
             try:
@@ -187,6 +246,51 @@ def search(query: str, sources: list | None = None, limit: int = 10,
     return {"query": query, "per_source": per_source,
             "n_raw": len(raw), "n_deduped": len(deduped),
             "n_duplicates": len(raw) - len(deduped), "results": deduped}
+
+
+def snowball(doi: str, direction: str = "citations", limit: int = 25) -> list:
+    """引用滚雪球:从种子 DOI 沿 OpenAlex 引用网络扩展——文献综述的正道。
+
+    direction:citations=引用了它的新文献(往前追前沿)/ references=它引的经典(往回追源头)
+    / both。比关键词检索精准:一篇好综述的种子文献,其引用网络就是这个领域的地图。
+    返回统一题录(去重)。任何网络异常都 fail-safe 返回已得部分。
+    """
+    base = "https://api.openalex.org"
+    mail = "mailto=psyclaw@example.org"
+    try:
+        w = _get(f"{base}/works/https://doi.org/{urllib.parse.quote(doi)}?{mail}")
+    except Exception:  # noqa: BLE001
+        return []
+    if not isinstance(w, dict):
+        return []
+    n = min(max(limit, 1), 50)
+    out = []
+    if direction in ("citations", "both"):
+        cu = w.get("cited_by_api_url")
+        if cu:
+            try:
+                c = _get(f"{cu}&per-page={n}&{mail}")
+                out += [_paper_from_oa(x) for x in
+                        (c.get("results", []) if isinstance(c, dict) else [])]
+            except Exception:  # noqa: BLE001
+                pass
+    if direction in ("references", "both"):
+        refs = (w.get("referenced_works") or [])[:n]
+        if refs:
+            ids = "|".join(r.rsplit("/", 1)[-1] for r in refs)
+            try:
+                rr = _get(f"{base}/works?filter=openalex_id:{ids}&per-page={n}&{mail}")
+                out += [_paper_from_oa(x) for x in
+                        (rr.get("results", []) if isinstance(rr, dict) else [])]
+            except Exception:  # noqa: BLE001
+                pass
+    seen, ded = set(), []
+    for p in out:
+        k = (p["doi"] or "").lower() or p["title"].lower().strip()[:80]
+        if k and k not in seen:
+            seen.add(k)
+            ded.append(p)
+    return ded
 
 
 # ---------------------------------------------------------------------------
