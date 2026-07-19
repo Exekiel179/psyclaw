@@ -55,27 +55,33 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
         print(f"   {ui.dim(au)} ({p.get('year','?')}) · {badge} · {p['source']}"
               + (f" · doi:{p['doi']}" if p["doi"] else ""))
     print(ui.dim(f"\n开放获取 {oa_n}/{len(r['results'][:limit])} 篇可直接取全文"))
-    if download:                          # feat-109:OA PDF 批量真下载,规范命名落盘
+    if download:                          # OA + 机构权限批量真下载(付费墙无权限如实跳过)
         print()
-        got = failed = 0
+        got = failed = walled = 0
         for p in r["results"][:limit]:
-            if p.get("oa_status") not in ("gold", "green", "hybrid", "bronze") \
-                    and not p.get("arxiv_id") and not p.get("pmcid"):
-                continue
+            # 对所有命中都试:fetch_and_save 内部分流 OA 直下 / 机构权限(LibKey/IP)下 /
+            # 付费墙无权限则 status=closed 不下载。不再前置只筛 OA,机构权限才生效。
             res = litsearch.fetch_and_save(p, out_dir=pdf_dir)
             dl = res.get("downloaded") or {}
             if dl.get("ok"):
                 got += 1
-                print(ui.ok(f"  ⬇ {Path(dl['path']).name}"
-                            f"({dl['bytes'] // 1024} KB)"))
+                print(ui.ok(f"  ⬇ {Path(dl['path']).name}({dl['bytes'] // 1024} KB)"
+                            + ui.dim(f" · {res.get('channel', '')}")))
             elif res.get("status") == "fulltext" and res.get("saved"):
                 got += 1
                 print(ui.ok(f"  ⬇ {Path(res['saved']).name}(全文文本)"))
+            elif res.get("status") == "closed":
+                walled += 1                # 付费墙且无机构权限:不算失败,如实跳过
             else:
                 failed += 1
-                print(ui.warn(f"  ✗ {p['title'][:46]}:"
-                              f"{(dl.get('note') or res.get('note', ''))[:60]}"))
-        print(ui.dim(f"  下载 {got} 篇 → {pdf_dir};失败 {failed} 篇(如实标注,不假装)"))
+                msg = dl.get("browser_hint") or dl.get("note") or res.get("note", "")
+                print(ui.warn(f"  ✗ {p['title'][:40]}:{msg[:72]}"))
+        summary = f"  下载 {got} 篇 → {pdf_dir}"
+        if walled:
+            summary += f";付费墙无权限跳过 {walled} 篇(配 psyclaw auth --set 机构权限可下)"
+        if failed:
+            summary += f";失败 {failed} 篇(如实标注,不假装)"
+        print(ui.dim(summary))
     else:
         print(ui.dim("取全文:psyclaw lit --fulltext <DOI>(走合法 OA);"
                      "--download 批量下载本次 OA 命中;付费墙用 --zotero <DOI>。"))
