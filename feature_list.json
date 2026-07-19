@@ -1700,6 +1700,14 @@
    "dependencies": "['feat-169']",
    "status": "done",
    "evidence": "tests/test_litsearch_sources.py +6;commit(本次);--snowball/--direction 解析正常;全量 2106 passed。"
+  },
+  {
+   "id": "feat-178",
+   "name": "全文下载打通机构权限(OA + LibKey/IP 授权)",
+   "description": "fetch_and_save 此前只下 OA;打通机构权限真下载:_pdf_candidates 纳入机构链接,institutional 走 download_pdf(LibKey 直链/IP 授权可下),EZProxy 需会话则 %PDF 校验失败给 browser_hint。lit --download 覆盖所有命中(OA 下/机构下/付费墙如实跳过)。付费墙仍不绕过。",
+   "dependencies": "['feat-109','feat-177']",
+   "status": "done",
+   "evidence": "tests/test_institutional_download.py +4;commit(本次);全量 2110 passed。"
   }
  ]
 }
