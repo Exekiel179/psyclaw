@@ -191,8 +191,10 @@ def capability_map() -> str:
         "投稿前质检:`psyclaw check <稿.md>`(JARS+效应量+引用+选择性报告)——"
         "下结论/交付前先跑,别把没核过的结论写进报告;\n"
         "统计计算:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
-        "文献/量表/预注册:psyclaw lit / scale / preregister。\n"
-        "拿不准有没有现成能力,先想 psyclaw 命令,再考虑手写。")
+        "文献检索/引用滚雪球/下载全文:**直接调 lit_search / lit_snowball / lit_download "
+        "工具**(用户以对话工作,别甩 CLI 让他自己跑;下载覆盖 OA + 机构权限);\n"
+        "量表/预注册/质检/导出:scale / preregister / check / export。\n"
+        "有对应工具就调工具,别让用户去记命令;拿不准先想现成能力,再考虑手写。")
 
 
 def skills_catalog(project_dir: str = ".") -> str:

@@ -256,6 +256,82 @@ def build_tools(project_dir: str = ".") -> dict:
         return render_tree(scan_tree(str(p)))
     _t("list_dir", "看目录结构(有界树;data/raw 只报数不列名)", "path?:str", _list_dir)
 
+    # 文献工具(对话原生:检索/引用滚雪球/下载全文,模型直接调,无需用户记 CLI)
+    def _fmt_papers(header, papers):
+        lines = [header]
+        for i, p in enumerate(papers, 1):
+            au = ", ".join(p.get("authors", [])[:3]) + (" 等" if len(p.get("authors", [])) > 3 else "")
+            cit = f" · 被引{p['citations']}" if p.get("citations") else ""
+            oa = f" · {p['oa_status']}" if p.get("oa_status") and p["oa_status"] != "unknown" else ""
+            doi = f" · doi:{p['doi']}" if p.get("doi") else ""
+            lines.append(f"{i}. {(p.get('title') or '')[:96]} — {au} "
+                         f"({p.get('year') or '?'}){oa}{cit}{doi}")
+        return "\n".join(lines)
+
+    def _lit_search(a):
+        from psyclaw.psych import litsearch
+        q = str(a.get("query", "")).strip()
+        if not q:
+            return "需要 query"
+        srcs = a.get("sources")
+        srcs = [s.strip() for s in srcs.split(",") if s.strip()] if isinstance(srcs, str) and srcs else None
+        limit = int(a.get("limit", 8))
+        r = litsearch.search(q, sources=srcs, limit=limit)
+        return _fmt_papers(f"检索「{q}」· 来源 {r['per_source']} · 去重后 {r['n_deduped']} 条:",
+                           r["results"][:limit])
+    _t("lit_search",
+       "文献检索(OpenAlex/Crossref/EuropePMC 多源,覆盖中英文核心期刊;返回题录+DOI 供下载/滚雪球)",
+       "query:str, limit?:int, sources?:str(逗号:openalex,crossref,europepmc,semanticscholar,arxiv)",
+       _lit_search)
+
+    def _lit_snowball(a):
+        from psyclaw.psych import litsearch
+        doi = str(a.get("doi", "")).strip()
+        if not doi:
+            return "需要 doi(种子文献)"
+        direction = a.get("direction") or "citations"
+        hits = litsearch.snowball(doi, direction=direction, limit=int(a.get("limit", 20)))
+        if not hits:
+            return f"没拿到(DOI「{doi}」不在 OpenAlex / 无引用数据 / 网络失败)"
+        return _fmt_papers(f"引用滚雪球「{doi}」· {direction} · {len(hits)} 条:", hits)
+    _t("lit_snowball",
+       "引用滚雪球:从种子 DOI 沿引用网络扩展(citations 往前追前沿 / references 往回追源头 / both)——综述正道,比关键词精准",
+       "doi:str, direction?:citations|references|both, limit?:int", _lit_snowball)
+
+    def _lit_download(a):
+        from psyclaw.psych import litsearch
+        out_dir = str(Path(project_dir) / "outputs" / "pdfs")
+        doi = str(a.get("doi", "")).strip()
+        if doi:
+            papers = [{"doi": doi}]
+        else:
+            q = str(a.get("query", "")).strip()
+            if not q:
+                return "需要 query(批量检索下载)或 doi(下单篇)"
+            papers = litsearch.search(q, limit=int(a.get("limit", 8)))["results"][:int(a.get("limit", 8))]
+        got, walled, failed = [], 0, []
+        for p in papers:
+            res = litsearch.fetch_and_save(p, out_dir=out_dir)
+            dl = res.get("downloaded") or {}
+            if dl.get("ok"):
+                got.append(f"{Path(dl['path']).name} ({dl['bytes'] // 1024}KB · {res.get('channel', '')})")
+            elif res.get("status") == "fulltext" and res.get("saved"):
+                got.append(f"{Path(res['saved']).name} (全文文本)")
+            elif res.get("status") == "closed":
+                walled += 1
+            else:
+                failed.append((p.get("title") or p.get("doi") or "?")[:40] + ":"
+                              + (dl.get("browser_hint") or dl.get("note") or "")[:70])
+        lines = [f"下载 {len(got)} 篇 → {out_dir}"]
+        lines += [f"  ⬇ {g}" for g in got]
+        if walled:
+            lines.append(f"  付费墙无权限跳过 {walled} 篇(配机构权限:auth --set 后可下)")
+        lines += [f"  ✗ {f}" for f in failed]
+        return "\n".join(lines)
+    _t("lit_download",
+       "下载文献全文 PDF 到 outputs/pdfs(OA + 机构权限[LibKey/IP];给 query 批量检索下载 或 给 doi 下单篇;付费墙不绕过,如实跳过)",
+       "query?:str, doi?:str, limit?:int", _lit_download, side_effect=True)
+
     # 插件工具(用户项目/全局插件注册;内置同名优先,加载失败不拖垮工具集)
     try:
         from psyclaw.plugins import load_plugins, merge_plugin_tools
