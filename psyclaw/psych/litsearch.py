@@ -516,6 +516,8 @@ def _pdf_candidates(paper: dict, res: dict) -> list[str]:
     cands: list[str] = []
     if res.get("pdf_url"):
         cands.append(res["pdf_url"])
+    if res.get("url"):                 # 机构权限链接(LibKey 全文直链 / EZProxy 入口 / IP 直连)
+        cands.append(res["url"])
     pmcid = paper.get("pmcid")
     if pmcid:
         pid = pmcid if str(pmcid).startswith("PMC") else f"PMC{pmcid}"
@@ -536,7 +538,10 @@ def fetch_and_save(paper: dict, out_dir: str) -> dict:
     返回 get_fulltext 的结果并附 {downloaded: {ok, path?, note?, tried}}。
     """
     res = get_fulltext(paper, out_dir=out_dir)
-    if res.get("status") == "oa_pdf":
+    # OA 与机构权限都真下载:OA 走合法开放链接;机构权限走 LibKey 全文直链 / IP 授权直连。
+    # EZProxy 这类需浏览器 SSO 会话的链接 urllib 下不了(会拿到登录页 HTML,download_pdf
+    # 靠 %PDF 魔数如实报失败),此时回执带 browser_hint 引导用已登录浏览器打开(或 --via-bridge)。
+    if res.get("status") in ("oa_pdf", "institutional"):
         meta = paper if paper.get("title") else (paper_from_doi(paper.get("doi") or "")
                                                  or paper)
         notes = []
@@ -547,6 +552,10 @@ def fetch_and_save(paper: dict, out_dir: str) -> dict:
                 res["downloaded"] = dl
                 return res
             notes.append(f"{url[:60]}: {dl.get('note', '')[:60]}")
-        res["downloaded"] = {"ok": False, "tried": len(notes),
-                             "note": " | ".join(notes) or "无候选链接"}
+        failed = {"ok": False, "tried": len(notes),
+                  "note": " | ".join(notes) or "无候选链接"}
+        if res.get("status") == "institutional" and res.get("url"):
+            failed["browser_hint"] = ("机构权限链接可能需浏览器 SSO 会话——"
+                                      f"用已登录机构的浏览器打开:{res['url']}")
+        res["downloaded"] = failed
     return res
