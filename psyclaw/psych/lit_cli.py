@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 
-def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
+def lit_cli(query: str, sources: str = "", limit: int = 10,
             year_from: int | None = None, fulltext_doi: str | None = None,
             zotero_doi: str | None = None, synthesize: bool = False,
             download: bool = False, project_dir: str = ".",
@@ -39,7 +39,11 @@ def lit_cli(query: str, sources: str = "openalex,europepmc", limit: int = 10,
     # 模式 C:检索(PRISMA 第一步)
     print(ui.title(f"文献检索 — {query}"))
     print(ui.rule())
-    src = [s.strip() for s in sources.split(",") if s.strip()]
+    # 默认源的**唯一真源**是 litsearch.search(传 None 即用它的默认)。
+    # 此处曾另抄一份 "openalex,europepmc",feat-177 给 search() 加 Crossref 时漏改,
+    # 导致走工具有 Crossref、走 CLI 没有——而 Crossref 正是中文核心期刊 DOI
+    # 覆盖最好的源。两份默认值必然漂移,故不再自留副本。
+    src = [s.strip() for s in (sources or "").split(",") if s.strip()] or None
     r = litsearch.search(query, sources=src, limit=limit, year_from=year_from)
     print(ui.dim(f"来源 {r['per_source']} · 原始 {r['n_raw']} · "
                  f"去重后 {r['n_deduped']}(去掉 {r['n_duplicates']} 条重复)"))
@@ -315,7 +319,7 @@ def lit_cli_argv(argv: list[str], project_dir: str = ".") -> int:
             limit=10, sources="", year_from=None, fulltext=None, zotero=None,
             synthesize=False))
     query_parts: list[str] = []
-    sources, limit, year_from = "openalex,europepmc", 10, None
+    sources, limit, year_from = "", 10, None   # "" = 用 litsearch.search 的默认源
     fulltext_doi = zotero_doi = None
     synthesize = False
     download = False
