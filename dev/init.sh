@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # PsyClaw harness 初始化 / 验证入口 — 干净、可重启 (clean, restartable)。
-# 用法: PSYCLAW_PYTHON=C:/Python314/python ./init.sh
+# 用法: PSYCLAW_PYTHON=C:/Python314/python ./dev/init.sh(从任意目录调用均可)
 # 注: 测试需装好统计栈的解释器 (scipy/pingouin/statsmodels/lifelines/factor_analyzer/semopy)；
 #     本机用 C:\Python314\python，msys 默认 python 无统计栈会失败。
 set -euo pipefail
+cd "$(dirname "$0")/.."   # 脚本在 dev/,切回仓库根执行
 
 PY="${PSYCLAW_PYTHON:-python}"
 echo "=== PsyClaw Harness Init ==="
@@ -30,7 +31,7 @@ echo "--- gates 质量检查 ---"
 echo "=== Verification Complete (clean state) ==="
 echo ""
 echo "Next steps (restartable — 每轮一任务一提交):"
-echo "1. 读 feature_list.json 看各 feature 状态"
-echo "2. 读 progress.md / session-handoff.md 接续上下文"
+echo "1. 读 dev/feature_list.json 看各 feature 状态"
+echo "2. 读 dev/progress.md / dev/session-handoff.md 接续上下文"
 echo "3. 选 ONE 个 status != done 的 feature 动手 (one feature at a time)"
-echo "4. 改完重跑 ./init.sh，全绿 + 记录 evidence 后才宣称 done"
+echo "4. 改完重跑 ./dev/init.sh，全绿 + 记录 evidence 后才宣称 done"

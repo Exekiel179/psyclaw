@@ -4,14 +4,14 @@
 #   curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
 #
 # 环境变量(都可选):
-#   PSYCLAW_VERSION=v0.20.0   指定版本 tag(默认最新发行)
+#   PSYCLAW_VERSION=v0.21.0   指定版本 tag(默认最新发行)
 #   PSYCLAW_EXTRAS=[stats]    附带 extra(如本机跑统计:[stats];补全体验:[full])
 #   PSYCLAW_CN=1              强制走国内镜像(默认:探测 GitHub 通不通自动决定)
 #   PSYCLAW_CN=0              强制走官方源
 set -eu
 
 REPO="Exekiel179/psyclaw"
-TAG="${PSYCLAW_VERSION:-v0.20.0}"
+TAG="${PSYCLAW_VERSION:-v0.21.0}"
 EXTRAS="${PSYCLAW_EXTRAS:-}"
 CN="${PSYCLAW_CN:-auto}"
 

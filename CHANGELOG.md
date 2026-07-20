@@ -1,5 +1,25 @@
 # Changelog
-
+> 主题:**仓库精简,开箱即用**。功能无变更,面向新用户的第一印象整体重做。
+开发脚手架此前散落在仓库顶层,占据大量篇幅而对使用者毫无意义。现统一收入 `dev/`:
+- 自主开发循环脚本(`ralph.*` / `nostop.*` / `plan.*` / `init.sh`)及其提示词
+  (`PROMPT.md` / `PLAN_PROMPT.md`);
+- 计划与状态文件(`TODO.md` / `feature_list.json` / `progress.md` /
+  `session-handoff.md` / `AGENTS.md` / `skills-lock.json`);
+- harness 工具链 `.agents/` → `dev/agents/`;
+- 评测夹具 `evalcase*/`;
+- `docs/` 中的内部审计报告(混沌报告、迁移审计、优化记录、记忆设计、superpowers 规格)
+  → `dev/docs/`。
+脚本内部路径已同步修正并实测:各脚本切到仓库根执行、提示词从 `dev/` 读取,
+`dev/init.sh` 从任意目录调用均可。`CLAUDE.md` 中的 harness 契约路径一并更新。
+- 移除开发残留 `notes/_diag_meta.py`(内含早期 `F:/Projects/psyclaw` 路径)
+  与两份层级回归报告;
+- `.gitignore` 补充运行期产物(`outputs/` `figures/` `notes/` `data/` `dist2/`
+  `.remember/` 等)——新用户克隆后跑一遍不会带出一堆脏文件。
+面向使用者而非开发者:开篇即指向使用白皮书,安装后直接给对话示例,
+四个入口一张表说清。修正多处陈旧内容——版本号仍钉在 v0.15.0,
+命令清单里仍在介绍 v0.18.0 已移除的 `norms` / `design` / `preregister`。
+新增校验:README 中出现的每个命令与每条相对链接均经实测确认有效。
+随版本重新生成为 `docs/PsyClaw使用白皮书_v0.21.0.docx/.pdf`。
 ## v0.20.0(2026-07-20)
 
 > 主题:**付费墙全文三级取全文链路打通**——从「无法获取」到全自动。

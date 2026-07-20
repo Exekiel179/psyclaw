@@ -7,14 +7,14 @@
 #   Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 
 $ErrorActionPreference = "Continue"
-Set-Location -Path $PSScriptRoot
+Set-Location -Path (Split-Path -Parent $PSScriptRoot)   # 脚本在 dev\,切回仓库根
 
 $iter      = 0
 $fails     = 0
 $maxFails  = 5        # 连续失败这么多次 ≈ 额度耗尽/服务不可用，自动退出
 $cooldown  = 30       # 失败后退避秒数（指数退避，封顶 300s）
 
-$prompt = Get-Content -Path ".\PROMPT.md" -Raw
+$prompt = Get-Content -Path ".\dev\PROMPT.md" -Raw
 
 while ($true) {
     $iter++

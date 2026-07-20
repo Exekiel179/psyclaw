@@ -8,7 +8,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
-Set-Location -Path $PSScriptRoot
+Set-Location -Path (Split-Path -Parent $PSScriptRoot)   # 脚本在 dev\,切回仓库根
 New-Item -ItemType Directory -Force -Path ".\logs" | Out-Null
 # 防止 PowerShell 给 format-claude-stream 注入 UTF-8 BOM
 $OutputEncoding = New-Object System.Text.UTF8Encoding $false
@@ -18,7 +18,7 @@ $Model    = "claude-opus-4-8"   # 规划用 Opus 4.8(想得深)
 $MaxTurns = 40
 
 $haveFmt = $null -ne (Get-Command format-claude-stream -ErrorAction SilentlyContinue)
-$prompt  = Get-Content -Path ".\PLAN_PROMPT.md" -Raw
+$prompt  = Get-Content -Path ".\dev\PLAN_PROMPT.md" -Raw
 
 for ($i = 1; $i -le $Rounds; $i++) {
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"

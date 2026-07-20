@@ -24,7 +24,7 @@ $Cooldown  = 30           # 失败后退避秒数(指数退避，封顶 300s)
 # ─────────────────────────────────────────────────────────────
 
 $ErrorActionPreference = "Continue"
-Set-Location -Path $PSScriptRoot
+Set-Location -Path (Split-Path -Parent $PSScriptRoot)   # 脚本在 dev\,切回仓库根
 New-Item -ItemType Directory -Force -Path ".\logs" | Out-Null
 
 # 关键:阻止 PowerShell 在管道里给 format-claude-stream 的 stdin 注入 UTF-8 BOM，
@@ -41,7 +41,7 @@ switch ($Mode) {
 # 若装了 @khanacademy/format-claude-stream，则美化流式输出
 $haveFmt = $null -ne (Get-Command format-claude-stream -ErrorAction SilentlyContinue)
 
-$prompt = Get-Content -Path ".\PROMPT.md" -Raw
+$prompt = Get-Content -Path ".\dev\PROMPT.md" -Raw
 $iter = 0; $fails = 0
 
 while ($true) {
