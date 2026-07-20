@@ -42,9 +42,11 @@ def test_lit_download_tool_runs(monkeypatch, tmp_path):
 
 
 def test_lit_download_reports_paywall(monkeypatch, tmp_path):
+    """付费墙要**指路**而非只报「跳过」——用户往往有机构权限,只是需要去浏览器登录。"""
     monkeypatch.setattr(ls, "fetch_and_save", lambda p, out_dir=None: {"status": "closed"})
     out = build_tools(str(tmp_path))["lit_download"]["run"]({"doi": "10.1/x"})
-    assert "付费墙无权限跳过 1 篇" in out
+    assert "付费墙 1 篇" in out
+    assert "lit_open_institutional" in out       # feat-189:给下一步,别让路走死
 
 
 def test_lit_search_needs_query():

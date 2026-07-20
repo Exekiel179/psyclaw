@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.19.1(2026-07-20)
+
+> 主题:**付费墙不再是终点**——唤起浏览器走机构登录取全文。
+
+### 新增(feat-189):`lit_open_institutional`
+此前 `lit_download` 撞到付费墙只报「付费墙无权限跳过 N 篇」,`fetch_and_save`
+也只返回一句「配置机构权限/用 Zotero」,**不做任何事**。用户看到的就是
+「❌ 付费墙 ——」然后没有下一步,模型据此告诉用户「无法获取」。
+
+**但用户本人往往是有权限的**(在校 / VPN / 机构账号),缺的只是「在真实浏览器里
+登一下」——真实浏览器带着他的 SSO 会话,出版社认的正是那个会话。零件其实都在
+(`webbridge.open_in_default_browser`、`institution.ezproxy_url`/`libkey_fulltext`),
+只是从没接起来。
+
+- `psyclaw/psych/paywall.py`:`resolve_entry` 按 **LibKey → EZProxy → doi.org**
+  给出最佳机构入口(越靠前越可能直接出全文);机构层任何异常都不使整条路断掉,
+  至少能落到 doi.org。
+- `browser_handoff` 打开该入口并**预先建好** `outputs/pdfs/`(用户另存时目录已在);
+  引导文案给出逐步下一步(登录 → 另存到哪 → 存好后告诉我)。
+- **不绕过付费墙**:用的是用户自己的权限;psyclaw 全程不碰账号密码,
+  登录在浏览器里由用户自己完成。工具标 `side_effect=True`(会弹浏览器,先问)。
+- `lit_download` 撞墙时改为**指路**并列出待取 DOI,不再只说「跳过 N 篇」;
+  `capability_map` 同步写明「付费墙不是终点…别回『无法获取』」。
+
+`tests/test_paywall_handoff.py` +10,其中一条专门守着
+**引导文案不许提不存在的工具**——本功能第一版文案里就写了并不存在的 `lit_import`
+(与本项目一贯反对的"编造能力"同类),该测试比对真实工具表,杜绝复发。
+
+全量 pytest → 2192 passed;gates ✓;eval 28/28。
+
 ## v0.19.0(2026-07-20)
 
 > 主题:**agent 模式转正**(默认开 + 流式输出)+ 修「近三年却拿回 1980 年文献」。
