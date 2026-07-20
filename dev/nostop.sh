@@ -6,7 +6,7 @@
 # 建议在 tmux 里跑，Mac 防休眠见文末注释。
 
 set -o pipefail   # 不用 set -u：macOS 自带 bash 3.2 在失败分支会误报 unbound variable 打死整个循环
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # 脚本在 dev/,切回仓库根执行
 mkdir -p logs
 
 # ─── 可调参数（对应 nostop.ps1）────────────────────────────────
@@ -25,7 +25,7 @@ case "$MODE" in
 esac
 
 command -v format-claude-stream >/dev/null 2>&1 && HAVE_FMT=1 || HAVE_FMT=0
-PROMPT="$(cat PROMPT.md)"
+PROMPT="$(cat dev/PROMPT.md)"
 ITER=0; FAILS=0
 
 while true; do

@@ -13,7 +13,7 @@ FORBIDDEN_TERMS = (
 
 def test_active_copy_avoids_deprecated_translated_jargon():
     targets = [ROOT / "psyclaw", ROOT / "docs"]
-    files = [ROOT / "README.md", ROOT / "DESIGN.md"]
+    files = [ROOT / "README.md", ROOT / "dev" / "docs" / "DESIGN.md"]
     for target in targets:
         files.extend(
             path for path in target.rglob("*")

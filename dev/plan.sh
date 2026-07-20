@@ -6,7 +6,7 @@
 # 规划完用 ./nostop.sh (Sonnet) 去实现。
 
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # 脚本在 dev/,切回仓库根执行
 mkdir -p logs
 
 ROUNDS="${1:-1}"
@@ -14,7 +14,7 @@ MODEL="claude-opus-4-8"      # 规划用 Opus 4.8(想得深)
 MAX_TURNS=40
 
 command -v format-claude-stream >/dev/null 2>&1 && HAVE_FMT=1 || HAVE_FMT=0
-PROMPT="$(cat PLAN_PROMPT.md)"
+PROMPT="$(cat dev/PLAN_PROMPT.md)"
 
 for i in $(seq 1 "$ROUNDS"); do
   STAMP=$(date +%Y%m%d_%H%M%S)

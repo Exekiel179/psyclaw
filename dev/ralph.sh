@@ -5,7 +5,7 @@
 # 停止：Ctrl-C 手动停；或额度跑完后 claude 连续失败，脚本自动退出。
 
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # 脚本在 dev/,切回仓库根执行
 
 ITER=0
 FAILS=0
@@ -19,7 +19,7 @@ while true; do
   echo "═══════════════════════════════════════════════════════"
 
   # 跑一轮；输出同时落盘便于事后回看。捕获退出码判断是否额度耗尽。
-  claude --dangerously-skip-permissions -p "$(cat PROMPT.md)" 2>&1 | tee -a ralph.log
+  claude --dangerously-skip-permissions -p "$(cat dev/PROMPT.md)" 2>&1 | tee -a ralph.log
   RC=${PIPESTATUS[0]}
 
   if [ "$RC" -eq 0 ]; then

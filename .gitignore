@@ -17,6 +17,15 @@ notes/blocked.md
 notes/pending_for_human.md
 notes/decision_request.md
 
+/outputs/
+/figures/
+/notes/
+/data/
+/dist2/
+/scripts/fig_*.py
+/.remember/
+/*.pdf
+
 # 根目录个人文档（申报表等，不入库；examples/ 下的示例产物不受影响）
 /*.docx
 
