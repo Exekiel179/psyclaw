@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "psyclaw"
-version = "0.17.0"
+version = "0.17.1"
 description = "心理学研究编排 Agent CLI — 文献调研 · 实验设计 · 论文写作 · 同行评审，质量检查内置；统计交给成熟库/MCP"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -32,6 +32,14 @@ psyclaw = "psyclaw.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["psyclaw*"]
+
+# 数据文件必须随包分发:gates 判据(PSYCLAW.md/rules.yaml)、agent 提示词、
+# 心理学数据(methods/scales/journals…)、全部 skill。少一个都会让装出来的
+# psyclaw 变残(质量检查无判据 / skill 目录为空)。
+# 注:skills/nature-review 这类带连字符的目录不是合法包名,packages.find 收不到,
+# 只能靠这里的递归 glob 带进 wheel——改动后务必 `uv build` 后校验 wheel 内容。
+[tool.setuptools.package-data]
+psyclaw = ["**/*.md", "**/*.json", "**/*.yaml", "**/*.yml", "**/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
