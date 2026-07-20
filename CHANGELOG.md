@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.17.3(2026-07-20)
+
+> 主题:**Zotero 连带管理 + 沙箱白名单补漏**。
+
+### 新增:Zotero 三件套进对话(feat-183)
+`zotero_client.py` 一直有 110 行可用的 Web API v3 客户端,但:
+`add_by_doi` 是**空壳**(只返回「请你自己去 Zotero 点一下」),
+`search_library`/`add_by_doi` 的外部调用点为 **0**,toolloop 里**一个 zotero 工具都没有**
+——能力在代码里,对话里够不着。现补齐:
+
+- **`add_by_doi` 真正实现写入**:Crossref 取元数据 → 拼 Zotero `journalArticle`
+  条目 → `POST items`。三条安全约束:已在库**不重复添加**(Zotero 允许重复条目,
+  重复写会污染用户文库);Crossref 查不到元数据**拒绝写入**(不给文库塞空条目);
+  查重本身失败时**也不写**(否则网络抖动就产生重复条目)。
+- **三个对话工具**:`zotero_search`(先在自己库里找,别重复下载)、
+  `zotero_fulltext`(付费墙文献的合法全文来源:用户本就有访问权)、
+  `zotero_add`(写用户私人文库 → `side_effect=True` 走审批;搜索只读不打扰)。
+- 未配置凭据时给**配置指引**(去哪拿 API key 和 library ID),而非裸报错。
+
+### 修复:沙箱网络白名单漏域
+`DEFAULT_POLICY.net.allow_domains` 缺 `api.semanticscholar.org` 与 `api.zotero.org`
+——沙箱一旦开启,Semantic Scholar 检索与 Zotero 全部**静默失效**,且极难归因。
+补齐并加测试锁定「白名单 ⊇ 实际访问的域」。
+
+> 说明:psyclaw **本来就默认联网**(沙箱默认 `enabled: False`,lit_search 直连
+> OpenAlex/Crossref/EuropePMC)。此前"感觉没联网"是模型未调工具、直接转向编造
+> 造成的假象,根因已在 v0.17.1/v0.17.2 修复。
+
+因触发 `capability_map` 700 字符预算,按守卫要求压缩既有表述而非调大预算。
+
 ## v0.17.2(2026-07-20)
 
 > 主题:**引用存在性查证**——把"别编造"从规则升级成机器可验的判据。

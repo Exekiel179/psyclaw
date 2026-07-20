@@ -332,6 +332,66 @@ def build_tools(project_dir: str = ".") -> dict:
        "下载文献全文 PDF 到 outputs/pdfs(OA + 机构权限[LibKey/IP];给 query 批量检索下载 或 给 doi 下单篇;付费墙不绕过,如实跳过)",
        "query?:str, doi?:str, limit?:int", _lit_download, side_effect=True)
 
+    # ── Zotero 文库(此前 110 行客户端只从 lit --zotero 开了个取全文的小口,
+    # add/search 零调用点、对话里完全够不着;这里补齐读写三件套)─────────────
+    def _zot_guard():
+        from psyclaw.psych import zotero_client as z
+        if not z.available():
+            return ("未配置 Zotero:设 ZOTERO_API_KEY 与 ZOTERO_LIBRARY_ID"
+                    "(Zotero 网站 → 设置 → 安全 → 应用程序 → 新建私钥;"
+                    "库 ID 在同页 userID)。配好后文库搜索/入库/取全文都能用。")
+        return None
+
+    def _zotero_search(a):
+        from psyclaw.psych import zotero_client as z
+        if (g := _zot_guard()):
+            return g
+        q = str(a.get("query", "")).strip()
+        if not q:
+            return "需要 query"
+        try:
+            hits = z.search_library(q, limit=int(a.get("limit", 10)))
+        except Exception as exc:  # noqa: BLE001
+            return f"Zotero 检索失败:{exc}"
+        if not hits:
+            return f"你的 Zotero 文库里没有匹配「{q}」的条目。"
+        out = [f"Zotero 文库命中 {len(hits)} 条:"]
+        for i, h in enumerate(hits, 1):
+            au = "、".join(h.get("creators") or []) or "?"
+            out.append(f"{i}. {(h.get('title') or '')[:88]} — {au} "
+                       f"({h.get('year') or '?'})"
+                       + (f" · doi:{h['doi']}" if h.get("doi") else ""))
+        return "\n".join(out)
+    _t("zotero_search", "搜你自己的 Zotero 文库(元数据+全文索引)——已有文献先在自己库里找,别重复下载",
+       "query:str, limit?:int", _zotero_search)
+
+    def _zotero_fulltext(a):
+        from psyclaw.psych import zotero_client as z
+        if (g := _zot_guard()):
+            return g
+        doi = str(a.get("doi", "")).strip()
+        if not doi:
+            return "需要 doi"
+        r = z.get_fulltext_by_doi(doi)
+        if r.get("status") == "fulltext":
+            return (f"{r.get('title', '')}\n来源:{r.get('channel')} · "
+                    f"{r.get('chars')} 字\n\n{r.get('text', '')}")
+        return r.get("note") or str(r)
+    _t("zotero_fulltext", "从你自己的 Zotero 文库取该 DOI 的已索引全文(付费墙文献的合法全文来源:你本就有访问权)",
+       "doi:str", _zotero_fulltext)
+
+    def _zotero_add(a):
+        from psyclaw.psych import zotero_client as z
+        if (g := _zot_guard()):
+            return g
+        doi = str(a.get("doi", "")).strip()
+        if not doi:
+            return "需要 doi"
+        r = z.add_by_doi(doi)
+        return r.get("note") or str(r)
+    _t("zotero_add", "把 DOI 对应文献写入你的 Zotero 文库(Crossref 取元数据;已在库则不重复添加)",
+       "doi:str", _zotero_add, side_effect=True)
+
     # 全部 CLI 命令自动工具化(goal:所有 cli 命令工具化)——从 argparse 自省,新命令自动覆盖。
     try:
         _register_cli_tools(tools, project_dir)
