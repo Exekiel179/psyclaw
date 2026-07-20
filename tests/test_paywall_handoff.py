@@ -69,8 +69,9 @@ def test_handoff_message_gives_concrete_next_steps(tmp_path):
                                 opener=lambda u: True)
     msg = paywall.handoff_message(r, DOI)
     assert "机构账号登录" in msg
-    assert str(r["pdf_dir"]) in msg                   # 明确告诉用户存到哪
-    assert "read_file" in msg                         # 只指向真实存在的能力
+    # feat-190 起不再要求用户另存到指定路径:下到默认下载目录即可,由
+    # lit_capture_pdf 自动收进项目并改名。
+    assert "lit_capture_pdf" in msg
 
 
 def test_message_references_no_nonexistent_tool(tmp_path):

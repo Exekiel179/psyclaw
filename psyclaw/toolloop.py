@@ -429,6 +429,21 @@ def build_tools(project_dir: str = ".") -> dict:
        "lit_download 报 🔒 付费墙时就该调它,别告诉用户「无法获取」",
        "doi:str, url?:str", _lit_open_institutional, side_effect=True)
 
+    def _lit_capture_pdf(a):
+        from psyclaw.psych.paywall import capture_from_downloads
+        out_dir = str(Path(project_dir) / "outputs" / "pdfs")
+        r = capture_from_downloads(
+            doi=str(a.get("doi", "")).strip(), out_dir=out_dir,
+            name_hint=str(a.get("name", "")).strip(),
+            timeout=float(a.get("timeout", 180)))
+        return r.get("note") or str(r)
+    _t("lit_capture_pdf",
+       "用户在浏览器里下好 PDF 后调它:盯住系统下载目录,把新下的 PDF 自动收进 "
+       "outputs/pdfs 并按「作者_年份_题名」改名(校验 %PDF 魔数,登录页/错误页不收)。"
+       "别再让用户自己另存到指定路径+起文件名",
+       "doi?:str, name?:str, timeout?:int(秒,默认180)", _lit_capture_pdf,
+       side_effect=True)
+
     # ── Zotero 文库(此前 110 行客户端只从 lit --zotero 开了个取全文的小口,
     # add/search 零调用点、对话里完全够不着;这里补齐读写三件套)─────────────
     def _zot_guard():

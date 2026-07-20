@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.19.2(2026-07-20)
+
+> 主题:**下好的 PDF 自动收进项目**——不再让用户另存到指定路径 + 起对文件名。
+
+### 新增(feat-190):`lit_capture_pdf`
+用户问「不能帮我下载么」。**直接下不了**:登录后的会话在浏览器里,Python 侧拿不到
+那个 cookie——这是浏览器安全模型,不是 psyclaw 偷懒。但用户点一下「下载」本就是最
+自然的动作;真正多余的是让他记住「另存到 `outputs/pdfs/`、文件名还得叫
+`Ang_2025_Doomscrolling-and-Secondary-Traumatic-Stress.pdf`」。那份麻烦由 psyclaw 接过来:
+
+- `capture_from_downloads` 盯住系统下载目录(尊重 `XDG_DOWNLOAD_DIR`),
+  新 PDF 一出现就**移进** `outputs/pdfs/` 并按「作者_年份_题名」改名;
+- **只认新出现的文件**(调用开始时先拍快照)——绝不动用户下载目录里原有的东西;
+- **必须过 `%PDF` 魔数**:出版社的登录页/错误页常被存成 `.pdf`,靠扩展名会把垃圾
+  收进项目,还会让后续解析莫名其妙地失败;
+- 等 `.crdownload`/`.part`/`.download` 消失才算下完,不半截收走;
+- 同名不覆盖(自动加 `-1`)。工具标 `side_effect=True`(会移动用户文件,先问)。
+
+`browser_handoff` 的引导文案同步改口:「直接下到你平时的下载目录就行,不用另存到
+别处、也不用改名」,然后调 `lit_capture_pdf` 收。
+
+`tests/test_capture_pdf.py` +9(新文件才收 / 原有文件不动 / 非 PDF 内容拒收 /
+下载中不半截收 / 同名不覆盖 / 文件名净化)。全量 pytest → 2201 passed;gates ✓;eval 28/28。
+
 ## v0.19.1(2026-07-20)
 
 > 主题:**付费墙不再是终点**——唤起浏览器走机构登录取全文。
