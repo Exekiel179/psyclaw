@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.18.1(2026-07-20)
+
+> 主题:**修复"工具够不着"死胡同**——模型明明被教着调 lit_search,却无法真正调到。
+
+### 修复(feat-187):命令块 ↔ 对话工具桥接
+用户实测(deepseek)完整复现了此前那次「参数解析问题」:
+
+```
+```psyclaw
+lit_search --query "..." --max 20 --source pubmed
+```
+→ invalid choice: 'lit_search'
+→ 模型结论:「PsyClaw 当前配置中缺少直接对接外部学术数据库的联网检索工具」
+```
+
+**根因是架构错配**:`capability_map` 每轮注入、教模型「直接调 lit_search 工具」,
+但那句只在 **agent 模式**(```tool JSON 协议)成立;**默认 chat 模式只执行
+```psyclaw 命令块**。提示词在教模型做一件它在当前模式下做不到的事,于是它拼出
+「工具名 + CLI flag」的四不像,两套约定都不匹配,谁也没执行。
+
+与其规定模型只能用哪套语法(混用不可避免),不如**让两套都通**:
+
+- `run_tool_from_cmdline`:命令块首 token 是**注册工具名**时派发到工具,
+  `--key value` / `--key=value` / 裸位置参数(并进 query)统一解析;
+  `--max/--n/--topic/--source` 等常见同义参数名归一到工具真实参数。
+- **不抢 CLI 子命令**:名字是真子命令(export/gates/check…)一律走原 argparse 路径
+  ——否则 `export a.md --docx b.docx` 会被当副作用工具拒执行,破坏
+  capability_map 里「命令块跑 psyclaw export --docx」这条既有工作流。
+- **副作用工具在命令块路径不放行**:该路径没有审批环节,写盘/写用户文库必须走
+  agent 模式的 approve,这里如实告知而非静默执行。
+- 工具异常**如实回传**(静默失败会让模型误判成「没有这个能力」)。
+- `capability_map` 同步改口:两种写法都给出,不再只说 agent 模式才成立的那句。
+
+### 修复:不认识的检索源静默返回 0 条
+同一次事故的第二层:模型写 `--source pubmed`,而 `search()` 用 `if s in fn`
+**静默跳过**不认识的源 → 0 条结果。「全不认识」与「这领域真没论文」输出完全一样,
+模型据此再次断定「没有检索能力」。而 pubmed 其实有对应——EuropePMC 就索引 PubMed。
+
+- 新增 `_SOURCE_ALIASES`(pubmed/medline/pmc→europepmc、s2→semanticscholar…);
+- 认不出的源在 `per_source["_note"]` 里**明确报出**并列出可用源;
+- 一个可用源都不剩时**退回默认源**,不让调用方空手而归。
+
+实测:用户那条一字未改的命令现在直接返回 3 条带 DOI 的真实论文。
+
+`tests/test_cmdblock_tool_bridge.py` +9、`tests/test_source_aliases.py` +5。
+全量 pytest → 2165 passed;gates ✓;eval 28/28。
+
+> 附注:这次事故里**反杜撰规则完美生效**——检索失败后模型如实报告失败原因、
+> 明确拒绝编造条目、只提供不含书目的领域概况。v0.17.1/v0.17.2 那两层修复经受住了
+> 真实环境检验;本次修的是它下面那层「工具够不着」。
+
 ## v0.18.0(2026-07-20)
 
 > 主题:**砍掉半吊子内容库**。破坏性变更(命令移除),故升次版本号。
