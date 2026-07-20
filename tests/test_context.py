@@ -63,11 +63,17 @@ class TestLeanCore:
         assert "如实写不显著" in s
 
     def test_citation_antifabrication_hard_constraint(self):
-        """feat-093:对抗评估实测 chat 拒编条目后又凭记忆供出带页码的替代文献。"""
+        """feat-093:对抗评估实测 chat 拒编条目后又凭记忆供出带页码的替代文献。
+
+        当初的修法是「凭记忆的条目标⚠未核实」——太弱,等于贴标签就放行,
+        同一失败于 v0.17 复发(检索失败后整段书目凭记忆编造)。现升级为零杜撰:
+        条目只能来自检索返回,失败就停。详见 tests/test_no_fabricated_citations.py。
+        """
         s = lean_core()
-        assert "引用反杜撰" in s
-        assert "未核实" in s
-        assert "psyclaw lit" in s          # 指引检索而非光拒绝
+        assert "文献零杜撰" in s
+        assert "绝不凭记忆列文献" in s
+        assert "不是豁免" in s              # 贴标签不再是放行条件
+        assert "lit_search" in s           # 指引检索而非光拒绝
 
     def test_stats_delegation_hard_constraint(self):
         """feat-092:对抗评估实测 chat 手写 Welch t——统计外移必须是显式硬约束。"""
