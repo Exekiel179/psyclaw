@@ -90,6 +90,85 @@ def browser_handoff(doi: str, landing_url: str | None = None,
             "note": entry["note"], "pdf_dir": str(out)}
 
 
+def downloads_dir() -> Path:
+    """系统下载目录(尊重 XDG 配置,回退 ~/Downloads)。"""
+    import os
+    xdg = os.environ.get("XDG_DOWNLOAD_DIR")
+    if xdg:
+        return Path(xdg).expanduser()
+    return Path.home() / "Downloads"
+
+
+def _looks_like_pdf(p: Path) -> bool:
+    """靠魔数认 PDF——扩展名会骗人(登录页/错误页也可能存成 .pdf)。"""
+    try:
+        with p.open("rb") as f:
+            return f.read(5) == b"%PDF-"
+    except OSError:
+        return False
+
+
+def _safe_name(hint: str, doi: str) -> str:
+    import re
+    base = re.sub(r"[^\w一-鿿.-]+", "-", (hint or "").strip())[:80].strip("-")
+    if not base:
+        base = "paper-" + re.sub(r"[^\w.-]+", "-", doi or "unknown")[:60]
+    return base if base.lower().endswith(".pdf") else base + ".pdf"
+
+
+def capture_from_downloads(doi: str = "", out_dir: str | Path = "outputs/pdfs",
+                           name_hint: str = "", timeout: float = 180.0,
+                           poll: float = 2.0, src_dir: Path | None = None,
+                           sleeper=None, clock=None) -> dict:
+    """盯住系统下载目录,把用户刚下好的 PDF 收进项目并改好名。
+
+    为什么这样做:登录后的会话在**浏览器**里,Python 侧拿不到那个 cookie,所以
+    不可能代替用户直接下载。但用户点一下「下载」是最自然的动作——真正多余的是
+    让他记住「另存到 outputs/pdfs/、还得起对文件名」。这里把那份麻烦接过来。
+
+    只认**新出现**的文件(先拍快照),且必须过 %PDF 魔数——出版社的登录页/错误页
+    常被存成 .pdf,靠扩展名会把垃圾收进来。等 .crdownload/.part 消失才算下完。
+    """
+    import time
+    sleeper = sleeper or time.sleep
+    clock = clock or time.monotonic
+    src = Path(src_dir) if src_dir else downloads_dir()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    if not src.is_dir():
+        return {"ok": False, "note": f"找不到下载目录 {src};下好后告诉我路径也行。"}
+
+    before = {p.name for p in src.glob("*") if p.is_file()}
+    deadline = clock() + timeout
+    while clock() < deadline:
+        pending = any(p.suffix in (".crdownload", ".part", ".download")
+                      for p in src.glob("*") if p.name not in before)
+        if not pending:
+            fresh = [p for p in src.glob("*.pdf")
+                     if p.is_file() and p.name not in before]
+            fresh.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            for cand in fresh:
+                if not _looks_like_pdf(cand):
+                    return {"ok": False, "note":
+                            f"{cand.name} 不是 PDF(可能存成了登录页/错误页),已跳过;"
+                            "请确认在页面上点的是 Download PDF。"}
+                target = out / _safe_name(name_hint or cand.stem, doi)
+                if target.exists():
+                    target = target.with_name(target.stem + "-1" + target.suffix)
+                try:
+                    import shutil
+                    shutil.move(str(cand), str(target))
+                except OSError as exc:
+                    return {"ok": False, "note": f"移动失败:{exc}(文件仍在 {cand})"}
+                kb = max(1, target.stat().st_size // 1024)
+                return {"ok": True, "path": str(target), "kb": kb,
+                        "note": f"已收下 {target.name}({kb}KB)→ {out}"}
+        sleeper(poll)
+    return {"ok": False, "timeout": True,
+            "note": (f"等了 {int(timeout)} 秒没等到新的 PDF。若已下到别处,"
+                     "把文件路径告诉我即可;或重试一次。")}
+
+
 def handoff_message(res: dict, doi: str) -> str:
     """给用户看的引导文案——每一步都说清楚,别让他猜下一步做什么。"""
     lines = []
@@ -104,8 +183,9 @@ def handoff_message(res: dict, doi: str) -> str:
         "",
         "接下来(全程在你自己的浏览器里,psyclaw 不碰你的账号):",
         "  1. 若提示登录,选择你所在机构并用机构账号登录;",
-        f"  2. 找到 PDF,另存到:{res.get('pdf_dir')}",
-        "  3. 存好后告诉我文件名,我用 read_file 读它继续处理"
-        f"(DOI:{doi or '—'})。",
+        "  2. 点页面上的 Download PDF——**直接下到你平时的下载目录就行**,"
+        "不用另存到别处、也不用改名;",
+        f"  3. 然后调 lit_capture_pdf(doi=\"{doi or ''}\") 我来收:"
+        "会自动把刚下好的 PDF 收进项目并按 作者_年份_题名 改好名。",
     ]
     return "\n".join(lines)
