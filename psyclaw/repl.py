@@ -46,7 +46,7 @@ COMMANDS = {
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
     "/plugins": "已加载插件(用户 项目/全局;可注册工具/命令/system 片段)",
     "/prepare": "完成研究准备清单(17 个研究准备项)",
-    "/scale": "量表库(DASS/PHQ-9/GAD-7/TIPI…)",
+    "/scale": "量表库(你在 .psyclaw/scales/*.yaml 里定义的量表)",
     "/assume": "前提假设知识库(16 检验族)",
     "/method": "复杂方法目录(SEM/MLM/LPA/网络…)",
     "/cite": "引用保真核查(文内引用是否溯源到检索命中,反杜撰)",

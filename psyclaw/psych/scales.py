@@ -179,7 +179,7 @@ def print_cn_norms(scale_id: str | None = None) -> None:
             sample = entry.get("sample", "")
             print(f"    {sid:<12} {sample}")
         print()
-        print("  使用 `psyclaw norms <id>` 查看具体量表常模。")
+        print("  常模随内置量表库一并移除(v0.18.0);量表定义里可自带 norms 字段。")
         return
 
     sid = scale_id.lower().strip()
@@ -203,7 +203,7 @@ def print_scale(scale_id: str | None = None,
             has_norms = "★" if get_cn_norms(s["id"]) else " "
             print(f"    {has_norms} {s['id']:<10} {s.get('name', '')}({s.get('items', '?')} 题){src_tag}")
         user_dir = _user_scales_dir(project_dir)
-        print(f"\n  ★ = 有内置中文常模（psyclaw norms <id> 查看）")
+        print("\n  量表来自 .psyclaw/scales/*.yaml(psyclaw 不内置量表库)")
         print(f"  用户量表目录: {user_dir}")
         print("  (在此放置 *.yaml 文件即可扩展量表库，格式同内置 scales.yaml)")
         return
@@ -228,7 +228,7 @@ def print_scale(scale_id: str | None = None,
         print()
         print(format_cn_norms_text(s["id"]))
     elif get_cn_norms(s["id"]):
-        print("  ★ 中文常模: 使用 `psyclaw norms " + s["id"] + "` 查看截断值与中国样本参数")
+        print("  ★ 该量表定义自带常模字段")
 
 
 # ---------------------------------------------------------------------------
