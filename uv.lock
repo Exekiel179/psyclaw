@@ -1323,7 +1323,7 @@ wheels = [
 
 [[package]]
 name = "psyclaw"
-version = "0.19.2"
+version = "0.20.0"
 source = { editable = "." }
 dependencies = [
     { name = "prompt-toolkit" },

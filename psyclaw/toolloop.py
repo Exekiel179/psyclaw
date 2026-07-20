@@ -405,9 +405,10 @@ def build_tools(project_dir: str = ".") -> dict:
         if walled:
             # 付费墙不是终点:用户本人往往有机构权限,缺的只是在真实浏览器里登一下。
             # 此前这里只说「跳过」,模型据此告诉用户「无法获取」——路其实是通的。
-            lines.append(f"  🔒 付费墙 {walled} 篇——**别就此作罢**:调 "
-                         "lit_open_institutional(doi) 唤起浏览器走机构登录取全文"
-                         "(用户自己的权限,不绕过付费墙)")
+            lines.append(f"  🔒 付费墙 {walled} 篇——**别就此作罢**,用用户自己的机构权限取:"
+                         "① 装了 WebBridge 就调 lit_fetch_via_browser(doi) 全自动抓;"
+                         "② 否则 lit_open_institutional(doi) 开机构入口 → 用户点下载 → "
+                         "lit_capture_pdf() 自动收")
             lines += [f"     · 待取:{w}" for w in walled_dois[:8]]
         lines += [f"  ✗ {f}" for f in failed]
         return "\n".join(lines)
@@ -428,6 +429,30 @@ def build_tools(project_dir: str = ".") -> dict:
        "你在浏览器里用机构账号登录后另存 PDF——用你自己的权限,不绕过付费墙。"
        "lit_download 报 🔒 付费墙时就该调它,别告诉用户「无法获取」",
        "doi:str, url?:str", _lit_open_institutional, side_effect=True)
+
+    def _lit_fetch_via_browser(a):
+        from psyclaw.psych.bridge_fetch import bridge_ready, fetch_pdf_via_browser
+        from psyclaw.psych.paywall import _safe_name, resolve_entry
+        doi = str(a.get("doi", "")).strip()
+        url = str(a.get("url", "")).strip()
+        if not doi and not url:
+            return "需要 doi(或 url:文章页面)"
+        ready = bridge_ready()
+        if not ready["ok"]:
+            # 桥不可用不是死路:退回「你点下载 + lit_capture_pdf 自动收」
+            return (f"WebBridge 不可用:{ready['note']}\n"
+                    "现在可改走手动路径:lit_open_institutional(doi) 打开机构入口 → "
+                    "你点 Download PDF → lit_capture_pdf() 自动收进项目。")
+        page = url or resolve_entry(doi)["url"]
+        out = Path(project_dir) / "outputs" / "pdfs" / _safe_name(
+            str(a.get("name", "")).strip(), doi)
+        r = fetch_pdf_via_browser(page, out)
+        return r.get("note") or str(r)
+    _t("lit_fetch_via_browser",
+       "付费墙全文**全自动**抓取:用 WebBridge 驱动你已登录的浏览器 fetch PDF 并落盘"
+       "(连点下载都不用;用的仍是你自己的机构权限)。桥没装/没连时会说清缺哪一步并"
+       "退回手动路径",
+       "doi:str, url?:str, name?:str", _lit_fetch_via_browser, side_effect=True)
 
     def _lit_capture_pdf(a):
         from psyclaw.psych.paywall import capture_from_downloads
