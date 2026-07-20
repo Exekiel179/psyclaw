@@ -62,6 +62,62 @@ def sanitize_messages(messages: list) -> list:
     return out
 
 
+class ToolBlockFilter:
+    """流式过滤器:边流边隐藏 ```tool 协议块,只放行给人看的正文。
+
+    为什么需要它:agent 模式此前把整段回复 `"".join` 掉才处理,用户干等无输出。
+    直接全量流出又会把工具调用的 JSON 喷给用户(协议噪声)。故边流边过滤。
+
+    难点是 chunk 可能在围栏中间断开(``` 甚至 ```to 都可能被切开),所以留一段
+    尾巴不急着放行,等下一块拼上再判——宁可晚一点显示,也不能把半截围栏漏出去。
+    """
+
+    _FENCE = "```tool"
+
+    def __init__(self) -> None:
+        self.buf = ""
+        self.in_tool = False
+
+    def feed(self, chunk: str) -> str:
+        """喂入一块,返回**可以立即显示**的文本(可能为空)。"""
+        self.buf += chunk or ""
+        out = []
+        while self.buf:
+            if not self.in_tool:
+                i = self.buf.find(self._FENCE)
+                if i == -1:
+                    # 尾部可能是被切断的围栏前缀,留住不放行
+                    keep = 0
+                    for n in range(len(self._FENCE) - 1, 0, -1):
+                        if self.buf.endswith(self._FENCE[:n]):
+                            keep = n
+                            break
+                    if keep:
+                        out.append(self.buf[:-keep])
+                        self.buf = self.buf[-keep:]
+                    else:
+                        out.append(self.buf)
+                        self.buf = ""
+                    break
+                out.append(self.buf[:i])
+                self.buf = self.buf[i + len(self._FENCE):]
+                self.in_tool = True
+            else:
+                j = self.buf.find("```")
+                if j == -1:
+                    self.buf = self.buf[-2:] if len(self.buf) > 2 else self.buf
+                    break
+                self.buf = self.buf[j + 3:]
+                self.in_tool = False
+        return "".join(out)
+
+    def flush(self) -> str:
+        """收尾:非工具块里的残留文本放行(未闭合的 tool 块一律丢弃)。"""
+        tail = "" if self.in_tool else self.buf
+        self.buf = ""
+        return tail
+
+
 def _calls_signature(calls: list) -> tuple:
     """一轮工具调用的规范签名(name+排序后的 args),用于识别「反复调同一个」。"""
     return tuple(sorted(
@@ -268,6 +324,12 @@ def build_tools(project_dir: str = ".") -> dict:
                          f"({p.get('year') or '?'}){oa}{cit}{doi}")
         return "\n".join(lines)
 
+    def _int_or_none(v):
+        try:
+            return int(str(v)[:4])
+        except (TypeError, ValueError):
+            return None
+
     def _lit_search(a):
         from psyclaw.psych import litsearch
         q = str(a.get("query", "")).strip()
@@ -276,12 +338,26 @@ def build_tools(project_dir: str = ".") -> dict:
         srcs = a.get("sources")
         srcs = [s.strip() for s in srcs.split(",") if s.strip()] if isinstance(srcs, str) and srcs else None
         limit = int(a.get("limit", 8))
-        r = litsearch.search(q, sources=srcs, limit=limit)
-        return _fmt_papers(f"检索「{q}」· 来源 {r['per_source']} · 去重后 {r['n_deduped']} 条:",
-                           r["results"][:limit])
+        # 年份过滤此前被静默丢掉:模型传了 year_from 也不往下递,于是要「近三年」
+        # 却拿回 1980 年的经典文献,用户合理地以为「没有新研究」。
+        y_from, y_to = _int_or_none(a.get("year_from")), _int_or_none(a.get("year_to"))
+        r = litsearch.search(q, sources=srcs, limit=limit, year_from=y_from)
+        hits = r["results"]
+        if y_from or y_to:      # 各源对年份支持不一,统一在结果侧兜一刀,保证约束真生效
+            hits = [p for p in hits
+                    if p.get("year") and (not y_from or p["year"] >= y_from)
+                    and (not y_to or p["year"] <= y_to)]
+        span = (f" · 年份 {y_from or '不限'}–{y_to or '不限'}" if (y_from or y_to) else "")
+        head = (f"检索「{q}」{span} · 来源 {r['per_source']} · 去重后 {r['n_deduped']} 条"
+                + (f",年份过滤后 {len(hits)} 条" if (y_from or y_to) else "") + ":")
+        if not hits and (y_from or y_to):
+            return (head + f"\n该年份区间内无命中(全库去重后有 {r['n_deduped']} 条)。"
+                    "放宽年份或换检索式再试——不要据此断定该领域没有新研究。")
+        return _fmt_papers(head, hits[:limit])
     _t("lit_search",
        "文献检索(OpenAlex/Crossref/EuropePMC 多源,覆盖中英文核心期刊;返回题录+DOI 供下载/滚雪球)",
-       "query:str, limit?:int, sources?:str(逗号:openalex,crossref,europepmc,semanticscholar,arxiv)",
+       "query:str, limit?:int, year_from?:int, year_to?:int, "
+       "sources?:str(逗号:openalex,crossref,europepmc,semanticscholar,arxiv;pubmed→europepmc)",
        _lit_search)
 
     def _lit_snowball(a):
@@ -799,7 +875,8 @@ def collect_env_lessons(results: list[dict], seen_keys: set) -> list[dict]:
 
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
                   project_dir: str = ".", max_iters: int = 24,
-                  approve=None, emit=None, idle_state: dict | None = None) -> dict:
+                  approve=None, emit=None, idle_state: dict | None = None,
+                  on_chunk=None) -> dict:
     """跑纯工具层循环。返回 {final, iters, stopped, trace, lessons}。
 
     每轮:provider.chat → 解析 tool 块;无块=最终答案;有块=执行(副作用需 approve)→ 回灌 → 续。
@@ -838,8 +915,23 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
         # KeyboardInterrupt 上抛由调用方(REPL 深处捕获)取消本轮;监听只罩
         # provider 流式段,不罩工具审批 input()(cbreak 会破坏行编辑回显)。
         with EscapeWatch() as _esc:
-            reply = "".join(stream_interruptible(
-                provider.chat(sanitize_messages(convo), system=full_system), _esc))
+            if on_chunk is None:
+                reply = "".join(stream_interruptible(
+                    provider.chat(sanitize_messages(convo), system=full_system), _esc))
+            else:
+                # 边流边显示:tool 协议块由过滤器藏掉,只把正文推给调用方。
+                _filt = ToolBlockFilter()
+                _parts = []
+                for _c in stream_interruptible(
+                        provider.chat(sanitize_messages(convo), system=full_system), _esc):
+                    _parts.append(_c)
+                    shown = _filt.feed(_c)
+                    if shown:
+                        on_chunk(shown)
+                tail = _filt.flush()
+                if tail:
+                    on_chunk(tail)
+                reply = "".join(_parts)
         calls = parse_tool_calls(reply)
         cut = has_truncated_tool_block(reply) or (
             not calls and getattr(provider, "last_stop_reason", "") == "max_tokens")

@@ -349,7 +349,22 @@ def run_tool_from_cmdline(cmd: str, project_dir: str = ".") -> str | None:
         out = spec["run"](args)
     except Exception as exc:  # noqa: BLE001  工具异常如实回传,别让模型以为能力不存在
         return f"[工具 {name} 执行出错] {type(exc).__name__}: {exc}"
-    return f"$ {name}({', '.join(f'{k}={v!r}' for k, v in args.items())})\n{out}"
+    head = f"$ {name}({', '.join(f'{k}={v!r}' for k, v in args.items())})"
+    # 工具没声明的参数要**明说被忽略**:静默丢弃会让模型以为约束生效了。
+    # (真实事故:--year-from 传了却没往下递,模型要「近三年」拿回 1980 年的文献,
+    #  用户据此以为该领域没有新研究。)
+    unknown = _undeclared_args(args, spec.get("args") or "")
+    if unknown:
+        head += f"\n[注意:{name} 不接受参数 {sorted(unknown)},已忽略——该约束未生效]"
+    return f"{head}\n{out}"
+
+
+def _undeclared_args(args: dict, arg_spec: str) -> set:
+    """工具 args 说明串里没出现的参数名(工具规格是 "query:str, limit?:int" 这种)。"""
+    declared = set(re.findall(r"([A-Za-z_][A-Za-z0-9_]*)\s*\??:", arg_spec or ""))
+    if not declared:
+        return set()
+    return {k for k in args if k not in declared}
 
 
 def _run_psyclaw_cmd(cmd: str, project_dir: str = ".") -> str:
@@ -958,12 +973,25 @@ def _is_exit_word(line: str) -> bool:
     return (line or "").strip().lower() in ("quit", "exit")
 
 
+def _today_note() -> str:
+    """告诉模型今天几号——不给,它就拿训练截止当「现在」。
+
+    真实事故:用户问「近三年」,模型写 `--year-from 2021 --year-to 2024`
+    (2024 是它的训练边界),于是"最新研究"实际停在两年前。
+    """
+    from datetime import date
+    d = date.today()
+    return (f"# 当前日期:{d.isoformat()}\n"
+            f"「近三年」= {d.year - 2}–{d.year},「最新/近期」以此为准;"
+            "绝不用你的训练截止年份当作今年。文献年份筛选按真实当前年份算。")
+
+
 def _build_system_prompt() -> str:
     """瘦核心系统提示(长上下文优化:知识库改为按消息动态注入)。"""
     from psyclaw.context import (
         assist_directives, capability_map, lean_core, skills_catalog,
     )
-    parts = [lean_core(), capability_map()]   # feat-144:能力自知,不重造轮子
+    parts = [_today_note(), lean_core(), capability_map()]  # feat-144:能力自知,不重造轮子
     _cat = skills_catalog(".")                # bug 修:内置 skill 不再对模型隐藏
     if _cat:
         parts.append(_cat)
@@ -1013,7 +1041,13 @@ class ReplSession:
         self.memo = ""              # 滚动压缩的决策备忘
         self.plan_mode = False      # 规划模式:只规划不执行,产出自动抽任务
         self.audit_mode = False     # 逐轮审计(auditor agent,每轮多一次调用)
-        self.agent_mode = False     # agent 模式:模型自主多步调用工具(纯工具层循环)
+        # agent 模式:模型自主多步调用工具(纯工具层循环)。**默认开**——
+        # psyclaw 的定位是「对话即能力」,83 个工具在非 agent 模式下模型够不着
+        # (副作用工具更是完全无法调用,只能让用户自己切模式,是明显的死胡同)。
+        # 代价:agent 模式不流式(逐步推 ⚙ 进度行,最终答案整块出)。
+        # 想要流式打字机效果:config agent_mode=false,或 /agent off。
+        self.agent_mode = str(self.conf.get("agent_mode", True)).lower() not in (
+            "false", "0", "off", "no")
         # 文件读取权限:open(默认,模型 ```read 块自动读)| safe(一切读取须用户 @ 引用)
         self.file_access = str(self.conf.get("file_access", "open")).lower()
         # 审批模式:default(shell/危险命令、文件覆盖、工具副作用逐条人工确认)
@@ -1549,17 +1583,46 @@ class ReplSession:
             return self._side_effect_ok(
                 f"{call['name']}({_short(call.get('args') or {}, 120)})", label="工具副作用")
 
+        # 流式输出(feat-188):此前 agent 模式把整段回复 join 完才显示,用户干等。
+        # 现在边流边出,与普通对话观感一致;```tool 协议块由 ToolBlockFilter 藏掉。
+        # 顺序要紧:⚙ 进度行打印前必须先收掉当前 StreamBlock——StreamBlock 关闭时
+        # 要做光标上移覆盖,与穿插的普通 print 混在一起会把画面搞花。
+        cur: list = []                       # 至多一个「当前块」,用列表当可变持有者
+
+        def _close_block() -> None:
+            if cur:
+                cur.pop().close()
+                print()
+
+        def _on_chunk(text: str) -> None:
+            if not cur:
+                cur.append(ui.StreamBlock(f"PsyClaw · {self.provider.name}"))
+            cur[0].write(text)
+
+        def _emit(e) -> None:
+            _close_block()                   # 先收块,再打进度行
+            print(ui.dim(f"  ⚙ {e}"))
+
+        streamed = False
         try:
+            def _chunk(text: str) -> None:
+                nonlocal streamed
+                streamed = True
+                _on_chunk(text)
+
             res = run_tool_loop(
                 self.provider, system, self.messages, project_dir=".",
-                approve=_approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")),
+                approve=_approve, emit=_emit, on_chunk=_chunk,
                 idle_state=self._tool_idle)   # feat-133:跨消息累积工具组闲置,长期不用清走
         except KeyboardInterrupt:              # feat-090:ESC/Ctrl+C 取消本轮,不炸 REPL
+            _close_block()
             print(ui.warn("  [已中断本轮生成(ESC/Ctrl+C)]"))
             return None
         except Exception as exc:  # noqa: BLE001
+            _close_block()
             print(ui.err(f"  [provider 错误] {exc}"))
             return None
+        _close_block()
         if res["trace"]:
             print(ui.dim(f"  [agent:{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · "
                          f"{res['stopped']}]"))
@@ -1569,10 +1632,13 @@ class ReplSession:
         task_head = next((m["content"] for m in reversed(self.messages)
                           if m.get("role") == "user"), "")
         log_agent_run(".", task_head, res)   # feat-037:落运行痕迹(失败静默)
-        blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
-        blk.write(res["final"])
-        blk.close()
-        print()
+        # 已流式显示过就不再整块重印(否则最终答案出现两遍);provider 不支持流式
+        # 或本轮一个字都没流出时,退回整块渲染,保证答案一定被显示。
+        if not streamed and res.get("final"):
+            blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
+            blk.write(res["final"])
+            blk.close()
+            print()
         # feat-065:最终答案与工具输出里提到的图,终端支持时内联渲染(分析出图即见)
         self._render_images_in("\n".join(
             [res["final"]] + [str(t.get("output", "")) for t in res["trace"]]))
@@ -1785,10 +1851,11 @@ class ReplSession:
             if self.agent_mode:
                 from psyclaw.toolloop import build_tools
                 names = ", ".join(build_tools(".").keys())
-                print(ui.ok("  [agent 模式 开] 模型可自主多步调用工具:") + ui.dim(names))
-                print(ui.dim("    副作用工具(save_file)每次执行前问你批准;/agent off 退出。"))
+                print(ui.ok(f"  [agent 模式 开(默认)] 模型可自主多步调用 {len(names.split(','))} 个工具"))
+                print(ui.dim("    副作用工具每次执行前问你批准;/agent off 退出。"))
             else:
-                print("  [agent 模式 关] 恢复普通对话。")
+                print("  [agent 模式 关] 恢复普通对话:回复变流式,但模型无法调用工具")
+                print(ui.dim("    (需要检索/下载/导出时请 /agent on 切回来)"))
         elif cmd == "/clear":
             self.messages.clear()
             print("  [上下文已清空]")
