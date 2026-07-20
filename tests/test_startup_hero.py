@@ -20,7 +20,11 @@ def test_wide_terminal_shows_giant_wordmark(monkeypatch):
     out = ui.startup("0.16.0")
     assert "█" in out                           # 巨型 block wordmark 出现
     assert "PsyClaw" in out                      # 可读品牌名(eyebrow)
-    assert "研究编排" in out and "统计外移" in out   # eyebrow + thesis
+    assert "研究编排" in out                       # eyebrow 一行说清定位
+    # 开屏克制:wordmark 已喊过品牌,不再堆中英同义反复 + 功能清单 + 口号
+    assert "RESEARCH ORCHESTRATION" not in out
+    assert "统计外移" not in out
+    assert "psychology workflow harness" not in out
 
 
 def test_narrow_terminal_falls_back(monkeypatch):
