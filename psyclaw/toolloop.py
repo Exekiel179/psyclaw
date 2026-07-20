@@ -460,7 +460,7 @@ _CLI_TOOL_SKIP = {
 }
 _CLI_TOOL_SIDE_EFFECT = {
     # 写盘 / 改状态 / 外部副作用 → 需批准(HITL)
-    "export", "score", "scale", "preregister", "declare-test", "provenance",
+    "export", "score", "scale", "declare-test", "provenance",
     "journal", "memory", "kg", "new", "prepare", "jars", "run", "research",
     "auto", "goal", "tasks", "sync", "annotate", "skill",
 }

@@ -63,23 +63,8 @@ def print_method(method_id: str | None = None) -> None:
 # 方法学背书库(evidence.json)已删除:静态映射既不全也会过时,且"文献支撑"应可核实
 # ——需要文献依据走真实检索(psyclaw lit),不再查内置静态库。cite 现做引用保真核查。
 
+# 实验设计目录(designs.json + print_design)已删除:固定 12 类设计卡覆盖太窄,
+# 输入真实研究问题只会得到「未收录」,帮倒忙。设计讨论交给对话(模型本就懂设计),
+# gates 的 DESIGN.* 质量检查仍在(判据不动)——与"统计外移"同一原则:
+# 宁可不内置,也不做半吊子内容库。
 
-# -- 实验设计 ----------------------------------------------------------------
-
-def print_design(design_id: str | None = None) -> None:
-    designs = _load("designs.json", "designs")
-    if not design_id:
-        print("  实验设计目录(psyclaw design <id>):")
-        for d in designs:
-            print(f"    {d['id']:<18} {d['name']}")
-        return
-    d = next((x for x in designs if x["id"] == design_id.lower()), None)
-    if not d:
-        print(f"  未收录 {design_id}。可用:{', '.join(x['id'] for x in designs)}")
-        return
-    print(f"  {d['name']}")
-    for label, key in [("结构", "structure"), ("优势", "strengths"),
-                       ("效度威胁", "threats"), ("关键实践", "key_practices"),
-                       ("分析映射", "analysis")]:
-        if d.get(key) and d[key] != "—":
-            print(f"  {label:<4}: {d[key]}")
