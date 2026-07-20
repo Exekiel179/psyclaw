@@ -27,9 +27,13 @@ DEFAULT_POLICY: dict = {
                                "> /dev/sd", "dd if=", "curl|sh", "wget|sh"],
              "allow_intent": ["pandas", "pingouin", "numpy", "scipy",
                               "statsmodels", "matplotlib"]},
+    # 白名单要与 litsearch/cite_verify/zotero_client 实际访问的域保持同步——
+    # 漏一个的表现是「沙箱一开,某个源就静默查不到」,极难归因。
     "net": {"allow_domains": ["api.openalex.org", "www.ebi.ac.uk",
                               "api.crossref.org", "export.arxiv.org",
-                              "arxiv.org", "api.unpaywall.org"],
+                              "arxiv.org", "api.unpaywall.org",
+                              "api.semanticscholar.org",   # 摘要/TL;DR/引用图谱
+                              "api.zotero.org"],           # 用户自己的文库(读写)
             "upload": "deny"},
     "audit": ".psyclaw/sandbox_audit.jsonl",
 }

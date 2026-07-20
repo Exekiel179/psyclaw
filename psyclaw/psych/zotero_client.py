@@ -102,9 +102,80 @@ def get_fulltext_by_doi(doi: str) -> dict:
             "note": "条目在库但无已索引全文。请在 Zotero 中打开该 PDF 触发索引。"}
 
 
-def add_by_doi(doi: str) -> dict:
-    """通过 DOI 把条目加入文库(用 Zotero 的 translation server 需额外服务;
-    此处给元数据占位 + 引导)。"""
-    return {"status": "guide",
-            "note": (f"在 Zotero 中用 DOI {doi} 一键添加,或用浏览器插件抓取。"
-                     "PsyClaw 可检索元数据,但导入你的私人文库建议在 Zotero 客户端完成。")}
+def _crossref_meta(doi: str, getter=None) -> dict | None:
+    """按 DOI 取 Crossref 元数据(Zotero 的 translation server 是独立服务,
+    但我们本来就在用 Crossref,直接拿它拼条目即可,不必多引入一个服务)。"""
+    from psyclaw.psych import litsearch
+    get = getter or litsearch._get
+    data = get(f"https://api.crossref.org/works/{urllib.parse.quote(doi)}")
+    return (data or {}).get("message") if isinstance(data, dict) else None
+
+
+def _to_zotero_item(m: dict) -> dict:
+    """Crossref message → Zotero journalArticle 条目。"""
+    parts = (m.get("issued", {}) or {}).get("date-parts", [[None]])
+    year = parts[0][0] if parts and parts[0] else None
+    return {
+        "itemType": "journalArticle",
+        "title": (m.get("title") or [""])[0],
+        "creators": [{"creatorType": "author",
+                      "firstName": a.get("given", ""),
+                      "lastName": a.get("family", "")}
+                     for a in (m.get("author") or []) if a.get("family")],
+        "publicationTitle": (m.get("container-title") or [""])[0],
+        "volume": str(m.get("volume") or ""),
+        "issue": str(m.get("issue") or ""),
+        "pages": str(m.get("page") or ""),
+        "date": str(year or ""),
+        "DOI": m.get("DOI") or "",
+        "url": m.get("URL") or "",
+        "libraryCatalog": "Crossref (via PsyClaw)",
+    }
+
+
+def add_by_doi(doi: str, getter=None, poster=None) -> dict:
+    """按 DOI 真正写入用户 Zotero 文库(Crossref 取元数据 → POST items)。
+
+    幂等:已在库则不重复添加(Zotero 允许重复条目,重复写会污染用户文库)。
+    写用户私人文库属副作用操作,调用方须走审批。
+    """
+    doi = (doi or "").strip()
+    if not doi:
+        return {"status": "error", "note": "需要 DOI"}
+    if not available():
+        return {"status": "no_creds",
+                "note": "未配置 ZOTERO_API_KEY/ZOTERO_LIBRARY_ID(psyclaw config)。"}
+    try:
+        if find_by_doi(doi):                      # 幂等:不制造重复条目
+            return {"status": "exists", "doi": doi,
+                    "note": f"DOI {doi} 已在你的文库,未重复添加。"}
+    except Exception as exc:  # noqa: BLE001  查重失败不等于该写入,宁可不写
+        return {"status": "error", "note": f"查重失败,未写入:{exc}"}
+
+    try:
+        meta = _crossref_meta(doi, getter=getter)
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "note": f"Crossref 取元数据失败:{exc}"}
+    if not meta or not (meta.get("title") or [""])[0]:
+        return {"status": "not_found",
+                "note": f"Crossref 查无 DOI {doi} 的元数据,未写入(避免存入空条目)。"}
+
+    item = _to_zotero_item(meta)
+    try:
+        post = poster or (lambda body: _req(
+            "items", method="POST", body=body,
+            extra_headers={"Content-Type": "application/json"}))
+        resp = post(json.dumps([item]).encode("utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "note": f"写入 Zotero 失败:{exc}"}
+
+    succ = ((resp or {}).get("successful") or {}) if isinstance(resp, dict) else {}
+    failed = ((resp or {}).get("failed") or {}) if isinstance(resp, dict) else {}
+    if failed:
+        return {"status": "error", "title": item["title"],
+                "note": f"Zotero 拒收:{json.dumps(failed, ensure_ascii=False)[:160]}"}
+    key = None
+    for v in succ.values():
+        key = (v or {}).get("key") if isinstance(v, dict) else None
+    return {"status": "added", "key": key, "doi": doi, "title": item["title"],
+            "note": f"已加入 Zotero 文库:{item['title'][:60]}"}

@@ -186,19 +186,21 @@ def capability_map() -> str:
     """psyclaw 自带能力清单——要什么用什么,不要重造轮子。每轮注入。"""
     return (
         "\n# psyclaw 自带能力(要用现成的,不要自己手搓重造)\n"
-        "产出 Word/docx:命令块跑 `psyclaw export <稿.md> --docx <出.docx>`"
-        "(APA7 版式+中文字体+图片真嵌入)——不要自己写 python-docx 脚本;\n"
+        "产出 Word/docx:跑 `psyclaw export <稿.md> --docx <出.docx>`"
+        "(APA7 版式+中文字体+图片真嵌入),别自己写 python-docx;\n"
         "画图配色/中文字体:脚本里 `from psyclaw.figures import apply_style` 并"
         "`with apply_style('apa7'):` 内作图(中文字体前置,免豆腐块)——不要裸 matplotlib;\n"
-        "概念/框架/路径图:用 graphviz(dot)或 mermaid 让布局引擎排版,不要用 matplotlib "
-        "逐根画箭头(布点固定必然线条交叉成面条);matplotlib 只画数据图;\n"
-        "投稿前质检:`psyclaw check <稿.md>`(JARS+效应量+引用+选择性报告)——"
-        "下结论/交付前先跑,别把没核过的结论写进报告;\n"
-        "统计计算:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
-        "文献检索/引用滚雪球/下载全文:**直接调 lit_search / lit_snowball / lit_download "
-        "工具**(用户以对话工作,别甩 CLI 让他自己跑;下载覆盖 OA + 机构权限);\n"
+        "概念/框架/路径图:用 graphviz(dot)或 mermaid 让布局引擎排版,别用 matplotlib "
+        "逐根画箭头(布点固定必然交叉成面条);matplotlib 只画数据图;\n"
+        "投稿前质检:`psyclaw check <稿.md>`(JARS+效应量+引用+选择性报告),"
+        "交付前先跑;\n"
+        "统计:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
+        "文献:**直接调 lit_search / lit_snowball / lit_download 工具**"
+        "(用户以对话工作,别甩 CLI;下载覆盖 OA + 机构权限);\n"
+        "Zotero:zotero_search 先在用户自己库里找(别重复下载)/ zotero_fulltext "
+        "(付费墙文献的合法全文源)/ zotero_add 入库;\n"
         "量表/预注册/质检/导出:scale / preregister / check / export。\n"
-        "有对应工具就调工具,别让用户去记命令;拿不准先想现成能力,再考虑手写。")
+        "有工具就调工具,别让用户记命令;拿不准先找现成能力再手写。")
 
 
 def skills_catalog(project_dir: str = ".") -> str:
