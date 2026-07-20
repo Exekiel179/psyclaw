@@ -118,6 +118,20 @@ def relevant_knowledge(message: str, max_items: int = 6) -> str:
 # 新增硬约束前先合并压缩(N 条具体教训蒸馏回一条原则),超预算 = 测试红。
 LEAN_CORE_BUDGET = 900
 
+# feat-184:capability_map 预算——与 LEAN_CORE_BUDGET **性质不同**,别照搬。
+#
+# lean_core 是「原则集合」:条目越多越互相稀释,所以棘轮该收紧,新增前先蒸馏。
+# capability_map 是「能力目录」:psyclaw 每多一项能力,它本就该多一行,否则模型
+# 不知道有这能力就会重造轮子(feat-144 的事故正是如此:手搓 python-docx、
+# 裸 matplotlib 出豆腐块)。给一份索引设死上限是设计错配——压缩它的代价是删掉
+# 「布点固定必然交叉成面条」这类真能改变行为的具体理由,换来的只是省几十字。
+#
+# 所以这里给的是**防注水上限**而非蒸馏棘轮:留出足够余量让新能力自然进目录,
+# 但仍封顶,防止有人把使用手册整本塞进每轮上下文(那才是真的稀释注意力)。
+# 每轮注入,中文约 1 字 1 token,1200 字符 ≈ 千分之几的上下文,成本可忽略;
+# 真正的成本是注意力,而「知道有现成能力可用」正是最该占注意力的信息之一。
+CAPABILITY_MAP_BUDGET = 1200
+
 
 def lean_core() -> str:
     """固定注入的瘦核心:诚信原则 + 严谨性要点(不再整本塞)。
@@ -186,21 +200,22 @@ def capability_map() -> str:
     """psyclaw 自带能力清单——要什么用什么,不要重造轮子。每轮注入。"""
     return (
         "\n# psyclaw 自带能力(要用现成的,不要自己手搓重造)\n"
-        "产出 Word/docx:跑 `psyclaw export <稿.md> --docx <出.docx>`"
-        "(APA7 版式+中文字体+图片真嵌入),别自己写 python-docx;\n"
+        "产出 Word/docx:命令块跑 `psyclaw export <稿.md> --docx <出.docx>`"
+        "(APA7 版式+中文字体+图片真嵌入)——不要自己写 python-docx 脚本;\n"
         "画图配色/中文字体:脚本里 `from psyclaw.figures import apply_style` 并"
         "`with apply_style('apa7'):` 内作图(中文字体前置,免豆腐块)——不要裸 matplotlib;\n"
-        "概念/框架/路径图:用 graphviz(dot)或 mermaid 让布局引擎排版,别用 matplotlib "
-        "逐根画箭头(布点固定必然交叉成面条);matplotlib 只画数据图;\n"
-        "投稿前质检:`psyclaw check <稿.md>`(JARS+效应量+引用+选择性报告),"
-        "交付前先跑;\n"
-        "统计:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
-        "文献:**直接调 lit_search / lit_snowball / lit_download 工具**"
-        "(用户以对话工作,别甩 CLI;下载覆盖 OA + 机构权限);\n"
-        "Zotero:zotero_search 先在用户自己库里找(别重复下载)/ zotero_fulltext "
-        "(付费墙文献的合法全文源)/ zotero_add 入库;\n"
+        "概念/框架/路径图:用 graphviz(dot)或 mermaid 让布局引擎排版,不要用 matplotlib "
+        "逐根画箭头(布点固定必然线条交叉成面条);matplotlib 只画数据图;\n"
+        "投稿前质检:`psyclaw check <稿.md>`(JARS+效应量+引用+选择性报告)——"
+        "下结论/交付前先跑,别把没核过的结论写进报告;\n"
+        "统计计算:生成委托 pystat MCP 或 scipy/pingouin/statsmodels 的脚本再跑;\n"
+        "文献检索/引用滚雪球/下载全文:**直接调 lit_search / lit_snowball / lit_download "
+        "工具**(用户以对话工作,别甩 CLI 让他自己跑;下载覆盖 OA + 机构权限);\n"
+        "文献真伪:交付含参考文献的稿件前跑 `cite <稿> --verify`(逐条查存在性);\n"
+        "Zotero 文库:zotero_search(先在用户自己库里找,别重复下载)/ "
+        "zotero_fulltext(付费墙文献的合法全文来源)/ zotero_add(好文献入库);\n"
         "量表/预注册/质检/导出:scale / preregister / check / export。\n"
-        "有工具就调工具,别让用户记命令;拿不准先找现成能力再手写。")
+        "有对应工具就调工具,别让用户去记命令;拿不准先想现成能力,再考虑手写。")
 
 
 def skills_catalog(project_dir: str = ".") -> str:
