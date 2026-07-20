@@ -385,7 +385,7 @@ def build_tools(project_dir: str = ".") -> dict:
             if not q:
                 return "需要 query(批量检索下载)或 doi(下单篇)"
             papers = litsearch.search(q, limit=int(a.get("limit", 8)))["results"][:int(a.get("limit", 8))]
-        got, walled, failed = [], 0, []
+        got, walled, walled_dois, failed = [], 0, [], []
         for p in papers:
             res = litsearch.fetch_and_save(p, out_dir=out_dir)
             dl = res.get("downloaded") or {}
@@ -395,18 +395,39 @@ def build_tools(project_dir: str = ".") -> dict:
                 got.append(f"{Path(res['saved']).name} (全文文本)")
             elif res.get("status") == "closed":
                 walled += 1
+                if p.get("doi"):
+                    walled_dois.append(p["doi"])
             else:
                 failed.append((p.get("title") or p.get("doi") or "?")[:40] + ":"
                               + (dl.get("browser_hint") or dl.get("note") or "")[:70])
         lines = [f"下载 {len(got)} 篇 → {out_dir}"]
         lines += [f"  ⬇ {g}" for g in got]
         if walled:
-            lines.append(f"  付费墙无权限跳过 {walled} 篇(配机构权限:auth --set 后可下)")
+            # 付费墙不是终点:用户本人往往有机构权限,缺的只是在真实浏览器里登一下。
+            # 此前这里只说「跳过」,模型据此告诉用户「无法获取」——路其实是通的。
+            lines.append(f"  🔒 付费墙 {walled} 篇——**别就此作罢**:调 "
+                         "lit_open_institutional(doi) 唤起浏览器走机构登录取全文"
+                         "(用户自己的权限,不绕过付费墙)")
+            lines += [f"     · 待取:{w}" for w in walled_dois[:8]]
         lines += [f"  ✗ {f}" for f in failed]
         return "\n".join(lines)
     _t("lit_download",
        "下载文献全文 PDF 到 outputs/pdfs(OA + 机构权限[LibKey/IP];给 query 批量检索下载 或 给 doi 下单篇;付费墙不绕过,如实跳过)",
        "query?:str, doi?:str, limit?:int", _lit_download, side_effect=True)
+
+    def _lit_open_institutional(a):
+        from psyclaw.psych.paywall import browser_handoff, handoff_message
+        doi = str(a.get("doi", "")).strip()
+        url = str(a.get("url", "")).strip() or None
+        if not doi and not url:
+            return "需要 doi(或 url:出版社落地页)"
+        res = browser_handoff(doi, landing_url=url, project_dir=project_dir)
+        return handoff_message(res, doi)
+    _t("lit_open_institutional",
+       "付费墙文献取全文:唤起你的浏览器打开机构入口(LibKey→EZProxy→出版社页),"
+       "你在浏览器里用机构账号登录后另存 PDF——用你自己的权限,不绕过付费墙。"
+       "lit_download 报 🔒 付费墙时就该调它,别告诉用户「无法获取」",
+       "doi:str, url?:str", _lit_open_institutional, side_effect=True)
 
     # ── Zotero 文库(此前 110 行客户端只从 lit --zotero 开了个取全文的小口,
     # add/search 零调用点、对话里完全够不着;这里补齐读写三件套)─────────────
