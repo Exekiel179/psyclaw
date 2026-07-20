@@ -1063,6 +1063,37 @@ def cmd_cite_check(args: argparse.Namespace) -> int:
             print(ui.warn(f"  ⚠ 文献表条目未被正文引用 {cons['uncited_n']} 条(整理问题):"))
             for r in cons["uncited_references"]:
                 print(ui.dim(f"     · {r}"))
+    # 联网存在性查证(--verify):前面的核查都是「相对」的(对语料/对自洽),
+    # 判不了「格式规整、内外自洽、但现实中根本不存在」的条目——那正是杜撰的常见形态。
+    if getattr(args, "verify", False):
+        from pathlib import Path as _P
+
+        from psyclaw.psych.cite_verify import verify_references
+        from psyclaw.psych.citations import (extract_reference_entries,
+                                             _reference_section)
+        text = _P(args.manuscript).read_text(encoding="utf-8", errors="replace")
+        entries = extract_reference_entries(_reference_section(text))
+        if not entries:
+            print(ui.dim("  (稿件无参考文献区,跳过存在性查证)"))
+        else:
+            v = verify_references(entries)
+            print(ui.dim(f"  存在性查证(Crossref):查 {v['checked_n']}/{v['n']} 条"))
+            if v["verified_n"]:
+                print(ui.ok(f"  ✓ 真实存在 {v['verified_n']} 条"))
+            if v["unresolvable_n"]:
+                print(ui.warn(f"  ⚠ 无法查证 {v['unresolvable_n']} 条"
+                              "(索引不可达或该文献类型不被收录;不作杜撰判据):"))
+                for r in v["unresolvable"]:
+                    print(ui.dim(f"     · {(r['raw'] or '')[:76]}"))
+            if v["skipped"]:
+                print(ui.warn(f"  ⚠ 另有 {v['skipped']} 条超出单次查证上限、未核"
+                              "(勿视作已通过)"))
+            if v["suspect_n"]:
+                fail = True
+                print(ui.err(f"  ✗ 查无此文 {v['suspect_n']} 条(疑似杜撰):"))
+                for r in v["suspect"]:
+                    print(ui.warn(f"     · {(r['raw'] or '')[:76]}"))
+                    print(ui.dim(f"       {r['note'][:100]}"))
     if fail:
         print(ui.dim("  详见 notes/citation_audit.md;删除或补检索后复核。"))
         return 1
@@ -2125,6 +2156,9 @@ def build_parser() -> argparse.ArgumentParser:
                      help="引用文章:JSON 元数据(单条或列表)→ 规范 APA7 参考文献 + 文内引用")
     pci.add_argument("--project", default=".", help="项目目录(默认当前)")
     pci.add_argument("--journal", default=None, help="按期刊定制引用风格核对")
+    pci.add_argument("--verify", action="store_true",
+                     help="联网存在性查证:拿每条参考文献去 Crossref 查,证明它真实存在"
+                          "(查无此文=疑似杜撰;索引不可达只提示不拦截)")
     pci.set_defaults(func=cmd_cite)
 
     pex = sub.add_parser("export", help="格式化输出(APA7 / 心理学报 / 心理科学,确定性模板)")
