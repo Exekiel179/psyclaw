@@ -625,10 +625,6 @@ def cmd_scale(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_norms(args: argparse.Namespace) -> int:
-    from psyclaw.psych.scales import print_cn_norms
-    print_cn_norms(getattr(args, "scale_id", None))
-    return 0
 
 
 def cmd_score(args: argparse.Namespace) -> int:
@@ -930,16 +926,9 @@ def _journal_install(name: str, global_install: bool = False,
     return 0
 
 
-def cmd_design(args: argparse.Namespace) -> int:
-    from psyclaw.psych.knowledge import print_design
-    print_design(args.design_id)
     return 0
 
 
-def cmd_preregister(args: argparse.Namespace) -> int:
-    from psyclaw.psych.preregister import run_preregister
-    fmt = "osf" if args.osf else "aspredicted" if args.aspredicted else "both"
-    return run_preregister(fmt=fmt)
 
 
 def cmd_clarify(args: argparse.Namespace) -> int:
@@ -1831,10 +1820,9 @@ COMMAND_CATEGORIES = [
     ("环境 / 系统", ["help", "guide", "status", "version", "doctor", "config", "setup",
                   "skills", "mcp", "plugins", "gates", "eval", "commands", "assist", "update",
                   "skill"]),
-    ("知识目录(只读)", ["scale", "norms", "assume", "method", "design", "ethics",
-                    "journal"]),
+    ("知识目录(只读)", ["scale", "assume", "method", "ethics", "journal"]),
     ("量表 / 数据准备", ["score", "annotate"]),
-    ("研究前规划 / 预注册", ["prepare", "clarify", "declare-test", "preregister", "jars", "cite",
+    ("研究前规划", ["prepare", "clarify", "declare-test", "jars", "cite",
                        "cite-check", "check"]),
     ("兼容 / 高级编排", ["repl", "agent", "auto-loop", "loop", "lit-loop", "meta-loop",
                       "analysis-loop", "qual-loop", "research"]),
@@ -2119,9 +2107,6 @@ def build_parser() -> argparse.ArgumentParser:
                     help="关键词(如「样本量」「无关变量控制」)路由到 skill;留空列出全部")
     pm.set_defaults(func=cmd_method)
 
-    pd = sub.add_parser("design", help="实验设计目录(被试间/内/混合/纵向/ESM…)")
-    pd.add_argument("design_id", nargs="?", default=None, help="设计 id,留空列出全部")
-    pd.set_defaults(func=cmd_design)
 
     pj = sub.add_parser("journal",
                         help="期刊画像(心理学报/心理科学/Psych Science/JPSP/Psych Bulletin…引用风格/报告标准/退稿红线);"
@@ -2134,12 +2119,6 @@ def build_parser() -> argparse.ArgumentParser:
                     help="install 用:装到全局 ~/.claude/skills(默认项目级)")
     pj.set_defaults(func=cmd_journal)
 
-    ppr = sub.add_parser("preregister",
-                         help="预注册模板(OSF/AsPredicted 双格式;据研究准备清单抽取)")
-    ppr.add_argument("--osf", action="store_true", help="只出 OSF 格式")
-    ppr.add_argument("--aspredicted", action="store_true", help="只出 AsPredicted 格式")
-    ppr.add_argument("--both", action="store_true", help="两种格式(默认)")
-    ppr.set_defaults(func=cmd_preregister)
 
     pprep = sub.add_parser("prepare", help="完成研究准备清单(17 个研究准备项)")
     pprep.add_argument("--status", action="store_true", help="只看研究准备进度")
@@ -2174,9 +2153,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pex.set_defaults(func=cmd_export)
 
-    pnm = sub.add_parser("norms", help="中文量表常模(截断值 + 中国样本均值/SD)")
-    pnm.add_argument("scale_id", nargs="?", default=None, help="量表 id(留空列出全部有常模量表)")
-    pnm.set_defaults(func=cmd_norms)
 
     pjars = sub.add_parser(
         "jars",

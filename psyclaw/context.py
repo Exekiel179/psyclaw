@@ -63,13 +63,8 @@ def _load_entries() -> list:
                 f"报告:{m['report']};坑:{m['pitfalls']}")
     except Exception:  # noqa: BLE001
         pass
-    try:
-        data = json.loads((_PSYCH_DIR / "designs.json").read_text(encoding="utf-8"))
-        for d in data.get("designs", []):
-            add(d["id"] + " " + d["name"],
-                f"[设计·{d['name']}] 威胁:{d.get('threats', '')};实践:{d.get('key_practices', '')}")
-    except Exception:  # noqa: BLE001
-        pass
+    # 设计静态库(designs.json)已删除:固定 12 类覆盖太窄,真实研究问题一律「未收录」。
+    # 设计知识交给模型本身,gates 的 DESIGN.* 质量检查不变。
     # 方法学背书静态库(evidence.json)已删除:文献支撑走真实检索(psyclaw lit),不内置。
     _ENTRIES_CACHE = out
     return out
@@ -214,7 +209,7 @@ def capability_map() -> str:
         "文献真伪:交付含参考文献的稿件前跑 `cite <稿> --verify`(逐条查存在性);\n"
         "Zotero 文库:zotero_search(先在用户自己库里找,别重复下载)/ "
         "zotero_fulltext(付费墙文献的合法全文来源)/ zotero_add(好文献入库);\n"
-        "量表/预注册/质检/导出:scale / preregister / check / export。\n"
+        "量表(用你自己定义的)/质检/导出:scale / check / export。\n"
         "有对应工具就调工具,别让用户去记命令;拿不准先想现成能力,再考虑手写。")
 
 

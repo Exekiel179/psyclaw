@@ -46,11 +46,9 @@ COMMANDS = {
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
     "/plugins": "已加载插件(用户 项目/全局;可注册工具/命令/system 片段)",
     "/prepare": "完成研究准备清单(17 个研究准备项)",
-    "/preregister": "预注册模板(OSF/AsPredicted 双格式;据研究准备清单抽取)",
     "/scale": "量表库(DASS/PHQ-9/GAD-7/TIPI…)",
     "/assume": "前提假设知识库(16 检验族)",
     "/method": "复杂方法目录(SEM/MLM/LPA/网络…)",
-    "/design": "实验设计目录(12 设计卡)",
     "/cite": "引用保真核查(文内引用是否溯源到检索命中,反杜撰)",
     "/export": "APA7 输出(Word docx + Markdown)",
     "/memory": "三层记忆(画像/惯性/教训卡);/memory verify 再验证环境教训、已恢复的自动失效",
@@ -1559,9 +1557,6 @@ class ReplSession:
         elif cmd == "/method":
             from psyclaw.psych.knowledge import print_method
             print_method(arg or None)
-        elif cmd == "/design":
-            from psyclaw.psych.knowledge import print_design
-            print_design(arg or None)
         elif cmd in ("/prepare", "/clarify"):
             from psyclaw.psych.clarify import print_clarify_status, run_clarify_interactive
             if arg == "status":
@@ -1569,9 +1564,6 @@ class ReplSession:
             else:
                 run_clarify_interactive()
                 self.system = _build_system_prompt()  # 重载(惯性可能已更新)
-        elif cmd in ("/preregister", "/prereg"):
-            from psyclaw.psych.preregister import preregister_cli
-            preregister_cli(arg.split() if arg else [])
         elif cmd == "/cite":
             if not arg:
                 print("  用法:/cite <稿件.md> —— 引用保真核查(文内引用是否溯源到检索命中)")

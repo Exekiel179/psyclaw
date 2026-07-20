@@ -63,7 +63,7 @@ SLOTS: list = [
      "IRB 批号或豁免依据;敏感条目处理流程"),
     ("prereg", "F.伦理与开放科学", "在哪预注册(OSF/AsPredicted)?何时(数据收集前)?",
      "确证性结论的资格证;不预注册就全部标探索",
-     "平台+计划时间;模板可由 /preregister 生成"),
+     "平台+计划时间;预注册文本在对话里写(OSF/AsPredicted 模板模型都熟)"),
     ("data_sharing", "F.伦理与开放科学", "数据/代码/材料共享计划?",
      "越来越多期刊强制;提前规划匿名化方案",
      "OSF 仓库;写明哪些能开放、哪些因隐私不能及理由"),
@@ -270,3 +270,24 @@ def print_clarify_status(project_dir: str | Path = ".") -> int:
         return 1
     print("  ✓ 全部研究准备项已完成")
     return 0
+_VALID_SIDS = {s[0] for s in SLOTS}
+_ROW_RE = re.compile(r"^\|([^|]+)\|([^|]+)\|(.*)\|\s*$")
+def parse_clarification(text: str) -> dict:
+    """把研究准备清单 markdown 表格解析为 ``{sid: 内容}``(仅含已 resolved 的非空值)。
+    只保留合法 sid 的行,自然滤掉表头 / 分隔行;还原被转义的 ``\\|``。
+    (原在 preregister.py;preregister 命令删除后归位到此——它解析的本就是
+    clarify 自己的卡片,SLOTS/CARD_NAME 也都在这里。)
+    """
+    answers: dict = {}
+    for line in (text or "").splitlines():
+        m = _ROW_RE.match(line)
+        if not m:
+            continue
+        sid = m.group(1).strip()
+        if sid not in _VALID_SIDS:
+            continue
+        status = m.group(2).strip()
+        content = m.group(3).replace("\\|", "|").strip()
+        if status.lower() == "resolved" and content:
+            answers[sid] = content
+    return answers

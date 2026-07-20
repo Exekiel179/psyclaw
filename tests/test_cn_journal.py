@@ -359,48 +359,9 @@ class TestCnJournalDocument:
         assert "Abstract" in md
         assert "摘" not in md.split("---")[-1].split("Abstract")[0]
 
-
-# ---------------------------------------------------------------------------
-# cn_norms.json 数据完整性
-# ---------------------------------------------------------------------------
-
-class TestCnNormsData:
-    _norms_file = Path(__file__).parent.parent / "psyclaw" / "psych" / "cn_norms.json"
-
-    def test_norms_file_exists(self):
-        assert self._norms_file.exists()
-
-    def test_norms_valid_json(self):
-        data = json.loads(self._norms_file.read_text(encoding="utf-8"))
-        assert isinstance(data, dict)
-
-    def test_key_scales_present(self):
-        data = json.loads(self._norms_file.read_text(encoding="utf-8"))
-        for sid in ("dass-21", "phq-9", "gad-7", "rses", "pss-10"):
-            assert sid in data, f"{sid} missing from cn_norms.json"
-
-    def test_each_entry_has_source_zh(self):
-        data = json.loads(self._norms_file.read_text(encoding="utf-8"))
-        for sid, entry in data.items():
-            if sid.startswith("_"):
-                continue
-            assert "source_zh" in entry, f"{sid} missing source_zh"
-
-    def test_each_entry_has_subscales(self):
-        data = json.loads(self._norms_file.read_text(encoding="utf-8"))
-        for sid, entry in data.items():
-            if sid.startswith("_"):
-                continue
-            assert "subscales" in entry, f"{sid} missing subscales"
-
-    def test_subscale_cutoffs_are_dict(self):
-        data = json.loads(self._norms_file.read_text(encoding="utf-8"))
-        for sid, entry in data.items():
-            if sid.startswith("_"):
-                continue
-            for sub_name, sub_data in entry.get("subscales", {}).items():
-                assert isinstance(sub_data.get("cutoffs", {}), dict), \
-                    f"{sid}.{sub_name}.cutoffs must be dict"
+# cn_norms.json 数据完整性测试已随内置量表库一并移除(feat-186):
+# 常模数据已不是发行产物(移到 tests/fixtures/ 仅供机器测试当夹具),
+# 再校验一份测试夹具的数据质量没有意义。get_cn_norms 等**机器**的测试仍在下方。
 
 
 # ---------------------------------------------------------------------------

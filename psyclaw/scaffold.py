@@ -126,14 +126,14 @@ def _analysis_readme(name: str, goal: str = "") -> str:
 2. `psyclaw check` → 投稿前一键质检(JARS / 效应量+CI / 引用 / 复现溯源)
 
 ## 研究前(可选但推荐)
-`psyclaw prepare` 完成研究准备清单(问题/变量/设计/理论…),再 `psyclaw preregister` 预注册。
+`psyclaw prepare` 完成研究准备清单(问题/变量/设计/理论…)。
 """
 
 
 def _read_clarify(project_dir: str | Path) -> dict:
     """读并解析研究准备清单;无清单/无已完成内容 → 空 dict。"""
     from psyclaw.psych.clarify import CARD_NAME
-    from psyclaw.psych.preregister import parse_clarification
+    from psyclaw.psych.clarify import parse_clarification
     card = Path(project_dir) / "notes" / CARD_NAME
     if not card.exists():
         return {}

@@ -10,8 +10,8 @@ from psyclaw.toolloop import build_tools
 
 def test_cli_commands_auto_toolified():
     t = build_tools(".")
-    for name in ("check", "export", "method", "cite", "review", "preregister",
-                 "design", "assume", "jars", "provenance"):
+    # design/preregister 已随内置设计库、预注册命令一并移除(feat-186)
+    for name in ("check", "export", "method", "cite", "review", "assume", "jars", "provenance"):
         assert name in t, f"CLI 命令 {name} 未工具化"
 
 
@@ -24,7 +24,6 @@ def test_system_and_interactive_commands_skipped():
 def test_side_effect_flags_reasonable():
     t = build_tools(".")
     assert t["export"]["side_effect"] is True      # 写 Word,需批准
-    assert t["preregister"]["side_effect"] is True
     assert t["check"]["side_effect"] is False       # 质检只读,自动执行
     assert t["review"]["side_effect"] is False
 
