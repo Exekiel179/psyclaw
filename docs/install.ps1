@@ -3,13 +3,13 @@
 #   irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
 #
 # 环境变量(都可选):
-#   $env:PSYCLAW_VERSION = "v0.18.0"   指定版本 tag
+#   $env:PSYCLAW_VERSION = "v0.18.1"   指定版本 tag
 #   $env:PSYCLAW_EXTRAS  = "[stats]"   附带 extra(本机跑统计:[stats];体验:[full])
 #   $env:PSYCLAW_CN      = "1"         强制国内镜像(默认探测 GitHub 自动决定;"0" 强制官方)
 
 $ErrorActionPreference = "Stop"
 $Repo   = "Exekiel179/psyclaw"
-$Tag    = if ($env:PSYCLAW_VERSION) { $env:PSYCLAW_VERSION } else { "v0.18.0" }
+$Tag    = if ($env:PSYCLAW_VERSION) { $env:PSYCLAW_VERSION } else { "v0.18.1" }
 $Extras = if ($env:PSYCLAW_EXTRAS)  { $env:PSYCLAW_EXTRAS  } else { "" }
 $Cn     = if ($env:PSYCLAW_CN)      { $env:PSYCLAW_CN      } else { "auto" }
 

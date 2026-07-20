@@ -218,9 +218,22 @@ def search_semantic_scholar(query: str, limit: int = 10) -> list:
 # 多源检索 + 去重(PRISMA 第一步)
 # ---------------------------------------------------------------------------
 
+DEFAULT_SOURCES = ["openalex", "crossref", "europepmc"]
+
+# 源名同义词:模型/用户常按习惯写库名。能映射的就映射(PubMed/MEDLINE 的内容
+# EuropePMC 就在索引),映射不了的在结果里**明确报出**,绝不静默丢弃。
+_SOURCE_ALIASES = {
+    "pubmed": "europepmc", "medline": "europepmc", "pmc": "europepmc",
+    "europe_pmc": "europepmc", "europepubmedcentral": "europepmc",
+    "s2": "semanticscholar", "semantic_scholar": "semanticscholar",
+    "semantic scholar": "semanticscholar",
+    "openalex.org": "openalex", "cross_ref": "crossref", "doi": "crossref",
+    "arxiv.org": "arxiv",
+}
+
+
 def search(query: str, sources: list | None = None, limit: int = 10,
            year_from: int | None = None) -> dict:
-    sources = sources or ["openalex", "crossref", "europepmc"]
     raw = []
     per_source = {}
     fn = {"openalex": lambda: search_openalex(query, limit, year_from),
@@ -228,14 +241,33 @@ def search(query: str, sources: list | None = None, limit: int = 10,
           "arxiv": lambda: search_arxiv(query, limit),
           "crossref": lambda: search_crossref(query, limit, year_from),
           "semanticscholar": lambda: search_semantic_scholar(query, limit)}
-    for s in sources:
-        if s in fn:
-            try:
-                hits = fn[s]()
-                per_source[s] = len(hits)
-                raw.extend(hits)
-            except Exception as exc:  # noqa: BLE001
-                per_source[s] = f"err: {exc}"
+
+    # 归一 + 分拣:不认识的源必须现形,否则「全不认识 → 0 条」与「真没论文」
+    # 无法区分,调用方(尤其是模型)会误判成「没有检索能力」而放弃。
+    requested = [str(s).strip().lower() for s in (sources or []) if str(s).strip()]
+    resolved, unknown = [], []
+    for s in requested:
+        key = _SOURCE_ALIASES.get(s, s)
+        if key in fn:
+            if key not in resolved:
+                resolved.append(key)
+        else:
+            unknown.append(s)
+    if not resolved:                    # 一个可用源都没有 → 退回默认,别空手而归
+        resolved = list(DEFAULT_SOURCES)
+        if unknown:
+            per_source["_note"] = (f"不认识的源 {unknown},已改用默认源 "
+                                   f"{DEFAULT_SOURCES}(可用:{sorted(fn)})")
+    elif unknown:
+        per_source["_note"] = f"忽略不认识的源 {unknown}(可用:{sorted(fn)})"
+
+    for s in resolved:
+        try:
+            hits = fn[s]()
+            per_source[s] = len(hits)
+            raw.extend(hits)
+        except Exception as exc:  # noqa: BLE001
+            per_source[s] = f"err: {exc}"
     # 去重:DOI 优先,无 DOI 则标题
     seen = {}
     for p in raw:

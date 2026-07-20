@@ -247,11 +247,122 @@ def parse_run_requests(reply: str) -> list[dict]:
 _INTERACTIVE_CMDS = {"repl", "config", "setup", "clarify", "serve", "resume"}
 
 
-def _run_psyclaw_cmd(cmd: str) -> str:
-    """进程内跑 psyclaw 子命令(不需要子进程;argparse 报错也如实回传)。"""
+def parse_tool_flags(argv: list) -> dict:
+    """把 ``--key value`` / ``--key=value`` / ``--flag`` 解析成工具 args dict。
+
+    只做形状转换,不认识具体工具的参数名——工具自己会校验。
+    裸位置参数并进 ``query``(模型常写 ``lit_search "关键词"``)。
+    """
+    args: dict = {}
+    positional: list = []
+    i = 0
+    while i < len(argv):
+        tok = argv[i]
+        if tok.startswith("--"):
+            key, _, inline = tok[2:].partition("=")
+            key = key.replace("-", "_")
+            if inline:
+                args[key] = inline
+            elif i + 1 < len(argv) and not argv[i + 1].startswith("--"):
+                args[key] = argv[i + 1]
+                i += 1
+            else:
+                args[key] = True                   # 无值 flag
+        else:
+            positional.append(tok)
+        i += 1
+    if positional and "query" not in args:
+        args["query"] = " ".join(positional)
+    return args
+
+
+# 工具名 → 常见同义参数名的归一(模型爱写 --max/--n/--source)。
+_TOOL_ARG_ALIASES = {"max": "limit", "n": "limit", "rows": "limit",
+                     "source": "sources", "db": "sources", "q": "query",
+                     "keywords": "query", "topic": "query"}
+
+
+def _cli_subcommands() -> frozenset:
+    """psyclaw 的全部子命令名(从 argparse 自省;失败返回空集,失败即不抢)。"""
+    global _CLI_SUBCMDS
+    if _CLI_SUBCMDS is not None:
+        return _CLI_SUBCMDS
+    names: set = set()
+    try:
+        from psyclaw.cli import build_parser
+        for act in build_parser()._subparsers._group_actions:  # noqa: SLF001
+            names.update(getattr(act, "choices", {}) or {})
+    except Exception:  # noqa: BLE001
+        pass
+    _CLI_SUBCMDS = frozenset(names)
+    return _CLI_SUBCMDS
+
+
+_CLI_SUBCMDS: frozenset | None = None
+
+
+def run_tool_from_cmdline(cmd: str, project_dir: str = ".") -> str | None:
+    """命令块里写的其实是**对话工具**时,派发到工具;不是工具则返回 None。
+
+    为什么需要这座桥(用户实测的死胡同):`capability_map` 每轮都在教模型
+    「直接调 lit_search 工具」,但那句话只在 agent 模式(```tool JSON 协议)成立;
+    默认 chat 模式只执行 ```psyclaw 命令块。于是模型写出
+    ```psyclaw\\nlit_search --query "..." --max 20 --source pubmed\\n```
+    ——工具名配 CLI 语法的四不像,argparse 报 invalid choice,模型据此断定
+    「PsyClaw 没有联网检索能力」并放弃(而 lit_search 明明可用)。
+
+    与其规定模型只能用哪套语法(它必然会混),不如让两套都能跑通。
+    副作用工具在此**不放行**:命令块路径没有审批环节,写盘/写用户文库必须
+    走 agent 模式的 approve;这里如实告知,不静默执行。
+    """
+    import shlex
+    try:
+        argv = shlex.split(cmd)
+    except ValueError:
+        return None
+    if argv and argv[0] == "psyclaw":
+        argv = argv[1:]
+    if not argv:
+        return None
+    name = argv[0]
+    # 是真正的 CLI 子命令 → 一律走原来的 argparse 路径,别抢。
+    # (否则 `export a.md --docx b.docx` 会被当成副作用工具拒执行,
+    #  破坏 capability_map 里「命令块跑 psyclaw export --docx」这条既有工作流。)
+    if name in _cli_subcommands():
+        return None
+    try:
+        from psyclaw.toolloop import build_tools
+        tools = build_tools(project_dir)
+    except Exception:  # noqa: BLE001  工具集构建失败不该拖垮命令块
+        return None
+    spec = tools.get(name)
+    if spec is None:
+        return None                                # 既不是命令也不是工具 → 交回 argparse
+    if spec.get("side_effect"):
+        return (f"[未执行:{name} 是副作用工具,命令块路径没有审批环节]\n"
+                f"请在 agent 模式下调用它(会逐条确认),或改用等价的 psyclaw 子命令。")
+    args = parse_tool_flags(argv[1:])
+    for alias, real in _TOOL_ARG_ALIASES.items():
+        if alias in args and real not in args:
+            args[real] = args.pop(alias)
+    try:
+        out = spec["run"](args)
+    except Exception as exc:  # noqa: BLE001  工具异常如实回传,别让模型以为能力不存在
+        return f"[工具 {name} 执行出错] {type(exc).__name__}: {exc}"
+    return f"$ {name}({', '.join(f'{k}={v!r}' for k, v in args.items())})\n{out}"
+
+
+def _run_psyclaw_cmd(cmd: str, project_dir: str = ".") -> str:
+    """进程内跑 psyclaw 子命令(不需要子进程;argparse 报错也如实回传)。
+
+    先看是不是对话工具名(见 run_tool_from_cmdline),是则派发过去。
+    """
     import io as _io
     import shlex
     from contextlib import redirect_stderr, redirect_stdout
+    bridged = run_tool_from_cmdline(cmd, project_dir)
+    if bridged is not None:
+        return bridged
     argv = shlex.split(cmd)
     if argv and argv[0] == "psyclaw":
         argv = argv[1:]
