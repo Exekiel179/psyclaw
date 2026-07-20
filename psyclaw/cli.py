@@ -2058,7 +2058,7 @@ def build_parser() -> argparse.ArgumentParser:
     pev.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     pev.set_defaults(func=cmd_eval)
 
-    ps = sub.add_parser("scale", help="量表库查询(DASS/PHQ-9/GAD-7/TIPI…)")
+    ps = sub.add_parser("scale", help="量表库查询(你自定义的量表:.psyclaw/scales/*.yaml)")
     ps.add_argument("scale_id", nargs="?", default=None, help="量表 id,留空列出全部")
     ps.set_defaults(func=cmd_scale)
 
