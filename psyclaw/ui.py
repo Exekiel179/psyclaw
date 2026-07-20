@@ -271,18 +271,15 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     else:
         out.append("  " + paint(">_", "mint", "bold") + " "
                    + paint("PsyClaw", "bold", edge))
-    # eyebrow(mono 小大写标签感)+ thesis(一句话主张)
+    # eyebrow:一行说清「是什么 + 什么版本」。wordmark 已喊过品牌,别再重复
+    # 中英双语同义反复 + 功能清单 + 口号——功能地图交给 /help,不占开屏。
     out.append("")
     out.append("  " + paint("◆", edge) + " " + paint("PsyClaw", edge, "bold")
-               + paint("  ·  ", edge) + dim("研究编排工作台 · RESEARCH ORCHESTRATION")
-               + dim(f"   v{version}"))
-    out.append("  " + paint(">_", "mint", "bold")
-               + dim(" 文献 · 设计 · 写作 · 评审 · 质量检查")
-               + paint("   统计外移 · 编排为核", edge))
+               + dim("  研究编排工作台") + dim(f"   v{version}"))
     out.append("")
 
     # ── 状态卡(保留 CJK 对齐的框;边框改青绿)──────────────────────────
-    mode = paint("chat · run · auto", "bold", "white") + dim("  psychology workflow harness")
+    mode = paint("chat · run · auto", "bold", "white")   # 中文 eyebrow 已说明定位,不再补英文同义句
     status_lines = _startup_status_lines(status, provider, approval)
     title = "─ " + paint("session", edge, "bold") + " "
     out.append(paint("╭" + title, edge)
