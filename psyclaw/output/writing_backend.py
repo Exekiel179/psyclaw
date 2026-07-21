@@ -215,7 +215,8 @@ def run_jars_check(draft_path: Path, study_type: str = "quant") -> dict:
         text = draft_path.read_text(encoding="utf-8")
         # feat-096:此前误传 study_type= 关键字(签名是 research_type)→ 每次
         # TypeError 被下面兜底吞掉,sidecar 永远是 error+passed:False 的假结果。
-        return check_draft(text, research_type=study_type)
+        return check_draft(text, research_type=study_type,
+                           base_dir=draft_path.parent)   # feat-194:核图件是否真存在
     except Exception as exc:  # noqa: BLE001
         return {"error": str(exc), "passed": False, "blocking": [], "warnings": []}
 
