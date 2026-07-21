@@ -61,7 +61,29 @@ PY="${PYTHON:-python3}"
 echo "✓ 装好了。跑:psyclaw   (若提示找不到命令:$PY -m psyclaw)"
 EOS
 chmod +x "$STAGE/install.sh"
-printf 'psyclaw %s 离线整包\n\n解压后:sh install.sh\n无网环境可用;需本机已有 Python 3.11+。\n' \
+
+# Windows 装机脚本(PowerShell)。wheel 是 py3-none-any 纯 Python 包,跨平台通装;
+# 只是 install.sh 在 PowerShell/cmd 里跑不了,故单给一份 .ps1。
+cat > "$STAGE/install.ps1" <<'EOS'
+# 离线装 psyclaw(Windows PowerShell):只用同目录 wheels\,不碰网络。
+#   右键「使用 PowerShell 运行」,或:powershell -ExecutionPolicy Bypass -File install.ps1
+$ErrorActionPreference = 'Stop'
+Set-Location -Path $PSScriptRoot
+$py = $null
+foreach ($c in @('py -3', 'python', 'python3')) {
+    $exe, $rest = $c.Split(' ', 2)
+    if (Get-Command $exe -ErrorAction SilentlyContinue) {
+        $ok = & $exe $rest -c 'import sys;sys.exit(0 if sys.version_info>=(3,11) else 1)' 2>$null
+        if ($LASTEXITCODE -eq 0) { $py = $c; break }
+    }
+}
+if (-not $py) { Write-Error '需要 Python 3.11+(先从 python.org 安装,装时勾选 Add to PATH)'; exit 1 }
+$exe, $rest = $py.Split(' ', 2)
+& $exe $rest -m pip install --no-index --find-links wheels psyclaw
+Write-Host "✓ 装好了。跑:psyclaw   (若提示找不到命令:$py -m psyclaw)"
+EOS
+
+printf 'psyclaw %s 离线整包(无网环境可用;需本机已有 Python 3.11+)\n\n解压后:\n  macOS / Linux : sh install.sh\n  Windows       : 右键 install.ps1 →「使用 PowerShell 运行」\n' \
   "$VER" > "$STAGE/README.txt"
 
 tar -czf "dist/psyclaw-offline-$VER.tar.gz" -C dist "psyclaw-offline-$VER"
