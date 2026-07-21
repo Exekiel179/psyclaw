@@ -906,10 +906,20 @@ def _journal_install(name: str, global_install: bool = False,
             print(ui.dim("  已取消(可 psyclaw journal install <准确包名> 重试)"))
             return 1
     if not pack:
-        print(ui.warn(f"  ⚠ AJS 未收录「{name}」(或名字差异过大)"))
-        from psyclaw.psych.journals import get_journal
-        if get_journal(name):
-            print(ui.dim("    psyclaw 自带该刊画像:check/export --journal 仍按其规范定制"))
+        from psyclaw.psych.journals import get_journal, list_journal_ids
+        prof = get_journal(name)
+        if prof:                                    # 内置画像已覆盖:非失败,无需下载
+            print(ui.ok(f"  ✓ 该刊由内置画像覆盖({prof['id']}),无需下载 AJS 包"))
+            print(ui.dim("    check/export --journal 会按其引用格式/字数/红线定制判据。"))
+            return 0
+        # 内置与 AJS 都没有(如 Nature Human Behaviour):这不是失败,给通用高标准兜底。
+        print(ui.warn(f"  ⚠ AJS 按需目录暂无「{name}」的期刊包"))
+        print(ui.accent("    这不是死路——照常写这本刊即可,写作与质检会套用通用高标准:"))
+        print(ui.dim("      · APA JARS 必报项(缺失数据/剔除理由等)\n"
+                     "      · 效应量 + 95%CI 成对必报、相关≠因果、区分探索/确证\n"
+                     "      · 图件完整性门:占位「to be generated」/断链一律阻断\n"
+                     f"    自带画像可直接用 --journal:{', '.join(list_journal_ids())}\n"
+                     "    该刊字数/版块/引用格式等细节,请对照其官方投稿指南手动确认。"))
         return 1
     dest = (Path.home() if global_install else Path(project_dir).resolve()) \
         / ".claude" / "skills"

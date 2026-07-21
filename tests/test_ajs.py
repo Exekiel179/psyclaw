@@ -258,6 +258,38 @@ def test_cmd_start_install_failure_does_not_break_start(tmp_path, monkeypatch):
     assert rc == 0                                     # 装包失败不中断 start
 
 
+# ---- 查无匹配的落地(feat-194 A):非失败,给通用高标准/内置画像出路 -----------
+
+def test_uncovered_journal_gives_generic_standard_not_deadend(
+        tmp_path, monkeypatch, capsys):
+    """NHB 这类内置与 AJS 都没有的刊:明确告知套用通用高标准,不读成失败。"""
+    monkeypatch.chdir(tmp_path)
+    _mock_ajs(monkeypatch, packs=("Nature-Geoscience-Skills",))
+    from psyclaw.cli import cmd_journal
+    rc = cmd_journal(argparse.Namespace(journal_id="install",
+                                        name=["Nature Human Behaviour"],
+                                        global_install=False))
+    out = capsys.readouterr().out
+    assert "这不是死路" in out
+    assert "JARS" in out and "效应量" in out          # 点明兜底的通用高标准
+    assert "官方投稿指南" in out                       # 指清边界:细节手动核
+    assert rc == 1                                     # 没装成包,但不是错误语义
+
+
+def test_uncovered_but_builtin_profile_reports_covered(
+        tmp_path, monkeypatch, capsys):
+    """内置画像已覆盖的刊(psych-science)不在 AJS 里:报「已覆盖」,返回 0。"""
+    monkeypatch.chdir(tmp_path)
+    _mock_ajs(monkeypatch, packs=("AAAI-Skills",))     # AJS 无 psych-science
+    from psyclaw.cli import cmd_journal
+    rc = cmd_journal(argparse.Namespace(journal_id="install",
+                                        name=["psych-science"],
+                                        global_install=False))
+    out = capsys.readouterr().out
+    assert "内置画像覆盖" in out and "psych-science" in out
+    assert rc == 0
+
+
 # ---- check 默认带 target_journal(--journal 可覆盖)---------------------------
 
 def test_check_defaults_to_target_journal(tmp_path, monkeypatch):
