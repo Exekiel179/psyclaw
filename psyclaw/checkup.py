@@ -38,7 +38,7 @@ def run_check(draft: str | None = None, journal: str | None = None,
     if draft_text:
         try:
             from psyclaw.output.jars import check_draft
-            r = check_draft(draft_text, research_type)
+            r = check_draft(draft_text, research_type, base_dir=draft_p.parent)
             if r["passed"]:
                 items.append(_item("JARS 检查单", "pass",
                                    f"{r['n_present']}/{r['n_total']} 项已报告,无阻断缺失"))
