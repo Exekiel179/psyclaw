@@ -300,8 +300,10 @@ def ch1(doc):
           [[f"psyclaw-{VER}-py3-none-any.whl", "常规离线安装(装时仍需拉一个依赖)"],
            [f"psyclaw-offline-{VER}.tar.gz", "完全无网:依赖全部打包,解压即装"]],
           [6.6, 8.6])
-    para(doc, "全离线整包使用方式:拷贝至目标机器,解压后执行其中的 install.sh。"
-              "目标机器仅需具备 Python 3.11 及以上版本。")
+    para(doc, "全离线整包使用方式:拷贝至目标机器,解压后按平台执行其中的装机脚本——"
+              "macOS 与 Linux 运行 install.sh(sh install.sh),Windows 则右键 install.ps1 "
+              "选择「使用 PowerShell 运行」。两者仅需目标机器已具备 Python 3.11 及以上版本;"
+              "整包为纯 Python 包,同一份文件在两类系统通用。")
     heading(doc, "1.4　首次配置", level=2)
     code(doc, ["psyclaw setup"])
     para(doc, "该命令引导完成功能板块选择、模型服务(provider)与密钥配置。"
