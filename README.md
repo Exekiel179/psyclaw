@@ -30,14 +30,14 @@ irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
 
 ```bash
 # uv(推荐)
-uv tool install --python 3.12 "git+https://github.com/Exekiel179/psyclaw.git@v0.21.0"
+uv tool install --python 3.12 "git+https://github.com/Exekiel179/psyclaw.git@v0.22.0"
 
 # 国内:换镜像地址 + 国内 PyPI 索引
 UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/ \
-uv tool install --python 3.12 "git+https://gitclone.com/github.com/Exekiel179/psyclaw.git@v0.21.0"
+uv tool install --python 3.12 "git+https://gitclone.com/github.com/Exekiel179/psyclaw.git@v0.22.0"
 
 # pip
-pip install "git+https://github.com/Exekiel179/psyclaw.git@v0.21.0"
+pip install "git+https://github.com/Exekiel179/psyclaw.git@v0.22.0"
 ```
 
 **完全无网的机器**:在有网机器上跑 `sh scripts/build-dist.sh`,把生成的
