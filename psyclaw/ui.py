@@ -270,7 +270,13 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     edge = "teal"                              # 主色贴 landing page 的青绿 accent
     out: list[str] = [""]
 
-    # ── hero:紧凑双主标，避免大型 ASCII 字标压过产品信息 ────────────────
+    # ── hero:巨型英文识别图形 → 中文品牌锁定 → 产品定位 ────────────────
+    if tw >= 63:
+        out.append(wordmark(edge))
+    else:
+        out.append("  " + paint(">_", "mint", "bold") + " "
+                   + paint("PSYCLAW", "bold", edge))
+    out.append("")
     out.append("  " + paint("◈", "gold", "bold") + " "
                + paint(CN_BRAND, "gold", "bold") + " "
                + paint("·", "gold") + " "

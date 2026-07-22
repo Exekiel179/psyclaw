@@ -1,7 +1,7 @@
-"""启动界面品牌 hero:紧凑双主标 + 定位 + 状态卡。
+"""启动界面品牌 hero:巨型英文识别图形 + 中文品牌锁定 + 状态卡。
 
-守护:历史 wordmark block art 保持矩形；启动页本身使用紧凑双主标，避免巨型字标
-压过版本、项目和 session 状态。
+守护:wordmark block art 必须矩形对齐；宽终端保留巨型识别图形，中文品牌锁定
+紧随其后，窄终端降级为单行。
 """
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ def test_banner_art_is_rectangular():
     assert len(lines) == 6
 
 
-def test_wide_terminal_shows_giant_wordmark(monkeypatch):
+def test_wide_terminal_shows_giant_wordmark_and_cn_lockup(monkeypatch):
     monkeypatch.setattr(ui, "term_width", lambda default=80: 90)
     out = ui.startup("0.16.0")
-    assert "█" not in out                       # 启动页不再使用巨型 block wordmark
-    assert "灵智龙虾 · PsyClaw" in out
+    assert "█" in out
+    assert out.index("█") < out.index("灵智龙虾 · PsyClaw")
     assert "灵智龙虾" in out
     assert "用心分析" in out
     assert "兼顾其他人文社科" in out
@@ -30,7 +30,7 @@ def test_wide_terminal_shows_giant_wordmark(monkeypatch):
     assert "psychology workflow harness" not in out
 
 
-def test_narrow_terminal_keeps_compact_brand_lockup(monkeypatch):
+def test_narrow_terminal_falls_back_to_compact_brand_lockup(monkeypatch):
     monkeypatch.setattr(ui, "term_width", lambda default=80: 50)
     out = ui.startup("0.16.0")
     assert "█" not in out
