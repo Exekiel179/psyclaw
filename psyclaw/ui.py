@@ -97,6 +97,11 @@ BANNER_ART = (
     "╚═╝     ╚══════╝   ╚═╝    ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝ "
 )
 
+# 中文品牌锁定在启动页 hero，不替换英文 wordmark，方便中英文环境识别。
+CN_BRAND = "灵智龙虾"
+CN_TAGLINE = "用心分析"
+CN_POSITIONING = "国产自主研发 · 面向心理学，兼顾其他人文社科的分析与写作智能体"
+
 
 def wordmark(color: str = "teal") -> str:
     """巨型 block wordmark(每行左缩进 2),整体上色。"""
@@ -271,8 +276,15 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     else:
         out.append("  " + paint(">_", "mint", "bold") + " "
                    + paint("PsyClaw", "bold", edge))
-    # eyebrow:一行说清「是什么 + 什么版本」。wordmark 已喊过品牌,别再重复
-    # 中英双语同义反复 + 功能清单 + 口号——功能地图交给 /help,不占开屏。
+    # 中文 Logo：品牌名、口号、定位各占一层，长定位在窄终端自动折行。
+    out.append("")
+    out.append("  " + paint("◈", "gold", "bold") + " "
+               + paint(CN_BRAND, "gold", "bold"))
+    out.append("    " + paint(CN_TAGLINE, "peach", "bold"))
+    hero_width = max(24, min(tw - 4, w - 4))
+    for line in wrap_display(CN_POSITIONING, max(1, hero_width - 2)):
+        out.append("  " + dim(line))
+    # eyebrow:一行说清产品名、形态和版本。
     out.append("")
     out.append("  " + paint("◆", edge) + " " + paint("PsyClaw", edge, "bold")
                + dim("  研究编排工作台") + dim(f"   v{version}"))
