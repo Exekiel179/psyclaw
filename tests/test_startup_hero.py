@@ -1,7 +1,7 @@
-"""启动界面重做成 landing page 风格 hero:巨型 wordmark + eyebrow + thesis + 状态卡。
+"""启动界面品牌 hero:紧凑双主标 + 定位 + 状态卡。
 
-守护:wordmark block art 必须矩形对齐(每行等宽),否则终端里错位难看;宽终端出大字、
-窄终端降级单行;品牌名/eyebrow/thesis 都在。
+守护:历史 wordmark block art 保持矩形；启动页本身使用紧凑双主标，避免巨型字标
+压过版本、项目和 session 状态。
 """
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ def test_banner_art_is_rectangular():
 def test_wide_terminal_shows_giant_wordmark(monkeypatch):
     monkeypatch.setattr(ui, "term_width", lambda default=80: 90)
     out = ui.startup("0.16.0")
-    assert "█" in out                           # 巨型 block wordmark 出现
-    assert "PsyClaw" in out                      # 可读品牌名(eyebrow)
+    assert "█" not in out                       # 启动页不再使用巨型 block wordmark
+    assert "灵智龙虾 · PsyClaw" in out
     assert "灵智龙虾" in out
     assert "用心分析" in out
     assert "兼顾其他人文社科" in out
@@ -30,11 +30,11 @@ def test_wide_terminal_shows_giant_wordmark(monkeypatch):
     assert "psychology workflow harness" not in out
 
 
-def test_narrow_terminal_falls_back(monkeypatch):
+def test_narrow_terminal_keeps_compact_brand_lockup(monkeypatch):
     monkeypatch.setattr(ui, "term_width", lambda default=80: 50)
     out = ui.startup("0.16.0")
-    assert "█" not in out                        # 窄终端不画大字
-    assert "PsyClaw" in out                      # 但仍有品牌名
+    assert "█" not in out
+    assert "灵智龙虾 · PsyClaw" in out
     assert "灵智龙虾" in out
 
 

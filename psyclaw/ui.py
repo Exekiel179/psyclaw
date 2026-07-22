@@ -264,26 +264,20 @@ def _startup_status_lines(status: dict | None, provider: str | None = None,
 
 def startup(version: str, status: dict | None = None, provider: str | None = None,
             approval: str | None = None) -> str:
-    """启动界面——呼应 landing page 的 hero:巨型 wordmark → eyebrow → thesis → 状态卡。"""
+    """启动界面——紧凑双主标 → 产品定位 → 版本与状态卡。"""
     tw = term_width()
     w = max(68, min(tw, 92))
     edge = "teal"                              # 主色贴 landing page 的青绿 accent
     out: list[str] = [""]
 
-    # ── hero:中文与英文同等主标，巨型英文块字作为辅助识别图形 ──────────
+    # ── hero:紧凑双主标，避免大型 ASCII 字标压过产品信息 ────────────────
     out.append("  " + paint("◈", "gold", "bold") + " "
                + paint(CN_BRAND, "gold", "bold") + " "
                + paint("·", "gold") + " "
                + paint("PsyClaw", "gold", "bold"))
     out.append("    " + paint(CN_TAGLINE, "peach", "bold"))
     out.append("")
-    if tw >= 63:
-        out.append(wordmark(edge))
-    else:
-        out.append("  " + paint(">_", "mint", "bold") + " "
-                   + paint("PsyClaw", "bold", edge))
     # 中文定位单独一层，窄终端自动折行并保持缩进。
-    out.append("")
     hero_width = max(24, min(tw - 4, w - 4))
     for line in wrap_display(CN_POSITIONING, max(1, hero_width - 2)):
         out.append("  " + dim(line))
