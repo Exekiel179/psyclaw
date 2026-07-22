@@ -1,4 +1,4 @@
-<title>PsyClaw — 心理学研究编排 Agent</title>
+<title>灵智龙虾 PsyClaw — 泛社科研究智能体</title>
 <style>
   :root {
     --ground:#fafbfb; --surface:#ffffff; --surface-2:#f3f6f5;
@@ -88,6 +88,12 @@
   .wordmark { font-family:var(--mono); font-weight:700; letter-spacing:-.035em;
     font-size:clamp(3rem,8.2vw,5.1rem); line-height:.94; margin:.7rem 0 .05rem; }
   .wordmark .caret { color:var(--accent); }
+  .cnmark { font-size:clamp(2.35rem,6vw,4.1rem); line-height:1.08; font-weight:720;
+    letter-spacing:.02em; margin:.7rem 0 .1rem; }
+  .cnmark .lob { color:var(--accent); font-size:.72em; vertical-align:.08em; margin-right:.12em; }
+  .cnmark small { display:block; margin:.38rem 0 0 .08em; color:var(--faint); font-family:var(--mono);
+    font-size:.22em; font-weight:650; letter-spacing:.1em; text-transform:uppercase; }
+  .tagline { color:var(--accent); font-size:1.06rem; font-weight:620; letter-spacing:.16em; margin-top:.7rem; }
   .hero h1 { font-size:clamp(1.3rem,3vw,1.85rem); line-height:1.24; font-weight:560; letter-spacing:-.012em;
     margin:.55rem 0 .8rem; text-wrap:balance; max-width:21ch; color:var(--ink); }
   .hero h1 em { font-style:normal; color:var(--accent); background:linear-gradient(transparent 62%, var(--accent-soft) 62%); padding:0 .05em; }
@@ -102,6 +108,15 @@
   .btn.primary:hover { transform:translateY(-1px); background:var(--accent-2); }
   .btn.ghost { border-color:var(--hair-strong); color:var(--ink); background:var(--surface); }
   .btn.ghost:hover { border-color:var(--accent); color:var(--accent); }
+  .downloads { display:grid; grid-template-columns:1.15fr .85fr; gap:18px; margin-top:32px; }
+  .download { padding:23px 22px; }
+  .download h3 { margin:0 0 .35rem; font-size:1.02rem; font-weight:620; }
+  .download p { margin:0; color:var(--muted); font-size:.9rem; line-height:1.55; }
+  .download .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:17px; }
+  .download .actions .btn { padding:9px 13px; font-size:.82rem; }
+  .download code { display:inline-block; margin-top:13px; padding:8px 10px; border-radius:6px;
+    background:var(--surface-2); color:var(--muted); font: .76rem/1.45 var(--mono); overflow-wrap:anywhere; }
+  @media (max-width:760px){ .downloads { grid-template-columns:1fr; } }
   .term { background:var(--surface); border:1px solid var(--hair); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; font-family:var(--mono); }
   .term .top { display:flex; align-items:center; gap:8px; padding:12px 15px; border-bottom:1px solid var(--hair); background:var(--surface-2); }
   .term .top .dot { width:9px; height:9px; border-radius:50%; background:var(--hair-strong); }
@@ -202,6 +217,7 @@
   <div class="wrap">
     <div class="brand"><span class="caret">&gt;_</span>&nbsp;PsyClaw</div>
     <nav>
+      <a class="lnk" href="#download">下载</a>
       <a class="lnk" href="#mental">心智模型</a>
       <a class="lnk" href="#pipeline">研究流水线</a>
       <a class="lnk" href="#guide">对话示例</a>
@@ -216,11 +232,14 @@
     <div class="wrap">
       <div class="grid">
         <div>
-          <span class="eyebrow"><span class="p">&gt;_</span> psychology research · orchestration agent</span>
+          <span class="eyebrow"><span class="p">&gt;_</span> 国产自主研发 · social science agent</span>
+          <div class="cnmark"><span class="lob">◈</span>灵智龙虾<small>PsyClaw</small></div>
+          <div class="tagline">用心分析</div>
           <div class="wordmark"><span class="caret">&gt;_</span> PsyClaw</div>
-          <h1>把一项心理学研究，<em>编排</em>成可复现、可审计的流程。</h1>
-          <p class="thesis">不是会聊天的统计包，而是<b>研究编排 Agent</b>——像跟研究助理说话一样，陪你把研究问题走完「从问题到可投稿产物」的全程。统计交给成熟工具，PsyClaw 守着流程、规范、记忆与质量门。纯 Python、stdlib 零硬依赖核，处处能跑。</p>
+          <h1>面向心理学，兼顾其他人文社科的<em>分析与写作</em>。</h1>
+          <p class="thesis">灵智龙虾是国产自主研发的研究智能体。像跟研究助理说话一样，陪你把问题走完「从文献到可复现产物」的全程：检索、设计、分析、写作与质检。统计交给成熟工具，PsyClaw 守着流程、规范、记忆与质量门。</p>
           <div class="cta-row">
+            <a class="btn primary" href="#download"><span class="m">↓</span>&nbsp;立即下载</a>
             <a class="btn primary" href="#guide"><span class="m">&gt;_</span>&nbsp;看对话示例</a>
             <a class="btn ghost" href="https://github.com/Exekiel179/psyclaw" target="_blank" rel="noopener">GitHub&nbsp;↗</a>
           </div>
@@ -242,6 +261,38 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="download">
+    <div class="wrap">
+      <span class="eyebrow"><span class="p">&gt;_</span> get started · 下载灵智龙虾</span>
+      <h2>选你的安装方式</h2>
+      <p class="lead">当前版本 <b>v0.21.0</b>，需要 Python 3.11 或更高版本。安装器会自动配置 PsyClaw 及其运行环境。</p>
+      <div class="downloads">
+        <div class="card download reveal">
+          <h3>macOS / Linux</h3>
+          <p>打开终端执行一条命令，自动安装；国内网络环境会自动切换镜像。</p>
+          <code>curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh</code>
+          <div class="actions">
+            <a class="btn primary" href="install.sh" download><span class="m">↓</span>&nbsp;下载安装脚本</a>
+            <a class="btn ghost" href="https://github.com/Exekiel179/psyclaw/releases/tag/v0.21.0" target="_blank" rel="noopener">Release v0.21.0&nbsp;↗</a>
+          </div>
+        </div>
+        <div class="card download reveal">
+          <h3>Windows</h3>
+          <p>在 PowerShell 中运行安装脚本，支持 Windows 10 及以上版本。</p>
+          <code>irm https://exekiel179.github.io/psyclaw/install.ps1 | iex</code>
+          <div class="actions">
+            <a class="btn primary" href="install.ps1" download><span class="m">↓</span>&nbsp;下载安装脚本</a>
+            <a class="btn ghost" href="https://github.com/Exekiel179/psyclaw/archive/refs/tags/v0.21.0.zip" target="_blank" rel="noopener">下载源码 ZIP&nbsp;↗</a>
+          </div>
+        </div>
+      </div>
+      <div class="cta-row">
+        <a class="btn ghost" href="https://github.com/Exekiel179/psyclaw/releases" target="_blank" rel="noopener">全部版本与离线包&nbsp;↗</a>
+        <a class="btn ghost" href="https://github.com/Exekiel179/psyclaw#安装">安装说明与文档&nbsp;↗</a>
       </div>
     </div>
   </section>
@@ -348,8 +399,8 @@
 
 <footer>
   <div class="wrap row">
-    <div class="brand"><span class="caret">&gt;_</span>&nbsp;PsyClaw</div>
-    <div class="meta"><span>psychology research orchestration</span><span class="sep">·</span><span>python -m psyclaw</span><span class="sep">·</span><span>stdlib core · MCP ecosystem</span></div>
+    <div class="brand"><span class="caret">&gt;_</span>&nbsp;灵智龙虾 <small>PsyClaw</small></div>
+    <div class="meta"><span>用心分析</span><span class="sep">·</span><span>泛社科研究智能体</span><span class="sep">·</span><span>python -m psyclaw</span></div>
     <a class="gh" href="https://github.com/Exekiel179/psyclaw" target="_blank" rel="noopener">github.com/Exekiel179/psyclaw&nbsp;↗</a>
   </div>
 </footer>

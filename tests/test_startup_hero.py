@@ -20,6 +20,9 @@ def test_wide_terminal_shows_giant_wordmark(monkeypatch):
     out = ui.startup("0.16.0")
     assert "█" in out                           # 巨型 block wordmark 出现
     assert "PsyClaw" in out                      # 可读品牌名(eyebrow)
+    assert "灵智龙虾" in out
+    assert "用心分析" in out
+    assert "兼顾其他人文社科" in out
     assert "研究编排" in out                       # eyebrow 一行说清定位
     # 开屏克制:wordmark 已喊过品牌,不再堆中英同义反复 + 功能清单 + 口号
     assert "RESEARCH ORCHESTRATION" not in out
@@ -32,6 +35,7 @@ def test_narrow_terminal_falls_back(monkeypatch):
     out = ui.startup("0.16.0")
     assert "█" not in out                        # 窄终端不画大字
     assert "PsyClaw" in out                      # 但仍有品牌名
+    assert "灵智龙虾" in out
 
 
 def test_wordmark_helper_indents_and_colors_each_line():
