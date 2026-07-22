@@ -85,13 +85,16 @@
   .hero { padding:clamp(70px,10vw,120px) 0 clamp(46px,6vw,74px); border-top:0; }
   .hero .grid { display:grid; grid-template-columns:1.04fr .96fr; gap:clamp(30px,4.5vw,64px); align-items:center; }
   @media (max-width:920px){ .hero .grid { grid-template-columns:1fr; gap:38px; } }
-  .brandlockup { display:flex; align-items:baseline; flex-wrap:wrap; gap:.24em; margin:.75rem 0 .05rem;
-    font-size:clamp(2.35rem,6.5vw,4.5rem); line-height:1.08; font-weight:720; letter-spacing:.01em; }
-  .brandlockup .cnname { color:var(--ink); }
-  .brandlockup .branddot { color:var(--accent); font-weight:500; }
-  .brandlockup .enname { color:var(--accent); font-family:var(--mono); letter-spacing:-.045em; }
-  .tagline { color:var(--accent); font-size:1.06rem; font-weight:620; letter-spacing:.16em; margin-top:.7rem; }
-  .brandlockup .tagline { font-size:.28em; letter-spacing:.12em; margin:0 0 .08em; }
+  .brand-cycle { position:relative; display:grid; margin:.75rem 0 .05rem; font-size:clamp(2.35rem,6.5vw,4.5rem);
+    line-height:1.08; font-weight:720; letter-spacing:.01em; min-height:1.18em; }
+  .brand-slide { grid-area:1/1; display:flex; align-items:baseline; gap:.24em; opacity:0; transform:translateY(8px);
+    transition:opacity .45s ease, transform .45s ease; pointer-events:none; }
+  .brand-slide.active { opacity:1; transform:none; }
+  .brand-slide .cnname { color:var(--ink); }
+  .brand-slide .enname { color:var(--accent); font-family:var(--mono); letter-spacing:-.045em; }
+  .brand-slide .branddot { color:var(--accent); font-weight:500; }
+  .brand-slide .tagline { color:var(--accent); font-size:.28em; font-weight:620; letter-spacing:.12em; margin:0 0 .08em; }
+  @media (prefers-reduced-motion: reduce){ .brand-slide { transition:none; } .brand-slide:not(:first-child) { display:none; } }
   .hero h1 { font-size:clamp(1.3rem,3vw,1.85rem); line-height:1.24; font-weight:560; letter-spacing:-.012em;
     margin:.55rem 0 .8rem; text-wrap:balance; max-width:21ch; color:var(--ink); }
   .hero h1 em { font-style:normal; color:var(--accent); background:linear-gradient(transparent 62%, var(--accent-soft) 62%); padding:0 .05em; }
@@ -231,7 +234,10 @@
       <div class="grid">
         <div>
           <span class="eyebrow"><span class="p">&gt;_</span> 国产自主研发 · social science agent</span>
-          <div class="brandlockup"><span class="cnname">灵智龙虾</span><span class="branddot">·</span><span class="tagline">用心分析</span></div>
+          <div class="brand-cycle" aria-label="灵智龙虾 PsyClaw" data-brand-cycle>
+            <div class="brand-slide active"><span class="cnname">灵智龙虾</span><span class="branddot">·</span><span class="tagline">用心分析</span></div>
+            <div class="brand-slide"><span class="enname">PsyClaw</span><span class="branddot">·</span><span class="tagline">用心分析</span></div>
+          </div>
           <h1>面向心理学，兼顾其他人文社科的<em>分析与写作</em>。</h1>
           <p class="thesis">灵智龙虾是国产自主研发的研究智能体。像跟研究助理说话一样，陪你把问题走完「从文献到可复现产物」的全程：检索、设计、分析、写作与质检。统计交给成熟工具，PsyClaw 守着流程、规范、记忆与质量门。</p>
           <div class="cta-row">
@@ -420,6 +426,15 @@
       });
     });
     var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var brandSlides = Array.prototype.slice.call(document.querySelectorAll('[data-brand-cycle] .brand-slide'));
+    if (!reduce && brandSlides.length > 1) {
+      var brandIndex = 0;
+      setInterval(function(){
+        brandSlides[brandIndex].classList.remove('active');
+        brandIndex = (brandIndex + 1) % brandSlides.length;
+        brandSlides[brandIndex].classList.add('active');
+      }, 2600);
+    }
     var line = document.getElementById('typeLine'), rest = document.querySelector('#termBody .rest');
     var full = '你好,想研究公正世界信念对心理健康的影响';
     function reveal(){ if(rest) rest.style.display='block'; }
