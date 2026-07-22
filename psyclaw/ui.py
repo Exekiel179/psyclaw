@@ -280,8 +280,7 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     out.append("  " + paint("◈", "gold", "bold") + " "
                + paint(CN_BRAND, "gold", "bold") + " "
                + paint("·", "gold") + " "
-               + paint("PsyClaw", "gold", "bold"))
-    out.append("    " + paint(CN_TAGLINE, "peach", "bold"))
+               + paint(CN_TAGLINE, "peach", "bold"))
     out.append("")
     # 中文定位单独一层，窄终端自动折行并保持缩进。
     hero_width = max(24, min(tw - 4, w - 4))
