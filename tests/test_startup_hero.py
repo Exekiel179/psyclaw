@@ -19,7 +19,7 @@ def test_wide_terminal_shows_giant_wordmark_and_cn_lockup(monkeypatch):
     monkeypatch.setattr(ui, "term_width", lambda default=80: 90)
     out = ui.startup("0.16.0")
     assert "█" in out
-    assert out.index("█") < out.index("灵智龙虾 · PsyClaw")
+    assert out.index("█") < out.index("灵智龙虾 · 用心分析")
     assert "灵智龙虾" in out
     assert "用心分析" in out
     assert "兼顾其他人文社科" in out
@@ -34,7 +34,7 @@ def test_narrow_terminal_falls_back_to_compact_brand_lockup(monkeypatch):
     monkeypatch.setattr(ui, "term_width", lambda default=80: 50)
     out = ui.startup("0.16.0")
     assert "█" not in out
-    assert "灵智龙虾 · PsyClaw" in out
+    assert "灵智龙虾 · 用心分析" in out
     assert "灵智龙虾" in out
 
 
