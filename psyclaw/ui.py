@@ -270,17 +270,20 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     edge = "teal"                              # 主色贴 landing page 的青绿 accent
     out: list[str] = [""]
 
-    # ── hero:巨型 wordmark(宽终端)或单行(窄终端)────────────────────────
+    # ── hero:中文与英文同等主标，巨型英文块字作为辅助识别图形 ──────────
+    out.append("  " + paint("◈", "gold", "bold") + " "
+               + paint(CN_BRAND, "gold", "bold") + " "
+               + paint("·", "gold") + " "
+               + paint("PsyClaw", "gold", "bold"))
+    out.append("    " + paint(CN_TAGLINE, "peach", "bold"))
+    out.append("")
     if tw >= 63:
         out.append(wordmark(edge))
     else:
         out.append("  " + paint(">_", "mint", "bold") + " "
                    + paint("PsyClaw", "bold", edge))
-    # 中文 Logo：品牌名、口号、定位各占一层，长定位在窄终端自动折行。
+    # 中文定位单独一层，窄终端自动折行并保持缩进。
     out.append("")
-    out.append("  " + paint("◈", "gold", "bold") + " "
-               + paint(CN_BRAND, "gold", "bold"))
-    out.append("    " + paint(CN_TAGLINE, "peach", "bold"))
     hero_width = max(24, min(tw - 4, w - 4))
     for line in wrap_display(CN_POSITIONING, max(1, hero_width - 2)):
         out.append("  " + dim(line))
