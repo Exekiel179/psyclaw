@@ -105,7 +105,7 @@ def test_auto_defaults_to_autonomous_dispatch(monkeypatch):
     assert seen["auto"] is False
 
 
-def test_cli_registers_three_public_modes_and_legacy_aliases():
+def test_cli_registers_two_public_modes_and_legacy_auto_alias():
     p = build_parser()
     assert p.parse_args(["chat"]).func.__name__ == "cmd_chat"
     run = p.parse_args(["run", "analysis", "data.csv", "--yes"])
@@ -113,6 +113,8 @@ def test_cli_registers_three_public_modes_and_legacy_aliases():
     run2 = p.parse_args(["run", "analysis", "data.csv", "--confirm-each",
                          "--exploratory", "--resume"])
     assert run2.confirm_each and run2.exploratory and run2.resume
+    auto_run = p.parse_args(["run"])
+    assert auto_run.func.__name__ == "cmd_run" and auto_run.kind is None
     auto = p.parse_args(["auto", "--confirm-each"])
     assert auto.func.__name__ == "cmd_auto" and auto.confirm_each is True
     # 兼容期内旧脚本仍可解析。

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import urllib.parse
 import urllib.request
@@ -179,3 +180,31 @@ def add_by_doi(doi: str, getter=None, poster=None) -> dict:
         key = (v or {}).get("key") if isinstance(v, dict) else None
     return {"status": "added", "key": key, "doi": doi, "title": item["title"],
             "note": f"已加入 Zotero 文库:{item['title'][:60]}"}
+
+
+def build_handoff_package(items: list[dict], output: str = "zotero_handoff.json") -> dict:
+    """Write a replayable Zotero handoff manifest without copying credentials."""
+    records = []
+    for item in items or []:
+        rec = {"doi": str(item.get("doi") or ""),
+               "zotero_key": str(item.get("zotero_key") or ""),
+               "path": str(item.get("path") or ""), "sha256": None}
+        if rec["path"]:
+            try:
+                digest = hashlib.sha256()
+                with open(rec["path"], "rb") as f:
+                    for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                rec["sha256"] = digest.hexdigest()
+            except OSError:
+                rec["status"] = "missing_local_file"
+        records.append(rec)
+    manifest = {"format": "psyclaw-zotero-handoff-v1", "credentials_included": False,
+                "items": records,
+                "replay": ["配置 ZOTERO_API_KEY/ZOTERO_LIBRARY_ID",
+                           "逐条运行 zotero_client.find_by_doi 或 psyclaw cite",
+                           "将本地 PDF 作为 Zotero attachment 交由用户审批"]}
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    return {"ok": True, "path": output, **manifest}

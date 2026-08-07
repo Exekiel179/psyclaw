@@ -30,14 +30,14 @@ irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
 
 ```bash
 # uv(推荐)
-uv tool install --python 3.12 "git+https://github.com/Exekiel179/psyclaw.git@v0.22.0"
+uv tool install --python 3.12 "git+https://github.com/Exekiel179/psyclaw.git@v0.23.0"
 
 # 国内:换镜像地址 + 国内 PyPI 索引
 UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/ \
-uv tool install --python 3.12 "git+https://gitclone.com/github.com/Exekiel179/psyclaw.git@v0.22.0"
+uv tool install --python 3.12 "git+https://gitclone.com/github.com/Exekiel179/psyclaw.git@v0.23.0"
 
 # pip
-pip install "git+https://github.com/Exekiel179/psyclaw.git@v0.22.0"
+pip install "git+https://github.com/Exekiel179/psyclaw.git@v0.23.0"
 ```
 
 **完全无网的机器**:在有网机器上跑 `sh scripts/build-dist.sh`,把生成的
@@ -90,6 +90,30 @@ Nature 级审稿模拟(1287 篇审稿报告蒸馏);一键导出 APA7 / 心理学
 
 **四类研究流程** — `analysis` / `meta` / `literature` / `qualitative`,
 自动串联「设计 → 执行 → 产出 → 评审」,每步留可复现记录。
+
+**资料中间层** — `psyclaw convert materials.docx` 将异构资料统一成 Markdown，
+并写入源文件 SHA-256 与转换后 SHA-256 审计；常见文本/表格格式无需额外依赖，DOCX/PDF
+等复杂格式可选接入 MarkItDown。
+
+**资料编译与交接** — `psyclaw compile notes/materials --out notes/compiled-skill` 将一批资料编译成
+可导航 `INDEX.md`、逐文件 Markdown、源文件哈希清单和 `staged/v0` Skill 草稿；
+`psyclaw handoff --goal "..." --next-step "..."` 生成可核验的 `HANDOFF.md` 与 JSON 清单。
+视频 URL 可用 `psyclaw convert --url <地址>`，字幕不可得时明确标记 `partial`，不把简介冒充转录。
+Skill 只有在 `known/forward/contrast/boundary` 四类验证全部通过、且 Claim-Evidence 中有带来源的
+`verified` claim 后，才能用 `psyclaw compile --bundle notes/compiled-skill --promote` 晋升为 `v3`。
+
+**科研组图** — `psyclaw figures --compose figures/a.png figures/b.png --out figures/fig1.png`
+将已有科研图做确定性多面板排版；统计图本身仍由成熟绘图库生成，并通过 `FIG.honest` 检查。
+
+以上命令是人工调试入口。Agent 不需要拼 CLI：`build_tools()` 原生提供
+`material_convert`、`material_compile`、`skill_claim_record`、`skill_validate`、
+`skill_promote`、`skill_bundle_status`、`session_handoff_write` 和 `figure_compose`。
+写盘工具统一走副作用审批，并拒绝项目外路径、`data/raw`、`.git` 和 `.psyclaw`。
+
+**三个入口最小案例** — 同一个目标“分析 `data/clean/scores.csv`”可分别：
+记住两句话：`chat` 一起做，`run` 交给它做。
+`run analysis data/clean/scores.csv` 是按步骤执行；只输入 `psyclaw run` 则让它根据项目状态继续下一步。
+旧命令 `psyclaw auto` 仍兼容，但不再作为主要入口。
 
 ---
 

@@ -6,6 +6,7 @@ import sys
 import tempfile
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 try:
     import pytest
@@ -27,6 +28,7 @@ from psyclaw.output.apa7 import (
     format_apa_stat,
     _split_for_italic,
     _table_three_line,
+    _TABLE_WIDTH_DXA,
     APA7Document,
 )
 
@@ -194,6 +196,21 @@ def test_table_three_line_has_top_border():
     assert 'w:val="single"' in xml
 
 
+def test_table_three_line_has_cross_renderer_border_fallbacks():
+    xml = _table_three_line(["A", "B"], [["1", "2"]])
+    wrapped = (
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"{xml}"
+        "</w:document>"
+    )
+    root = ET.fromstring(wrapped)
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    table_borders = root.find(".//w:tblPr/w:tblBorders", ns)
+    assert table_borders.find("./w:top", ns) is not None
+    assert table_borders.find("./w:bottom", ns) is not None
+    assert root.find(".//w:tr[1]/w:tc/w:p/w:pPr/w:pBdr/w:bottom", ns) is not None
+
+
 def test_table_three_line_no_caption():
     xml = _table_three_line(["X"], [["1"]])
     # No caption paragraph
@@ -206,6 +223,49 @@ def test_table_three_line_with_caption():
     assert "<w:p>" in xml
     assert "<w:tbl>" in xml
     assert xml.index("<w:p>") < xml.index("<w:tbl>")
+
+
+def test_table_three_line_uses_fixed_dxa_widths():
+    xml = _table_three_line(["Variable", "M", "SD"], [["Depression", "14.2", "3.4"]])
+    wrapped = (
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"{xml}"
+        "</w:document>"
+    )
+    root = ET.fromstring(wrapped)
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+    tbl_w = root.find(".//w:tblW", ns)
+    assert tbl_w is not None
+    assert tbl_w.attrib["{http://schemas.openxmlformats.org/wordprocessingml/2006/main}type"] == "dxa"
+    assert int(tbl_w.attrib["{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w"]) == _TABLE_WIDTH_DXA
+    assert root.find(".//w:tblLayout", ns).attrib[
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}type"
+    ] == "fixed"
+
+    grid_widths = [
+        int(node.attrib["{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w"])
+        for node in root.findall(".//w:tblGrid/w:gridCol", ns)
+    ]
+    assert len(grid_widths) == 3
+    assert sum(grid_widths) == _TABLE_WIDTH_DXA
+
+    rows = root.findall(".//w:tbl/w:tr", ns)
+    assert rows[0].find("./w:trPr/w:tblHeader", ns) is not None
+    assert all(row.find("./w:trPr/w:cantSplit", ns) is not None for row in rows)
+
+    for row in rows:
+        cell_widths = [
+            int(node.attrib["{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w"])
+            for node in row.findall("./w:tc/w:tcPr/w:tcW", ns)
+        ]
+        assert cell_widths == grid_widths
+
+
+def test_table_three_line_normalizes_short_rows():
+    xml = _table_three_line(["A", "B", "C"], [["1"]])
+    assert xml.count("<w:tc>") == 6
+    assert 'w:type="auto"' not in xml
 
 
 # ---------------------------------------------------------------------------

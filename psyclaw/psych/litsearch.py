@@ -14,6 +14,7 @@ PRISMA:检索→去重→筛选的计数贯穿,对接 LIT.prisma 质量检查。
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import urllib.error
 import urllib.parse
@@ -482,6 +483,39 @@ def _dedup_path(fp):
     return parent / f"{stem}-dup{suffix}"
 
 
+def pdf_sha256(path: str) -> str:
+    """Return a content hash for a downloaded PDF without parsing its contents."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _find_pdf_by_hash(directory, digest: str):
+    for candidate in sorted(directory.glob("*.pdf")):
+        try:
+            if pdf_sha256(str(candidate)) == digest:
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
+def _record_pdf_audit(directory, record: dict) -> str:
+    """Append a replayable acquisition record; failure must not lose the PDF."""
+    audit = directory / "pdf_audit.json"
+    try:
+        old = json.loads(audit.read_text(encoding="utf-8")) if audit.exists() else []
+        if not isinstance(old, list):
+            old = []
+        old.append(record)
+        audit.write_text(json.dumps(old, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except (OSError, json.JSONDecodeError):
+        pass
+    return str(audit)
+
+
 def paper_from_doi(doi: str) -> dict | None:
     """裸 DOI → 题录(OpenAlex),供命名用;取不到返回 None(不阻塞下载)。"""
     try:
@@ -537,9 +571,21 @@ def download_pdf(url: str, dest_dir: str, paper: dict) -> dict:
                 "note": f"{why}——已放弃保存,可用浏览器打开链接手动下载"}
     d = Path(dest_dir)
     d.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(body).hexdigest()
+    existing = _find_pdf_by_hash(d, digest)
+    if existing:
+        audit = _record_pdf_audit(d, {"url": url, "path": str(existing),
+                                      "sha256": digest, "bytes": len(body),
+                                      "duplicate": True, "title": paper.get("title", "")})
+        return {"ok": True, "path": str(existing), "bytes": len(body), "url": url,
+                "sha256": digest, "duplicate": True, "audit": audit}
     fp = _dedup_path(d / pdf_filename(paper))
     fp.write_bytes(body)
-    return {"ok": True, "path": str(fp), "bytes": len(body), "url": url}
+    audit = _record_pdf_audit(d, {"url": url, "path": str(fp), "sha256": digest,
+                                  "bytes": len(body), "duplicate": False,
+                                  "title": paper.get("title", "")})
+    return {"ok": True, "path": str(fp), "bytes": len(body), "url": url,
+            "sha256": digest, "duplicate": False, "audit": audit}
 
 
 def _pdf_candidates(paper: dict, res: dict) -> list[str]:

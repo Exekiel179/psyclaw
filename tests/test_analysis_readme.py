@@ -16,7 +16,9 @@ def test_readme_created(tmp_path):
 
 def test_readme_has_mental_model(tmp_path):
     r = _readme(tmp_path)
-    assert "chat" in r and "run" in r and "auto" in r     # 三种工作方式
+    assert "chat" in r and "run" in r
+    assert "**auto**" not in r
+    assert "run**(按步骤做，或自己推进)" in r
 
 
 def test_readme_literature_flow_accurate(tmp_path):

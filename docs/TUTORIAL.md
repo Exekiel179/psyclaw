@@ -67,7 +67,7 @@ REPL 里你需要知道的 7 件事:
 
 ---
 
-## 3. 第一个研究:run 或 auto
+## 3. 第一个研究:chat 或 run
 
 ### 路线 A:先探索(不想先答 17 题)
 
@@ -85,10 +85,10 @@ python -m psyclaw run literature "正念训练对焦虑的干预效果" --explor
 
 ```bash
 python -m psyclaw prepare       # 17 个研究准备项逐项填写(有 LLM 时会追问模糊回答)
-python -m psyclaw auto          # 自动发现该做什么 → 派发 → 独立验收 → 记状态
+python -m psyclaw run            # 自动发现该做什么 → 派发 → 独立验收 → 记状态
 ```
 
-`auto` 每轮做五件事:**感知**(从仓库状态推导待办:有目标→综述;有数据表→实证分析;
+不带类型的 `run` 每轮做五件事:**感知**(从仓库状态推导待办:有目标→综述;有数据表→实证分析;
 有效应量表→元分析;有转录稿→质性)→ **派发** → **独立验收**(只认落盘产物)→ **记状态** → **决定**。
 每个待办下还会列出你装的相关技能包。默认自动派发;需要逐任务确认时加 `--confirm-each`。
 
@@ -114,6 +114,15 @@ python -m psyclaw provenance outputs/analysis.py   # 给脚本打复现溯源包
 ---
 
 ## 4. 投稿前:一键质检
+
+### 4.1 先把材料统一成 Markdown
+
+```bash
+python -m psyclaw convert materials.docx --out notes/materials.md
+```
+
+转换记录写入 `notes/materials.md.conversion.json`（源文件和输出的 SHA-256、使用的后端、字符数）。
+这份记录让后续文献矩阵、Claim-Evidence 账本和稿件导出都能重放同一份输入。
 
 ```bash
 python -m psyclaw check outputs/report.md --journal psych-science
@@ -162,7 +171,7 @@ python -m psyclaw                              # 通用任务直接在 Chat 中�
 | PDF 读出乱码/读不到 | 扫描件/加密件抽不了正文;`pip install pypdf` 提升抽取质量,或先 OCR |
 | 模型说"无法读取文件" | 当前为 `access:safe`。用 `/access open` 放开,或用 `@路径` 引用 |
 | 统计命令去哪了 | 外移了:分析流程生成脚本 → `[stats]` 环境或 MCP 跑(见 COMMANDS.md「统计去哪了」) |
-| auto 某项验收未过 | 本轮记为“需要处理”并继续;修正后再次运行 `psyclaw auto` 会重试 |
+| run 某项验收未过 | 本轮记为“需要处理”并继续;修正后再次运行 `psyclaw run` 会重试 |
 
 ---
 
@@ -173,7 +182,7 @@ psyclaw status        ←—— 迷路先敲这个
    │
    ├─ 对话:psyclaw
    ├─ 明确任务:run literature|analysis|meta|qualitative
-   ├─ 持续推进:prepare → auto(自动发现→派发→验收→记状态)
+   ├─ 持续推进:prepare → run(自动发现→派发→验收→记状态)
    │        └─ 数据:data/clean/*.csv → run analysis → outputs/analysis.py
    └─ 投稿:check 稿件.md --journal <刊> → 修 ✗ → 重跑 → export
 ```

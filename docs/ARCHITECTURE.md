@@ -4,7 +4,7 @@ PsyClaw 是**研究编排 harness**:按研究类型把流程路由起来,统计�
 核心是一个**四层 + 两横切**的可组合结构。
 
 ```
-L0  路由 Router        三种公开入口:`chat` / `run <类型>` / `auto`
+L0  路由 Router        两种公开入口:`chat` / `run <类型>`（`run` 不带类型=自动继续）
         │              （旧 agent/loop/*-loop 是兼容入口,不再暴露为心智模型）
 L1  流程 Workflow       每类研究 = 一份声明式「步骤 + 前置检查」定义;引擎按定义跑(HITL + 总验收)
         │              （完整跑 = 高级 loop;psyclaw/workflows/engine.py）
@@ -16,13 +16,13 @@ L3  实现 Skill + MCP    每个 Step 是薄壳,真正干活委托既有命令 /
 横切 B  Memory          三层记忆贯穿路由与各步(方法学偏好/期刊/惯例)
 ```
 
-## L0 路由：chat / run / auto
+## L0 路由：chat / run
 
 | 入口 | 作用 | 底层引擎 |
 |---|---|---|
-| `chat`(缺省 `psyclaw`) | 自然语言协作,工具按需使用,副作用受审批 | REPL + toolloop |
-| `run <类型>` | 一次明确、可复现的流程 | workflow |
-| `auto` | 感知项目→派发 `run` 类型→验收→继续 | autoloop + workflow |
+| `chat`(缺省 `psyclaw`) | 一起做：边聊边推进 | REPL + toolloop |
+| `run <类型>` | 交给它做：按步骤执行一条流程 | workflow |
+| `run`（不带类型） | 交给它做：根据状态继续下一步 | autoloop + workflow |
 
 `psyclaw/modes.py` 是共享路由真源:`run analysis/meta/literature/qualitative` 进入声明式
 workflow。固定 pipeline 和通用 planner→critic 回路只保留旧命令兼容,不再作为公开 `run` 类型。
@@ -100,7 +100,7 @@ Step 之下是真正的实现层:
 
 ## 现状
 
-- ✅ 公开入口收敛为 `chat / run / auto`;`run` 下只含 literature/meta/analysis/qualitative
+- ✅ 公开入口收敛为 `chat / run`;`run` 下含 literature/meta/analysis/qualitative，省略类型时进入自动继续
   四条具备稳定输入、步骤、产物和验收契约的 workflow。
 - "统计外移"两处样板:`meta` 生成委托 statsmodels 的脚本(随机效应 DL + I²/τ²/Q + Egger);
   `analysis` 据数据画像**推荐分析**(t/ANOVA/相关/回归/描述)并生成委托 pingouin/scipy 的脚本——
@@ -109,3 +109,24 @@ Step 之下是真正的实现层:
   `profile_data`/`recommend_analysis`/`generate_analysis_script`、`load_transcripts`。
 - `tests/test_workflows.py` 35 例;meta 与 analysis 生成脚本均经 C:\Python314 实跑 exit 0。
 - 下一步:各分析步从"生成脚本"升级为"可选直连 MCP 统计后端";质性编码升级为专用 skill。
+
+## 资料编译与 Skill 晋升
+
+`psyclaw.materials` 负责单文件/视频资料转换与 SHA-256 审计；
+`psyclaw.knowledge_compile` 将资料目录编译为 `materials/`、`INDEX.md`、`manifest.json`、
+`claims.json`、`validation.json` 和 staged/v0 `SKILL.md`。编译只证明材料可导航，不证明规则成立。
+
+Skill 晋升采用 fail-closed：必须存在带来源的 `verified` claim，并且 `known`、`forward`、
+`contrast`、`boundary` 四类验证全部通过，才能写入 `status: promoted` 和 `evidence_level: v3`。
+`psyclaw.handoff` 把目标、完成项、下一步和阻塞同时写入 Markdown 与 JSON，供下一会话先核验再继续。
+
+`psyclaw.figures.compose_figures` 只负责已有科研图的确定性多面板排版和哈希审计；统计图的数值、
+坐标轴和误差线仍由 matplotlib/R/SmartPlot 等成熟工具生成，并继续接受 `FIG.honest` 质量检查。
+
+### Agent-first 工具面
+
+上述能力的主入口不是 CLI，而是 `psyclaw.academic_tools.merge_academic_tools()` 注册到
+`toolloop.build_tools()` 的原生工具。工具使用明确参数契约和结构化 JSON 返回；所有写盘操作标记为
+`side_effect=True`，由 Agent loop 的审批层 fail-closed。路径解析限制在项目根目录内，并额外禁止
+`data/raw`、`.git` 和 `.psyclaw`。同名 CLI 仅供人类调试，已从 CLI 自动工具化列表排除，避免 Agent
+同时看到两套接口。

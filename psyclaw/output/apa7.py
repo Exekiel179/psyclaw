@@ -26,6 +26,7 @@ from __future__ import annotations
 import os
 import re
 import struct
+import unicodedata
 import zipfile
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -148,6 +149,7 @@ class APA7Document:
         self.keywords: list = []
         self.blocks: list = []      # ("h1"|"h2"|"h3"|"p", text)
         self.references: list = []
+        self.footnotes: list[str] = []
 
     def set_abstract(self, text: str, keywords: list | None = None) -> None:
         self.abstract = text.strip()
@@ -160,6 +162,12 @@ class APA7Document:
     def add_paragraph(self, text: str) -> None:
         if text.strip():
             self.blocks.append(("p", text.strip()))
+
+    def add_paragraph_with_footnote(self, text: str, note: str) -> None:
+        """Add a paragraph with a real Word footnote reference."""
+        if text.strip() and note.strip():
+            self.footnotes.append(note.strip())
+            self.blocks.append(("pfn", (text.strip(), len(self.footnotes))))
 
     def add_reference(self, text: str) -> None:
         if text.strip():
@@ -251,6 +259,9 @@ class APA7Document:
                 body.append(_table_three_line(headers, rows, caption=caption))
             elif kind == "p":
                 body.append(_p_stat(content, style="PCBody"))
+            elif kind == "pfn":
+                text, footnote_id = content
+                body.append(_p_stat_with_footnote(text, footnote_id, style="PCBody"))
             elif kind == "figure":
                 fpath, caption = content
                 xml = self._figure_xml(fpath, caption, media, extra_rels)
@@ -269,18 +280,40 @@ class APA7Document:
         doc_rels = _DOC_RELS.replace("</Relationships>",
                                      "".join(extra_rels) + "</Relationships>")
         content_types = _CONTENT_TYPES
+        if not self.footnotes:
+            doc_rels = doc_rels.replace(
+                '<Relationship Id="rIdF1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>',
+                "")
+        else:
+            content_types = content_types.replace(
+                "</Types>", '<Override PartName="/word/footnotes.xml" '
+                'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/></Types>')
         if media and "image/png" not in content_types:
             content_types = content_types.replace(
                 "</Types>",
                 '<Default Extension="png" ContentType="image/png"/></Types>')
+        # ZIP headers include the current clock by default, making an otherwise
+        # identical document differ on every run.  Fixed metadata keeps the
+        # exported artifact reproducible and makes byte-level regression useful.
+        entries = [
+            ("[Content_Types].xml", content_types),
+            ("_rels/.rels", _RELS),
+            ("word/document.xml", document),
+            ("word/styles.xml", _STYLES_XML),
+            ("word/header1.xml", _HEADER_XML),
+            ("word/_rels/document.xml.rels", doc_rels),
+            ("docProps/core.xml", _CORE_XML.format(title=escape(self.title))),
+        ]
+        if self.footnotes:
+            entries.append(("word/footnotes.xml", _FOOTNOTES_XML.format(
+                notes="".join(_footnote_xml(i, note) for i, note in enumerate(self.footnotes, 1)))))
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("[Content_Types].xml", content_types)
-            z.writestr("_rels/.rels", _RELS)
-            z.writestr("word/document.xml", document)
-            z.writestr("word/styles.xml", _STYLES_XML)
-            z.writestr("word/header1.xml", _HEADER_XML)
-            z.writestr("word/_rels/document.xml.rels", doc_rels)
-            z.writestr("docProps/core.xml", _CORE_XML.format(title=escape(self.title)))
+            for name, payload in entries:
+                info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.create_system = 0
+                info.external_attr = 0
+                z.writestr(info, payload.encode("utf-8"))
             for _rid, arc, data in media:
                 z.writestr(arc, data)
         return path
@@ -387,6 +420,12 @@ def parse_md(text: str) -> APA7Document:
 _IMG_RE = re.compile(r"^!\[(.*?)\]\(([^)]+)\)\s*$")
 
 
+_PAGE_WIDTH_DXA = 12240
+_PAGE_MARGIN_DXA = 1440
+_TABLE_WIDTH_DXA = _PAGE_WIDTH_DXA - (_PAGE_MARGIN_DXA * 2)
+_MIN_TABLE_COL_DXA = 480
+
+
 def export_cli(argv: list) -> int:
     """psyclaw export draft.md [--docx out.docx] [--md out.md]"""
     if not argv:
@@ -407,6 +446,17 @@ def export_cli(argv: list) -> int:
         else src.with_suffix(".apa7.md")
     doc.to_docx(docx_out)
     md_out.write_text(doc.to_markdown(), encoding="utf-8")
+    # A file existing is not sufficient evidence of a usable delivery.  Keep
+    # both artifacts for diagnosis, but never report a broken DOCX as complete.
+    from psyclaw.output.docx_contract import inspect_docx
+    contract = inspect_docx(docx_out)
+    if not contract["ok"]:
+        print("APA7 输出失败(DOCX 契约未通过；中间文件已保留):")
+        for error in contract["errors"]:
+            print(f"  - {error}")
+        print(f"  Word    : {docx_out}")
+        print(f"  Markdown: {md_out}")
+        return 1
     print(f"APA7 输出完成(确定性模板,格式稳定):")
     print(f"  Word    : {docx_out}")
     print(f"  Markdown: {md_out}")
@@ -452,6 +502,13 @@ def _p_stat(text: str, style: str = "PCBody") -> str:
     return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{runs}</w:p>'
 
 
+def _p_stat_with_footnote(text: str, footnote_id: int, style: str = "PCBody") -> str:
+    runs = "".join(_run(t, italic=i, bold=b, code=c)
+                    for t, b, i, c in _split_inline(text))
+    runs += (f'<w:r><w:footnoteReference w:id="{int(footnote_id)}"/></w:r>')
+    return f'<w:p><w:pPr><w:pStyle w:val="{style}"/></w:pPr>{runs}</w:p>'
+
+
 def _table_three_line(headers: list[str], rows: list[list[str]],
                       caption: str = "") -> str:
     """生成 APA7 三线表 OOXML（顶线加粗、表头下细线、底线加粗、无竖线）。
@@ -463,50 +520,147 @@ def _table_three_line(headers: list[str], rows: list[list[str]],
     THICK = "24"
     THIN = "12"
 
-    def _border(name: str, size: str) -> str:
-        return (f'<w:top w:val="single" w:sz="{size}" w:space="0" w:color="000000"/>'
-                if name == "top"
-                else f'<w:bottom w:val="single" w:sz="{size}" w:space="0" w:color="000000"/>')
+    headers, rows = _normalize_table(headers, rows)
+    widths = _table_column_widths(headers, rows)
 
     def _cell(txt: str, bold: bool = False, top_border: str = "",
-              bot_border: str = "") -> str:
-        borders = ""
-        if top_border or bot_border:
-            parts_b = []
-            if top_border:
-                parts_b.append(f'<w:top w:val="single" w:sz="{top_border}" '
+              bot_border: str = "", width: int = _TABLE_WIDTH_DXA) -> str:
+        border_parts = []
+        if top_border:
+            border_parts.append(f'<w:top w:val="single" w:sz="{top_border}" '
                                 'w:space="0" w:color="000000"/>')
-            if bot_border:
-                parts_b.append(f'<w:bottom w:val="single" w:sz="{bot_border}" '
+        if bot_border:
+            border_parts.append(f'<w:bottom w:val="single" w:sz="{bot_border}" '
                                 'w:space="0" w:color="000000"/>')
-            # suppress left/right/insideH borders
-            parts_b.append('<w:left w:val="none" w:sz="0" w:space="0" w:color="auto"/>')
-            parts_b.append('<w:right w:val="none" w:sz="0" w:space="0" w:color="auto"/>')
-            borders = f'<w:tcBorders>{"".join(parts_b)}</w:tcBorders>'
+        border_parts.append('<w:left w:val="none" w:sz="0" w:space="0" w:color="auto"/>')
+        border_parts.append('<w:right w:val="none" w:sz="0" w:space="0" w:color="auto"/>')
+        borders = f'<w:tcBorders>{"".join(border_parts)}</w:tcBorders>'
+        cell_pr = (
+            f'<w:tcW w:w="{width}" w:type="dxa"/>'
+            f'{borders}'
+            '<w:tcMar>'
+            '<w:top w:w="80" w:type="dxa"/>'
+            '<w:left w:w="120" w:type="dxa"/>'
+            '<w:bottom w:w="80" w:type="dxa"/>'
+            '<w:right w:w="120" w:type="dxa"/>'
+            '</w:tcMar>'
+            '<w:vAlign w:val="center"/>'
+        )
         rpr = "<w:rPr><w:b/></w:rPr>" if bold else ""
         run = f'<w:r>{rpr}<w:t xml:space="preserve">{escape(str(txt))}</w:t></w:r>'
-        return (f'<w:tc><w:tcPr>{borders}</w:tcPr>'
-                f'<w:p><w:pPr><w:pStyle w:val="PCNoIndent"/></w:pPr>{run}</w:p></w:tc>')
+        # Quick Look ignores tcBorders in some DOCX previews.  A paragraph
+        # bottom border keeps the header rule visible there, while tcBorders
+        # remains the canonical Word/LibreOffice table definition.
+        para_border = (
+            f'<w:pBdr><w:bottom w:val="single" w:sz="{bot_border}" '
+            'w:space="0" w:color="000000"/></w:pBdr>'
+            if bot_border and bold else ""
+        )
+        para_pr = ('<w:pPr><w:pStyle w:val="PCNoIndent"/>'
+                   f'{para_border}'
+                   '<w:spacing w:line="240" w:lineRule="auto" w:after="0"/>'
+                   '</w:pPr>')
+        return f'<w:tc><w:tcPr>{cell_pr}</w:tcPr><w:p>{para_pr}{run}</w:p></w:tc>'
 
     parts: list[str] = []
     if caption:
-        parts.append(_p(caption, style="PCNoIndent"))
+        parts.extend(_p(line, style="PCNoIndent")
+                     for line in str(caption).splitlines() if line.strip())
 
     # 表头行 (top=thick, bottom=thin)
     header_cells = "".join(
-        _cell(h, bold=True, top_border=THICK, bot_border=THIN) for h in headers)
-    parts.append(f'<w:tr>{header_cells}</w:tr>')
+        _cell(h, bold=True, top_border=THICK, bot_border=THICK if not rows else THIN,
+              width=widths[i])
+        for i, h in enumerate(headers))
+    table_rows = [f'<w:tr><w:trPr><w:cantSplit/><w:tblHeader/></w:trPr>{header_cells}</w:tr>']
 
     # 数据行 (最后一行 bottom=thick)
     for i, row in enumerate(rows):
         is_last = (i == len(rows) - 1)
         bot = THICK if is_last else ""
-        data_cells = "".join(_cell(str(v), bot_border=bot) for v in row)
-        parts.append(f'<w:tr>{data_cells}</w:tr>')
+        data_cells = "".join(
+            _cell(str(v), bot_border=bot, width=widths[j])
+            for j, v in enumerate(row))
+        table_rows.append(f'<w:tr><w:trPr><w:cantSplit/></w:trPr>{data_cells}</w:tr>')
 
-    table_content = "".join(parts[1:]) if caption else "".join(parts)
-    table_xml = f'<w:tbl><w:tblPr><w:tblStyle w:val="TableNormal"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>{table_content}</w:tbl>'
-    return (parts[0] if caption else "") + table_xml
+    grid = "".join(f'<w:gridCol w:w="{w}"/>' for w in widths)
+    table_pr = (
+        '<w:tblPr>'
+        '<w:tblStyle w:val="TableNormal"/>'
+        f'<w:tblW w:w="{_TABLE_WIDTH_DXA}" w:type="dxa"/>'
+        '<w:tblInd w:w="0" w:type="dxa"/>'
+        '<w:tblBorders>'
+        f'<w:top w:val="single" w:sz="{THICK}" w:space="0" w:color="000000"/>'
+        f'<w:bottom w:val="single" w:sz="{THICK}" w:space="0" w:color="000000"/>'
+        '<w:left w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+        '<w:right w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+        '<w:insideH w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+        '<w:insideV w:val="none" w:sz="0" w:space="0" w:color="auto"/>'
+        '</w:tblBorders>'
+        '<w:tblLayout w:type="fixed"/>'
+        '<w:tblCellMar>'
+        '<w:top w:w="80" w:type="dxa"/>'
+        '<w:left w:w="120" w:type="dxa"/>'
+        '<w:bottom w:w="80" w:type="dxa"/>'
+        '<w:right w:w="120" w:type="dxa"/>'
+        '</w:tblCellMar>'
+        '</w:tblPr>'
+    )
+    table_xml = f'<w:tbl>{table_pr}<w:tblGrid>{grid}</w:tblGrid>{"".join(table_rows)}</w:tbl>'
+    return "".join(parts) + table_xml
+
+
+def _normalize_table(headers: list[str], rows: list[list[str]]) -> tuple[list[str], list[list[str]]]:
+    """让 OOXML 表格始终有稳定列数；不足补空，超出截断。"""
+    col_count = len(headers)
+    if col_count <= 0:
+        col_count = max((len(row) for row in rows), default=1)
+        headers = [f"Column {i + 1}" for i in range(col_count)]
+    normalized_headers = [str(h) for h in headers[:col_count]]
+    normalized_rows = []
+    for row in rows:
+        cells = [str(v) for v in row[:col_count]]
+        cells.extend([""] * (col_count - len(cells)))
+        normalized_rows.append(cells)
+    return normalized_headers, normalized_rows
+
+
+def _table_column_widths(headers: list[str], rows: list[list[str]],
+                         total_width: int = _TABLE_WIDTH_DXA) -> list[int]:
+    """按内容估算列宽，同时保证总宽精确等于正文宽度。
+
+    Word/LibreOffice/Google Docs 对 auto 表格的重排差异很大；这里固定 DXA
+    宽度、tblGrid 和 tcW，遵循 docx skill 的表格规则。
+    """
+    col_count = max(1, len(headers))
+    if col_count * _MIN_TABLE_COL_DXA >= total_width:
+        base = total_width // col_count
+        widths = [base] * col_count
+        widths[-1] += total_width - sum(widths)
+        return widths
+
+    weights: list[int] = []
+    for idx in range(col_count):
+        samples = [headers[idx]] + [row[idx] for row in rows if idx < len(row)]
+        longest = max((_visual_width(v) for v in samples), default=1)
+        weights.append(max(6, min(36, longest)))
+
+    min_total = _MIN_TABLE_COL_DXA * col_count
+    flex_total = total_width - min_total
+    weight_total = sum(weights) or col_count
+    widths = [
+        _MIN_TABLE_COL_DXA + int(flex_total * weight / weight_total)
+        for weight in weights
+    ]
+    widths[-1] += total_width - sum(widths)
+    return widths
+
+
+def _visual_width(text: object) -> int:
+    width = 0
+    for ch in str(text):
+        width += 2 if unicodedata.east_asian_width(ch) in ("F", "W") else 1
+    return width or 1
 
 
 def _p_keywords(kw: str) -> str:
@@ -516,7 +670,10 @@ def _p_keywords(kw: str) -> str:
 
 
 def _page_break() -> str:
-    return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
+    # Paragraph-level pagination is rendered consistently by Word,
+    # LibreOffice and macOS Quick Look; an inline page-break run appears as a
+    # missing-glyph square in Quick Look thumbnails.
+    return '<w:p><w:pPr><w:pageBreakBefore/></w:pPr></w:p>'
 
 
 # feat-137:图片嵌入(纯 stdlib OOXML DrawingML)。宽度上限 6",按 PNG 原比例缩放。
@@ -581,7 +738,21 @@ _DOC_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rIdH1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>
 <Relationship Id="rIdS1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+<Relationship Id="rIdF1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>
 </Relationships>"""
+
+
+_FOOTNOTES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:footnote w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>
+<w:footnote w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>
+{notes}</w:footnotes>"""
+
+
+def _footnote_xml(footnote_id: int, text: str) -> str:
+    return (f'<w:footnote w:id="{int(footnote_id)}"><w:p>'
+            f'<w:r><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve">'
+            f'{escape(text)}</w:t></w:r></w:p></w:footnote>')
 
 _CORE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/">

@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "packs": [
+    {
+      "id": "core",
+      "name": "PsyClaw Core",
+      "domain": "workflow",
+      "description": "Agent 路由与学术质量检查，随 PsyClaw 安装并始终启用。",
+      "bundled": true,
+      "required": true,
+      "skills": ["research-workflow", "paper-review-gates"],
+      "sources": []
+    },
+    {
+      "id": "research-design",
+      "name": "研究设计",
+      "domain": "research_design",
+      "description": "分析规划、混淆控制和样本量设计。",
+      "bundled": false,
+      "skills": ["analysis-planning", "confound-control", "sample-size"],
+      "sources": [
+        {
+          "url": "https://github.com/Exekiel179/psyclaw.git",
+          "ref": "main",
+          "subdir": "psyclaw/skills",
+          "skills": ["analysis-planning", "confound-control", "sample-size"]
+        }
+      ]
+    },
+    {
+      "id": "literature",
+      "name": "文献综述",
+      "domain": "literature",
+      "description": "真实检索、PRISMA 筛选和证据综合。",
+      "bundled": false,
+      "skills": ["lit-review"],
+      "sources": [
+        {
+          "url": "https://github.com/Exekiel179/psyclaw.git",
+          "ref": "main",
+          "subdir": "psyclaw/skills",
+          "skills": ["lit-review"]
+        }
+      ]
+    },
+    {
+      "id": "quantitative",
+      "name": "定量分析",
+      "domain": "data_analysis",
+      "description": "统计函数路由和可复现分析规划。",
+      "bundled": false,
+      "skills": ["pingouin"],
+      "sources": [
+        {
+          "url": "https://github.com/Exekiel179/psyclaw.git",
+          "ref": "main",
+          "subdir": "psyclaw/skills",
+          "skills": ["pingouin"]
+        }
+      ]
+    },
+    {
+      "id": "writing-review",
+      "name": "写作与同行评审",
+      "domain": "review",
+      "description": "论文质量检查、同行评审与回复信。",
+      "bundled": false,
+      "skills": ["nature-review"],
+      "sources": [
+        {
+          "url": "https://github.com/Exekiel179/psyclaw.git",
+          "ref": "main",
+          "subdir": "psyclaw/skills",
+          "skills": ["nature-review"]
+        }
+      ]
+    },
+    {
+      "id": "agent-learning",
+      "name": "智能体学习",
+      "domain": "memory",
+      "description": "从上下文和轨迹蒸馏可复用 Skill。",
+      "bundled": false,
+      "skills": ["ctx2skill", "opid"],
+      "sources": [
+        {
+          "url": "https://github.com/Exekiel179/psyclaw.git",
+          "ref": "main",
+          "subdir": "psyclaw/skills",
+          "skills": ["ctx2skill", "opid"]
+        }
+      ]
+    }
+  ]
+}

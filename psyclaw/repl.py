@@ -2026,7 +2026,7 @@ class ReplSession:
                               f"[运行完成] 退出码 {rc};产物见 notes/ 与 outputs/。"})
 
     def _cmd_run_mode(self, arg: str) -> None:
-        """/run <类型> <目标>:聊天内调用与 CLI 相同的共享模式路由。"""
+        """/run <类型> <目标> 或 /run:聊天内调用统一执行入口。"""
         import shlex
         from psyclaw.modes import RUN_TYPES, run_mode
         try:
@@ -2035,7 +2035,7 @@ class ReplSession:
             print(ui.warn(f"  参数解析失败:{exc}"))
             return
         if not toks:
-            print("  用法:/run <类型> <路径或主题>  类型:" + "|".join(RUN_TYPES))
+            self._cmd_auto_mode("")
             return
         kind, rest = toks[0], toks[1:]
         confirm_each = "--confirm-each" in rest
@@ -2224,11 +2224,11 @@ class ReplSession:
 
 
 HELP_TEXT = """\
-  三种工作方式
-  对话         直接输入问题;工具按需使用,关键操作按 approval 策略确认
-  /run TYPE X  执行明确流程:analysis|meta|literature|qualitative
+  两种工作方式
+  对话         一起做:直接输入问题
+  /run TYPE X  按步骤做:analysis|meta|literature|qualitative
                默认连续执行;可加 --confirm-each / --exploratory / --resume
-  /auto         据项目状态持续推进(--confirm-each 可逐任务确认)
+  /run          自己推进:继续项目的下一步(--confirm-each 可逐任务确认)
 
   当前任务
   @<file>     在消息中引用文件内容(如:帮我看看 @data.csv 的结构)

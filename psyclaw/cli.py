@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from psyclaw import __version__
 from psyclaw import config as cfg
@@ -44,9 +45,18 @@ def cmd_chat(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """公开运行入口:`run <类型>`,复用既有 workflow/pipeline/loop。"""
+    """统一执行入口:`run <类型>` 或不带类型自动继续下一步。"""
     from psyclaw import ui
-    from psyclaw.modes import run_mode
+    from psyclaw.modes import run_auto, run_mode
+    if not getattr(args, "kind", None) or args.kind in ("auto", "autonomous"):
+        try:
+            return run_auto(max_iters=getattr(args, "max_iters", 6),
+                            confirm_each=getattr(args, "confirm_each", False),
+                            exploratory=(getattr(args, "exploratory", False)
+                                         or getattr(args, "skip_gates", False)))
+        except KeyboardInterrupt:
+            print("\n运行已中断。状态已保存,下次 `psyclaw run` 继续。")
+            return 0
     target = " ".join(getattr(args, "target", [])).strip() or None
     try:
         return run_mode(
@@ -469,6 +479,85 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
 def cmd_skills(args: argparse.Namespace) -> int:
     from psyclaw import ui
+    pack_action = next(((action, getattr(args, action, None)) for action in
+                        ("pack_install", "pack_update", "pack_enable", "pack_disable")
+                        if getattr(args, action, None)), None)
+    if getattr(args, "packs", False) or pack_action or getattr(args, "pack_catalog_sync", False):
+        from psyclaw.skills.packs import (install_pack, list_packs, update_pack,
+                                          load_pack_catalog, sync_pack_catalog)
+        from psyclaw.skills.registry import rebuild_registry
+        from psyclaw.skills.state import set_pack_enabled
+        if getattr(args, "pack_catalog_sync", False):
+            result = sync_pack_catalog(getattr(args, "catalog_url", None))
+            if result.get("ok"):
+                rebuild_registry(".")
+            print((ui.ok if result.get("ok") else ui.err)(str(result)))
+            return 0 if result.get("ok") else 1
+        if pack_action:
+            action, pack_id = pack_action
+            if action == "pack_install":
+                result = install_pack(pack_id, scope=getattr(args, "scope", "global"),
+                                      dry_run=getattr(args, "dry_run", False))
+            elif action == "pack_update":
+                result = update_pack(pack_id, scope=getattr(args, "scope", "global"),
+                                     dry_run=getattr(args, "dry_run", False))
+            else:
+                pack = next((p for p in load_pack_catalog()["packs"] if p["id"] == pack_id), None)
+                current = next((p for p in list_packs() if p["id"] == pack_id), None)
+                if not pack:
+                    result = {"ok": False, "status": "not_found", "pack": pack_id}
+                elif action == "pack_enable" and not current.get("installed"):
+                    result = {"ok": False, "status": "not_installed", "pack": pack_id}
+                else:
+                    result = set_pack_enabled(pack_id, action == "pack_enable",
+                                              scope=getattr(args, "scope", "global"),
+                                              locked=bool(pack.get("required")),
+                                              installed=bool(current.get("installed")))
+            if result.get("ok") and not getattr(args, "dry_run", False):
+                rebuild_registry(".")
+            print((ui.ok if result.get("ok") else ui.err)(str(result)))
+            return 0 if result.get("ok") else 1
+        print(ui.title("PsyClaw System Skill Packs"))
+        for pack in list_packs():
+            mark = "●" if pack["enabled"] else "○"
+            installed = "已安装" if pack["installed"] else "可安装"
+            print(f"  {mark} {pack['id']:<18} {installed:<6} {pack['name']} — {pack['description']}")
+        return 0
+
+    skill_action = next(((action, getattr(args, action, None)) for action in ("enable", "disable")
+                         if getattr(args, action, None)), None)
+    if skill_action:
+        from psyclaw.skills.registry import build_registry, rebuild_registry
+        from psyclaw.skills.state import set_skill_enabled, source_preference
+        action, name = skill_action
+        registry = build_registry(".")
+        matches = [s for s in registry.get("skills", []) if s.get("name") == name]
+        if not matches:
+            result = {"ok": False, "status": "not_found", "name": name}
+        elif (action == "enable" and len(matches) > 1
+              and not any(s.get("scope") == "builtin" for s in matches)
+              and not source_preference(name, ".")):
+            result = {"ok": False, "status": "source_required", "name": name,
+                      "sources": [s.get("path") for s in matches],
+                      "note": "同名 Skill 先用 --select-source 选择来源"}
+        else:
+            result = set_skill_enabled(name, action == "enable",
+                                       scope=getattr(args, "scope", "global"))
+        if result.get("ok"):
+            rebuild_registry(".")
+        print((ui.ok if result.get("ok") else ui.err)(str(result)))
+        return 0 if result.get("ok") else 1
+    if getattr(args, "select_source", None):
+        from psyclaw.skills.registry import build_registry, rebuild_registry
+        from psyclaw.skills.state import select_source
+        name, source = args.select_source
+        records = [s for s in build_registry(".").get("skills", []) if s.get("name") == name]
+        candidates = [str(Path(s["path"]).resolve()) for s in records]
+        result = select_source(name, source, candidates, scope=getattr(args, "scope", "project"))
+        if result.get("ok"):
+            rebuild_registry(".")
+        print((ui.ok if result.get("ok") else ui.err)(str(result)))
+        return 0 if result.get("ok") else 1
     sync_target = getattr(args, "sync", None)
     if sync_target is not None:
         from psyclaw.skills.sync import list_syncable_skills, sync_skills
@@ -508,12 +597,15 @@ def cmd_skills(args: argparse.Namespace) -> int:
             if s.get("description"):
                 print(ui.dim(f"      {s['description'][:64]}  [{s['source']}]"))
         return 0
-    skills = list_skills()
+    from psyclaw.skills.registry import build_registry
+    registry = build_registry(".")
+    skills = [s for s in registry.get("skills", []) if s.get("selected", True)]
     bundled = [s for s in skills if s.get("source") == "bundled"]
     external = [s for s in skills if s.get("source") != "bundled"]
     print(ui.title(f"已注册 Skills（{len(skills)}）"))
     for s in bundled:
-        print(f"  - {s['name']:<20} [{s['category']}]  {s['description'][:56]}")
+        mark = ui.ok("●") if s.get("enabled") else ui.dim("○")
+        print(f"  {mark} {s['name']:<20} [{s['category']}]  {s['description'][:56]}")
     if external:
         from collections import defaultdict
         by_root: dict[str, list] = defaultdict(list)
@@ -525,7 +617,8 @@ def cmd_skills(args: argparse.Namespace) -> int:
             scope = _scope_label.get(items[0].get("scope", ""), "用户")
             print(ui.dim(f"  [{scope}] {root}（{len(items)}）"))
             for s in items[:12]:
-                print(f"    - {s['name']:<28} {ui.dim(s['description'][:44])}")
+                mark = ui.ok("●") if s.get("enabled") else ui.dim("○")
+                print(f"    {mark} {s['name']:<28} {ui.dim(s['description'][:44])}")
             if len(items) > 12:
                 print(ui.dim(f"    …… 另 {len(items) - 12} 个"))
     else:
@@ -776,6 +869,7 @@ def cmd_assume(args: argparse.Namespace) -> int:
 def cmd_method(args: argparse.Namespace) -> int:
     # feat:method 重定位——先路由到结构化方法学 skill(样本量/无关变量控制…),
     # 让宿主模型按 skill 既定流程做(比裸输出规范);匹配不到再退回 methods.json 词条。
+    from psyclaw import ui
     from psyclaw.psych.knowledge import print_method
     from psyclaw.psych.method_skills import (
         list_method_skills, match_method_skill, skill_procedure,
@@ -792,16 +886,23 @@ def cmd_method(args: argparse.Namespace) -> int:
             print(body if body else "(skill 正文读取失败)")
             print(f"\n（宿主模型请按上面的流程执行；对应 SKILL.md：{hit.get('path', '')}）")
             return 0
+        available = match_method_skill(query, ".", include_disabled=True)
+        if available:
+            print(ui.warn(f"方法学 Skill `{available['name']}` 当前未启用，未读取其正文。"))
+            print(ui.dim("  安装领域包：psyclaw skills --pack-install research-design"))
+            print(ui.dim("  或单独启用：psyclaw skills --enable " + available["name"]))
+            return 0
         # 未命中 skill → 退回旧方法词条查询
         print_method(query)
         return 0
 
     # 无参数:先亮出方法学 skill,再列旧词条目录
-    skills = list_method_skills(".")
+    skills = list_method_skills(".", include_disabled=True)
     if skills:
         print("◆ 方法学 skill（按流程办事，胜过裸输出）")
         for s in skills:
-            print(f"  · {s['name']:<18} {s.get('description', '')}")
+            mark = "●" if s.get("enabled") else "○"
+            print(f"  {mark} {s['name']:<18} {s.get('description', '')}")
         print("  用法：psyclaw method <关键词>（如「样本量」「无关变量控制」）\n")
     print_method(None)
     return 0
@@ -972,6 +1073,72 @@ def cmd_export(args: argparse.Namespace) -> int:
     if args.md:
         argv += ["--md", args.md]
     return export_cli(argv)
+
+
+def cmd_convert(args: argparse.Namespace) -> int:
+    from psyclaw.materials import convert_to_markdown, convert_video_url
+    from psyclaw import ui
+    if not getattr(args, "file", None) and not getattr(args, "url", None):
+        print(ui.err("资料转换需要文件路径或 --url 视频地址"))
+        return 2
+    res = convert_video_url(args.url, args.out) if getattr(args, "url", None) else convert_to_markdown(args.file, args.out)
+    if not res.get("ok"):
+        print(ui.err(f"资料转换失败: {res.get('note', '未知错误')}"))
+        return 1
+    print(ui.ok(f"资料已转换为 Markdown: {res['output']}"))
+    digest = res.get("source_sha256", res.get("output_sha256", ""))
+    print(ui.dim(f"状态:{res.get('status', 'converted')}  SHA-256:{digest[:16]}…  审计:{res['sidecar']}"))
+    return 0
+
+
+def cmd_compile(args: argparse.Namespace) -> int:
+    """Compile a material directory into INDEX.md + staged SKILL.md."""
+    from psyclaw.knowledge_compile import (append_claim, compile_materials,
+                                           promote_compiled_skill, record_validation)
+    from psyclaw import ui
+    if args.bundle and args.validate:
+        result = record_validation(args.bundle, kind=args.validate, passed=args.passed,
+                                   evidence=args.evidence or [], notes=args.notes or "")
+        print(ui.ok(f"验证记录已写入: {args.bundle} ({args.validate}={result['status']})") if result["ok"]
+              else ui.err(f"验证记录失败: {result.get('note', result.get('status'))}"))
+        return 0 if result["ok"] else 1
+    if args.bundle and args.promote:
+        result = promote_compiled_skill(args.bundle, reviewer=args.reviewer)
+        if not result["ok"]:
+            print(ui.err(f"Skill 尚不能晋升: {result.get('note', result.get('incomplete_checks'))}"))
+            return 1
+        print(ui.ok(f"Skill 已晋升为 v3: {result['skill']}"))
+        return 0
+    if args.bundle and args.claim:
+        result = append_claim(args.bundle, claim=args.claim, source=args.claim_source,
+                              status=args.claim_status, locator=args.claim_locator)
+        print(ui.ok(f"Claim 已记录: {result['path']} ({result['claim']['status']})")
+              if result["ok"] else ui.err(f"Claim 记录失败: {result.get('note', result.get('status'))}"))
+        return 0 if result["ok"] else 1
+    if not args.source:
+        print(ui.err("资料编译需要 source 目录；验证/晋升请使用 --bundle"))
+        return 2
+    result = compile_materials(args.source, args.out, skill_name=args.name)
+    if not result.get("ok"):
+        print(ui.err(f"资料编译失败: {result.get('note', '未知错误')}"))
+        return 1
+    print(ui.ok(f"资料已编译为可导航 Skill 草稿: {result['skill']}"))
+    print(ui.dim(f"索引:{result['index']}  清单:{result['manifest']}  "
+                 f"材料:{result['converted']}/{result['total']}"))
+    print(ui.warn("状态为 staged/v0；请完成 Claim-Evidence 核验和前向任务后再晋升。"))
+    return 0
+
+
+def cmd_handoff(args: argparse.Namespace) -> int:
+    from psyclaw.handoff import write_handoff
+    from psyclaw import ui
+    result = write_handoff(args.project, goal=args.goal,
+                           next_steps=args.next_step or [],
+                           completed=args.completed or [], blockers=args.blocker or [],
+                           output=args.out)
+    print(ui.ok(f"会话交接已写入: {result['path']}"))
+    print(ui.dim(f"可重放清单:{result['sidecar']}"))
+    return 0
 
 
 def cmd_jars(args: argparse.Namespace) -> int:
@@ -1214,6 +1381,12 @@ def cmd_figures(args: argparse.Namespace) -> int:
         argv += ["--check", args.check]
     if getattr(args, "palette", 0):
         argv += ["--palette", str(args.palette)]
+    if getattr(args, "compose", None):
+        argv += ["--compose", *args.compose]
+        if getattr(args, "out", None):
+            argv += ["--out", args.out]
+        if getattr(args, "columns", 2) != 2:
+            argv += ["--columns", str(args.columns)]
     return figures_cli(argv or None)
 
 
@@ -1495,7 +1668,7 @@ def cmd_start(args: argparse.Namespace) -> int:
                          global_install=getattr(args, "journal_global", False))
 
     # feat-130:start 收尾引导进流程——与 setup(一次性装依赖/建目录)划清界限:
-    # start = 每次开工的意图向导,自然衔接三种工作方式;缺依赖时才回指 setup。
+    # start = 每次开工的意图向导,自然衔接两种工作方式;缺依赖时才回指 setup。
     print()
     _start_next_step(intent, skills)
     return 0
@@ -1819,14 +1992,14 @@ def cmd_review(args: argparse.Namespace) -> int:
 # 常用命令集——`--help` 暴露**全部**命令(不隐藏);CORE_COMMANDS 仅供 `guide`/`commands`
 # 标注 ★ 常用,帮助新用户聚焦上手路径。改这个集合只影响 ★ 标注,不影响命令可见性/可用性。
 CORE_COMMANDS = {
-    "chat", "run", "auto", "start", "guide", "status", "prepare", "check",
+    "chat", "run", "start", "guide", "status", "prepare", "check",
     "config", "setup", "doctor", "resume", "commands",
 }
 
 # 职能分类(每个命令恰好出现一次;`psyclaw commands` 按此展示)。统计方法已外移到
 # 成熟库/MCP——本 CLI 只保留研究编排 + 知识参考 + 文献/写作 harness。
 COMMAND_CATEGORIES = [
-    ("三种交互入口", ["chat", "run", "auto"]),
+    ("两种工作方式", ["chat", "run"]),
     ("环境 / 系统", ["help", "guide", "status", "version", "doctor", "config", "setup",
                   "skills", "mcp", "plugins", "gates", "eval", "commands", "assist", "update",
                   "skill"]),
@@ -1834,11 +2007,11 @@ COMMAND_CATEGORIES = [
     ("量表 / 数据准备", ["score", "annotate"]),
     ("研究前规划", ["prepare", "clarify", "declare-test", "jars", "cite",
                        "cite-check", "check"]),
-    ("兼容 / 高级编排", ["repl", "agent", "auto-loop", "loop", "lit-loop", "meta-loop",
+    ("兼容 / 高级编排", ["auto", "repl", "agent", "auto-loop", "loop", "lit-loop", "meta-loop",
                       "analysis-loop", "qual-loop", "research"]),
     ("工作流 / 编排", ["goal", "plan", "tasks", "review"]),
-    ("检索 / 知识图谱", ["search", "kg", "lit", "webbridge"]),
-    ("记忆 / 消息 / IO", ["memory", "sleep", "new", "start", "session", "resume", "serve", "notify", "auth",
+    ("检索 / 知识图谱", ["search", "kg", "lit", "convert", "compile", "webbridge"]),
+    ("记忆 / 消息 / IO", ["memory", "sleep", "new", "start", "session", "resume", "handoff", "serve", "notify", "auth",
                        "export", "figures", "provenance"]),
 ]
 
@@ -1849,7 +2022,7 @@ def cmd_guide(args: argparse.Namespace) -> int:
 
 
 def _print_help() -> int:
-    """psyclaw help / guide / --help 的统一内容:三种工作方式 + 上手路径 + 命令去哪找。
+    """psyclaw help / guide / --help 的统一内容:两种工作方式 + 上手路径 + 命令去哪找。
 
     合并原 guide(工作方式/run 类型)与 help(命令去向),消除重复入口。
     """
@@ -1859,11 +2032,11 @@ def _print_help() -> int:
                    ui.ok("psyclaw start") + ui.dim("   一句话说你要做什么,系统澄清意图、"
                          "选能力、配好就绪——只需回答几个问题"),
                    color="brgreen"))
-    print(ui.panel("三种工作方式",
+    print(ui.panel("两种工作方式",
                    "\n".join([
-                       ui.ok("psyclaw") + ui.dim("                       对话:边讨论边做,关键操作确认"),
-                       ui.ok("psyclaw run analysis data.csv") + ui.dim("  运行:明确、可复现的单次流程"),
-                       ui.ok("psyclaw auto") + ui.dim("                  自动:据项目状态持续推进"),
+                       ui.ok("psyclaw") + ui.dim("                       chat: 一起做"),
+                       ui.ok("psyclaw run analysis data.csv") + ui.dim("  run: 按步骤做"),
+                       ui.ok("psyclaw run") + ui.dim("                  run: 自己推进下一步"),
                    ]),
                    color="brmagenta"))
     print(ui.panel("Run 类型",
@@ -1923,17 +2096,19 @@ def build_parser() -> argparse.ArgumentParser:
                    help="副作用审批:ask(默认)|auto;suggest 为 ask 的兼容名")
     sub = p.add_subparsers(dest="command")
 
-    pchat = sub.add_parser("chat", help="对话模式:边讨论边推进,工具按需使用并保留审批")
+    pchat = sub.add_parser("chat", help="一起做:边聊边推进")
     pchat.add_argument("--resume", nargs="?", const="__latest__", default=None,
                        help="续接指定会话 ID;不带 ID 续接最近会话")
     pchat.set_defaults(func=cmd_chat)
 
-    prun = sub.add_parser("run", help="运行模式:执行明确、可复现的一次研究流程")
-    prun.add_argument("kind", help="流程类型:analysis|meta|literature|qualitative")
+    prun = sub.add_parser("run", help="按步骤做:执行一条研究流程")
+    prun.add_argument("kind", nargs="?", help="流程类型:analysis|meta|literature|qualitative；留空=自己推进")
     prun.add_argument("target", nargs="*", help="数据路径、转录目录或综述主题")
     prun.add_argument("--topic", default=None, help="为数据型流程另设研究主题")
     prun.add_argument("--confirm-each", action="store_true",
                       help="每个步骤完成后确认;默认连续执行")
+    prun.add_argument("--max-iters", dest="max_iters", type=int, default=6,
+                      help="自动推进的迭代上限(仅留空类型时生效;默认 6)")
     prun.add_argument("--exploratory", action="store_true",
                       help="允许跳过未完成的前置检查并留痕;产出明确标为探索性")
     prun.add_argument("--resume", action="store_true",
@@ -1945,7 +2120,7 @@ def build_parser() -> argparse.ArgumentParser:
     prun.add_argument("--rounds", type=int, default=3, help=argparse.SUPPRESS)
     prun.set_defaults(func=cmd_run)
 
-    pauto = sub.add_parser("auto", help="自动模式:据项目状态持续派发流程、验收并记录状态")
+    pauto = sub.add_parser("auto", help="自己推进:根据项目状态继续下一步")
     pauto.add_argument("--max-iters", dest="max_iters", type=int, default=6,
                        help="迭代上限(默认 6)")
     pauto.add_argument("--confirm-each", action="store_true",
@@ -2053,6 +2228,19 @@ def build_parser() -> argparse.ArgumentParser:
                      help="同步带 upstream.json 的内置 skill。可指定名称,如 ctx2skill/opid")
     pks.add_argument("--dry-run", action="store_true",
                      help="配合 --sync 只显示将执行的同步动作")
+    pks.add_argument("--packs", action="store_true", help="列出系统领域 Skill 包及安装/启用状态")
+    pks.add_argument("--pack-install", metavar="PACK", help="一键安装并启用领域包")
+    pks.add_argument("--pack-update", metavar="PACK", help="同步更新已安装领域包")
+    pks.add_argument("--pack-enable", metavar="PACK", help="启用领域包")
+    pks.add_argument("--pack-disable", metavar="PACK", help="停用领域包但保留文件")
+    pks.add_argument("--pack-catalog-sync", action="store_true", help="同步官方领域包目录")
+    pks.add_argument("--catalog-url", default=None, help="自定义 HTTPS pack catalog 地址")
+    pks.add_argument("--enable", metavar="SKILL", help="启用单个 Skill")
+    pks.add_argument("--disable", metavar="SKILL", help="停用单个 Skill")
+    pks.add_argument("--select-source", nargs=2, metavar=("SKILL", "PATH"),
+                     help="同名 Skill 冲突时选择要启用的来源")
+    pks.add_argument("--scope", choices=["global", "project"], default="global",
+                     help="启停状态作用域(默认 global；project 覆盖 global)")
     pks.set_defaults(func=cmd_skills)
     pmcp = sub.add_parser("mcp", help="MCP 目录 / 以 stdio 服务器身份运行内置 MCP")
     pmcp.add_argument("--serve", dest="name",
@@ -2162,6 +2350,45 @@ def build_parser() -> argparse.ArgumentParser:
              "xinlixuebao(心理学报) / xinlikexue(心理科学)",
     )
     pex.set_defaults(func=cmd_export)
+
+    pconv = sub.add_parser("convert", help="统一资料转换为 Markdown 并保留 SHA-256 审计")
+    pconv.add_argument("file", nargs="?", help="输入资料(.md/.txt/.html/.csv/.json，其他格式需 MarkItDown)")
+    pconv.add_argument("--url", default=None, help="视频 URL(YouTube/Bilibili；字幕优先，失败明确标记 partial)")
+    pconv.add_argument("--out", default=None, help="Markdown 输出路径")
+    pconv.set_defaults(func=cmd_convert)
+
+    pcompile = sub.add_parser(
+        "compile",
+        help="把资料目录编译成可导航 INDEX.md、证据清单和 staged SKILL.md",
+    )
+    pcompile.add_argument("source", nargs="?", help="资料目录(递归读取 md/txt/html/csv/tsv/json及可选复杂格式)")
+    pcompile.add_argument("--out", default="notes/compiled-skill",
+                          help="编译产物目录(默认 notes/compiled-skill)")
+    pcompile.add_argument("--name", default="Compiled Research Skill",
+                          help="Skill 名称")
+    pcompile.add_argument("--bundle", default=None, help="已有 Skill 编译目录(用于 --validate/--promote)")
+    pcompile.add_argument("--validate", choices=["known", "forward", "contrast", "boundary"],
+                          help="记录一类验证结果")
+    pcompile.add_argument("--passed", action="store_true", help="将验证标记为通过")
+    pcompile.add_argument("--evidence", action="append", default=[], help="验证证据路径(可重复)")
+    pcompile.add_argument("--notes", default="", help="验证备注")
+    pcompile.add_argument("--promote", action="store_true", help="四类验证通过后晋升 Skill")
+    pcompile.add_argument("--reviewer", default="human", help="晋升审核者")
+    pcompile.add_argument("--claim", default=None, help="向已有 bundle 追加 Claim")
+    pcompile.add_argument("--claim-source", default="", help="Claim 来源标识")
+    pcompile.add_argument("--claim-locator", default="", help="Claim 在来源中的定位")
+    pcompile.add_argument("--claim-status", choices=["verified", "unverified", "inferred", "unknown"],
+                          default="unverified", help="Claim 证据状态(默认 unverified)")
+    pcompile.set_defaults(func=cmd_compile)
+
+    phandoff = sub.add_parser("handoff", help="写入可验证的跨会话 HANDOFF.md 和 JSON 清单")
+    phandoff.add_argument("--project", default=".", help="项目目录")
+    phandoff.add_argument("--goal", required=True, help="当前总目标")
+    phandoff.add_argument("--next-step", action="append", default=[], help="下一步(可重复)")
+    phandoff.add_argument("--completed", action="append", default=[], help="已完成项(可重复)")
+    phandoff.add_argument("--blocker", action="append", default=[], help="阻塞项(可重复)")
+    phandoff.add_argument("--out", default=None, help="HANDOFF.md 输出路径")
+    phandoff.set_defaults(func=cmd_handoff)
 
 
     pjars = sub.add_parser(
@@ -2319,6 +2546,10 @@ def build_parser() -> argparse.ArgumentParser:
                       help="对图表 sidecar JSON 跑 FIG.honest 诚实性核查")
     pfig.add_argument("--palette", type=int, default=0, metavar="N",
                       help="打印 Okabe-Ito 调色板前 N 色(默认 8)")
+    pfig.add_argument("--compose", nargs="+", metavar="FIGURE",
+                      help="将已有 PNG/JPG 组装成多面板图")
+    pfig.add_argument("--out", default="figures/composed.png", help="组图输出路径")
+    pfig.add_argument("--columns", type=int, default=2, help="组图列数")
     pfig.set_defaults(func=cmd_figures)
 
     plit = sub.add_parser("lit", help="文献检索 + 全文获取(合法 OA;PRISMA 计数)")
@@ -2406,7 +2637,7 @@ def build_parser() -> argparse.ArgumentParser:
     pwb.set_defaults(func=cmd_webbridge)
 
     sub.add_parser(
-        "help", help="上手介绍 + 命令去向(= guide;三种工作方式/run 类型/常用命令)"
+        "help", help="上手介绍 + 命令去向(= guide;两种工作方式/run 类型/常用命令)"
     ).set_defaults(func=cmd_guide)
     sub.add_parser(
         "guide", help="上手介绍(help 的别名)"
@@ -2425,7 +2656,7 @@ def build_parser() -> argparse.ArgumentParser:
             n_all = len(action.choices)
             action._choices_actions = [
                 ca for ca in action._choices_actions if ca.dest in CORE_COMMANDS]
-            action.metavar = "{chat,run,auto,...}"
+            action.metavar = "{chat,run,...}"
             p.epilog = (f"--help 只列 {len(action._choices_actions)} 条常用命令;"
                         f"全部 {n_all} 条(均可直接用)见 `psyclaw commands`。"
                         "第一次用?`psyclaw guide`;手把手教程 docs/TUTORIAL.md。")

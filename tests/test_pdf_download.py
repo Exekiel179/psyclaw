@@ -87,6 +87,17 @@ def test_download_pdf_saves_named_file(tmp_path, pdf_server):
     from pathlib import Path
     fp = Path(r["path"])
     assert fp.name == "Lee_2021_A-real-study.pdf" and fp.read_bytes().startswith(b"%PDF")
+    assert r["sha256"] == LS.pdf_sha256(str(fp))
+    assert Path(r["audit"]).exists()
+
+
+def test_download_pdf_deduplicates_identical_content(tmp_path, pdf_server):
+    paper = {"title": "Same study", "authors": ["Kim Lee"], "year": 2021}
+    first = LS.download_pdf(f"{pdf_server}/real.pdf", str(tmp_path), paper)
+    second = LS.download_pdf(f"{pdf_server}/real.pdf", str(tmp_path), paper)
+    assert first["ok"] and second["ok"] and second["duplicate"] is True
+    assert first["path"] == second["path"]
+    assert len(list(tmp_path.glob("*.pdf"))) == 1
 
 
 def test_download_rejects_landing_page_honestly(tmp_path, pdf_server):

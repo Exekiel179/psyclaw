@@ -317,6 +317,77 @@ def case_toolloop_discipline(tmp: Path) -> list[dict]:  # noqa: ARG001
 
 
 # ---------------------------------------------------------------------------
+# 用例 7:交付与入口 —— DOCX 契约、资料转换、两入口不分叉
+# ---------------------------------------------------------------------------
+
+def case_delivery_contract(tmp: Path) -> list[dict]:
+    """Exercise the artifact surface without Word, a model, or network access."""
+    from psyclaw.materials import convert_to_markdown
+    from psyclaw.knowledge_compile import compile_materials, promote_compiled_skill
+    from psyclaw.handoff import write_handoff
+    from psyclaw.modes import RUN_TYPES, normalize_run_type
+    from psyclaw.output.apa7 import APA7Document
+    from psyclaw.output.docx_contract import inspect_docx
+    from psyclaw.toolloop import build_tools
+
+    checks: list[dict] = []
+    doc = APA7Document(title="稳定样稿", authors="Li, M.", affiliation="PsyClaw")
+    doc.set_abstract("含有 **粗体** 和 *斜体* 的中文摘要。", keywords=["fixture"])
+    doc.add_heading("方法", 1)
+    doc.add_heading("参与者", 2)
+    doc.add_heading("材料", 3)
+    doc.add_paragraph_with_footnote("正文。", "脚注来源说明。")
+    doc.add_stat_table("Table 1", ["变量", "M"], [["焦虑", "3.20"]])
+    doc.add_reference("Li, M. (2026). *Stable fixture*. Journal, 1, 1-2.")
+    left, right = tmp / "fixture-a.docx", tmp / "fixture-b.docx"
+    doc.to_docx(left)
+    doc.to_docx(right)
+    a, b = inspect_docx(left), inspect_docx(right)
+    checks.append(_check("DOCX:结构契约通过", a["ok"], "; ".join(a["errors"])))
+    checks.append(_check("DOCX:连续导出字节稳定", a.get("sha256") == b.get("sha256")))
+
+    csv_path = tmp / "materials.csv"
+    _write_csv(csv_path, ["id", "score"], [["1", "3"]])
+    converted = convert_to_markdown(csv_path)
+    checks.append(_check("资料转换:Markdown 与 SHA-256 审计均落盘",
+                         converted.get("ok") and Path(converted["output"]).is_file()
+                         and Path(converted["sidecar"]).is_file(), str(converted)))
+    source_dir = tmp / "source-materials"
+    source_dir.mkdir()
+    (source_dir / "notes.md").write_text("# Evidence\n\nA staged claim.\n", encoding="utf-8")
+    bundle = tmp / "compiled-skill"
+    compiled = compile_materials(source_dir, bundle, skill_name="Eval Skill")
+    checks.append(_check("资料编译:索引、manifest、账本与 staged Skill 均落盘",
+                         compiled.get("ok") and all((bundle / name).is_file() for name in
+                         ("INDEX.md", "manifest.json", "claims.json", "validation.json", "SKILL.md"))))
+    blocked = promote_compiled_skill(bundle, reviewer="eval")
+    checks.append(_check("Skill 晋升:无 verified claim/四类验证时 fail-closed",
+                         blocked.get("ok") is False and blocked.get("status") == "not_ready", str(blocked)))
+    handoff = write_handoff(tmp, goal="Continue", next_steps=["Review claims"],
+                            generated_at="2026-08-07T00:00:00+00:00")
+    checks.append(_check("会话交接:Markdown 与可重放 JSON 同时落盘",
+                         Path(handoff["path"]).is_file() and Path(handoff["sidecar"]).is_file()))
+    agent_tools = build_tools(str(tmp))
+    native = {"academic_orchestrate", "material_convert", "material_compile", "skill_claim_record", "skill_validate",
+              "skill_promote", "skill_bundle_status", "session_handoff_write", "figure_compose",
+              "skill_search", "skill_get", "skill_categories", "skill_registry_rebuild"}
+    checks.append(_check("Agent 工具面:学术能力原生注册且不暴露重复 CLI 包装",
+                         native <= set(agent_tools)
+                         and not ({"convert", "compile", "handoff", "figures"} & set(agent_tools))))
+    planned = json.loads(agent_tools["academic_orchestrate"]["run"]({
+        "task": "蒸馏导师材料", "execute": False
+    }))
+    checks.append(_check("Agent 编排:先路由并生成停止条件，不直接宣称完成",
+                         planned.get("status") == "planned"
+                         and planned.get("route", {}).get("mode") == "distill"
+                         and any(s.get("stop_if") for s in planned.get("steps", []))))
+    checks.append(_check("入口路由:只公开四种明确 workflow",
+                         RUN_TYPES == ("analysis", "meta", "literature", "qualitative")
+                         and normalize_run_type("lit") == "literature"))
+    return checks
+
+
+# ---------------------------------------------------------------------------
 # 注册表 + 运行器
 # ---------------------------------------------------------------------------
 
@@ -333,6 +404,8 @@ CASES: dict = {
                        "错误自学习:三类蒸馏;ok 输出不误学;去重"),
     "toolloop_discipline": (case_toolloop_discipline,
                             "toolloop:失败回灌教训;重复止损;副作用需批准"),
+    "delivery_contract": (case_delivery_contract,
+                          "交付:确定性 DOCX、资料编译/交接审计、两入口路由"),
 }
 
 
