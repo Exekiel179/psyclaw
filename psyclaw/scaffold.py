@@ -94,8 +94,8 @@ def _analysis_readme(name: str, goal: str = "") -> str:
     goal_line = f"\n> 研究目标:{goal}\n" if goal else ""
     return f"""# {name}
 {goal_line}
-研究分析工作目录。三种工作方式:**chat**(边聊边做,最自由)· **run**(跑通某类
-明确流程)· **auto**(按状态自动巡航)。不确定先做什么就 `psyclaw start` 走意图向导,
+研究分析工作目录。记住两句话：**chat**(一起做)· **run**(按步骤做，或自己推进)。
+不确定先做什么就 `psyclaw start` 走意图向导,
 或直接 `psyclaw` 对话说你要做什么。
 
 ## 目录怎么放(产物各归其位)

@@ -5,11 +5,31 @@
 """
 from __future__ import annotations
 
+import pytest
+import subprocess
+from pathlib import Path
+
 from psyclaw.psych.method_skills import (
     list_method_skills,
     match_method_skill,
     skill_procedure,
 )
+
+
+def _git_runner(args, **_kwargs):
+    if args[:2] == ["git", "clone"]:
+        (Path(args[-1]) / ".git").mkdir(parents=True)
+    return subprocess.CompletedProcess(args, 0, "", "")
+
+
+@pytest.fixture(autouse=True)
+def enabled_research_design_pack(tmp_path, monkeypatch):
+    """Method routing requires its domain pack, never an implicit default."""
+    home = tmp_path / "home"
+    monkeypatch.setattr("pathlib.Path.home", lambda: home)
+    monkeypatch.chdir(tmp_path)
+    from psyclaw.skills.packs import install_pack
+    assert install_pack("research-design", project_dir=str(tmp_path), runner=_git_runner)["ok"]
 
 
 def test_lists_the_two_method_skills():

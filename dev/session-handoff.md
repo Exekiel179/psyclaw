@@ -4,8 +4,12 @@
 
 ## Current Objective
 
-- Goal: cite/scale/method 三命令重定位 + 发行自检 → 已打包 **v0.15.0**
-- Current status: **feat-161~165 全 done**——160 个 feature 全 done,无未完成项;
+- Goal: 依据 `progress-2026-08-05-academic-ai-skill.md` 完成下一阶段交付、入口与开源复用代办。
+- Current status: DOCX 契约/稳定 fixture、资料转换中间层、PDF SHA-256 去重审计、
+  Claim-Evidence 账本和 evidence-first Skill 蒸馏记录均已落地；`session-handoff` 已从
+  v0.15.0 的旧状态更新。全量测试 2241 passed、gates 通过、eval 32/32；完整多页
+  PDF/PNG 视觉回归脚本已就绪，当前环境的实际渲染降级为 Quick Look 首页。
+- Historical release state: **feat-161~165 全 done**——160 个 feature 全 done,无未完成项;
   tag **v0.15.0** 已打(本地未推送——push 到 master 属危险操作,留用户定夺)
 - Branch / commit: master 本地;本轮 commits 4d59eb8→12093ab;release=12093ab
 - Verification: 全量 `uv run --python 3.12 --with pytest python -m pytest -q`

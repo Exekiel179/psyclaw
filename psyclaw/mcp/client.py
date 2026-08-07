@@ -16,6 +16,7 @@ tools/call。PsyClaw 的 agent 循环(feat-040)据此把外部 MCP 工具并进�
 from __future__ import annotations
 
 import json
+import os
 import queue
 import shlex
 import subprocess
@@ -24,6 +25,8 @@ import threading
 
 _DEFAULT_TIMEOUT = 30.0
 PROTOCOL_VERSION = "2024-11-05"
+_SAFE_ENV_KEYS = frozenset({"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP",
+                            "SystemRoot", "WINDIR", "USER", "LOGNAME"})
 
 
 def resolve_command(command: str) -> list[str]:
@@ -41,9 +44,12 @@ def resolve_command(command: str) -> list[str]:
 class MCPClient:
     """一个 MCP 服务器子进程的会话。惰性:__init__ 不起进程,start()/首个调用才起。"""
 
-    def __init__(self, command: str, timeout: float = _DEFAULT_TIMEOUT) -> None:
+    def __init__(self, command: str, timeout: float = _DEFAULT_TIMEOUT,
+                 env: dict[str, str] | None = None, cwd: str | None = None) -> None:
         self.command = command
         self.timeout = timeout
+        self.env = dict(env or {})
+        self.cwd = cwd or None
         self._proc: subprocess.Popen | None = None
         self._q: queue.Queue = queue.Queue()
         self._reader: threading.Thread | None = None
@@ -71,6 +77,11 @@ class MCPClient:
             self._proc = subprocess.Popen(
                 argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL, text=True, encoding="utf-8", bufsize=1,
+                # Do not expose unrelated API/cloud credentials to an MCP
+                # server. Its declared env is explicit; common runtime paths
+                # are the only inherited baseline.
+                env={**{k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}, **self.env},
+                cwd=self.cwd,
             )
         except OSError as exc:
             self._start_error = f"MCP 启动失败:{exc}"

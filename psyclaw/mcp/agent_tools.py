@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import atexit
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -33,12 +34,17 @@ _clients: dict = {}             # command -> MCPClient(进程级复用)
 _refreshed: set[str] = set()    # 本进程内已回填过缓存的 command
 
 
-def _get_client(command: str):
+def _get_client(command: str, runtime_env: dict | None = None, runtime_cwd: str = ""):
     from psyclaw.mcp.client import MCPClient
-    c = _clients.get(command)
+    env = {str(k): str(v) for k, v in (runtime_env or {}).items()}
+    identity = command
+    if env or runtime_cwd:
+        material = json.dumps({"env": env, "cwd": runtime_cwd}, sort_keys=True).encode()
+        identity = f"{command}\0{hashlib.sha256(material).hexdigest()}"
+    c = _clients.get(identity)
     if c is None:
-        c = MCPClient(command, timeout=_MERGE_TIMEOUT)
-        _clients[command] = c
+        c = MCPClient(command, timeout=_MERGE_TIMEOUT, env=env, cwd=runtime_cwd or None)
+        _clients[identity] = c
     return c
 
 
@@ -110,14 +116,16 @@ def _provides_names(raw) -> list[str]:
 
 
 def _register_lazy(tools: dict, server: str, command: str, meta: dict,
-                   project_dir: str) -> None:
+                   project_dir: str, runtime_env: dict | None = None,
+                   runtime_cwd: str = "") -> None:
     tname = meta.get("name", "")
     if not tname:
         return
     desc = f"[MCP:{server}] {meta.get('description', '')}".strip()
 
-    def _run(a, _cmd=command, _t=tname, _pd=project_dir):
-        client = _get_client(_cmd)
+    def _run(a, _cmd=command, _t=tname, _pd=project_dir,
+             _env=runtime_env, _cwd=runtime_cwd):
+        client = _get_client(_cmd, _env, _cwd) if (_env or _cwd) else _get_client(_cmd)
         client.timeout = max(client.timeout, _CALL_TIMEOUT)
         out = client.call_tool(_t, a)
         _refresh_cache_once(_pd, _cmd, client)
@@ -134,18 +142,23 @@ def merge_mcp_tools(tools: dict, project_dir: str = ".") -> None:
         return
     try:
         from psyclaw.mcp.manager import list_mcp_catalog_with_health
-        catalog = list_mcp_catalog_with_health(project_dir)
+        try:
+            catalog = list_mcp_catalog_with_health(project_dir, include_runtime=True)
+        except TypeError:  # test/third-party compatibility with the older callable
+            catalog = list_mcp_catalog_with_health(project_dir)
     except Exception:  # noqa: BLE001
         return
     lazy = _lazy_enabled()
     cache = _load_tool_cache(project_dir) if lazy else {}
     for entry in catalog:
-        command = entry.get("command") or ""
+        command = entry.get("_runtime_command") or entry.get("command") or ""
         if not (entry.get("enabled") and command):
             continue
         if not (entry.get("health") or {}).get("ok"):
             continue
         server = entry.get("name", "?")
+        runtime_env = entry.get("_runtime_env") or {}
+        runtime_cwd = str(entry.get("_runtime_cwd") or "")
 
         if lazy:
             metas = cache.get(command)
@@ -160,12 +173,14 @@ def merge_mcp_tools(tools: dict, project_dir: str = ".") -> None:
                          for n in names]
             if metas:
                 for m in metas:
-                    _register_lazy(tools, server, command, m, project_dir)
+                    _register_lazy(tools, server, command, m, project_dir,
+                                   runtime_env, runtime_cwd)
                 continue
 
         # eager 老路径:无缓存也无 provides(或 PSYCLAW_MCP_LAZY=0)
         try:
-            client = _get_client(command)
+            client = (_get_client(command, runtime_env, runtime_cwd)
+                      if (runtime_env or runtime_cwd) else _get_client(command))
             mcp_tools = client.list_tools()
         except Exception:  # noqa: BLE001
             continue

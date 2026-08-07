@@ -229,19 +229,30 @@ def skills_catalog(project_dir: str = ".") -> str:
     空串(系统提示零污染)。
     """
     try:
-        skills = list_skills(project_dir, include_external=False)
+        # Keep loader discovery as the failure boundary; Registry only enriches
+        # accepted SKILL.md files with categories and retrieval metadata.
+        discovered = list_skills(project_dir, include_external=False)
+        from psyclaw.skills.registry import build_registry, skill_categories
+        registry = build_registry(project_dir, include_external=False, skills=discovered)
+        # The system prompt is a catalog, not an execution grant: include
+        # installed/available metadata while disabled Skills remain unloaded.
+        skills = [s for s in registry.get("skills", []) if s.get("selected", True)]
     except Exception:  # noqa: BLE001 — 发现失败不污染系统提示
         return ""
     if not skills:
         return ""
-    lines = ["\n# 内置 skill(结构化能力,按其流程办事胜过裸输出——命中场景就调用,别忽略)"]
+    categories = skill_categories(project_dir=project_dir, registry=registry, include_disabled=True)
+    summary = " · ".join(f"{item['category']}:{item['count']}" for item in categories)
+    lines = ["\n# Skill 检索目录(先按任务调用 skill_search，再用 skill_get 读取详情)",
+             f"分类:{summary}",
+             f"同名查重:{len(registry.get('duplicates', []))} 组（需要时调用 skill_duplicates）"]
     for s in sorted(skills, key=lambda x: x.get("name", "")):
         name = s.get("name", "")
         desc = (s.get("description") or "").strip().replace("\n", " ")
         if len(desc) > 64:
             desc = desc[:64] + "…"
         lines.append(f"- {name}:{desc}")
-    lines.append("调用方式:读对应 SKILL.md 按其步骤执行;`psyclaw skills` 或 `method <关键词>` 可路由。")
+    lines.append("列表仅为摘要；需要时读取对应 SKILL.md。Skill 是 Agent 指令，不是 Python 可执行插件；没有检索命中时不要编造 Skill。")
     return "\n".join(lines)
 
 

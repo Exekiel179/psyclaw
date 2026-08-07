@@ -2,8 +2,35 @@
 
 ## Current State
 
-**Last Updated:** 2026-07-18(cite/scale/method 重定位三部曲 feat-161~164 done:
-统计全外移,harness 层做编排/格式化/skill 路由)
+**Last Updated:** 2026-08-06(academic-ai-skill 后续待办实现中；统计仍全外移，
+harness 层新增可验收的 DOCX/资料/证据账本能力)
+
+## 本轮:academic-ai-skill 交付闭环
+
+- Word 稳定性：APA7 导出固定 ZIP 元数据与条目顺序，连续导出可做字节哈希回归；
+  新增 `output/docx_contract.py`，检查 OOXML parts、段落样式、固定 DXA 表格几何、
+  不拆分行与真实 footnote part；fixture 覆盖中英文、标题层级、粗斜体、表格、脚注、
+  参考文献和分页。渲染以 Quick Look 做首页抽查；LibreOffice/pdf2image 不在当前环境，
+  PDF 多页视觉 diff 作为环境补齐后的 CI 扩展项。
+- 入口心智模型：公开只保留 `chat/run`；`modes.py` 继续作为单一路由，README/教程补最小真实案例，
+  离线 eval 覆盖公开 workflow 集合，避免三套近似执行逻辑回流。
+- 开源复用：新增 `materials.py` 和 `psyclaw convert`，常见格式走 stdlib，复杂格式显式
+  接可选 MarkItDown；PDF 下载按 SHA-256 去重并写 `pdf_audit.json`；
+  `evidence.py` 提供统一 Claim-Evidence 账本，`skill_distill.py` 强制候选→复现→人工晋升。
+  依赖选择、许可证/维护状态、替代与退出路径记录在 `docs/OPEN_SOURCE_REUSE.md`。
+- Agent 评估：`delivery_contract` 纳入 `psyclaw eval`，覆盖 DOCX 契约/连续输出、转换审计与
+  两入口路由；现有 eval 继续覆盖工具循环、质量门和错误恢复。
+
+**本轮验证证据（2026-08-06）**：
+`uv run --python 3.12 --with pytest python -m pytest -q` → **2241 passed**；
+`uv run --python 3.12 python -m psyclaw gates` → 22 条规则解析、自检通过；
+`uv run --python 3.12 python -m psyclaw eval` → **32/32**；
+`git diff --check` → 通过。DOCX fixture 还用 macOS Quick Look 做了首页图像抽查；
+完整多页 PDF/PNG 需要 LibreOffice + Poppler，`scripts/verify_docx.py` 已提供该 CI 路径，
+当前机器仅能证明 `coverage=first_page`，没有把缩略图结果冒充全页视觉验收。
+
+**入口进一步合并（同日）**：公开心智模型收敛为两个入口——`chat` 一起做、`run` 交给它做。
+`run <类型>` 按步骤执行，裸 `run` 自动继续下一步；旧 `auto` 仅作为兼容命令保留。
 
 ## 本轮:cite/scale/method 重定位三部曲(feat-161~164)
 

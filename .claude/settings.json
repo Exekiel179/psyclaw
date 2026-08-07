@@ -59,5 +59,8 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "pingouin-psych-stats@pingouin-stats": true
   }
 }

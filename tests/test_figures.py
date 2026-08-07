@@ -25,6 +25,12 @@ from psyclaw.gates.checker import (  # noqa: E402
 )
 
 
+def test_compose_figures_missing_is_explicit(tmp_path):
+    from psyclaw.figures import compose_figures
+    result = compose_figures([tmp_path / "missing.png"], tmp_path / "out.png")
+    assert result["ok"] is False and result["status"] == "missing"
+
+
 # ---------------------------------------------------------------------------
 # Okabe-Ito 调色板
 # ---------------------------------------------------------------------------

@@ -82,7 +82,12 @@ def recommend_skills(research_type: str, skills: list[dict] | None = None,
     rt = normalize_type(research_type)
     if rt is None:
         return []
-    pool = skills if skills is not None else list_skills(project_dir)
+    if skills is not None:
+        pool = skills
+    else:
+        from psyclaw.skills.registry import build_registry
+        pool = [s for s in build_registry(project_dir).get("skills", [])
+                if s.get("selected", True) and s.get("enabled", True)]
     if external_only:
         pool = [s for s in pool if s.get("source") != "bundled"]
     kws = RESEARCH_TYPE_KEYWORDS[rt]

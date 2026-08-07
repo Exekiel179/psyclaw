@@ -1,7 +1,8 @@
-"""三种公开交互模式的共享路由:chat / run / auto。
+"""两种公开交互模式的共享路由:chat / run。
 
 本模块只把稳定的用户意图映射到既有引擎,不承载研究或统计逻辑。旧的
-agent/loop/*-loop/auto-loop 命令继续作为兼容入口,但不再构成用户心智模型。
+agent/loop/*-loop/auto-loop 命令继续作为兼容入口；裸 run 复用 auto-loop 的
+自动推进能力,但 auto 不再构成用户心智模型。
 """
 
 from __future__ import annotations

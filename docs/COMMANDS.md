@@ -8,17 +8,22 @@
 
 ---
 
-## 命令总览(56 条;默认帮助只突出 3 种交互入口与基础命令)
+## 命令总览(含 `convert`；默认帮助只突出 3 种交互入口与基础命令)
 
-> 三种工作方式:`psyclaw`(chat 对话)· `psyclaw run <类型>`(明确流程)·
-> `psyclaw auto`(持续推进)。旧 `agent/loop/*-loop/auto-loop` 保持兼容,不再是主入口。
+本页是人工操作/调试地图。Agent 通过 `toolloop.build_tools()` 调用对应原生工具，不需要生成 shell
+命令；资料编译、Skill 晋升、交接和组图分别使用 `material_*`、`skill_*`、
+`session_handoff_write`、`figure_compose`。
+
+> 两种工作方式：`chat` 一起做 · `run` 交给它做。
+> `run <类型> <目标>` 按步骤执行；`run` 不带类型则自动继续下一步。
+> 旧 `auto` / `agent` / `loop` 命令保持兼容,不再是主入口。
 
 ### 环境 / 系统
 | 命令 | 作用 |
 |---|---|
-| `chat` / 缺省 `psyclaw` | 对话模式:边讨论边推进,工具按需使用并保留审批 |
-| `run <类型> <目标>` | 运行模式:`analysis/meta/literature/qualitative`;默认连续执行 |
-| `auto` | 自动模式:感知项目状态→派发流程→验收→记录→继续;强制检查未通过时暂停 |
+| `chat` / 缺省 `psyclaw` | 一起做：边聊边推进 |
+| `run <类型> <目标>` | 交给它做：按步骤执行一条流程 |
+| `run`（不带类型） | 交给它做：根据项目状态继续下一步 |
 | `repl` | `chat` 的兼容别名 |
 | `version` / `doctor` | 版本 / 环境自检(配置·MCP·质量检查) |
 | `config` | 配置向导(API key/模型/环境变量) |
@@ -74,7 +79,7 @@
 `--resume` 从 `.psyclaw/workflows/<流程>.json` 的最后成功步骤继续。恢复时目标、输入和已有产物必须一致。
 
 兼容命令:`agent`、`loop`、`research`、`lit-loop`、`meta-loop`、`analysis-loop`、
-`qual-loop`、`auto-loop`。它们继续可调用,但新脚本与文档应使用 `run` / `auto`。
+`qual-loop`、`auto-loop`。它们继续可调用,但新脚本与文档应使用 `chat` / `run`。
 
 ### 工作流 / 编排
 | 命令 | 作用 |
@@ -93,6 +98,10 @@
 | `lit <主题> --plan` | 检索计划包:中英布尔检索式+公开API路线+机构库浏览器桥接分步提示词+纳入/排除标准(检索前声明) |
 | `lit --import <结果表>` | 导入机构库桥接检索结果(Markdown 表/CSV)并入语料,PRISMA 留痕 |
 | `lit [主题] --matrix` | 从检索语料生成文献矩阵骨架(「待核查/全文未获取」约定;键与 cite-check 语料同源) |
+| `convert <资料>` | 统一资料转换为 Markdown；保留源文件/输出 SHA-256 和可重放审计 sidecar |
+| `convert --url <视频>` | 视频资料路由：yt-dlp 元数据 + 字幕优先；无字幕明确返回 `partial` |
+| `compile <目录>` | 资料目录编译为 `INDEX.md`、逐文件材料、`manifest.json`、Claim-Evidence 账本与 staged/v0 `SKILL.md`；配合 `--claim`、`--validate`、`--promote` 完成 v3 晋升 |
+| `handoff --goal <目标>` | 写入可验证的 `HANDOFF.md` 与 JSON 清单，供下一会话核对后续步骤 |
 | `start [--intent X] [--sandbox]` | 启动向导:澄清意图→路由 skill→询问是否启用沙箱→按 skill 能力配最小权限策略 |
 | `webbridge [install\|status\|start]` | Kimi WebBridge:驱动你已登录的**真实浏览器**(默认浏览器识别+扩展指引;/agent on 后 web__* 工具可用) |
 
@@ -106,14 +115,14 @@
 | `notify <msg>` | 推送通知(企业微信 webhook / Telegram) |
 | `auth` | 机构权限(EZProxy/LibKey)配置与认证状态自检 |
 | `export <file>` | 格式化输出(APA7 / 心理学报 / 心理科学) |
-| `figures` | 图表主题层 + FIG.honest 诚实性核查 + Okabe-Ito 调色板 |
+| `figures` | 图表主题层 + FIG.honest 诚实性核查 + Okabe-Ito 调色板；`--compose` 做确定性多面板组图 |
 | `provenance <产物>` | 复现溯源:给生成脚本/图打包 代码+环境+说明+决策轨迹(`<产物>.provenance.json`);`--journal` 按数据可得性要求收紧,`data_availability=required` 期刊强制 replication-package 声明(v0.12,声明文本可直接放进稿件) |
 
 ### Chat 斜杠命令(缺省 `psyclaw` / `psyclaw chat` 内)
 | 命令 | 作用 |
 |---|---|
 | `/run <类型> <目标>` | 在对话中调用与 CLI 相同的共享流程路由 |
-| `/auto` | 在对话中启动自主项目推进 |
+| `/run` | 在对话中执行流程；不带参数时自动继续下一步 |
 | `/goal [文本]` | 查看目标;带文本时写入 `notes/goal.md`,同时作为当前对话任务立即开始执行;目标会持续注入后续轮次,输入“继续”也不丢上下文 |
 | `/dump [--full] [路径]` | 导出当前对话为 Markdown;`--full` 连同不展示的隐藏上下文(system/当前目标/决策备忘/约定片段)一并导出;拒写 `data/raw` |
 | `/approval ask\|auto` | 副作用逐条确认或自动放行非危险操作;危险操作始终确认 |

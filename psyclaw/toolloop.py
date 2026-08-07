@@ -529,6 +529,13 @@ def build_tools(project_dir: str = ".") -> dict:
     _t("zotero_add", "把 DOI 对应文献写入你的 Zotero 文库(Crossref 取元数据;已在库则不重复添加)",
        "doi:str", _zotero_add, side_effect=True)
 
+    # 学术资料/Skill/交接/组图的原生工具。它们返回结构化 JSON，CLI 只保留人工入口。
+    try:
+        from psyclaw.academic_tools import merge_academic_tools
+        merge_academic_tools(tools, project_dir)
+    except Exception:  # noqa: BLE001
+        pass
+
     # 全部 CLI 命令自动工具化(goal:所有 cli 命令工具化)——从 argparse 自省,新命令自动覆盖。
     try:
         _register_cli_tools(tools, project_dir)
@@ -594,6 +601,7 @@ _CLI_TOOL_SKIP = {
     "repl", "chat", "setup", "doctor", "config", "update", "eval", "commands",
     "help", "guide", "resume", "mcp", "plugins", "webbridge", "auth", "assist",
     "start", "version", "status", "sleep", "init", "lit", "clarify",
+    "convert", "compile", "handoff", "figures",
 }
 _CLI_TOOL_SIDE_EFFECT = {
     # 写盘 / 改状态 / 外部副作用 → 需批准(HITL)

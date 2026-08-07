@@ -33,6 +33,16 @@ def test_to_zotero_item_maps_crossref_fields():
     assert it["DOI"] == "10.1000/x"
 
 
+def test_build_handoff_package_hashes_pdf_without_credentials(tmp_path):
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(b"%PDF-1.4 handoff")
+    out = tmp_path / "handoff.json"
+    result = z.build_handoff_package([{"doi": "10.1000/x", "path": str(pdf)}], str(out))
+    assert result["ok"] and result["credentials_included"] is False
+    assert result["items"][0]["sha256"]
+    assert "ZOTERO_API_KEY" in " ".join(result["replay"])
+
+
 def test_add_by_doi_posts_item(monkeypatch):
     _creds(monkeypatch)
     monkeypatch.setattr(z, "find_by_doi", lambda d: None)

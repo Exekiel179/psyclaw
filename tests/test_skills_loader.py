@@ -38,6 +38,13 @@ def test_discovers_project_claude_skills(tmp_path):
     assert hit[0]["category"] == "bioinformatics"
 
 
+def test_discovers_codex_and_agents_skills(tmp_path):
+    _write_skill(tmp_path / ".codex" / "skills", "codex-local")
+    _write_skill(tmp_path / ".agents" / "skills", "agents-local")
+    names = {s["name"] for s in loader.list_skills(project_dir=str(tmp_path))}
+    assert {"codex-local", "agents-local"} <= names
+
+
 def test_discovers_via_env_path(tmp_path, monkeypatch):
     root = tmp_path / "myforge"
     _write_skill(root, "af-drug-discovery", desc="Cheminformatics")
@@ -89,3 +96,25 @@ def test_external_roots_only_existing(tmp_path):
     roots = loader.external_skill_roots(str(tmp_path))
     assert any(".claude" in str(r) for r in roots)
     assert all(r.is_dir() for r in roots)
+
+
+def test_rejects_skill_symlink_outside_root(tmp_path):
+    root = tmp_path / ".codex" / "skills"
+    root.mkdir(parents=True)
+    secret = tmp_path / "secret.md"
+    secret.write_text("---\nname: leaked\n---\nPRIVATE\n", encoding="utf-8")
+    (root / "leaked").mkdir()
+    (root / "leaked" / "SKILL.md").symlink_to(secret)
+    names = {s["name"] for s in loader.list_skills(project_dir=str(tmp_path))}
+    assert "leaked" not in names
+
+
+def test_external_scope_collision_is_fail_closed(tmp_path, monkeypatch):
+    _write_skill(tmp_path / ".claude" / "skills", "same-name")
+    global_home = tmp_path / "global-home"
+    global_root = global_home / "global-skills"
+    _write_skill(global_root, "same-name")
+    monkeypatch.setattr("pathlib.Path.home", lambda: global_home)
+    monkeypatch.setenv("PSYCLAW_SKILLS_PATH", str(global_root))
+    names = {s["name"] for s in loader.list_skills(project_dir=str(tmp_path))}
+    assert "same-name" not in names

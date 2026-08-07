@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shlex
 import shutil
 import sys
 from pathlib import Path
@@ -118,8 +119,31 @@ def _adapt_browser_command(entry: dict) -> None:
         entry["command"] = f'{cmd} --executablePath "{exe}"'
 
 
+def _display_command(entry: dict) -> str:
+    """Show a host command without exposing token-like argv values."""
+    command = str(entry.get("command", ""))
+    if entry.get("origin") not in {"claude-code", "codex"}:
+        return command
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return "<invalid host command>"
+    redact_next = False
+    out = []
+    for arg in argv:
+        low = arg.lower()
+        if redact_next:
+            out.append("<redacted>")
+            redact_next = False
+            continue
+        out.append(arg)
+        if any(word in low for word in ("token", "secret", "password", "api-key", "apikey", "credential")):
+            redact_next = True
+    return shlex.join(out)
+
+
 def _all_entries(project_dir: str = ".") -> list:
-    """内置 registry + 用户目录合并(带 _scope;同名内置优先,用户重复项忽略)。"""
+    """内置、PsyClaw 用户目录和宿主配置合并；先发现者优先。"""
     entries: list = []
     seen: set[str] = set()
     for s in _parse_registry(REGISTRY):
@@ -136,6 +160,33 @@ def _all_entries(project_dir: str = ".") -> list:
             s.setdefault("origin", "user")
             seen.add(name)
             entries.append(s)
+    try:
+        from psyclaw.mcp.host_configs import discover_host_mcp_configs
+        host_entries = discover_host_mcp_configs(project_dir)
+    except Exception:  # noqa: BLE001 — 坏宿主配置不拖垮 PsyClaw 目录
+        host_entries = []
+    host_counts: dict[str, int] = {}
+    for s in host_entries:
+        host_counts[s.get("name", "?")] = host_counts.get(s.get("name", "?"), 0) + 1
+    preferred_host = os.environ.get("PSYCLAW_MCP_SOURCE_PREFERENCE", "").strip().lower()
+    for s in host_entries:
+        name = s.get("name", "?")
+        # A built-in or PsyClaw user definition owns its name. Host shadows
+        # are omitted from the callable catalog rather than shown as a second
+        # disabled copy.
+        if name in seen:
+            continue
+        preferred = host_counts.get(name, 0) > 1 and s.get("origin") == preferred_host
+        if host_counts.get(name, 0) > 1 and not preferred:
+            # Keep duplicate metadata visible, but make every ambiguous host
+            # entry non-callable. Builtins/PsyClaw definitions still remain.
+            s = dict(s)
+            s["_conflict"] = True
+            s["enable_when"] = "conflict:host"
+            entries.append(s)
+            continue
+        seen.add(name)
+        entries.append(s)
     return entries
 
 
@@ -146,6 +197,8 @@ def _is_enabled(enable_when: str) -> bool:
         return bool(os.environ.get(enable_when[4:]))
     if enable_when.startswith("detect:"):
         return shutil.which(enable_when[7:]) is not None
+    if enable_when == "trust:project":
+        return os.environ.get("PSYCLAW_TRUST_HOST_MCP", "").strip().lower() in {"1", "true", "yes"}
     return False
 
 
@@ -179,6 +232,23 @@ def health_check(entry: dict) -> dict:
             return {"ok": False, "detail": f"模块未找到: {mod_path}", "optional": optional}
         return {"ok": True, "detail": "模块就绪", "optional": optional}
 
+    # Claude Code/Codex 的 stdio 配置必须至少能解析并找到可执行文件；
+    # 不启动服务，避免 catalog 查询产生外部副作用。
+    if entry.get("origin") in {"claude-code", "codex", "cc-switch"} and command:
+        try:
+            argv = shlex.split(command)
+        except ValueError:
+            argv = []
+        if not argv:
+            return {"ok": False, "detail": "宿主 MCP command 无法解析", "optional": optional}
+        executable = Path(argv[0]).expanduser()
+        if not executable.is_absolute():
+            executable = Path(entry.get("_runtime_cwd") or ".") / executable
+        found = executable.is_file() or shutil.which(argv[0]) is not None
+        return {"ok": found,
+                "detail": "宿主 stdio 命令就绪" if found else f"宿主 MCP 可执行文件未找到:{argv[0]}",
+                "optional": optional}
+
     # env:/detect: — 条件已满足
     if ew.startswith("env:"):
         return {"ok": True, "detail": f"${ew[4:]} 已设置", "optional": optional}
@@ -202,20 +272,24 @@ def list_mcp_catalog(project_dir: str = ".") -> list:
             "enabled": _is_enabled(ew),
             "provides": s.get("provides", ""),
             "tools": s.get("tools", ""),
-            "command": s.get("command", ""),
+            "command": _display_command(s),
             "note": SERVER_NOTES.get(s.get("name", ""), ""),
+            "transport": s.get("transport", "stdio" if s.get("command") else "unknown"),
+            "config_path": s.get("config_path", ""),
+            "env_keys": s.get("env_keys", []),
+            "conflict": bool(s.get("_conflict", False)),
         })
     return out
 
 
-def list_mcp_catalog_with_health(project_dir: str = ".") -> list:
-    """读取目录(内置 + 用户)并包含实时健康检查结果(含 origin/scope 归属字段)。"""
+def list_mcp_catalog_with_health(project_dir: str = ".", *, include_runtime: bool = False) -> list:
+    """读取目录并附健康状态；默认绝不返回宿主配置中的环境变量值。"""
     out = []
     for s in _all_entries(project_dir):
         ew = s.get("enable_when", "always")
         enabled = _is_enabled(ew)
         h = health_check(s)
-        out.append({
+        item = {
             "name": s.get("name", "?"),
             "category": s.get("category", "?"),
             "origin": s.get("origin", "builtin"),
@@ -224,10 +298,19 @@ def list_mcp_catalog_with_health(project_dir: str = ".") -> list:
             "enabled": enabled,
             "provides": s.get("provides", ""),
             "tools": s.get("tools", ""),
-            "command": s.get("command", ""),
+            "command": _display_command(s),
             "note": SERVER_NOTES.get(s.get("name", ""), ""),
+            "transport": s.get("transport", "stdio" if s.get("command") else "unknown"),
+            "config_path": s.get("config_path", ""),
+            "env_keys": s.get("env_keys", []),
+            "conflict": bool(s.get("_conflict", False)),
             "health": h,
-        })
+        }
+        if include_runtime:
+            item["_runtime_env"] = s.get("_runtime_env", {})
+            item["_runtime_cwd"] = s.get("_runtime_cwd", "")
+            item["_runtime_command"] = s.get("command", "")
+        out.append(item)
     return out
 
 

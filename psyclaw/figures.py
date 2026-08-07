@@ -17,6 +17,8 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import json
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -369,6 +371,57 @@ def write_figure_sidecar(
     return p
 
 
+def compose_figures(inputs: list[str | Path], output: str | Path, *, columns: int = 2,
+                    labels: bool = True, gap: int = 24) -> dict[str, Any]:
+    """Compose existing raster figures into a deterministic labeled grid."""
+    if not inputs:
+        return {"ok": False, "status": "empty", "note": "至少需要一张图"}
+    paths = [Path(p) for p in inputs]
+    missing = [str(p) for p in paths if not p.is_file()]
+    if missing:
+        return {"ok": False, "status": "missing", "missing": missing}
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError:
+        return {"ok": False, "status": "dependency_missing", "note": "组图需要可选依赖 Pillow"}
+    columns = max(1, int(columns))
+    gap = max(0, int(gap))
+    images = [Image.open(p).convert("RGB") for p in paths]
+    cell_w = max(im.width for im in images)
+    cell_h = max(im.height for im in images)
+    rows = (len(images) + columns - 1) // columns
+    label_h = 28 if labels else 0
+    canvas = Image.new("RGB", (columns * cell_w + (columns + 1) * gap,
+                                rows * (cell_h + label_h) + (rows + 1) * gap), "white")
+    draw = ImageDraw.Draw(canvas)
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", 18)
+    except OSError:
+        font = ImageFont.load_default()
+    for idx, (path, image) in enumerate(zip(paths, images)):
+        row, col = divmod(idx, columns)
+        x = gap + col * (cell_w + gap) + (cell_w - image.width) // 2
+        y = gap + row * (cell_h + label_h) + (cell_h - image.height) // 2
+        canvas.paste(image, (x, y))
+        if labels:
+            draw.text((gap + col * (cell_w + gap), gap + row * (cell_h + label_h) + cell_h + 5),
+                      f"{chr(65 + idx)}) {path.stem}", fill="black", font=font)
+    dest = Path(output)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(dest, format="PNG", optimize=False)
+    sidecar = dest.with_suffix(dest.suffix + ".composition.json")
+    audit = {"format": "psyclaw-figure-composition-v1", "output": str(dest),
+             "canvas": {"width": canvas.width, "height": canvas.height},
+             "columns": columns, "rows": rows, "gap": gap, "labels": labels,
+             "inputs": [{"path": str(p), "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
+                         "width": im.width, "height": im.height}
+                        for p, im in zip(paths, images)]}
+    sidecar.write_text(json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"ok": True, "status": "composed", "output": str(dest),
+            "sidecar": str(sidecar), "inputs": [str(p) for p in paths],
+            "columns": columns, "rows": rows}
+
+
 # ---------------------------------------------------------------------------
 # CLI helper — figures 命令
 # ---------------------------------------------------------------------------
@@ -387,9 +440,21 @@ def figures_cli(argv: list[str] | None = None) -> int:
                         help="对图表 sidecar JSON 跑 FIG.honest 诚实性核查")
     parser.add_argument("--palette", type=int, default=0, metavar="N",
                         help="打印 Okabe-Ito 调色板前 N 色（默认 8）")
+    parser.add_argument("--compose", nargs="+", metavar="FIGURE",
+                        help="将已有 PNG/JPG 组装成多面板图")
+    parser.add_argument("--out", default="figures/composed.png", help="组图输出路径")
+    parser.add_argument("--columns", type=int, default=2, help="组图列数")
     args = parser.parse_args(argv or [])
 
     any_action = False
+
+    if args.compose:
+        any_action = True
+        result = compose_figures(args.compose, args.out, columns=args.columns)
+        if not result["ok"]:
+            print(f"组图失败: {result.get('note') or result.get('missing')}")
+            return 1
+        print(f"✓ 组图已输出: {result['output']} ({len(result['inputs'])} 张)  审计:{result['sidecar']}")
 
     if args.list_styles:
         any_action = True

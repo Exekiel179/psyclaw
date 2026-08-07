@@ -11,8 +11,6 @@ psyclaw 只发现/匹配/呈现 skill,不执行、不算统计(样本量走 powe
 from __future__ import annotations
 
 import re
-from pathlib import Path
-
 from psyclaw.skills.loader import list_skills
 
 
@@ -37,17 +35,33 @@ _ALIASES: dict[str, tuple[str, ...]] = {
 }
 
 
-def list_method_skills(project_dir: str = ".") -> list[dict]:
-    """列出内置方法学 skill(category == method),按名排序。发现失败返回 []。"""
+def list_method_skills(project_dir: str = ".", *, include_disabled: bool = True) -> list[dict]:
+    """列出内置方法学 Skill。
+
+    默认保留停用项的摘要，便于命令行提示用户安装对应领域包；实际
+    路由和正文读取必须传入 ``include_disabled=False``，从而不能绕过
+    Registry 的启用状态。
+    """
     try:
         skills = list_skills(project_dir, include_external=False)
+        from psyclaw.skills.registry import build_registry
+        registry = build_registry(project_dir, include_external=False)
+        status = {s.get("name"): s for s in registry.get("skills", [])
+                  if s.get("selected", True)}
     except Exception:
         return []
-    methods = [s for s in skills if (s.get("category") or "").strip() == "method"]
+    methods = []
+    for skill in skills:
+        if (skill.get("category") or "").strip() != "method":
+            continue
+        enriched = {**skill, **{key: value for key, value in status.get(skill["name"], {}).items()
+                                if key in {"enabled", "enable_reason", "path", "selected"}}}
+        if include_disabled or enriched.get("enabled", False):
+            methods.append(enriched)
     return sorted(methods, key=lambda s: s.get("name", ""))
 
 
-def match_method_skill(query: str, project_dir: str = ".") -> dict | None:
+def match_method_skill(query: str, project_dir: str = ".", *, include_disabled: bool = False) -> dict | None:
     """据用户意图把 query 匹配到一个方法学 skill;匹配不到返回 None。
 
     先按别名(最长优先),再退回 skill 名/描述的子串命中。
@@ -55,7 +69,8 @@ def match_method_skill(query: str, project_dir: str = ".") -> dict | None:
     q = (query or "").strip().lower()
     if not q:
         return None
-    skills = {s["name"]: s for s in list_method_skills(project_dir)}
+    skills = {s["name"]: s for s in list_method_skills(project_dir,
+                                                         include_disabled=include_disabled)}
 
     # 1) 别名命中——按别名长度降序,长词优先(避免"控制变量"被"样本"之类短词抢先)
     hits: list[tuple[int, str]] = []
@@ -79,18 +94,12 @@ def match_method_skill(query: str, project_dir: str = ".") -> dict | None:
 
 
 def skill_procedure(name: str, project_dir: str = ".") -> str:
-    """读取指定方法学 skill 的正文(去掉 YAML frontmatter)。未知/读失败返回 ""。"""
-    for s in list_method_skills(project_dir):
-        if s.get("name") == name:
-            path = s.get("path")
-            if not path:
-                return ""
-            try:
-                text = Path(path).read_text(encoding="utf-8")
-            except OSError:
-                return ""
-            return _strip_frontmatter(text).strip()
-    return ""
+    """读取已启用方法学 Skill 的正文；停用项绝不从磁盘读取。"""
+    from psyclaw.skills.registry import get_skill
+    skill = get_skill(name, project_dir=project_dir, include_body=True)
+    if skill is None:
+        return ""
+    return _strip_frontmatter(str(skill.get("body") or "")).strip()
 
 
 def _strip_frontmatter(text: str) -> str:

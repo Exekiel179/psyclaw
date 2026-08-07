@@ -293,7 +293,7 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     out.append("")
 
     # ── 状态卡(保留 CJK 对齐的框;边框改青绿)──────────────────────────
-    mode = paint("chat · run · auto", "bold", "white")   # 中文 eyebrow 已说明定位,不再补英文同义句
+    mode = paint("chat 一起做 · run 按步骤", "bold", "white")
     status_lines = _startup_status_lines(status, provider, approval)
     title = "─ " + paint("session", edge, "bold") + " "
     out.append(paint("╭" + title, edge)
@@ -306,7 +306,7 @@ def startup(version: str, status: dict | None = None, provider: str | None = Non
     launch = [
         _button("/goal", "当前", edge),
         _button("/run", "工作流", "brmagenta"),
-        _button("/auto", "下一步", "bryellow"),
+        _button("/run", "下一步", "bryellow"),
         _button("/help", "地图", "mint"),
     ]
     out.append(_agent_row("try", "   ".join(launch[:2]), w))

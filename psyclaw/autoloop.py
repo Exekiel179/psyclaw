@@ -411,6 +411,13 @@ def skill_hints(action: str, project_dir: str = ".",
     本函数只把「装了哪些相关技能包」呈现给人,不改派发/验收。无相关/未装 → 返回 []。
     """
     try:
+        from psyclaw.skills.registry import search_skills
+        indexed = search_skills(action, project_dir=project_dir, top_k=top_k)
+        if indexed:
+            return [r["name"] for r in indexed]
+    except Exception:  # noqa: BLE001
+        pass
+    try:
         from psyclaw.skills.recommend import recommend_skills
         recs = recommend_skills(action, skills=skills, project_dir=project_dir,
                                 top_k=top_k)
@@ -430,18 +437,13 @@ def _print_sense(backlog: list[dict], state: dict, project_dir: str = ".") -> No
         print(ui.dim(f"  ① 感知:无待办({line})"))
         return
     print(ui.accent(f"  ① 感知 — 发现 {len(backlog)} 项待办({line})"))
-    # 一次性取外部技能池,避免每个待办各扫一遍 .claude/skills。
-    pool: list = []
-    try:
-        from psyclaw.skills.loader import list_skills
-        pool = list_skills(project_dir)
-    except Exception:  # noqa: BLE001
-        pool = []
     for c in backlog:
         mark = ui.warn("⚠ blocker") if c.get("blocker") else ui.dim(f"P{c['priority']}")
         print(f"     {mark}  {c['title']} — {c['reason']}")
         if not c.get("blocker"):
-            hints = skill_hints(c["action"], project_dir, skills=pool)
+            # No raw loader fallback here: it would suggest a disabled or
+            # untrusted external Skill. ``skill_hints`` queries Registry.
+            hints = skill_hints(c["action"], project_dir)
             if hints:
                 print(ui.dim(f"        ↳ 相关技能包:{' · '.join(hints)}"
                              "(psyclaw skills --for 看详情)"))

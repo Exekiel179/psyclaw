@@ -7,8 +7,9 @@ category: workflow
 # Research Workflow
 
 Use this skill to route a research task through PsyClaw's current workflow
-system. This replaces the legacy all-in-one ARS mental model with small,
-explicit loops.
+system. The user-facing model is intentionally simple: chat = do it together,
+run = hand it over. A typed run follows a named workflow; a bare run continues
+the next project task. `auto` remains a compatibility alias.
 
 ## Route
 
