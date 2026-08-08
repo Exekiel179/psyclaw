@@ -444,13 +444,17 @@ class ActivityIndicator:
         if thread and thread is not threading.current_thread():
             thread.join(timeout=1)
         self._thread = None
+        failed = bool(final and any(word in final for word in
+                                    ("失败", "错误", "超时", "已结束")))
+        status = f"{'✗' if failed else '✓'} {final}" if final else ""
         if _ENABLED:
-            suffix = f"  {final}" if final else ""
-            self._out.write("\r\033[K" + (dim(suffix) if suffix else ""))
+            suffix = f"  {status}" if status else ""
+            painted = err(suffix) if failed else dim(suffix)
+            self._out.write("\r\033[K" + (painted if suffix else ""))
             self._out.write("\n" if suffix else "")
             self._out.flush()
         elif final:
-            self._out.write(f"  {final}\n")
+            self._out.write(f"  {status}\n")
             self._out.flush()
         self._started = False
 

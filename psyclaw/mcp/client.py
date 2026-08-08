@@ -24,6 +24,8 @@ import sys
 import threading
 from pathlib import Path
 
+from psyclaw.network import network_error_message, redact_secrets
+
 _DEFAULT_TIMEOUT = 30.0
 _PROGRESS_INTERVAL = 5.0
 PROTOCOL_VERSION = "2024-11-05"
@@ -155,7 +157,9 @@ class MCPClient:
             "clientInfo": {"name": "psyclaw", "version": "0.5.0"},
         })
         if "error" in resp:
-            self._start_error = f"MCP initialize 失败:{resp['error']}"
+            raw = self._error_text(resp["error"])
+            self._start_error = (network_error_message(raw)
+                                 or f"MCP initialize 失败:{resp['error']}")
             return self._start_error
         self._notify("notifications/initialized", {})
         self._initialized = True
@@ -232,7 +236,7 @@ class MCPClient:
         """返回限长、去换行的 stderr 尾部，不让诊断输出淹没原始错误。"""
         if not self._stderr_tail:
             return ""
-        return "；".join(self._stderr_tail)[-800:]
+        return redact_secrets("；".join(self._stderr_tail)[-800:])
 
     def _send(self, msg: dict) -> bool:
         proc = self._proc
@@ -245,6 +249,11 @@ class MCPClient:
         except (OSError, ValueError):
             return False
 
+    @staticmethod
+    def _error_text(error: object) -> object:
+        """兼容 JSON-RPC 的 dict 错误和少数服务器返回的字符串错误。"""
+        return error.get("message", error) if isinstance(error, dict) else error
+
     def _notify(self, method: str, params: dict) -> None:
         self._send({"jsonrpc": "2.0", "method": method, "params": params})
 
@@ -254,7 +263,10 @@ class MCPClient:
         want = self._id
         if not self._send({"jsonrpc": "2.0", "id": want, "method": method,
                            "params": params}):
-            return {"error": {"code": -1, "message": "MCP 写入失败(进程已退出?)"}}
+            hint = self._stderr_hint()
+            diagnosis = network_error_message(hint) if hint else None
+            return {"error": {"code": -1, "message": diagnosis or
+                               "MCP 写入失败(进程已退出?)"}}
         import time as _time
         from psyclaw import ui
         activity = ui.ActivityIndicator(f"MCP {method}")
@@ -264,18 +276,20 @@ class MCPClient:
             now = _time.monotonic()
             remaining = deadline - now
             if remaining <= 0:
-                activity.stop("MCP 响应超时")
+                activity.stop("网络连接失败：请求超时")
                 return {"error": {"code": -2, "message": f"MCP 响应超时(>{self.timeout}s)"}}
             try:
                 msg = self._q.get(timeout=remaining)
             except queue.Empty:
-                activity.stop("MCP 响应超时")
+                activity.stop("网络连接失败：请求超时")
                 return {"error": {"code": -2, "message": f"MCP 响应超时(>{self.timeout}s)"}}
             if msg.get("__eof__"):
                 hint = self._stderr_hint()
                 suffix = f"；stderr: {hint}" if hint else ""
-                activity.stop("MCP 进程已结束")
-                return {"error": {"code": -3, "message": f"MCP 进程提前退出{suffix}"}}
+                diagnosis = network_error_message(hint) if hint else None
+                activity.stop("网络连接失败" if diagnosis else "MCP 进程已结束")
+                return {"error": {"code": -3, "message": diagnosis or
+                                   f"MCP 进程提前退出{suffix}"}}
             if msg.get("id") == want:
                 activity.stop("MCP 已完成")
                 return msg
@@ -308,8 +322,9 @@ class MCPClient:
                 return {"ok": False, "text": err}
         resp = self._request("tools/call", {"name": name, "arguments": arguments or {}})
         if "error" in resp:
+            raw = self._error_text(resp["error"])
             return {"ok": False,
-                    "text": f"MCP 调用失败:{resp['error'].get('message', resp['error'])}"}
+                    "text": network_error_message(raw) or f"MCP 调用失败:{raw}"}
         result = resp.get("result") or {}
         parts = [c.get("text", "") for c in result.get("content", [])
                  if c.get("type") == "text"]
@@ -317,5 +332,6 @@ class MCPClient:
         if not text:
             return {"ok": False, "text": "(空结果)"}
         if result.get("isError"):
-            return {"ok": False, "text": f"MCP 工具报错:{text}"}
+            return {"ok": False, "text": network_error_message(text)
+                    or f"MCP 工具报错:{text}"}
         return {"ok": True, "text": text}

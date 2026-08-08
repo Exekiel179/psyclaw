@@ -16,7 +16,19 @@ def test_activity_indicator_non_tty_shows_started_and_finished(monkeypatch):
     text = out.getvalue()
     assert "MCP 初始化" in text
     assert "MCP 已完成" in text
+    assert "✓ MCP 已完成" in text
     assert not indicator.active
+
+
+def test_activity_indicator_marks_network_failure(monkeypatch):
+    out = io.StringIO()
+    monkeypatch.setattr(ui, "_ENABLED", False)
+    indicator = ui.ActivityIndicator("正在连接")
+    indicator._out = out
+    indicator.start()
+    indicator.stop("网络连接失败：DNS 解析失败")
+    text = out.getvalue()
+    assert "✗ 网络连接失败" in text and "DNS" in text
 
 
 def test_activity_indicator_stop_is_idempotent(monkeypatch):
