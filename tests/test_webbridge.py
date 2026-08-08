@@ -48,6 +48,9 @@ def test_default_browser_arc(tmp_path, monkeypatch):
 
 
 def test_default_browser_safari_not_chromium(tmp_path, monkeypatch):
+    import sys
+    if sys.platform != "darwin":
+        pytest.skip("Safari detection only works on macOS")
     import pathlib
     home = tmp_path / "home"
     dst = home / "Library" / "Preferences" / "com.apple.LaunchServices"
