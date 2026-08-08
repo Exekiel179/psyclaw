@@ -40,7 +40,7 @@ COMMANDS = {
     "/goal": "查看研究目标;带文本时写入 notes/goal.md 并立即开始执行",
     "/run": "运行明确流程:analysis|meta|literature|qualitative",
     "/auto": "按项目状态自主推进;强制检查和不可逆决策仍会暂停",
-    "/approval": "审批策略:ask(默认)|auto;危险操作始终确认",
+    "/approval": "审批策略:auto(默认)|ask;危险操作始终确认",
     "/access": "文件访问策略:open(默认)|safe",
     "/tasks": "任务看板(自动从计划抽取;start/done/add/sync)",
     "/recall": "手动召回历史上下文(/recall <查询>;库状态留空查看)",
@@ -149,6 +149,32 @@ _DANGEROUS_RE = re.compile(
     r"|DROP\s+TABLE|del\s+/[fsq]|rd\s+/s|format\s+[a-z]:|mkfs|shutdown", re.I)
 _RUN_TIMEOUT = 180
 _MAX_RUN_CMDS = 6
+
+# 这些工具会改变研究约定或分析状态，不能由普通副作用自动放行替代用户决策。
+_DECISION_TOOLS = frozenset({
+    "goal", "prepare", "declare-test", "run", "research", "auto",
+})
+
+
+def tool_requires_human(call: dict, project_dir: str = ".") -> tuple[bool, str]:
+    """判断 agent 工具调用是否必须由人确认。"""
+    import json
+
+    name = str(call.get("name") or "")
+    args = call.get("args") or {}
+    detail = json.dumps(args, ensure_ascii=False)
+    if _DANGEROUS_RE.search(detail):
+        return True, "危险参数"
+    if name in _DECISION_TOOLS:
+        return True, "研究决策"
+    if name == "save_file":
+        raw = str(args.get("path") or "")
+        target = Path(raw).expanduser()
+        if not target.is_absolute():
+            target = Path(project_dir) / target
+        if target.exists():
+            return True, "覆盖已有文件"
+    return False, ""
 
 
 _HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?")
@@ -1050,9 +1076,8 @@ class ReplSession:
             "false", "0", "off", "no")
         # 文件读取权限:open(默认,模型 ```read 块自动读)| safe(一切读取须用户 @ 引用)
         self.file_access = str(self.conf.get("file_access", "open")).lower()
-        # 审批模式:default(shell/危险命令、文件覆盖、工具副作用逐条人工确认)
-        # | yolo(非危险副作用自动放行,只有红线危险命令仍问;/yolo 切换,config approval=yolo 设默认)。
-        # 可自定义:config 里 approval=yolo|default 或 yolo=true。
+        # 审批模式:auto(默认放行普通副作用,危险/决策点仍确认)
+        # | ask(所有副作用逐条确认);旧 yolo/default 配置值继续兼容。
         self.yolo = (str(self.conf.get("approval", "")).lower() in ("yolo", "auto")
                      or bool(self.conf.get("yolo", False)))
         if approval:
@@ -1327,21 +1352,23 @@ class ReplSession:
             finally:
                 self._auto_depth -= 1
 
-    # -- 副作用审批(YOLO / 「全部同意」/ 默认逐条确认)----------------------
+    # -- 副作用审批(普通自动放行 / 危险与决策点确认)----------------------
     def _side_effect_ok(self, detail: str, *, dangerous: bool = False,
+                        requires_human: bool = False,
                         label: str = "副作用") -> bool:
         """统一的副作用确认门。
 
         - 命中红线的**危险**操作(rm -rf / push --force / DROP TABLE…):永远逐条问,
           **不给「全部同意」**,即使 YOLO / 之前说过 a 也照问(红线不放松)。
-        - 非危险:① YOLO 全放行 ② 本会话已对该类说过「全部同意(a)」→ 自动放行
-          ③ 否则三态确认 Y/n/a——选 a 则**本会话该类不再逐条问**(用户实测:确认一次同类就统一)。
+        - 非危险:① 自动模式或本会话已对该类说过「全部同意(a)」→ 自动放行
+          ② ask 模式下三态确认 Y/n/a——选 a 则本会话该类不再逐条问。
 
         待确认内容单独打在上一行(短提示,免与回显 y 串行);data/raw 与密钥是更上层硬拒。
         """
-        if dangerous:
+        if dangerous or requires_human:
             print(ui.dim(f"  ┆ 待确认{label}:{detail[:200]}"))
-            return _hitl_confirm("  确认⚠ 危险操作?")
+            prompt = "  确认⚠ 危险操作?" if dangerous else "  确认该研究决策/覆盖操作?"
+            return _hitl_confirm(prompt)
         if self.yolo or label in self._auto_approve_labels:
             why = "YOLO" if self.yolo else "本会话已同意此类"
             print(ui.dim(f"  ⚡ 自动放行({why}·{label}):{detail[:60]}"))
@@ -1578,10 +1605,12 @@ class ReplSession:
         from psyclaw.toolloop import _short, run_tool_loop
 
         def _approve(call: dict) -> bool:
-            # YOLO 自动放行工具副作用;否则人工确认。参数截断(save_file 的 content
-            # 可能几十 KB,不整个灌进提示);非 TTY/EOF/中断仍 fail-closed(在 _hitl_confirm)。
+            # 普通工具副作用自动放行；危险参数、研究决策和文件覆盖仍确认。
+            needs_human, _reason = tool_requires_human(call, ".")
             return self._side_effect_ok(
-                f"{call['name']}({_short(call.get('args') or {}, 120)})", label="工具副作用")
+                f"{call['name']}({_short(call.get('args') or {}, 120)})",
+                dangerous=bool(_DANGEROUS_RE.search(str(call.get("args") or ""))),
+                requires_human=needs_human, label="工具副作用")
 
         # 流式输出(feat-188):此前 agent 模式把整段回复 join 完才显示,用户干等。
         # 现在边流边出,与普通对话观感一致;```tool 协议块由 ToolBlockFilter 藏掉。
@@ -1656,8 +1685,9 @@ class ReplSession:
             return []
 
         def _confirm(p: Path) -> bool:
-            # YOLO 自动覆盖(data/raw 另有硬拒);否则 fail-closed 人工确认(非 TTY/EOF 不覆盖)
-            return self._side_effect_ok(str(p), label="覆盖已存在文件")
+            # 覆盖已有文件属于明确决策点，即使 auto 也要确认。
+            return self._side_effect_ok(str(p), requires_human=True,
+                                        label="覆盖已存在文件")
 
         if not hasattr(self, "_reinvent_nudged"):
             self._reinvent_nudged = set()
@@ -1972,7 +2002,7 @@ class ReplSession:
             print(f"    [{h['session']}] {snippet}")
 
     def _cmd_approval(self, arg: str, *, toggle: bool = False) -> None:
-        """审批策略:ask|auto。旧 `/yolo` 用 toggle=True 保留原切换语义。"""
+        """审批策略:auto|ask。旧 `/yolo` 用 toggle=True 保留原切换语义。"""
         low = arg.strip().lower()
         if low in ("auto", "on", "yolo"):
             self.yolo = True
@@ -1985,7 +2015,7 @@ class ReplSession:
                   "  (/approval ask|auto)")
             return
         else:
-            print(ui.warn("  用法:/approval ask|auto"))
+            print(ui.warn("  用法:/approval auto|ask"))
             return
         if self.yolo:
             print(ui.err("  [审批:auto] 命令 / 文件覆盖 / 工具副作用自动放行——"
@@ -2173,7 +2203,7 @@ class ReplSession:
             status = None
         print(ui.startup(__version__, status=status,
                          provider=self.provider.describe_short(),   # feat-158:横幅短形态
-                         approval="auto" if self.yolo else "default"))
+                         approval="auto" if self.yolo else "ask"))
         # 自动失效(轻量):启动时秒验证 cmd 类环境教训——上次说「没有 python」但现在装上了,
         # 就自动归档,别再用过时的坑误导模型。只 shutil.which、零子进程、无卡则零成本;
         # 模块/属性类较慢,留给 /memory verify 手动跑。config verify_env_lessons=false 可关。
@@ -2238,7 +2268,7 @@ HELP_TEXT = """\
   /recall [q] 历史上下文召回(全量存库+关键词索引,相关度≥80%才注入)
 
   安全策略
-  /approval ask|auto  ask=副作用逐条确认;auto=自动放行非危险操作
+  /approval auto|ask  auto=普通副作用自动放行;ask=逐条确认;危险操作始终确认
   /access open|safe   open=模型可请求读文件;safe=只能用 @ 显式引用
 
   会话与输出

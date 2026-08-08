@@ -195,8 +195,8 @@ class TestStartupApproval:
     def test_shows_auto(self):
         s = _strip(ui.startup("0.13.0", approval="auto"))
         assert "Approval" in s and "auto" in s
-    def test_shows_default(self):
+    def test_shows_ask(self):
         s = _strip(ui.startup("0.13.0", approval="default"))
-        assert "Approval" in s and "default" in s and "/approval" in s
+        assert "Approval" in s and "ask" in s and "/approval" in s
     def test_hidden_when_unknown(self):
         assert "Approval" not in _strip(ui.startup("0.13.0"))

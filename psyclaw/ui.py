@@ -230,7 +230,7 @@ def _startup_status_lines(status: dict | None, provider: str | None = None,
             lines.append(kv("Approval", err("auto")
                             + dim("  非危险副作用自动放行 · /approval 切换")))
         else:
-            lines.append(kv("Approval", ok("default")
+            lines.append(kv("Approval", ok("ask")
                             + dim("  副作用逐条确认 · /approval 切换")))
     if not status:
         return lines
