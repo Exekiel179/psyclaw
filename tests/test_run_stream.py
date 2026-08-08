@@ -56,3 +56,17 @@ def test_timeout_still_enforced(monkeypatch):
 def test_bad_command_no_raise():
     out = _run_shell_cmd("nonexistent_binary_xyz_123 --go")
     assert "$ " in out                       # 不抛,回传可读串
+
+
+def test_python_fence_code_executes_and_returns_output():
+    from psyclaw.repl import parse_run_requests, run_commands
+    reqs = parse_run_requests("```python\nprint('PYTHON_BLOCK_OK')\n```")
+    msg, _ = run_commands(reqs, confirm=lambda _: True)
+    assert "PYTHON_BLOCK_OK" in msg and "(rc=0)" in msg
+
+
+def test_long_command_shows_background_progress(monkeypatch, capsys):
+    import psyclaw.repl as R
+    monkeypatch.setattr(R, "_RUN_PROGRESS_INTERVAL", 0.0)
+    _run_shell_cmd(f'{sys.executable} -c "import time; time.sleep(.1)"')
+    assert "后台工作中" in capsys.readouterr().out
