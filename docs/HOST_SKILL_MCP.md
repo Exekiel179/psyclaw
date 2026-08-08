@@ -59,6 +59,9 @@ PsyClaw 本体不内置 Kaggle SDK。
 psyclaw mcp --setup kaggle
 ```
 
+通常不需要用户记命令：在 `psyclaw chat` 中直接说“配置 Kaggle MCP”，Agent 会调用
+`kaggle_configure` 自动检查已有用户级 Token、环境变量和可用的本机 Token 文件；只有确实找不到凭据时才会提示下一步。
+
 按提示从 <https://www.kaggle.com/settings> 创建 API token。新版 Kaggle 下载的
 `KGAT_...` Token 也可以直接导入（不会回显 Token）：
 

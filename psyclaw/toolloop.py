@@ -303,6 +303,19 @@ def build_tools(project_dir: str = ".") -> dict:
                          for h in hits) or "无历史命中"
     _t("recall", "检索历史对话(跨会话全文)", "query:str, limit?:int", _recall)
 
+    def _kaggle_configure(a):
+        from psyclaw.mcp.client import configure_kaggle_token
+        result = configure_kaggle_token(
+            token_file=str(a.get("token_file", "")).strip() or None)
+        if result.get("ok"):
+            return (f"{result['message']}。来源:{result.get('source')}。"
+                    "凭据只供 Kaggle MCP 使用，不会传播给其他 MCP。")
+        return str(result.get("message") or result)
+    _t("kaggle_configure",
+       "自动配置 Kaggle MCP 凭据：优先使用指定的本机 Token 文件，随后检查已有环境变量/用户级 Token；"
+       "不回显密钥。用户说‘配置 Kaggle’时直接调用，不要让用户手动运行命令。",
+       "token_file?:str", _kaggle_configure, side_effect=True)
+
     def _list_dir(a):
         from psyclaw.project_sense import render_tree, scan_tree
         target = str(a.get("path", "") or project_dir)
