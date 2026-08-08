@@ -157,11 +157,21 @@ def cmd_agent(args: argparse.Namespace) -> int:
     conf = cfg.load_config()
     provider = get_provider(conf)
     task = " ".join(args.task)
-    auto = getattr(args, "auto", False)
-    approve = (lambda c: True) if auto else None   # 非 auto:拒副作用工具(只读照跑)
+    # 普通副作用默认自动执行；--ask 可显式恢复逐条确认。
+    auto = not getattr(args, "ask", False)
+
+    def _approve(call: dict) -> bool:
+        from psyclaw.repl import _hitl_confirm, tool_requires_human
+        needs_human, reason = tool_requires_human(call, ".")
+        if needs_human:
+            detail = f"{call.get('name', '工具')}({call.get('args') or {}})"
+            return _hitl_confirm(f"确认{reason}:{detail[:180]}?")
+        return True
+
+    approve = _approve if auto else None
     print(ui.title("PsyClaw agent") + ui.dim(f"  {task}"))
     if not auto:
-        print(ui.dim("  (副作用工具默认拒绝;--auto 自动批准。只读工具照常执行。)"))
+        print(ui.dim("  (审批:ask；副作用工具逐条确认，危险操作始终确认。)"))
     res = run_tool_loop(provider, _build_system_prompt(),
                         [{"role": "user", "content": task}], project_dir=".",
                         max_iters=getattr(args, "max_iters", 24),
@@ -2118,7 +2128,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("-v", "--version", action="store_true", help="打印版本")
     p.add_argument("--approval", choices=["ask", "auto", "suggest"], default=None,
-                   help="副作用审批:ask(默认)|auto;suggest 为 ask 的兼容名")
+                   help="副作用审批:auto(默认)|ask;suggest 为 ask 的兼容名")
     sub = p.add_subparsers(dest="command")
 
     pchat = sub.add_parser("chat", help="一起做:边聊边推进")
@@ -2183,8 +2193,9 @@ def build_parser() -> argparse.ArgumentParser:
         "agent",
         help="agent 一次性任务:模型自主多步调用工具(纯工具层循环,provider 无关保底)")
     pag.add_argument("task", nargs="*", help="任务描述(--history 时可省)")
-    pag.add_argument("--auto", action="store_true",
-                     help="自动批准副作用工具(默认拒绝;只读工具照跑)")
+    pag.add_argument("--auto", action="store_true", help="兼容旧参数；普通副作用默认自动执行")
+    pag.add_argument("--ask", action="store_true",
+                     help="副作用工具逐条确认；危险操作始终确认")
     pag.add_argument("--max-iters", type=int, default=24, dest="max_iters",
                      help="工具调用轮数上限(默认 24;长研究任务多步调用不够时再调高)")
     pag.add_argument("--history", type=int, nargs="?", const=10, default=None,

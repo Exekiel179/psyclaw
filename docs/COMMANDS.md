@@ -125,7 +125,7 @@
 | `/run` | 在对话中执行流程；不带参数时自动继续下一步 |
 | `/goal [文本]` | 查看目标;带文本时写入 `notes/goal.md`,同时作为当前对话任务立即开始执行;目标会持续注入后续轮次,输入“继续”也不丢上下文 |
 | `/dump [--full] [路径]` | 导出当前对话为 Markdown;`--full` 连同不展示的隐藏上下文(system/当前目标/决策备忘/约定片段)一并导出;拒写 `data/raw` |
-| `/approval ask\|auto` | 副作用逐条确认或自动放行非危险操作;危险操作始终确认 |
+| `/approval auto\|ask` | 默认自动放行普通副作用；ask 逐条确认；危险操作始终确认 |
 | `/access open\|safe` | 模型可请求读文件,或仅允许用户用 `@路径` 显式引用 |
 | `/img <路径>`（`/show`） | 终端内联渲染图片(iTerm2/WezTerm/VSCode/Warp/kitty;命令出图会自动显示);`config image_protocol` 可强制 iterm2\|kitty\|none |
 | `/memory verify` | 再验证环境教训卡:环境已恢复(装上库/命令有了)的自动失效归档,别再用过时的坑误导模型 |

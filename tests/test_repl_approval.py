@@ -24,10 +24,36 @@ def _sess(yolo=False):
     return s
 
 
+def test_default_config_auto_approves_ordinary_requests():
+    from psyclaw.config import DEFAULTS
+    assert DEFAULTS["approval"] == "auto"
+    assert repl.tool_requires_human({"name": "search", "args": {}}) == (False, "")
+
+
+def test_tool_policy_keeps_danger_and_overwrite_as_human_decisions(tmp_path):
+    existing = tmp_path / "notes.md"
+    existing.write_text("old", encoding="utf-8")
+    assert repl.tool_requires_human({
+        "name": "shell", "args": {"cmd": "git push --force origin main"}
+    }) == (True, "危险参数")
+    assert repl.tool_requires_human({
+        "name": "save_file", "args": {"path": str(existing), "content": "new"}
+    }) == (True, "覆盖已有文件")
+
+
 # -- YOLO 放行 / 危险仍问 ---------------------------------------------------
 def test_yolo_auto_approves_nondangerous():
     s = _sess(yolo=True)
     assert s._side_effect_ok("python3 analysis.py", label="执行") is True
+
+
+def test_auto_mode_still_confirms_explicit_decision(monkeypatch):
+    s = _sess(yolo=True)
+    seen = []
+    monkeypatch.setattr(repl, "_hitl_confirm", lambda p: seen.append(p) or False)
+    assert s._side_effect_ok("notes/plan.md", requires_human=True,
+                             label="研究决策") is False
+    assert seen
 
 
 def test_yolo_still_confirms_dangerous(monkeypatch):

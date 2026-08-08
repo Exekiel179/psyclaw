@@ -18,6 +18,8 @@ DEFAULTS = {
     "base_url": "",
     "language": "zh",
     "figure_style": "apa7",
+    # 普通副作用自动执行；危险操作和明确决策点仍由各自护栏拦截。
+    "approval": "auto",
 }
 
 
