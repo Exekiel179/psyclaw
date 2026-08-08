@@ -25,8 +25,13 @@ import threading
 
 _DEFAULT_TIMEOUT = 30.0
 PROTOCOL_VERSION = "2024-11-05"
-_SAFE_ENV_KEYS = frozenset({"PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP",
-                            "SystemRoot", "WINDIR", "USER", "LOGNAME"})
+_SAFE_ENV_KEYS = frozenset({
+    "PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP",
+    "SystemRoot", "WINDIR", "USER", "LOGNAME",
+    # Windows user installs (pip --user, uv/uvx) resolve packages and caches
+    # through these path-only variables. They carry no credential values.
+    "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "COMSPEC", "PATHEXT",
+})
 
 
 def resolve_command(command: str) -> list[str]:
@@ -35,7 +40,12 @@ def resolve_command(command: str) -> list[str]:
     本机可能只有 python3(无 python),内置服务器 command 写的是 `python -m …`——
     直接跑会 command not found,故统一兜底到 sys.executable。
     """
-    argv = shlex.split(command or "")
+    argv = shlex.split(command or "", posix=os.name != "nt")
+    if os.name == "nt":
+        # posix=False preserves Windows backslashes but also retains wrapping
+        # quotes; subprocess argv must receive the unquoted values.
+        argv = [arg[1:-1] if len(arg) >= 2 and arg[0] == arg[-1]
+                and arg[0] in {'"', "'"} else arg for arg in argv]
     if argv and argv[0] in ("python", "python3"):
         argv[0] = sys.executable
     return argv

@@ -50,4 +50,4 @@ def test_setup_modules_include_new_capabilities():
     assert {"sequential-thinking", "mne", "journal"} <= keys
     # 每个板块声明 kind(pip/npx/mcp/skill)供 setup 分派
     kinds = {m[3] for m in _SETUP_MODULES}
-    assert kinds <= {"pip", "npx", "mcp", "skill"}
+    assert kinds <= {"pip", "npx", "mcp", "skill", "external-mcp"}
