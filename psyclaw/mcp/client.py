@@ -256,27 +256,28 @@ class MCPClient:
                            "params": params}):
             return {"error": {"code": -1, "message": "MCP 写入失败(进程已退出?)"}}
         import time as _time
+        from psyclaw import ui
+        activity = ui.ActivityIndicator(f"MCP {method}")
+        activity.start()
         deadline = _time.monotonic() + self.timeout
-        started = _time.monotonic()
-        next_progress = started + _PROGRESS_INTERVAL
         while True:
             now = _time.monotonic()
-            if now >= next_progress:
-                elapsed = int(now - started)
-                print(f"  ⏳ 后台工作中:MCP {method} · 已等待 {elapsed}s", flush=True)
-                next_progress = now + _PROGRESS_INTERVAL
             remaining = deadline - now
             if remaining <= 0:
+                activity.stop("MCP 响应超时")
                 return {"error": {"code": -2, "message": f"MCP 响应超时(>{self.timeout}s)"}}
             try:
                 msg = self._q.get(timeout=remaining)
             except queue.Empty:
+                activity.stop("MCP 响应超时")
                 return {"error": {"code": -2, "message": f"MCP 响应超时(>{self.timeout}s)"}}
             if msg.get("__eof__"):
                 hint = self._stderr_hint()
                 suffix = f"；stderr: {hint}" if hint else ""
+                activity.stop("MCP 进程已结束")
                 return {"error": {"code": -3, "message": f"MCP 进程提前退出{suffix}"}}
             if msg.get("id") == want:
+                activity.stop("MCP 已完成")
                 return msg
 
     # -- 高层 API ------------------------------------------------------------

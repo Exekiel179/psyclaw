@@ -187,6 +187,17 @@ def test_inline_no_altscreen_escapes(capsys):
     out = capsys.readouterr().out
     assert "\x1b[?1049h" not in out and "\x1b[2J" not in out
     assert "选哪个?" in out and "1. 甲" in out
+    assert "需要你的选择" in out
+
+
+def test_question_and_all_options_are_emphasized_together(capsys):
+    from psyclaw.choices import _pick_inline
+    choice = {"question": "下一步怎么做?", "multi": False,
+              "options": ["重试 Kaggle", "提供数据集 URL", "改用其他数据源"]}
+    _pick_inline(choice, get_key=_feed(["ENTER"]))
+    out = capsys.readouterr().out
+    assert "需要你的选择" in out and "下一步怎么做?" in out
+    assert all(option in out for option in choice["options"])
 def test_inline_detail_zone_shows_full_text_when_truncated(monkeypatch, capsys):
     """feat-071:高亮项超宽被截断时,详情区给全文(用户反馈:看不见选项所说的方案)。"""
     import os
