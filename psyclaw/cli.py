@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -632,6 +633,24 @@ def cmd_skills(args: argparse.Namespace) -> int:
 
 
 def cmd_mcp(args: argparse.Namespace) -> int:
+    setup_name = getattr(args, "setup_name", None)
+    if setup_name == "kaggle":
+        from psyclaw.mcp.client import resolve_command
+        from psyclaw.mcp.manager import REGISTRY, _parse_registry
+
+        entry = next((item for item in _parse_registry(REGISTRY)
+                      if item.get("name") == "kaggle"), None)
+        argv = resolve_command((entry or {}).get("command", ""))
+        if not argv or argv[-1:] != ["--stdio"]:
+            print("Kaggle MCP 注册命令缺失或无效。")
+            return 1
+        argv[-1:] = ["--setup", "--no-env"]
+        print("Kaggle 凭据将写入 ~/.kaggle/kaggle.json，不写入当前项目。")
+        try:
+            return subprocess.run(argv, check=False).returncode
+        except OSError as exc:
+            print(f"无法启动 Kaggle MCP 设置：{exc}\n请先安装 uv：https://docs.astral.sh/uv/")
+            return 1
     if getattr(args, "name", None):
         if args.name == "mne":
             from psyclaw.mcp.servers.mne_server import srv
@@ -657,6 +676,8 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     print("  psyclaw mcp --serve spss   # SPSS 语法生成 + 批处理")
     print("  psyclaw mcp --serve mplus  # Mplus CFA/SEM/LGM/Mixture 语法生成")
     print("  psyclaw mcp --serve stata  # Stata do-file 生成(面板/IV/生存等)")
+    print("\n外部 MCP 配置:")
+    print("  psyclaw mcp --setup kaggle # 配置 Kaggle token(~/.kaggle/kaggle.json)")
     return 0
 
 
@@ -1472,6 +1493,7 @@ _SETUP_MODULES = [
     ("full", "REPL 增强", "命令补全/富交互等对话体验增强", "pip"),
     ("sequential-thinking", "序列化思考", "把复杂推理拆成可回溯/可修正的思考步骤(设计/统计策略/评审);npx 开箱即用", "npx"),
     ("browser", "浏览器桥", "驱动真实浏览器进机构库检索(需 node/npx + 扩展)", "npx"),
+    ("kaggle", "Kaggle 数据", "搜索、查看并下载 Kaggle 数据集(需 uvx + Kaggle token)", "external-mcp"),
     ("mne", "EEG/脑电分析", "MNE 事件相关电位/预处理 MCP(需 mne)", "mcp"),
     ("journal", "目标期刊 skill", "目标期刊专属写作/投稿规范 skill(据你的目标期刊)", "skill"),
 ]
@@ -1571,6 +1593,9 @@ def _setup_global(args, online: bool, ni: bool) -> int:
         elif kinds.get(m) == "skill":
             print(ui.dim(f"  {m} skill:psyclaw journal install <刊名> 装目标期刊"
                          " AJS 技能包(start 向导也会问);psyclaw journal 看自带画像"))
+        elif kinds.get(m) == "external-mcp":
+            print(ui.dim(f"  {m} MCP:psyclaw mcp --setup {m} 配置凭据;"
+                         "psyclaw mcp 看状态"))
     print(ui.ok("\n  全局配置完成。开工:psyclaw start(项目级意图向导)"))
     return 0
 
@@ -2246,6 +2271,8 @@ def build_parser() -> argparse.ArgumentParser:
     pmcp.add_argument("--serve", dest="name",
                       choices=["mne", "spss", "mplus", "stata"], default=None,
                       help="作为 stdio MCP 服务器运行(mne/spss/mplus/stata)")
+    pmcp.add_argument("--setup", dest="setup_name", choices=["kaggle"], default=None,
+                      help="配置外部 MCP 凭据(kaggle)")
     pmcp.set_defaults(func=cmd_mcp)
     sub.add_parser("gates", help="质量规则系统自检(check 才检查实际稿件)").set_defaults(func=cmd_gates)
 

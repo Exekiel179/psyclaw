@@ -47,6 +47,31 @@ PsyClaw 内置 MCP 定义优先于宿主同名定义。宿主中明确禁用的�
 
 当前执行客户端支持 stdio MCP。HTTP/SSE 配置会出现在目录中，但标记为 unsupported，不注册成 Agent 工具。
 
+## Kaggle 数据 MCP
+
+PsyClaw 内置登记了可选的 Kaggle stdio MCP，用于搜索数据集、查看元数据与文件列表、
+以及下载数据。实现复用外部 `mtrakretech/kaggle-mcp`，并固定到经过核验的 Git 提交；
+PsyClaw 本体不内置 Kaggle SDK。
+
+首次使用前安装 `uv`，然后运行：
+
+```bash
+psyclaw mcp --setup kaggle
+```
+
+按提示从 <https://www.kaggle.com/settings> 创建 API token。凭据只写入标准
+`~/.kaggle/kaggle.json`，不会写入项目或仓库。配置后可在 `psyclaw chat` 中直接说：
+
+```text
+在 Kaggle 搜索适合研究工作倦怠的数据集，先列出候选和字段信息，不要下载。
+下载 owner/dataset-name 到当前研究项目的 data/kaggle 目录。
+```
+
+首批可直接发现的工具为 `search_datasets`、`dataset_details`、
+`list_dataset_files`、`get_dataset_metadata` 和 `download_dataset`；首次连接成功后，
+完整 Kaggle 工具目录会写入项目的 `.psyclaw/mcp_tools_cache.json`。所有调用都沿用
+PsyClaw 的外部副作用审批，下载、上传、提交和删除不会静默执行。
+
 ## 安全边界
 
 - MCP `command` 和 `args` 解析成 argv 后直接交给子进程，不通过 shell。

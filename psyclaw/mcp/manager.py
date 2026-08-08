@@ -31,6 +31,7 @@ SERVER_NOTES: dict[str, str] = {
     "zotero-mcp": "Zotero 文献管理（搜索/引用/全文/撤稿）",
     "lit-search-mcp": "文献多源检索（PubMed/OpenAlex/Semantic Scholar）",
     "osf-mcp": "OSF 开放科学（预注册/数据托管）",
+    "kaggle": "Kaggle 数据集搜索、元数据查看与下载【可选，需 uvx 和 Kaggle API token】",
 }
 
 # origin=optional/user 的商业软件 MCP 不纳入 doctor 强制健康检查（可选，非核心路径）

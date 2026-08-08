@@ -87,3 +87,14 @@ servers:
     category: open-science
     enable_when: env:OSF_TOKEN
     provides: [preregistration, data_hosting]
+
+  # Kaggle 数据 MCP——复用外部成熟实现，PsyClaw 只负责注册和审批编排。
+  # 固定上游提交，避免 uvx 每次启动静默拉取未经核验的新代码。凭据仅由
+  # `psyclaw mcp --setup kaggle` 写入标准 ~/.kaggle/kaggle.json。
+  - name: kaggle
+    category: data
+    origin: optional
+    enable_when: detect:uvx
+    command: uvx --from git+https://github.com/mtrakretech/kaggle-mcp@47bb38e53f7041d3a0feee6e20a3573ae6af80fa kaggle-mcp --stdio
+    provides: [dataset_search, dataset_metadata, dataset_download]
+    tools: [search_datasets, dataset_details, list_dataset_files, get_dataset_metadata, download_dataset]

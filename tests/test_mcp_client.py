@@ -1,10 +1,11 @@
 """MCP stdio 客户端往返测试(v0.5 feat-039)——起真实短命服务器验证协议。"""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
-from psyclaw.mcp.client import MCPClient, resolve_command
+from psyclaw.mcp.client import MCPClient, _SAFE_ENV_KEYS, resolve_command
 
 _ECHO = str(Path(__file__).with_name("_mcp_echo_server.py"))
 _CMD = f"python {_ECHO}"   # resolve_command 会把 python 换成 sys.executable
@@ -15,6 +16,16 @@ def test_resolve_command_python_fallback():
     assert argv[0] == sys.executable and argv[1:] == ["-m", "foo.bar"]
     assert resolve_command("Rscript x.R")[0] == "Rscript"   # 非 python 不动
     assert resolve_command("") == []
+    if os.name == "nt":
+        assert resolve_command(r"python C:\tools\server.py")[1] == r"C:\tools\server.py"
+        assert resolve_command(r'python "C:\Program Files\server.py"')[1] \
+            == r"C:\Program Files\server.py"
+
+
+def test_safe_environment_keeps_windows_runtime_paths_not_secrets():
+    assert {"USERPROFILE", "APPDATA", "LOCALAPPDATA", "PATHEXT"} <= _SAFE_ENV_KEYS
+    assert "KAGGLE_KEY" not in _SAFE_ENV_KEYS
+    assert "OPENAI_API_KEY" not in _SAFE_ENV_KEYS
 
 
 def test_list_tools_roundtrip():
