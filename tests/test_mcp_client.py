@@ -28,6 +28,21 @@ def test_safe_environment_keeps_windows_runtime_paths_not_secrets():
     assert "OPENAI_API_KEY" not in _SAFE_ENV_KEYS
 
 
+def test_kaggle_token_is_scoped_to_kaggle_mcp(monkeypatch, tmp_path):
+    from psyclaw.mcp import client as mc
+    token_file = tmp_path / ".kaggle" / "access_token"
+    token_file.parent.mkdir()
+    token_file.write_text("KGAT_test", encoding="utf-8")
+    monkeypatch.setattr(mc.Path, "home", classmethod(lambda cls: tmp_path))
+    kaggle = MCPClient("uvx kaggle-mcp --stdio")
+    other = MCPClient("python -m other_mcp")
+    kaggle_env = kaggle._credential_env()
+    assert kaggle_env["KAGGLE_API_TOKEN"] == "KGAT_test"
+    assert kaggle_env["KAGGLE_KEY"] == "KGAT_test"
+    assert kaggle_env["KAGGLE_USERNAME"] == "__token__"
+    assert "KAGGLE_API_TOKEN" not in other._credential_env()
+
+
 def test_list_tools_roundtrip():
     with MCPClient(_CMD) as c:
         tools = c.list_tools()
