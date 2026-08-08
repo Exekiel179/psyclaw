@@ -22,6 +22,7 @@ import shlex
 import subprocess
 import sys
 import threading
+from pathlib import Path
 
 _DEFAULT_TIMEOUT = 30.0
 _PROGRESS_INTERVAL = 5.0
@@ -32,6 +33,7 @@ _SAFE_ENV_KEYS = frozenset({
     # Windows user installs (pip --user, uv/uvx) resolve packages and caches
     # through these path-only variables. They carry no credential values.
     "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "COMSPEC", "PATHEXT",
+    "UV_CACHE_DIR",
 })
 
 
@@ -93,7 +95,7 @@ class MCPClient:
                 # Do not expose unrelated API/cloud credentials to an MCP
                 # server. Its declared env is explicit; common runtime paths
                 # are the only inherited baseline.
-                env={**{k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}, **self.env},
+                env=self._credential_env(),
                 cwd=self.cwd,
             )
         except OSError as exc:
@@ -115,6 +117,25 @@ class MCPClient:
         self._notify("notifications/initialized", {})
         self._initialized = True
         return None
+
+    def _credential_env(self) -> dict[str, str]:
+        """构造最小运行环境；Kaggle token 只给 Kaggle MCP 子进程。"""
+        env = {k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}
+        if "kaggle-mcp" in self.command:
+            token_file = Path.home() / ".kaggle" / "access_token"
+            try:
+                token = token_file.read_text(encoding="utf-8").strip()
+            except (OSError, UnicodeError):
+                token = ""
+            if token:
+                # kaggle-mcp v3 still gates startup on a non-empty username,
+                # while KGAT tokens authenticate through Bearer auth alone.
+                # Keep this compatibility value inside the Kaggle child only.
+                env["KAGGLE_USERNAME"] = "__token__"
+                env["KAGGLE_KEY"] = token
+                env["KAGGLE_API_TOKEN"] = token
+        env.update(self.env)
+        return env
 
     def close(self) -> None:
         if self._proc is None:
