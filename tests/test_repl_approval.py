@@ -394,3 +394,8 @@ class TestApprovalScopeHardening:
         assert repl.cmd_approval_scope("git status -sb") == "git status"
         assert repl.cmd_approval_scope("python3 analyze.py --out x.png") \
             == "python3 analyze.py"
+
+
+def test_python_fence_is_an_executable_request():
+    reqs = repl.parse_run_requests("```python\nprint('download result')\n```")
+    assert reqs == [{"kind": "python", "cmd": "print('download result')"}]

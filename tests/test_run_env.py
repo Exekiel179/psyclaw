@@ -26,6 +26,16 @@ def test_normalize_python_to_python3(monkeypatch):
     assert _normalize_interpreter("pip install foo").startswith("pip3 ")
 
 
+def test_normalize_which_to_where_on_windows(monkeypatch):
+    import os
+    import shutil
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(shutil, "which",
+                        lambda b: r"C:\\Windows\\System32\\where.exe"
+                        if b == "where" else None)
+    assert _normalize_interpreter("which kaggle") == "where kaggle"
+
+
 def test_normalize_keeps_python3(monkeypatch):
     import shutil
     monkeypatch.setattr(shutil, "which", lambda b: None if b == "python" else "/x/" + b)

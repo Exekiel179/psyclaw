@@ -133,13 +133,14 @@ _RUN_SYSTEM = (
     "那样只会让用户困惑):\n"
     "```psyclaw\nrun analysis data/clean/x.csv\n```\n"
     "```shell\npython3 outputs/analysis.py\n```\n"
+    "```python\nprint('需要执行的 Python 代码')\n```\n"
     "(python3/python 都行,psyclaw 自动适配本机解释器;脚本可直接 `import psyclaw`,"
-    "PYTHONPATH 已配好)\n"
+    "Python 代码围栏也会自动执行并实时回传输出,PYTHONPATH 已配好)\n"
     "注意:**没有** describe/stat 等内置统计命令(统计已外移)——统计请生成脚本再用 shell 跑。"
     "不要输出命令块之后就当作已完成;结果会回传,等结果再下结论。")
 _RUN_SAFE_NOTE = "(当前安全模式:命令块不会自动执行,会提示用户手动跑。)"
 
-_RUN_RE = re.compile(r"```(?P<kind>psyclaw|shell|bash|sh|cmd|powershell)\s*\r?\n"
+_RUN_RE = re.compile(r"```(?P<kind>psyclaw|shell|bash|sh|cmd|powershell|python|python3|py)\s*\r?\n"
                      r"(?P<body>.*?)```", re.S)
 # 危险模式标签(CLAUDE.md 红线)。v0.3 安全加固(外审 HIGH):此正则只是确认提示里的
 # ⚠ 标签,**不是**安全边界——LLM 生成的 shell 命令每条都须人工确认(fail-closed),
@@ -148,6 +149,7 @@ _DANGEROUS_RE = re.compile(
     r"rm\s+-rf|git\s+push\s+--force|git\s+reset\s+--hard|push\s+.*\b(master|main)\b"
     r"|DROP\s+TABLE|del\s+/[fsq]|rd\s+/s|format\s+[a-z]:|mkfs|shutdown", re.I)
 _RUN_TIMEOUT = 180
+_RUN_PROGRESS_INTERVAL = 5.0
 _MAX_RUN_CMDS = 6
 
 # 这些工具会改变研究约定或分析状态，不能由普通副作用自动放行替代用户决策。
@@ -250,14 +252,26 @@ def cmd_display(cmd: str) -> str:
 
 
 def parse_run_requests(reply: str) -> list[dict]:
-    """从回复解析 psyclaw/shell 命令块 → [{kind, cmd}](kind ∈ psyclaw|shell)。纯函数。
+    """从回复解析 psyclaw/shell/python 命令块 → [{kind, cmd}]。纯函数。
 
     shell 块按 `group_shell_commands` 分组(多行引号/续行/heredoc 是一条命令,
     feat-101);psyclaw 子命令天然单行,保持逐行。
     """
     out: list[dict] = []
     for m in _RUN_RE.finditer(reply or ""):
-        kind = "psyclaw" if m.group("kind") == "psyclaw" else "shell"
+        raw_kind = m.group("kind")
+        if raw_kind == "psyclaw":
+            kind = "psyclaw"
+        elif raw_kind in {"python", "python3", "py"}:
+            # Python fenced blocks are executable requests, not explanatory text.
+            kind = "python"
+        else:
+            kind = "shell"
+        if kind == "python":
+            body = m.group("body").strip()
+            if body:
+                out.append({"kind": kind, "cmd": body})
+            continue
         if kind == "shell":
             for cmd in group_shell_commands(m.group("body")):
                 out.append({"kind": kind, "cmd": cmd})
@@ -454,6 +468,9 @@ def _normalize_interpreter(cmd: str) -> str:
     if shutil.which(tok):                    # 首 token 本身可跑 → 不动(含 win 的 python)
         return cmd
     win = os.name == "nt"
+    if win and tok.lower() == "which":
+        rest = parts[1] if len(parts) > 1 else ""
+        return f"where {rest}".rstrip() if shutil.which("where") else cmd
     if tok in _PY_NAMES:
         order = ("python", "py", "python3") if win else ("python3", "python")
     elif tok in ("pip", "pip3"):
@@ -532,9 +549,16 @@ def _run_shell_cmd(cmd: str) -> str:
     threading.Thread(target=_pump, daemon=True).start()
     lines: list[str] = []
     deadline = _time.monotonic() + timeout
+    started = _time.monotonic()
+    next_progress = started + _RUN_PROGRESS_INTERVAL
     timed_out = False
     while True:
-        remaining = deadline - _time.monotonic()
+        now = _time.monotonic()
+        if now >= next_progress:
+            elapsed = int(now - started)
+            print(ui.dim(f"  ⏳ 后台工作中:命令仍在运行 · 已等待 {elapsed}s"), flush=True)
+            next_progress = now + _RUN_PROGRESS_INTERVAL
+        remaining = deadline - now
         if remaining <= 0:
             timed_out = True
             break
@@ -560,6 +584,31 @@ def _run_shell_cmd(cmd: str) -> str:
     return f"$ {cmd}\n(rc={proc.returncode})\n{body}"
 
 
+def _run_python_code(code: str) -> str:
+    """执行 Python 代码围栏并复用命令的实时输出、超时和 PYTHONPATH 护栏。"""
+    import shlex
+    import subprocess
+    import tempfile
+
+    path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".py", encoding="utf-8",
+                                         delete=False) as f:
+            f.write(code)
+            path = Path(f.name)
+        if sys.platform == "win32":
+            command = subprocess.list2cmdline([sys.executable, str(path)])
+        else:
+            command = shlex.join([sys.executable, str(path)])
+        return _run_shell_cmd(command)
+    finally:
+        if path is not None:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def run_commands(reqs: list[dict], confirm=None,
                  limit: int = _MAX_RUN_CMDS) -> tuple[str, list[str]]:
     """执行命令块 → (回传消息, 终端提示行)。
@@ -582,7 +631,12 @@ def run_commands(reqs: list[dict], confirm=None,
                 notes.append(f"  ✗ 拒执行({tag}):{shown[:50]}")
                 continue
         notes.append(f"  ⚙ 执行:{shown[:70]}")
-        out = _run_psyclaw_cmd(cmd) if r["kind"] == "psyclaw" else _run_shell_cmd(cmd)
+        if r["kind"] == "psyclaw":
+            out = _run_psyclaw_cmd(cmd)
+        elif r["kind"] == "python":
+            out = _run_python_code(cmd)
+        else:
+            out = _run_shell_cmd(cmd)
         parts.append(out[:6000])
     if len(reqs) > limit:
         parts.append(f"[本轮最多执行 {limit} 条命令,其余 {len(reqs) - limit} 条请下一轮]")
@@ -1285,6 +1339,7 @@ class ReplSession:
             pass
         self.chars_in += len(text) + len(system)
         print()
+        print(ui.dim(f"  ⏳ 后台工作中:正在请求 {self.provider.name}…"), flush=True)
         if self.agent_mode:
             reply = self._run_agent(system)
             if reply is None:            # provider 错误 → 回退用户消息

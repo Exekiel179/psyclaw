@@ -24,6 +24,7 @@ import sys
 import threading
 
 _DEFAULT_TIMEOUT = 30.0
+_PROGRESS_INTERVAL = 5.0
 PROTOCOL_VERSION = "2024-11-05"
 _SAFE_ENV_KEYS = frozenset({
     "PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TEMP", "TMP",
@@ -63,6 +64,8 @@ class MCPClient:
         self._proc: subprocess.Popen | None = None
         self._q: queue.Queue = queue.Queue()
         self._reader: threading.Thread | None = None
+        self._stderr_reader: threading.Thread | None = None
+        self._stderr_tail: list[str] = []
         self._id = 0
         self._initialized = False
         self._start_error: str | None = None
@@ -86,7 +89,7 @@ class MCPClient:
         try:
             self._proc = subprocess.Popen(
                 argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, text=True, encoding="utf-8", bufsize=1,
+                stderr=subprocess.PIPE, text=True, encoding="utf-8", bufsize=1,
                 # Do not expose unrelated API/cloud credentials to an MCP
                 # server. Its declared env is explicit; common runtime paths
                 # are the only inherited baseline.
@@ -98,6 +101,8 @@ class MCPClient:
             return self._start_error
         self._reader = threading.Thread(target=self._pump, daemon=True)
         self._reader.start()
+        self._stderr_reader = threading.Thread(target=self._pump_stderr, daemon=True)
+        self._stderr_reader.start()
         # 握手:initialize → notifications/initialized
         resp = self._request("initialize", {
             "protocolVersion": PROTOCOL_VERSION,
@@ -149,6 +154,26 @@ class MCPClient:
             pass
         self._q.put({"__eof__": True})
 
+    def _pump_stderr(self) -> None:
+        """保留子进程最近几行 stderr，进程提前退出时给出可操作线索。"""
+        proc = self._proc
+        if proc is None or proc.stderr is None:
+            return
+        try:
+            for raw in proc.stderr:
+                line = raw.strip()
+                if line:
+                    self._stderr_tail.append(line)
+                    del self._stderr_tail[:-8]
+        except (OSError, ValueError):
+            pass
+
+    def _stderr_hint(self) -> str:
+        """返回限长、去换行的 stderr 尾部，不让诊断输出淹没原始错误。"""
+        if not self._stderr_tail:
+            return ""
+        return "；".join(self._stderr_tail)[-800:]
+
     def _send(self, msg: dict) -> bool:
         proc = self._proc
         if proc is None or proc.stdin is None or proc.stdin.closed:
@@ -172,8 +197,15 @@ class MCPClient:
             return {"error": {"code": -1, "message": "MCP 写入失败(进程已退出?)"}}
         import time as _time
         deadline = _time.monotonic() + self.timeout
+        started = _time.monotonic()
+        next_progress = started + _PROGRESS_INTERVAL
         while True:
-            remaining = deadline - _time.monotonic()
+            now = _time.monotonic()
+            if now >= next_progress:
+                elapsed = int(now - started)
+                print(f"  ⏳ 后台工作中:MCP {method} · 已等待 {elapsed}s", flush=True)
+                next_progress = now + _PROGRESS_INTERVAL
+            remaining = deadline - now
             if remaining <= 0:
                 return {"error": {"code": -2, "message": f"MCP 响应超时(>{self.timeout}s)"}}
             try:
@@ -181,7 +213,9 @@ class MCPClient:
             except queue.Empty:
                 return {"error": {"code": -2, "message": f"MCP 响应超时(>{self.timeout}s)"}}
             if msg.get("__eof__"):
-                return {"error": {"code": -3, "message": "MCP 进程提前退出"}}
+                hint = self._stderr_hint()
+                suffix = f"；stderr: {hint}" if hint else ""
+                return {"error": {"code": -3, "message": f"MCP 进程提前退出{suffix}"}}
             if msg.get("id") == want:
                 return msg
 
