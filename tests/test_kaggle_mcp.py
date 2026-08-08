@@ -78,6 +78,23 @@ def test_kaggle_setup_uses_argv_and_standard_credentials_file(monkeypatch, capsy
     assert "~/.kaggle/kaggle.json" in capsys.readouterr().out
 
 
+def test_kaggle_setup_accepts_new_token_file(monkeypatch, tmp_path, capsys):
+    import psyclaw.cli as cli
+
+    source = tmp_path / "kaggle-token.txt"
+    source.write_text("KGAT_test\n", encoding="utf-8")
+    home = tmp_path / "home"
+    monkeypatch.setattr("pathlib.Path.home", lambda: home)
+
+    rc = cli.cmd_mcp(argparse.Namespace(
+        setup_name="kaggle", name=None, access_token_file=str(source)))
+
+    assert rc == 0
+    target = home / ".kaggle" / "access_token"
+    assert target.read_text(encoding="utf-8") == "KGAT_test\n"
+    assert "KGAT_test" not in capsys.readouterr().out
+
+
 def test_setup_modules_offer_kaggle_data():
     from psyclaw.cli import _SETUP_MODULES
 
