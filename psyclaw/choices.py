@@ -142,7 +142,9 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
     hint = ("↑↓ 移动 · 空格勾选 · 回车确认 · Esc 跳过 · 直接打字作答" if multi
             else "↑↓ 移动 · 回车/空格选定 · Esc 跳过 · 直接打字作答")
     out = sys.stdout
-    out.write(ui.accent(f"  {choice['question']}") + ui.dim(f"  ({hint})") + "\n")
+    out.write(ui.paint("  ╭─ 需要你的选择", "brmagenta", "bold") + "\n")
+    out.write(ui.paint(f"  │ {choice['question']}", "brcyan", "bold") + "\n")
+    out.write(ui.dim(f"  │ {hint}") + "\n")
     # 按终端**显示宽度**截断(feat-085 评审修复:此前按 len() 码点数截断,
     # CJK 每字符占 2 列——60 个中文字符在 100 列终端不触发截断却物理换行,
     # 固定行数的光标上移原地重画随即错位花屏;改用 ui 的 CJK 感知宽度工具)。
@@ -161,9 +163,9 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
             cut = ui._clip(o, avail)                # 显示宽度截断(CJK=2 列)
             line = f"{box}{i + 1}. {cut}"
             if i == sel:
-                out.write("\033[K  " + ui.paint("▸ " + line, "brcyan", "bold") + "\n")
+                out.write("\033[K  │ " + ui.paint("▸ " + line, "brcyan", "bold") + "\n")
             else:
-                out.write("\033[K    " + line + "\n")
+                out.write("\033[K  │   " + line + "\n")
         full = opts[sel]
         detail: list[str] = []
         if ui.display_width(full) > avail:          # 高亮项截断了 → 详情区给全文
@@ -173,7 +175,7 @@ def _pick_inline(choice: dict, get_key=None, read_rest=None) -> tuple[list[str],
                 detail[-1] = ui._clip(detail[-1], max(19, width - 9))
         for r in range(detail_rows):
             txt = detail[r] if r < len(detail) else ""
-            out.write("\033[K" + (ui.dim("    ▏" + txt) if txt else "") + "\n")
+            out.write("\033[K  │ " + (ui.dim("▏" + txt) if txt else "") + "\n")
         out.flush()
 
     _draw(first=True)
@@ -233,9 +235,10 @@ def _pick_numbered(choice: dict) -> tuple[list[str], str | None]:
     当作对该问题的自由作答回传给模型继续,而不是「未选择」死胡同。
     """
     from psyclaw import ui
-    print(ui.accent(f"  {choice['question']}"))
+    print(ui.paint("  ╭─ 需要你的选择", "brmagenta", "bold"))
+    print(ui.paint(f"  │ {choice['question']}", "brcyan", "bold"))
     for i, o in enumerate(choice["options"], 1):
-        print(f"    {ui.ok(str(i)):>4}. {o[:90]}")
+        print(f"  │   {ui.ok(str(i)):>2}. {o[:90]}")
     tip = "编号(可多选,如 1,3)或 全部" if choice["multi"] else "编号(单选)"
     try:
         raw = input(f"  选择 [{tip};或直接打字作答;回车跳过]: ")

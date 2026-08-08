@@ -117,7 +117,8 @@ _FENCE_RE = re.compile(r"^```")
 _CHOICES_SYSTEM = (
     "\n# 让用户选择(键盘选择器)\n需要用户在若干选项里选择时,除正文说明外,附一个块:\n"
     "```choices\n{\"question\": \"问题\", \"multi\": true, \"options\": [\"选项A\", \"选项B\"]}\n"
-    "```\nPsyClaw 会弹出键盘选择器并把用户的选择自动回传给你;不要只写复选清单等用户打字。"
+    "```\nPsyClaw 会把**问题和全部选项一起高亮显示**并弹出键盘选择器,再把用户的选择自动回传给你;"
+    "不要只给答案或只写复选清单让用户猜问题。"
     "**先在正文把各方案的内容/取舍写清楚**,选项文字要自包含且简短(一行说清是什么),"
     "不要写「方案A」这种脱离正文就看不懂的标签。"
     "**一次只问一个问题**:绝不把多个问题合并进一次选项、也绝不说「为紧凑我把以上问题"
@@ -549,15 +550,11 @@ def _run_shell_cmd(cmd: str) -> str:
     threading.Thread(target=_pump, daemon=True).start()
     lines: list[str] = []
     deadline = _time.monotonic() + timeout
-    started = _time.monotonic()
-    next_progress = started + _RUN_PROGRESS_INTERVAL
+    activity = ui.ActivityIndicator("后台工作中:命令仍在运行")
+    activity.start()
     timed_out = False
     while True:
         now = _time.monotonic()
-        if now >= next_progress:
-            elapsed = int(now - started)
-            print(ui.dim(f"  ⏳ 后台工作中:命令仍在运行 · 已等待 {elapsed}s"), flush=True)
-            next_progress = now + _RUN_PROGRESS_INTERVAL
         remaining = deadline - now
         if remaining <= 0:
             timed_out = True
@@ -569,8 +566,12 @@ def _run_shell_cmd(cmd: str) -> str:
         if line is None:
             break
         lines.append(line)
+        activity.stop()
         print(ui.run_output(line.rstrip("\n")))   # feat-147:命令输出独立着色,一眼可分
+        activity = ui.ActivityIndicator("后台工作中:命令仍在运行")
+        activity.start()
     body = "".join(lines)
+    activity.stop("命令已结束")
     if timed_out:
         try:
             proc.kill()
@@ -1339,10 +1340,12 @@ class ReplSession:
             pass
         self.chars_in += len(text) + len(system)
         print()
-        print(ui.dim(f"  ⏳ 后台工作中:正在请求 {self.provider.name}…"), flush=True)
+        activity = ui.ActivityIndicator(f"正在请求 {self.provider.name}")
+        activity.start()
         if self.agent_mode:
-            reply = self._run_agent(system)
+            reply = self._run_agent(system, activity=activity)
             if reply is None:            # provider 错误 → 回退用户消息
+                activity.stop("请求失败")
                 self.messages.pop()
                 return
         else:
@@ -1353,19 +1356,24 @@ class ReplSession:
                 with EscapeWatch() as esc:     # feat-090:生成中按 ESC 也能取消本轮
                     for chunk in stream_interruptible(
                             self.provider.chat(self.messages, system=system), esc):
+                        if activity.active:
+                            activity.stop("已收到响应")
                         blk.write(chunk)
                         reply_parts.append(chunk)
             except KeyboardInterrupt:          # Ctrl+C / ESC = 取消本轮,不炸 REPL
+                activity.stop("已中断")
                 blk.write("\n[已中断本轮生成(ESC/Ctrl+C)]")
                 blk.close()
                 self.messages.pop()
                 return
             except Exception as exc:  # noqa: BLE001
+                activity.stop("请求失败")
                 blk.write(f"\n[provider 错误] {exc}")
                 blk.close()
                 self.messages.pop()
                 return
             blk.close()
+            activity.stop("已完成")
             print()
             reply = "".join(reply_parts)
         self.messages.append({"role": "assistant", "content": reply})
@@ -1655,7 +1663,7 @@ class ReplSession:
             print(ui.dim("  (跳过选择;可直接输入你的回复)"))
         return None
 
-    def _run_agent(self, system: str) -> str | None:
+    def _run_agent(self, system: str, activity=None) -> str | None:
         """agent 模式:跑纯工具层循环(模型自主多步调工具)。返回最终答案;provider 错误返回 None。"""
         from psyclaw.toolloop import _short, run_tool_loop
 
@@ -1679,11 +1687,15 @@ class ReplSession:
                 print()
 
         def _on_chunk(text: str) -> None:
+            if activity is not None and activity.active:
+                activity.stop("已收到响应")
             if not cur:
                 cur.append(ui.StreamBlock(f"PsyClaw · {self.provider.name}"))
             cur[0].write(text)
 
         def _emit(e) -> None:
+            if activity is not None and activity.active:
+                activity.stop("进入工具阶段")
             _close_block()                   # 先收块,再打进度行
             print(ui.dim(f"  ⚙ {e}"))
 
@@ -1699,14 +1711,20 @@ class ReplSession:
                 approve=_approve, emit=_emit, on_chunk=_chunk,
                 idle_state=self._tool_idle)   # feat-133:跨消息累积工具组闲置,长期不用清走
         except KeyboardInterrupt:              # feat-090:ESC/Ctrl+C 取消本轮,不炸 REPL
+            if activity is not None:
+                activity.stop("已中断")
             _close_block()
             print(ui.warn("  [已中断本轮生成(ESC/Ctrl+C)]"))
             return None
         except Exception as exc:  # noqa: BLE001
+            if activity is not None:
+                activity.stop("请求失败")
             _close_block()
             print(ui.err(f"  [provider 错误] {exc}"))
             return None
         _close_block()
+        if activity is not None:
+            activity.stop("已完成")
         if res["trace"]:
             print(ui.dim(f"  [agent:{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · "
                          f"{res['stopped']}]"))

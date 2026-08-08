@@ -354,6 +354,7 @@ class StreamBlock:
         self._indicator = _ENABLED
         self._out.flush()
 
+
     def write(self, chunk: str) -> None:
         """缓冲流式 chunk;不直接输出,避免 Markdown 标记被截断。首个 chunk 才打表头。"""
         if chunk:
@@ -363,13 +364,16 @@ class StreamBlock:
     def close(self) -> None:
         """渲染缓冲内容并关闭面板。空缓冲(从未 write)→ 不打任何框,零噪音。"""
         from psyclaw.md_render import render_md
-        if not self._buf.strip():
+        import re
+        display_buf = re.sub(r"```choices\s*\r?\n.*?```", "", self._buf,
+                             flags=re.S).strip()
+        if not display_buf:
             return                              # feat-149:空回复不渲染空框
         self._show_header()                     # 兜底:有内容但还没打过表头
         if self._indicator:
             # 光标上移一行 + 清屏到末尾(覆盖「▪ 正在生成…」行)
             self._out.write("\033[1A\033[J")
-        rendered = render_md(self._buf)
+        rendered = render_md(display_buf)
         w = term_width() - 2
         prefix = paint("│ ", self.color)
         rborder = paint("│", self.color)        # feat-157:右边框收口
@@ -381,6 +385,74 @@ class StreamBlock:
                 self._out.write(prefix + seg + reset + pad + " " + rborder + "\n")
         self._out.write(paint("╰" + "─" * max(0, w - 2) + "╯", self.color) + "\n")
         self._out.flush()
+
+
+class ActivityIndicator:
+    """后台工作指示器：TTY 中轻量旋转，非 TTY 保留一次明确状态。"""
+
+    _FRAMES = ("·", "··", "···", "··", "·")
+
+    def __init__(self, message: str = "后台工作中") -> None:
+        import threading
+        import time
+        self._out = sys.stdout
+        self.message = message
+        self._stop = threading.Event()
+        self._thread = None
+        self._started = False
+        self._started_at = time.monotonic()
+
+    @property
+    def active(self) -> bool:
+        return self._started and not self._stop.is_set()
+
+    def start(self) -> None:
+        import threading
+        import time
+        if self.active:
+            return
+        self._stop.clear()
+        self._started = True
+        self._started_at = time.monotonic()
+        self._draw(0)
+        if _ENABLED:
+            self._thread = threading.Thread(target=self._loop, daemon=True)
+            self._thread.start()
+
+    def _draw(self, index: int) -> None:
+        import time
+        elapsed = int(max(0, time.monotonic() - self._started_at))
+        text = f"  ⏳ {self.message} {self._FRAMES[index % len(self._FRAMES)]} · 已等待 {elapsed}s"
+        if _ENABLED:
+            self._out.write("\r\033[K" + dim(text))
+        else:
+            self._out.write(text + "\n")
+        self._out.flush()
+
+    def _loop(self) -> None:
+        i = 0
+        while not self._stop.wait(0.55):
+            i += 1
+            self._draw(i)
+
+    def stop(self, final: str | None = None) -> None:
+        import threading
+        if not self._started:
+            return
+        self._stop.set()
+        thread = self._thread
+        if thread and thread is not threading.current_thread():
+            thread.join(timeout=1)
+        self._thread = None
+        if _ENABLED:
+            suffix = f"  {final}" if final else ""
+            self._out.write("\r\033[K" + (dim(suffix) if suffix else ""))
+            self._out.write("\n" if suffix else "")
+            self._out.flush()
+        elif final:
+            self._out.write(f"  {final}\n")
+            self._out.flush()
+        self._started = False
 
 
 def banner(version: str) -> str:
