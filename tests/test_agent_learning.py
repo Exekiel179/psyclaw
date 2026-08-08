@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from psyclaw import repl, toolloop as TL
 
 
@@ -110,6 +112,9 @@ def test_ingest_lessons_dedups_and_drafts(monkeypatch, capsys):
 
 # -- 图片内联渲染(REPL/CLI 共用)-----------------------------------------------
 def test_render_images_in_text_renders_existing(tmp_path, capsys, monkeypatch):
+    import sys
+    if sys.platform == "win32":
+        pytest.skip("iTerm2 inline images not supported on Windows")
     import sys as _sys
     monkeypatch.setattr(_sys.stdout, "isatty", lambda: True, raising=False)
     img = tmp_path / "forest_plot.png"
@@ -132,6 +137,9 @@ def test_render_images_in_text_missing_file_skipped():
 
 
 def test_render_images_in_text_limit(tmp_path, capsys, monkeypatch):
+    import sys
+    if sys.platform == "win32":
+        pytest.skip("iTerm2 inline images not supported on Windows")
     import sys as _sys
     monkeypatch.setattr(_sys.stdout, "isatty", lambda: True, raising=False)
     paths = []

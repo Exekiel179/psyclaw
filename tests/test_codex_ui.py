@@ -18,7 +18,7 @@ def test_statusline_shows_model_mode_cwd():
         session_name=None, yolo=False, plan_mode=False, agent_mode=False, file_access="safe")
     line = _plain(ReplSession._statusline(fake))
     assert "deepseek" in line and "chat" in line and "access:safe" in line
-    assert "~" in line or "/" in line               # 当前目录
+    assert "~" in line or "/" in line or "\\" in line  # 当前目录(Windows用反斜杠)
 
 
 def test_statusline_failsafe_and_flags():

@@ -16,7 +16,10 @@ from psyclaw.repl import _normalize_interpreter, _run_env, _run_shell_cmd
 # ---- python→python3 归一(纯函数) --------------------------------------------
 
 def test_normalize_python_to_python3(monkeypatch):
+    import os
     import shutil
+    # Simulate POSIX system where python->python3 normalization happens
+    monkeypatch.setattr(os, "name", "posix")
     monkeypatch.setattr(shutil, "which",
                         lambda b: None if b in ("python", "pip") else "/usr/bin/" + b)
     assert _normalize_interpreter("python scripts/x.py").startswith("python3 ")
