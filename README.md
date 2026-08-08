@@ -3,7 +3,9 @@
 > 心理学研究编排 Agent CLI —— 文献、统计分析、论文写作润色,用日常语言完成。
 > 装好之后不需要记命令:说你要做什么,它去做。
 
-📘 **[使用白皮书(PDF)](docs/PsyClaw使用白皮书_v0.21.0.pdf)** —— 完整用法、对话示例、常见问题,建议先读这份。
+📘 **[使用白皮书(DOCX)](docs/PsyClaw使用白皮书_v0.23.0.docx)** —— 完整用法、对话示例、常见问题,建议先读这份。
+
+📋 **[v0.23.0 协作交接](docs/COLLABORATION_STATUS_v0.23.0.md)** —— 当前交付、开发待办、人工测试与文档更新状态。
 
 ---
 
@@ -129,7 +131,8 @@ Skill 只有在 `known/forward/contrast/boundary` 四类验证全部通过、且
 
 | 文档 | 内容 |
 |---|---|
-| [使用白皮书(PDF)](docs/PsyClaw使用白皮书_v0.21.0.pdf) | **推荐先读**:完整用法与对话示例 |
+| [使用白皮书(DOCX)](docs/PsyClaw使用白皮书_v0.23.0.docx) | **推荐先读**:完整用法与对话示例 |
+| [v0.23.0 协作交接](docs/COLLABORATION_STATUS_v0.23.0.md) | 当前能力、待办、人工验收与文档状态 |
 | [TUTORIAL.md](docs/TUTORIAL.md) | 分步教程 |
 | [COMMANDS.md](docs/COMMANDS.md) | 命令地图(`psyclaw commands` 可随时查看) |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构说明(参与开发时看) |

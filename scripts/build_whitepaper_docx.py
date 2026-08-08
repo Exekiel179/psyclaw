@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""生成 PsyClaw 使用白皮书的 Word 版(风格对齐用户提供的参考白皮书)。
+"""生成 PsyClaw 使用白皮书的 Word 版。
 
 参考件结构:封面(主标题/副标题/破折号行/定位行/日期版次)→ 关于本白皮书 →
 如何使用本白皮书 → 执行摘要 → 目录(域代码,Word 打开后 F9 更新)→ 第 N 章 → 附录。
 信息框三色:蓝=命令/提示词示例、绿=实用建议、黄=风险警示;灰底=代码。
 
-内容真源是 docs/WHITEPAPER.md 所依据的实测数据;本脚本只负责排版。
+内容随当前公开接口和已验证能力维护；本脚本负责排版。
 用法:uv run --python 3.12 --with python-docx python scripts/build_whitepaper_docx.py
 """
 from __future__ import annotations
@@ -25,8 +25,11 @@ sys.path.insert(0, str(ROOT))
 import psyclaw  # noqa: E402
 
 VER = psyclaw.__version__
-CN_FONT = "Songti SC"          # 正文中文
-CN_HEI = "Heiti SC"            # 标题中文
+# Arial Unicode MS is available to both Word and the headless LibreOffice
+# renderer used for release QA; using a shared fallback prevents missing-glyph
+# boxes when the document is rendered on a clean machine.
+CN_FONT = "Arial Unicode MS"   # 正文中文
+CN_HEI = "Arial Unicode MS"    # 标题中文
 MONO = "Menlo"
 
 BLUE = RGBColor(0x1F, 0x4E, 0x79)
@@ -37,9 +40,12 @@ GREY = RGBColor(0x44, 0x44, 0x44)
 
 # ── 底层排版助手 ────────────────────────────────────────────────────────────
 def _cn(run, font=CN_FONT):
-    """中文字体必须同时设 eastAsia,否则 Word 里中文回落成宋体默认、字重不对。"""
+    """Set every OOXML font slot so Word and LibreOffice share the CJK face."""
     run.font.name = font
-    run._element.rPr.rFonts.set(qn("w:eastAsia"), font)
+    r_fonts = run._element.rPr.rFonts
+    for slot in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+        r_fonts.set(qn(slot), font)
+    r_fonts.set(qn("w:hint"), "eastAsia")
 
 
 def _shade(cell, hex_color: str):
@@ -221,7 +227,7 @@ def build(out_path: Path):
          align=WD_ALIGN_PARAGRAPH.CENTER, color=GREY, space_after=18)
     para(doc, "无需编程 · 无需记忆命令", size=11,
          align=WD_ALIGN_PARAGRAPH.CENTER, color=BLUE, space_after=40)
-    para(doc, f"2026 年 7 月 · v{VER}", size=11,
+    para(doc, f"2026 年 8 月 · v{VER}", size=11,
          align=WD_ALIGN_PARAGRAPH.CENTER, color=GREY)
     page_break(doc)
     heading(doc, "关于本白皮书")
@@ -235,10 +241,10 @@ def build(out_path: Path):
               "日常可能使用 SPSS、JASP 或 R。分析脚本由 PsyClaw 生成并交给成熟统计库"
               "运行,你不必自己写。")
     heading(doc, "如何使用本白皮书", level=2)
-    bullet(doc, "第 1 章:安装与配置。首次使用前请完整阅读。")
-    bullet(doc, "第 2–4 章:文献 → 统计分析 → 写作润色,三个阶段各成一章,可按需查阅。")
-    bullet(doc, "第 5 章:使用建议与能力边界。")
-    bullet(doc, "附录:常用表述速查、量表配置、常见问题。")
+    bullet(doc, "第 1 章:安装与两个公开入口。首次使用前请完整阅读。")
+    bullet(doc, "第 2–4 章:文献 → 分析委托 → 写作与质量检查,三个阶段各成一章,可按需查阅。")
+    bullet(doc, "第 5 章:使用建议、能力边界与人工责任。")
+    bullet(doc, "第 6 章:研究流程、System Skill Pack、宿主 Skill/MCP 与资料编译。")
     para(doc, "文中三类信息框:蓝色为对话示例(可直接照此表述),绿色为实用建议,"
               "黄色为风险提示。灰底为需在终端输入的命令——"
               "除安装配置外,正文中几乎不再涉及。", space_after=10)
@@ -308,14 +314,13 @@ def ch1(doc):
     code(doc, ["psyclaw setup"])
     para(doc, "该命令引导完成功能板块选择、模型服务(provider)与密钥配置。"
               "配置一次即可,后续所有项目通用。")
-    heading(doc, "1.5　四个入口", level=2)
-    para(doc, "日常使用涉及以下四个入口。进入后即以自然语言交互。")
+    heading(doc, "1.5　两个公开入口", level=2)
+    para(doc, "日常使用只需记住两个入口：一起做用 chat，交给它做用 run。")
     table(doc, ["入口", "什么时候用"],
-          [["psyclaw", "最常用。直接进入对话。"],
-           ["psyclaw new 研究名", "新建研究。将建立独立目录,"
-                                  "其目标与进度同其他研究相互隔离。"],
-           ["psyclaw resume", "续接历史会话。不带参数时续接最近一次。"],
-           ["psyclaw status", "查看当前研究进度:目标、待办事项、最近产出与后续建议。"]],
+          [["psyclaw chat(或直接 psyclaw)", "一起做：自然语言讨论、澄清、读取材料和逐步决策。"],
+           ["psyclaw run <类型>", "交给它做：按步骤执行 literature、meta、analysis 或 qualitative 流程。"],
+           ["psyclaw run", "根据项目状态自动继续下一步；遇到 gate 或人工决策会暂停。"],
+           ["psyclaw status", "查看目标、待办、最近产出和下一步建议。"]],
           [4.6, 10.6])
     box(doc, "实用建议",
         ["建议每项研究单独使用 psyclaw new 建立目录。",
@@ -394,6 +399,8 @@ def ch2(doc):
         ["帮我核一下这份稿子里的参考文献,是不是每条都真实存在"])
     para(doc, "系统将稿件中每条参考文献送至学术数据库逐条查证,"
               "并严格区分以下三种结果:")
+    # Keep the result table and its explanatory callout together.
+    page_break(doc)
     table(doc, ["结果", "含义"],
           [["查到了", "该文献真实存在,作者与年份都对得上"],
            ["查无此文", "疑似杜撰或著录有误,将明确标出待处理"],
@@ -430,8 +437,9 @@ def ch3(doc):
         ["数据在 data/clean/survey.csv,帮我看看这份数据什么情况",
          "帮我按 MBI 的计分规则算总分,第 13、14 题是反向题",
          "有没有明显乱答的被试?比如一直选同一个选项的"])
-    para(doc, "系统可执行反向题翻转、子量表求和、缺失值处理,并识别可疑作答模式。"
-              "量表计分规则由研究者提供一次(见附录 B),此后持续可用。")
+    para(doc, "系统可执行规则化的反向题翻转、子量表求和、缺失值处理,并识别可疑作答模式。"
+              "量表计分规则由研究者提供一次(见附录 B),此后持续可用；信度和其他统计量"
+              "会生成委托成熟统计库的可复现脚本或交给 MCP 后端执行。")
     heading(doc, "3.3　执行分析", level=2)
     say(doc, "对话示例",
         ["帮我做个中介分析,自变量工作满意度,中介变量倦怠,因变量离职意向",
@@ -529,7 +537,8 @@ def ch5(doc):
 def ch6(doc):
     heading(doc, "第六章　流程编排与能力扩展")
     para(doc, "前几章介绍的是单步操作。当研究进入需要多步骤串联的阶段时,"
-              "可使用流程编排;当内置能力不足时,可通过 skill 与 MCP 扩展。")
+              "可使用流程编排；当内置能力不足时，可通过 System Skill Pack、既有宿主 Skill"
+              "与 MCP 扩展。")
     heading(doc, "6.1　四类研究流程", level=2)
     para(doc, "流程会自动串联「设计 → 执行 → 产出 → 评审」各环节,"
               "并在每个环节留下可复现的记录。可在对话中直接说明,"
@@ -559,26 +568,27 @@ def ch6(doc):
         ["除上述四类流程外,还可让系统根据项目当前状态自主决定下一步:",
          "在对话中说明「按现在的进度继续推进」即可。",
          "强制性检查与不可逆决策仍会暂停并征求同意,不会一路跑到底。"], "blue")
-    heading(doc, "6.2　skill:把方法学流程装进来", level=2)
-    para(doc, "skill 是一份结构化的方法学流程说明。系统内置若干 skill,"
-              "在对话涉及相应主题时自动调用,无需手动指定。")
-    table(doc, ["内置 skill", "用途"],
-          [["nature-review", "Nature 级同行评审与回复信撰写"],
-           ["sample-size", "样本量估算(功效分析)"],
-           ["confound-control", "无关变量与混淆变量的控制流程"],
-           ["analysis-planning", "实证分析计划制定"],
-           ["lit-review", "文献综述与证据合成"],
-           ["pingouin", "统计函数选择指南"],
-           ["paper-review-gates", "稿件评审与质量把关"]], [4.4, 10.8])
-    para(doc, "亦可安装第三方 skill。在终端执行:", space_after=2)
-    code(doc, ["psyclaw skill install https://github.com/用户名/仓库名"])
-    para(doc, "安装后的 skill 位于项目的 .claude/skills 目录,系统会自动发现并纳入调用范围。"
-              "查看当前已装载的 skill,在对话中询问即可。")
+    heading(doc, "6.2　Skill：按领域加载方法学流程", level=2)
+    para(doc, "Skill 是 Agent 可检索的结构化流程说明。v0.23.0 将“发现、安装、启用”分开："
+              "core 随包启用；其他领域包默认只显示为可用，安装或显式启用后才会进入默认检索。")
+    table(doc, ["System Skill Pack", "用途"],
+          [["core", "研究工作流路由与学术质量检查；随包安装且锁定启用"],
+           ["research-design", "分析规划、混淆控制与样本量设计"],
+           ["literature", "真实检索、PRISMA 筛选与证据综合"],
+           ["quantitative", "统计函数路由与可复现分析规划"],
+           ["writing-review", "论文质量检查、同行评审与回复信"],
+           ["agent-learning", "从资料与轨迹蒸馏可复用 Skill"]], [4.8, 10.4])
+    para(doc, "查看、安装或更新领域包:", space_after=2)
+    code(doc, ["psyclaw skills --packs",
+               "psyclaw skills --pack-install research-design",
+               "psyclaw skills --pack-update writing-review"])
+    para(doc, "系统也会只读发现 Claude Code、Codex、cc-switch 和插件提供的 Skill。"
+              "同名副本不会静默择一，可在 Registry 中审计来源和重复项。")
     box(doc, "安全提示",
-        ["skill 安装仅接受 https 协议的 GitHub 地址。",
-         "第三方 skill 的内容会进入系统提示并影响模型行为,",
-         "请确认来源可信后再安装。"], "amber")
-    heading(doc, "6.3　MCP:接入外部统计软件与服务", level=2)
+        ["非 core Skill 必须安装领域包或显式启用，发现不等于已验证。",
+         "第三方 Skill 会影响 Agent 的执行流程，请确认来源可信并审阅其权限需求。",
+         "带来源的 Claim-Evidence 验证通过前，资料蒸馏产生的 Skill 只能处于候选状态。"], "amber")
+    heading(doc, "6.3　MCP：接入外部统计软件与服务", level=2)
     para(doc, "MCP(Model Context Protocol)用于把外部工具接入对话。"
               "配置完成后,这些工具与内置能力一样可被直接调用。")
     table(doc, ["MCP 服务", "用途"],
@@ -592,11 +602,19 @@ def ch6(doc):
     para(doc, "查看目录与启用状态:", space_after=2)
     code(doc, ["psyclaw mcp        # 查看 MCP 目录与当前启用状态",
                "psyclaw config     # 配置向导中可完成密钥与路径设置"])
-    para(doc, "已有 SPSS、Mplus 使用习惯的研究者,可通过对应 MCP 继续使用原有软件,"
-              "由 PsyClaw 负责流程串联与结果归档。")
+    para(doc, "已有 SPSS、Mplus 使用习惯的研究者，可通过对应 MCP 继续使用原有软件，"
+              "由 PsyClaw 负责流程串联与结果归档。PsyClaw 也会发现宿主已有 MCP 配置；"
+              "项目级配置默认仅发现、不执行，确认项目可信后才可显式信任。当前执行客户端仅支持 stdio MCP。")
     box(doc, "实用建议",
-        ["MCP 采用惰性加载:未实际调用时不会占用上下文,",
-         "因此可以按需配置多个而不必担心影响日常对话的响应速度。"], "green")
+        ["MCP 采用惰性加载：未实际调用时不会启动对应进程。",
+         "配置中的环境变量只传给对应 MCP 子进程，不会显示在 Agent 上下文中。",
+         "所有写盘、下载和外部副作用仍沿用审批机制。"], "green")
+    heading(doc, "6.4　资料编译与可审计 Skill", level=2)
+    para(doc, "已有的论文、访谈材料、网页或视频资料可先编译为可检索的项目材料，再由 Agent"
+              "建立带哈希、来源和验证状态的证据账本。资料可导航不代表结论已被验证；"
+              "Skill 的晋升仍需要人工核查。")
+    code(doc, ["psyclaw convert materials.docx --out notes/materials.md",
+               "psyclaw convert --url https://example.org/video"])
     page_break(doc)
 
 def appendices(doc):
@@ -675,7 +693,7 @@ def appendices(doc):
     for q, a in qa:
         para(doc, "问:" + q, bold=True, space_after=2)
         para(doc, "答:" + a, space_after=8)
-    para(doc, f"PsyClaw v{VER} · 源码与问题反馈:"
+    para(doc, f"PsyClaw v{VER} · 源码、问题反馈与协作交接:"
               "https://github.com/Exekiel179/psyclaw · MIT 许可",
          size=9.5, color=GREY, align=WD_ALIGN_PARAGRAPH.CENTER)
 def main():

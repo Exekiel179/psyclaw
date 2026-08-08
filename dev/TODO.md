@@ -3,7 +3,7 @@
 > **状态约定**：✅ 已落地 · 🚧 进行中 · 📋 已设计待实现 · ❓ 开放问题
 > **真源分工**：机器可读状态真源 = `feature_list.json`；人读快照 = `progress.md`;
 > 交接 = `session-handoff.md`;本文件 = **计划真源**(只列现状与未完成/候选工作)。
-> 最后整理：2026-07-03
+> 最后整理：2026-08-08
 
 ---
 
@@ -38,6 +38,25 @@ psyclaw 只保留:研究编排(流程/回路)、知识参考、文献/写作、�
 ---
 
 ## 2. 未完成 / 进行中
+
+### v0.23.0 发布后收口（2026-08-08）
+
+- ✅ **P0 使用白皮书重建**：已由 `scripts/build_whitepaper_docx.py` 生成
+  `PsyClaw使用白皮书_v0.23.0.docx`，并完成 Quick Look 内容核验；覆盖 `chat/run`、System Skill Pack、宿主
+  Skill/MCP、资料编译与安全边界；旧 `PsyClaw使用白皮书_v0.21.0.*` 仅作历史归档。
+- 📋 **P0 可复跑发布验证**：在允许 fixture 绑定 localhost 的环境全量复跑 pytest，处理或证明
+  当前 7 个 PDF/WebBridge fixture 错误；发布说明只引用带命令输出的测试数字。
+- 📋 **P0 预印本事实核验**：更新 `docs/PsyClaw预印本_draft.md` 中版本、规则数、测试数和
+  功能描述；先核验引用/事实与可复跑证据，再生成 DOCX，不能只替换数字。
+- 📋 **P1 宿主生态人工兼容性**：在 Claude Code、Codex、cc-switch 的真实配置中验证 Skill/
+  plugin/MCP 发现、禁用态、冲突与 source preference；项目 MCP 未信任时必须不可执行。
+- 📋 **P1 System Skill Pack 实机验收**：在干净用户目录验证五个领域包的 install/update/
+  enable/disable、离线失败回退和不覆盖用户 Skill。
+- 📋 **P2 DOCX/PDF 多页视觉回归**：在具备完整中文字体的 Word/Pages 或 LibreOffice + Poppler
+  环境运行完整 DOCX→PDF/PNG 回归，覆盖三线表、分页、脚注和中英文排版；当前 Quick Look
+  内容核验不能替代逐页视觉验收。
+
+完整协作说明与手工测试步骤见 `docs/COLLABORATION_STATUS_v0.23.0.md`。
 
 **cite/scale/method 重定位三部曲(2026-07-18,用户拍板:cite=引用文章+引文核查,
 scale=量表分析含虚伪作答+信效度,method=方法学 skill 路由;统计一律外移)**:

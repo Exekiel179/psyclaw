@@ -1,4 +1,20 @@
 # Changelog
+## v0.23.0(2026-08-08)
+
+> 主题:**学术 Skill 平台与 Agent 原生交付工具**。
+
+- 新增 Agent 可调用的学术编排工具：资料导入/编译、Claim-Evidence 账本、Skill 蒸馏、交接、
+  图件编排与 DOCX 契约检查；结构化参数和副作用审批为默认接口，CLI 保留作人工调试入口。
+- 新增 Skill Registry：按自然语言、分类和标签检索，记录来源、哈希、证据等级、启用状态与
+  同名副本；`skill_get` 仅能读取 Registry 已解析的已启用项。
+- 新增 core + 五个领域 System Skill Pack；非 core 包支持受约束 Git 稀疏安装、更新、启停与
+  项目/全局状态覆盖，core 随包安装且锁定启用。
+- 只读发现 Claude Code、Codex 与 cc-switch 的 Skill、插件和 MCP 配置；项目级宿主 MCP
+  默认不执行，需显式信任；当前只注册 stdio MCP。
+- 强化 DOCX 交付：固定导出、OOXML/样式/脚注/表格契约检查、三线表 fixture 与视觉验证脚本。
+- 新增 v0.23.0 使用白皮书 DOCX、预印本草稿和协作交接页。预印本中的历史测试数字仍须在可复跑
+  验证后更新；详见 `docs/COLLABORATION_STATUS_v0.23.0.md`。
+
 ## v0.22.0(2026-07-22)
 
 > 主题:**灵智龙虾品牌与下载入口**——统一中文品牌，降低新用户安装门槛。
