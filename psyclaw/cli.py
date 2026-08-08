@@ -645,6 +645,26 @@ def cmd_skills(args: argparse.Namespace) -> int:
 def cmd_mcp(args: argparse.Namespace) -> int:
     setup_name = getattr(args, "setup_name", None)
     if setup_name == "kaggle":
+        token_file_arg = getattr(args, "access_token_file", None)
+        if token_file_arg:
+            token_path = Path(token_file_arg).expanduser()
+            try:
+                token = token_path.read_text(encoding="utf-8").strip()
+            except (OSError, UnicodeError) as exc:
+                print(f"无法读取 Kaggle access token 文件：{exc}")
+                return 1
+            if not token:
+                print("Kaggle access token 文件为空。")
+                return 1
+            target = Path.home() / ".kaggle" / "access_token"
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(token + "\n", encoding="utf-8")
+            except OSError as exc:
+                print(f"无法写入 Kaggle access token：{exc}")
+                return 1
+            print("Kaggle 新版 Token 已配置到 ~/.kaggle/access_token（仅供 Kaggle MCP 使用）。")
+            return 0
         from psyclaw.mcp.client import resolve_command
         from psyclaw.mcp.manager import REGISTRY, _parse_registry
 
@@ -2284,6 +2304,8 @@ def build_parser() -> argparse.ArgumentParser:
                       help="作为 stdio MCP 服务器运行(mne/spss/mplus/stata)")
     pmcp.add_argument("--setup", dest="setup_name", choices=["kaggle"], default=None,
                       help="配置外部 MCP 凭据(kaggle)")
+    pmcp.add_argument("--access-token-file", dest="access_token_file", default=None,
+                      help="从文件读取新版 Kaggle Token，写入用户级 ~/.kaggle/access_token")
     pmcp.set_defaults(func=cmd_mcp)
     sub.add_parser("gates", help="质量规则系统自检(check 才检查实际稿件)").set_defaults(func=cmd_gates)
 

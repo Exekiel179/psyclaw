@@ -59,8 +59,16 @@ PsyClaw 本体不内置 Kaggle SDK。
 psyclaw mcp --setup kaggle
 ```
 
-按提示从 <https://www.kaggle.com/settings> 创建 API token。凭据只写入标准
-`~/.kaggle/kaggle.json`，不会写入项目或仓库。配置后可在 `psyclaw chat` 中直接说：
+按提示从 <https://www.kaggle.com/settings> 创建 API token。新版 Kaggle 下载的
+`KGAT_...` Token 也可以直接导入（不会回显 Token）：
+
+```bash
+psyclaw mcp --setup kaggle --access-token-file ~/Downloads/kaggle-token.txt
+```
+
+凭据只写入用户级 `~/.kaggle/access_token` 或标准 `~/.kaggle/kaggle.json`，不会写入项目或仓库。
+PsyClaw 只把 Token 注入 Kaggle MCP 子进程，不会传播给其他 MCP。配置后可在
+`psyclaw chat` 中直接说：
 
 ```text
 在 Kaggle 搜索适合研究工作倦怠的数据集，先列出候选和字段信息，不要下载。
