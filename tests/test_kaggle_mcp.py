@@ -95,6 +95,40 @@ def test_kaggle_setup_accepts_new_token_file(monkeypatch, tmp_path, capsys):
     assert "KGAT_test" not in capsys.readouterr().out
 
 
+def test_agent_can_configure_kaggle_without_telling_user_to_run_cli(
+        monkeypatch, tmp_path):
+    from psyclaw.toolloop import build_tools
+
+    source = tmp_path / "token.txt"
+    source.write_text("KGAT_test\n", encoding="utf-8")
+    home = tmp_path / "home"
+    monkeypatch.setattr("pathlib.Path.home", lambda: home)
+
+    tool = build_tools(str(tmp_path))["kaggle_configure"]
+    assert tool["side_effect"] is True
+    assert "不要让用户手动运行命令" in tool["desc"]
+    out = tool["run"]({"token_file": str(source)})
+
+    assert "已配置" in out
+    assert "KGAT_test" not in out
+    assert (home / ".kaggle" / "access_token").read_text(encoding="utf-8") \
+        == "KGAT_test\n"
+
+
+def test_agent_kaggle_configure_reuses_existing_environment(monkeypatch, tmp_path):
+    from psyclaw.toolloop import build_tools
+
+    home = tmp_path / "home"
+    monkeypatch.setattr("pathlib.Path.home", lambda: home)
+    monkeypatch.setenv("KAGGLE_API_TOKEN", "KGAT_env")
+    out = build_tools(str(tmp_path))["kaggle_configure"]["run"]({})
+
+    assert "已配置" in out
+    assert "KGAT_env" not in out
+    assert (home / ".kaggle" / "access_token").read_text(encoding="utf-8") \
+        == "KGAT_env\n"
+
+
 def test_setup_modules_offer_kaggle_data():
     from psyclaw.cli import _SETUP_MODULES
 

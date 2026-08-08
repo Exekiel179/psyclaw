@@ -647,24 +647,10 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     if setup_name == "kaggle":
         token_file_arg = getattr(args, "access_token_file", None)
         if token_file_arg:
-            token_path = Path(token_file_arg).expanduser()
-            try:
-                token = token_path.read_text(encoding="utf-8").strip()
-            except (OSError, UnicodeError) as exc:
-                print(f"无法读取 Kaggle access token 文件：{exc}")
-                return 1
-            if not token:
-                print("Kaggle access token 文件为空。")
-                return 1
-            target = Path.home() / ".kaggle" / "access_token"
-            try:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(token + "\n", encoding="utf-8")
-            except OSError as exc:
-                print(f"无法写入 Kaggle access token：{exc}")
-                return 1
-            print("Kaggle 新版 Token 已配置到 ~/.kaggle/access_token（仅供 Kaggle MCP 使用）。")
-            return 0
+            from psyclaw.mcp.client import configure_kaggle_token
+            result = configure_kaggle_token(token_file=token_file_arg)
+            print(result.get("message", result))
+            return 0 if result.get("ok") else 1
         from psyclaw.mcp.client import resolve_command
         from psyclaw.mcp.manager import REGISTRY, _parse_registry
 

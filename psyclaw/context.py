@@ -216,6 +216,8 @@ def capability_map() -> str:
         "用户点下载 → lit_capture_pdf() 自动收;\n"
         "Zotero 文库:zotero_search(先在用户自己库里找,别重复下载)/ "
         "zotero_fulltext(付费墙文献的合法全文来源)/ zotero_add(好文献入库);\n"
+        "Kaggle 数据:用户说‘配置 Kaggle’就直接调 kaggle_configure 自动发现/配置本机 Token，"
+        "不要让用户记命令；配置后再调 mcp__kaggle__search_datasets / download_dataset;\n"
         "量表(用你自己定义的)/质检/导出:scale / check / export。\n"
         "有对应工具就调工具,别让用户去记命令;拿不准先想现成能力,再考虑手写。")
 

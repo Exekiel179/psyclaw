@@ -6,6 +6,8 @@
 - Kaggle MCP 配置支持新版 `KGAT_...` Token 文件导入：`psyclaw mcp --setup kaggle
   --access-token-file <文件>`。Token 保存在用户级 `~/.kaggle/access_token`，仅注入 Kaggle
   MCP 子进程，不传播给其他 MCP。
+- Agent 新增 `kaggle_configure` 对话工具；用户直接说“配置 Kaggle MCP”即可由 Agent 自动
+  检查并配置本机凭据，不再要求用户记住 CLI 命令。
 - 新增 Agent 可调用的学术编排工具：资料导入/编译、Claim-Evidence 账本、Skill 蒸馏、交接、
   图件编排与 DOCX 契约检查；结构化参数和副作用审批为默认接口，CLI 保留作人工调试入口。
 - 新增 Skill Registry：按自然语言、分类和标签检索，记录来源、哈希、证据等级、启用状态与

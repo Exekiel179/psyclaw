@@ -37,6 +37,49 @@ _SAFE_ENV_KEYS = frozenset({
 })
 
 
+def _kaggle_access_token_path() -> Path:
+    return Path.home() / ".kaggle" / "access_token"
+
+
+def _read_token_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return ""
+
+
+def configure_kaggle_token(token: str | None = None,
+                           token_file: str | None = None) -> dict[str, str | bool]:
+    """发现并保存 Kaggle token；返回状态信息，绝不返回 token 本身。"""
+    source = ""
+    value = (token or "").strip()
+    if value:
+        source = "argument"
+    if not value and token_file:
+        value = _read_token_file(Path(token_file).expanduser())
+        source = "token_file" if value else "token_file_empty"
+    if not value:
+        for key in ("KAGGLE_API_TOKEN", "KAGGLE_KEY"):
+            value = os.environ.get(key, "").strip()
+            if value:
+                source = f"env:{key}"
+                break
+    if not value:
+        value = _read_token_file(_kaggle_access_token_path())
+        if value:
+            source = "access_token"
+    if not value:
+        return {"ok": False, "status": "missing", "message": "未找到 Kaggle Token"}
+    target = _kaggle_access_token_path()
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(value + "\n", encoding="utf-8")
+    except OSError as exc:
+        return {"ok": False, "status": "error", "message": f"无法写入 Kaggle Token:{exc}"}
+    return {"ok": True, "status": "configured", "source": source,
+            "path": str(target), "message": "Kaggle Token 已配置"}
+
+
 def resolve_command(command: str) -> list[str]:
     """把 registry 的 command 字符串拆成 argv;开头的 `python` 换成当前解释器。
 
@@ -122,11 +165,7 @@ class MCPClient:
         """构造最小运行环境；Kaggle token 只给 Kaggle MCP 子进程。"""
         env = {k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}
         if "kaggle-mcp" in self.command:
-            token_file = Path.home() / ".kaggle" / "access_token"
-            try:
-                token = token_file.read_text(encoding="utf-8").strip()
-            except (OSError, UnicodeError):
-                token = ""
+            token = _read_token_file(_kaggle_access_token_path())
             if token:
                 # kaggle-mcp v3 still gates startup on a non-empty username,
                 # while KGAT tokens authenticate through Bearer auth alone.
