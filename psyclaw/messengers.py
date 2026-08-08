@@ -141,6 +141,7 @@ def serve_telegram() -> int:
             try:
                 reply = "".join(provider.chat(history[-20:], system=system))
             except Exception as exc:  # noqa: BLE001
-                reply = f"[provider 错误] {exc}"
+                from psyclaw.network import network_error_message
+                reply = network_error_message(exc) or f"[provider 错误] {exc}"
             history.append({"role": "assistant", "content": reply})
             _tg_send(token, chat_id, reply or "(空回复)")

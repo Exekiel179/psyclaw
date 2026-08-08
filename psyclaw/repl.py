@@ -1367,8 +1367,10 @@ class ReplSession:
                 self.messages.pop()
                 return
             except Exception as exc:  # noqa: BLE001
-                activity.stop("请求失败")
-                blk.write(f"\n[provider 错误] {exc}")
+                from psyclaw.network import network_error_message
+                network_msg = network_error_message(exc)
+                activity.stop("网络连接失败" if network_msg else "请求失败")
+                blk.write(f"\n[{network_msg or f'provider 错误: {exc}'}]")
                 blk.close()
                 self.messages.pop()
                 return
@@ -1717,10 +1719,12 @@ class ReplSession:
             print(ui.warn("  [已中断本轮生成(ESC/Ctrl+C)]"))
             return None
         except Exception as exc:  # noqa: BLE001
+            from psyclaw.network import network_error_message
+            network_msg = network_error_message(exc)
             if activity is not None:
-                activity.stop("请求失败")
+                activity.stop("网络连接失败" if network_msg else "请求失败")
             _close_block()
-            print(ui.err(f"  [provider 错误] {exc}"))
+            print(ui.err(f"  [{network_msg or f'provider 错误: {exc}'}]"))
             return None
         _close_block()
         if activity is not None:
