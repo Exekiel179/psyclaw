@@ -76,6 +76,13 @@ def redact_secrets(text: str) -> str:
     safe = re.sub(r"\bKGAT_[A-Za-z0-9._-]+", "KGAT_<redacted>", text,
                   flags=re.I)
     safe = re.sub(
+        r"\b(?:sk-(?:ant-)?[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{20,}|"
+        r"github_pat_[A-Za-z0-9_]{20,})\b",
+        "<redacted-token>", safe, flags=re.I,
+    )
+    safe = re.sub(r"(https?://)[^/@\s:]+:[^/@\s]+@", r"\1<redacted>@", safe,
+                  flags=re.I)
+    safe = re.sub(
         r"([?&](?:api[_-]?key|access[_-]?token|token|key)=)[^&\s]+",
         r"\1<redacted>", safe, flags=re.I,
     )

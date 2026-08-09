@@ -28,9 +28,16 @@ from psyclaw.ui_input import read_line
 MAX_FILE_CHARS = 30_000
 _MAX_GOAL_CONTEXT_CHARS = 8_000
 _MAX_EMPTY_REPLY_RETRIES = 2
+_MAX_PROMISE_RECOVERIES = 2
 _EMPTY_REPLY_NUDGE = (
     "上一轮模型回复为空,但前一条工具或命令结果仍待处理。请直接检查上一条结果:"
     "若失败,说明原因并修正后继续;若成功,解释结果并推进剩余任务。不要等待用户再说『继续』。"
+)
+_UNFULFILLED_ACTION_NUDGE = (
+    "你刚才声明要执行操作或等待结果，但回复中没有任何可执行的工具调用、命令块或读取请求，"
+    "因此系统实际上没有开始工作。请现在立即实际调用相应工具；若必须运行命令，输出一个完整的"
+    "psyclaw/powershell/shell/python 围栏。不要再次只说『我先做』『等结果回传』，也不要等待用户"
+    "输入『继续』。如果操作已经不需要执行，请直接给出带依据的最终结论。"
 )
 PROMPT = ui.paint("psyclaw", "brcyan", "bold") + ui.dim(" ❯ ")
 
@@ -129,26 +136,47 @@ _CHOICES_SYSTEM = (
 # shell 交系统终端跑。危险命令(rm -rf / git push --force / DROP TABLE…)须人工确认。
 _RUN_SYSTEM = (
     "\n# 直接运行命令(会真的执行)\n要跑 PsyClaw 子命令或系统命令时,第一人称「我来跑」"
-    "并当场输出命令块(每行一条),PsyClaw 会**自动执行**并把输出回传给你——"
+    "并当场输出命令块,PsyClaw 会**自动执行**并把输出回传给你——"
     "**绝不要写「请你运行」「请在终端执行」把命令甩给用户手动跑**(它本就会自动执行,"
     "那样只会让用户困惑):\n"
     "```psyclaw\nrun analysis data/clean/x.csv\n```\n"
     "```shell\npython3 outputs/analysis.py\n```\n"
     "```python\nprint('需要执行的 Python 代码')\n```\n"
+    "psyclaw 块每行一条子命令；shell/powershell/cmd/bash/sh 块是一个完整脚本,"
+    "多行循环、管道和变量赋值必须放在同一个围栏内,不要拆成多条命令。\n"
     "(python3/python 都行,psyclaw 自动适配本机解释器;脚本可直接 `import psyclaw`,"
     "Python 代码围栏也会自动执行并实时回传输出,PYTHONPATH 已配好)\n"
     "注意:**没有** describe/stat 等内置统计命令(统计已外移)——统计请生成脚本再用 shell 跑。"
     "不要输出命令块之后就当作已完成;结果会回传,等结果再下结论。")
 _RUN_SAFE_NOTE = "(当前安全模式:命令块不会自动执行,会提示用户手动跑。)"
 
+
+def _platform_shell_system() -> str:
+    """把当前 Shell 方言明确告诉模型，避免在 Windows 生成 POSIX 命令。"""
+    if sys.platform == "win32":
+        return (
+            "\n# 当前命令环境:Windows\n"
+            "系统命令优先使用 ```powershell 围栏；查找程序用 `Get-Command` 或 `where`，"
+            "不要使用 `which`。PowerShell 多行管道、ForEach-Object、变量赋值必须整体放在"
+            "同一个 powershell 围栏中，不要外包一层 `powershell -Command`，也不要逐行拆开。"
+        )
+    return (
+        "\n# 当前命令环境:POSIX\n"
+        "系统命令使用 ```bash 或 ```sh 围栏；不要生成 PowerShell cmdlet。"
+    )
+
 _RUN_RE = re.compile(r"```(?P<kind>psyclaw|shell|bash|sh|cmd|powershell|python|python3|py)\s*\r?\n"
                      r"(?P<body>.*?)```", re.S)
-# 危险模式标签(CLAUDE.md 红线)。v0.3 安全加固(外审 HIGH):此正则只是确认提示里的
-# ⚠ 标签,**不是**安全边界——LLM 生成的 shell 命令每条都须人工确认(fail-closed),
-# 拒绝清单绕过太容易(变量拼接/base64/别名),不能作为放行依据。
+# 危险模式标签(CLAUDE.md 红线)。普通 shell 按 approval 策略自动放行；命中这些
+# 明确的高风险模式时始终确认。命令仍经过沙箱和凭据环境隔离，正则不是唯一边界。
 _DANGEROUS_RE = re.compile(
     r"rm\s+-rf|git\s+push\s+--force|git\s+reset\s+--hard|push\s+.*\b(master|main)\b"
-    r"|DROP\s+TABLE|del\s+/[fsq]|rd\s+/s|format\s+[a-z]:|mkfs|shutdown", re.I)
+    r"|DROP\s+TABLE|del\s+/[fsq]|rd\s+/s|format\s+[a-z]:|mkfs|shutdown"
+    r"|\b(?:Remove-Item|Clear-Content|Format-Volume|Stop-Computer|Restart-Computer)\b"
+    r"|\b(?:Invoke-Expression|iex|Start-Process)\b"
+    r"|(?:Get-ChildItem|gci|dir)\s+(?:-Path\s+)?env:"
+    r"|\$env:[A-Za-z_][\w]*(?:KEY|TOKEN|SECRET|PASSWORD|AUTH|CREDENTIAL)[A-Za-z_\d]*",
+    re.I)
 _RUN_TIMEOUT = 180
 _RUN_PROGRESS_INTERVAL = 5.0
 _MAX_RUN_CMDS = 6
@@ -244,6 +272,18 @@ def group_shell_commands(body: str) -> list[str]:
     return cmds
 
 
+_POWERSHELL_HINT_RE = re.compile(
+    r"(?im)(?:^|[|;{]\s*)(?:Get|Set|New|Remove|Select|Measure|Where|ForEach|"
+    r"Test|Resolve|Invoke|Start|Stop|Write)-[A-Za-z]+\b|"
+    r"\$(?:env:|_\b|[A-Za-z_][\w]*\s*=)|\b(?:ForEach-Object|Where-Object)\b")
+_POWERSHELL_LAUNCH_RE = re.compile(r"(?i)^\s*(?:powershell|pwsh)(?:\.exe)?\s+(?:-|/)")
+
+
+def looks_like_powershell(script: str) -> bool:
+    """保守识别 PowerShell 语法，供 Windows 的泛型 ``shell`` 围栏选方言。"""
+    return bool(_POWERSHELL_HINT_RE.search(script or ""))
+
+
 def cmd_display(cmd: str) -> str:
     """多行命令的单行显示形态:首行 + (+N 行)。纯函数(feat-101)。"""
     lines = (cmd or "").splitlines() or [""]
@@ -266,6 +306,8 @@ def parse_run_requests(reply: str) -> list[dict]:
         elif raw_kind in {"python", "python3", "py"}:
             # Python fenced blocks are executable requests, not explanatory text.
             kind = "python"
+        elif raw_kind in {"powershell", "cmd", "bash", "sh"}:
+            kind = raw_kind
         else:
             kind = "shell"
         if kind == "python":
@@ -273,8 +315,23 @@ def parse_run_requests(reply: str) -> list[dict]:
             if body:
                 out.append({"kind": kind, "cmd": body})
             continue
+        if kind in {"powershell", "cmd", "bash", "sh"}:
+            body = m.group("body").strip()
+            if body:
+                out.append({"kind": kind, "cmd": body})
+            continue
         if kind == "shell":
-            for cmd in group_shell_commands(m.group("body")):
+            body = m.group("body")
+            if (sys.platform == "win32" and looks_like_powershell(body)
+                    and not _POWERSHELL_LAUNCH_RE.match(body)):
+                script = body.strip()
+                if script:
+                    # 泛型 shell 的固定解释器是 CMD。PowerShell 必须显式声明方言；
+                    # 静默猜测会改变 `$env:` 等文本的含义，甚至把字面量变成凭据读取。
+                    out.append({"kind": "shell", "cmd": script,
+                                "dialect_error": "powershell"})
+                continue
+            for cmd in group_shell_commands(body):
                 out.append({"kind": kind, "cmd": cmd})
             continue
         for line in m.group("body").splitlines():
@@ -282,6 +339,31 @@ def parse_run_requests(reply: str) -> list[dict]:
             if cmd and not cmd.startswith("#"):
                 out.append({"kind": kind, "cmd": cmd})
     return out
+
+
+_ACTION_COMMITMENT_RE = re.compile(
+    r"(?:我(?:先|来|现在|接下来)[^。！？\n]{0,36}"
+    r"(?:执行|运行|调用|启动|检查|查看|读取|检索|搜索|下载|分析|处理|重试))|"
+    r"(?:等(?:待)?[^。！？\n]{0,24}(?:结果|回传)(?:回来|返回|后)?)|"
+    r"(?:结果回传后)")
+_QUOTED_OR_FENCED_RE = re.compile(
+    r"```.*?```|[\"“‘][^\"”’\n]{0,240}[\"”’]", re.S)
+
+
+def unfulfilled_action_commitment(reply: str) -> str | None:
+    """识别“声称马上执行/等待结果”但未包含任何执行请求的回复。"""
+    text = _QUOTED_OR_FENCED_RE.sub(" ", reply or "")
+    text = "\n".join(line for line in text.splitlines()
+                     if not line.lstrip().startswith(">"))
+    for match in _ACTION_COMMITMENT_RE.finditer(text):
+        before = text[max(0, match.start() - 6):match.start()]
+        after = text[match.end():match.end() + 8]
+        if re.search(r"(?:不|无需|无须|不必|别)\s*$", before):
+            continue
+        if re.match(r"\s*(?:结果|显示|表明|如下)", after):
+            continue
+        return match.group(0)
+    return None
 
 
 # 交互式子命令不在块里跑:stdout 被重定向时它们会隐形地等输入,看起来像卡死。
@@ -466,12 +548,12 @@ def _normalize_interpreter(cmd: str) -> str:
     if not parts:
         return cmd
     tok = parts[0]
-    if shutil.which(tok):                    # 首 token 本身可跑 → 不动(含 win 的 python)
-        return cmd
     win = os.name == "nt"
     if win and tok.lower() == "which":
         rest = parts[1] if len(parts) > 1 else ""
         return f"where {rest}".rstrip() if shutil.which("where") else cmd
+    if shutil.which(tok):                    # 首 token 本身可跑 → 不动(含 win 的 python)
+        return cmd
     if tok in _PY_NAMES:
         order = ("python", "py", "python3") if win else ("python3", "python")
     elif tok in ("pip", "pip3"):
@@ -495,14 +577,61 @@ def _run_env() -> dict:
     """
     import os
     from pathlib import Path
-    env = dict(os.environ)
+    secret_name = re.compile(
+        r"(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH|BEARER|COOKIE|SESSION)",
+        re.I)
+    # 通用 shell 是模型生成代码的执行面，不继承 provider/MCP/登录凭据。
+    # 需要凭据的集成（如 Kaggle MCP）由对应客户端做定向注入。
+    env = {key: value for key, value in os.environ.items()
+           if not secret_name.search(key)}
     root = str(Path(__file__).resolve().parent.parent)
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = root + (os.pathsep + existing if existing else "")
     return env
 
 
-def _run_shell_cmd(cmd: str) -> str:
+def _shell_exec_spec(cmd: str, kind: str) -> tuple[object, bool, str] | tuple[None, bool, str]:
+    """选择命令解释器，返回 ``(Popen 参数, shell, 状态名称)``。"""
+    import os
+    import shutil
+
+    selected = kind
+    if selected == "powershell":
+        exe = shutil.which("pwsh") or shutil.which("powershell")
+        return ([exe, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", cmd],
+                False, "PowerShell") if exe else (None, False, "PowerShell")
+    if selected == "cmd":
+        exe = os.environ.get("COMSPEC") or shutil.which("cmd")
+        return ([exe, "/D", "/S", "/C", cmd], False, "CMD") \
+            if exe else (None, False, "CMD")
+    if selected in {"bash", "sh"}:
+        exe = shutil.which(selected)
+        return ([exe, "-c", cmd], False, selected) if exe else (None, False, selected)
+    return (_normalize_interpreter(cmd), True, "Shell")
+
+
+def _terminate_process_tree(proc) -> None:
+    """超时时终止解释器及其子进程，避免后台动作脱离 REPL 继续运行。"""
+    import os
+    import signal
+    import subprocess
+
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=10, check=False)
+        else:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+
+def _run_shell_cmd(cmd: str, kind: str = "shell") -> str:
     """交系统 shell 跑一条命令,**边跑边把输出打到终端**(feat-145 消灭空屏焦虑),
     完整输出仍回传模型(契约不变)。
 
@@ -516,7 +645,11 @@ def _run_shell_cmd(cmd: str) -> str:
     import threading
     import time as _time
     from psyclaw import ui
-    cmd = _normalize_interpreter(cmd)      # feat-151:python→python3(本机无 python 时)
+    from psyclaw.network import redact_secrets
+    safe_cmd = redact_secrets(cmd)
+    popen_cmd, use_shell, shell_name = _shell_exec_spec(cmd, kind)
+    if popen_cmd is None:
+        return f"$ {safe_cmd}\n[无法执行:本机未找到 {shell_name} 解释器]"
     # feat-127:启用沙箱时,执行前过代码执行面裁决(恶意硬拒,快速失败)
     timeout = _RUN_TIMEOUT
     try:
@@ -525,17 +658,19 @@ def _run_shell_cmd(cmd: str) -> str:
         if pol.get("enabled"):
             v = _sb.sandbox_check("exec", "run", {"cmd": cmd}, project_dir=".")
             if not v["allow"]:
-                return f"$ {cmd}\n[沙箱拒绝执行:{v['reason']}]"
+                return f"$ {safe_cmd}\n[沙箱拒绝执行:{v['reason']}]"
             timeout = _sb.exec_limits(pol)["timeout_s"]
     except Exception:  # noqa: BLE001  # 沙箱异常不阻断(既有 _DANGEROUS_RE 仍兜底)
         pass
     try:
         proc = subprocess.Popen(               # stderr 并入 stdout,统一按序流式
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            popen_cmd, shell=use_shell, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True, encoding="utf-8", errors="replace", bufsize=1,
-            env=_run_env())                    # feat-151:注入 PYTHONPATH,脚本可 import psyclaw
+            env=_run_env(),
+            start_new_session=sys.platform != "win32")  # POSIX 超时可终止整个进程组
     except OSError as exc:
-        return f"$ {cmd}\n[无法执行:{exc}]"
+        return f"$ {safe_cmd}\n[无法执行:{redact_secrets(str(exc))}]"
 
     q: queue.Queue = queue.Queue()
 
@@ -550,7 +685,7 @@ def _run_shell_cmd(cmd: str) -> str:
     threading.Thread(target=_pump, daemon=True).start()
     lines: list[str] = []
     deadline = _time.monotonic() + timeout
-    activity = ui.ActivityIndicator("后台工作中:命令仍在运行")
+    activity = ui.ActivityIndicator(f"后台工作中:{shell_name} 仍在运行")
     activity.start()
     timed_out = False
     while True:
@@ -568,21 +703,18 @@ def _run_shell_cmd(cmd: str) -> str:
         lines.append(line)
         activity.stop()
         print(ui.run_output(line.rstrip("\n")))   # feat-147:命令输出独立着色,一眼可分
-        activity = ui.ActivityIndicator("后台工作中:命令仍在运行")
+        activity = ui.ActivityIndicator(f"后台工作中:{shell_name} 仍在运行")
         activity.start()
-    body = "".join(lines)
+    body = redact_secrets("".join(lines))
     activity.stop("命令已结束")
     if timed_out:
-        try:
-            proc.kill()
-        except OSError:
-            pass
-        return f"$ {cmd}\n[超时:>{_RUN_TIMEOUT}s,已终止]\n{body}"
+        _terminate_process_tree(proc)
+        return f"$ {safe_cmd}\n[超时:>{_RUN_TIMEOUT}s,已终止]\n{body}"
     try:
         proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
         pass
-    return f"$ {cmd}\n(rc={proc.returncode})\n{body}"
+    return f"$ {safe_cmd}\n(rc={proc.returncode})\n{body}"
 
 
 def _run_python_code(code: str) -> str:
@@ -614,15 +746,20 @@ def run_commands(reqs: list[dict], confirm=None,
                  limit: int = _MAX_RUN_CMDS) -> tuple[str, list[str]]:
     """执行命令块 → (回传消息, 终端提示行)。
 
-    v0.3 安全加固(fail-closed):**shell 类命令每条**都须 confirm(cmd)→True 才执行——
-    LLM 生成的命令交 subprocess shell=True,拒绝清单不是安全边界,人工确认才是。
-    psyclaw 进程内子命令保持自动(自家 argparse 编排、无 shell,交互式命令另有守卫);
-    但命中 _DANGEROUS_RE 危险模式时同样须确认(纵深防御)。confirm=None → 一律拒。
+    shell 类命令按 confirm 策略执行：普通操作在 ``approval=auto`` 下自动放行，
+    明确危险模式始终确认；confirm=None 仍一律拒绝。PowerShell/CMD/Bash 使用显式
+    解释器参数，且子进程不会继承 provider/MCP 凭据。
     """
     parts: list[str] = []
     notes: list[str] = []
     for r in reqs[:limit]:
         cmd = r["cmd"]
+        if r.get("dialect_error") == "powershell":
+            parts.append(
+                f"$ {cmd}\n[未执行:检测到 PowerShell 语法，但使用了通用 shell 围栏。"
+                "请把完整脚本放入显式 ```powershell 围栏后重试。]")
+            notes.append(f"  ✗ 未执行(命令方言不明确):{cmd_display(cmd)[:50]}")
+            continue
         danger = bool(_DANGEROUS_RE.search(cmd))
         shown = cmd_display(cmd)               # feat-101:多行命令单行化显示
         if r["kind"] != "psyclaw" or danger:
@@ -637,7 +774,7 @@ def run_commands(reqs: list[dict], confirm=None,
         elif r["kind"] == "python":
             out = _run_python_code(cmd)
         else:
-            out = _run_shell_cmd(cmd)
+            out = _run_shell_cmd(cmd, kind=r["kind"])
         parts.append(out[:6000])
     if len(reqs) > limit:
         parts.append(f"[本轮最多执行 {limit} 条命令,其余 {len(reqs) - limit} 条请下一轮]")
@@ -1169,6 +1306,8 @@ class ReplSession:
         self._followup_prev_sig = None   # 上一轮命令/读取请求签名(no-progress 判重)
         self._followup_repeat = 0        # 连续重复次数
         self._empty_reply_streak = 0     # 命令结果后 provider 空回复的有限自动恢复
+        self._promise_recovery_streak = 0  # 声称执行却没调用工具的有限自动纠偏
+        self._force_confirm_next_action = False  # 纠偏轮首个副作用不能静默自动执行
         # 错误学习:本会话从命令失败蒸馏的环境教训(每轮注入,当场止损);跨会话见 memory 待确认卡
         self._tool_idle: dict = {"idle": {}}   # feat-133:工具组闲置计数(跨消息)
         self.session_lessons: list[dict] = []
@@ -1267,6 +1406,7 @@ class ReplSession:
                      else _READ_OPEN_SYSTEM)
         s += "\n" + _RUN_SYSTEM + ("" if self.file_access != "safe"
                                    else "\n" + _RUN_SAFE_NOTE)
+        s += _platform_shell_system()
         if self.plugins and self.plugins.systems:
             s += "\n\n" + "\n\n".join(self.plugins.systems)
         return s
@@ -1279,6 +1419,8 @@ class ReplSession:
             self._followup_prev_sig = None
             self._followup_repeat = 0
             self._empty_reply_streak = 0
+            self._promise_recovery_streak = 0
+            self._force_confirm_next_action = False
             # 路径自动检测:只对**用户输入**做——自动回传消息(读取结果/命令输出)里的
             # 碎片会被误当路径,打出「未找到文件 乱码」噪音(用户实测修复)。
             from psyclaw.path_ingest import process_message
@@ -1476,6 +1618,8 @@ class ReplSession:
         「全部同意(a)」的范围按 cmd_approval_scope 限定到命令前缀(feat-070,
         用户反馈:放行所有 shell 命令范围太大)——同意 `git status` 不放行 `rm`。
         """
+        forced = bool(getattr(self, "_force_confirm_next_action", False))
+        self._force_confirm_next_action = False
         if "\n" in cmd:                # feat-101:多行命令整体展示后确认(引号块=一条命令)
             lines = cmd.splitlines()
             print(ui.dim("  ┆ 多行命令内容:"))
@@ -1485,8 +1629,10 @@ class ReplSession:
                 print(ui.dim(f"  ┆   …(共 {len(lines)} 行)"))
             return self._side_effect_ok(
                 cmd_display(cmd), dangerous=bool(_DANGEROUS_RE.search(cmd)),
+                requires_human=forced,
                 label=f"执行 shell 命令(多行:{cmd_display(cmd)[:60]})")
         return self._side_effect_ok(cmd, dangerous=bool(_DANGEROUS_RE.search(cmd)),
+                                    requires_human=forced,
                                     label=f"执行 shell 命令({cmd_approval_scope(cmd)})")
 
     def _learn_from_output(self, output: str) -> None:
@@ -1632,6 +1778,8 @@ class ReplSession:
         body = strip_save_blocks(reply)
         runs = parse_run_requests(body)
         reads = parse_read_requests(body)
+        if runs or reads:
+            self._promise_recovery_streak = 0
 
         # 自动跟进可能空转,两道闸拦——但 no-progress 只针对**自主**回合(YOLO 自动跑 / 自动读):
         # 用户在逐条确认(打 y)本身就是在推进,不该被判「原地打转」而掐断(用户实测)。
@@ -1681,12 +1829,35 @@ class ReplSession:
         if choice and self._auto_depth < self.max_auto_depth:
             chosen, free = pick_interactive(choice)
             if chosen:
+                self._promise_recovery_streak = 0
                 print(ui.ok("  → 已选:" + "、".join(c[:40] for c in chosen)))
                 return format_selection_message(chosen, choice["question"])
             if free:   # 用户没选编号、直接打字(如 y)→ 当自由作答转发给模型,别吞掉(用户实测)
+                self._promise_recovery_streak = 0
                 print(ui.dim(f"  → 「{free[:40]}」不是编号,已作为你的回复发给模型继续"))
                 return format_free_answer(free, choice["question"])
             print(ui.dim("  (跳过选择;可直接输入你的回复)"))
+            self._promise_recovery_streak = 0
+            return None
+
+        commitment = unfulfilled_action_commitment(body)
+        if commitment:
+            if self._auto_depth >= self.max_auto_depth:
+                print(ui.dim(
+                    f"  (自动纠偏已达安全上限 {self.max_auto_depth}，已停止自动跟进)"))
+                return None
+            self._promise_recovery_streak = getattr(
+                self, "_promise_recovery_streak", 0) + 1
+            if self._promise_recovery_streak <= _MAX_PROMISE_RECOVERIES:
+                self._force_confirm_next_action = True
+                print(ui.warn(
+                    f"  (检测到未兑现的执行承诺，自动纠偏 "
+                    f"{self._promise_recovery_streak}/{_MAX_PROMISE_RECOVERIES}:"
+                    f"{commitment[:50]})"))
+                return _UNFULFILLED_ACTION_NUDGE
+            print(ui.warn("  (模型连续声称执行但未发出任何可执行请求，已停止空转)"))
+            return None
+        self._promise_recovery_streak = 0
         return None
 
     def _run_agent(self, system: str, activity=None) -> str | None:
@@ -1696,10 +1867,12 @@ class ReplSession:
         def _approve(call: dict) -> bool:
             # 普通工具副作用自动放行；危险参数、研究决策和文件覆盖仍确认。
             needs_human, _reason = tool_requires_human(call, ".")
+            forced = bool(getattr(self, "_force_confirm_next_action", False))
+            self._force_confirm_next_action = False
             return self._side_effect_ok(
                 f"{call['name']}({_short(call.get('args') or {}, 120)})",
                 dangerous=bool(_DANGEROUS_RE.search(str(call.get("args") or ""))),
-                requires_human=needs_human, label="工具副作用")
+                requires_human=needs_human or forced, label="工具副作用")
 
         # 流式输出(feat-188):此前 agent 模式把整段回复 join 完才显示,用户干等。
         # 现在边流边出,与普通对话观感一致;```tool 协议块由 ToolBlockFilter 藏掉。
@@ -1794,6 +1967,13 @@ class ReplSession:
             self._reinvent_nudged = set()
         nudges: list[str] = []
         for blk in blocks:
+            if getattr(self, "_force_confirm_next_action", False):
+                self._force_confirm_next_action = False
+                if not self._side_effect_ok(
+                        str(blk.get("path") or ""), requires_human=True,
+                        label="纠偏后写入文件"):
+                    print(ui.dim(f"  已跳过(纠偏后未确认):{blk.get('path', '')}"))
+                    continue
             r = apply_save_block(blk, confirm=_confirm)
             st = r["status"]
             if st == "saved":
@@ -2214,7 +2394,8 @@ class ReplSession:
         """
         parts = [_CHOICES_SYSTEM,
                  _READ_SAFE_SYSTEM if self.file_access == "safe" else _READ_OPEN_SYSTEM,
-                 _RUN_SYSTEM + ("\n" + _RUN_SAFE_NOTE if self.file_access == "safe" else "")]
+                 _RUN_SYSTEM + ("\n" + _RUN_SAFE_NOTE if self.file_access == "safe" else ""),
+                 _platform_shell_system()]
         if self.plan_mode:
             from psyclaw.tasks import PLAN_MODE_SYSTEM
             parts.append(PLAN_MODE_SYSTEM)

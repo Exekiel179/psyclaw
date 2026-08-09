@@ -151,6 +151,27 @@ def test_confirm_cmd_detects_danger(monkeypatch):
     assert not seen
 
 
+def test_confirm_cmd_detects_powershell_danger(monkeypatch):
+    s = _sess(yolo=True)
+    seen = []
+    monkeypatch.setattr(repl, "_hitl_confirm", lambda p: seen.append(p) or False)
+    assert s._confirm_cmd("Remove-Item -Recurse -Force C:\\tmp\\x") is False
+    assert seen
+    seen.clear()
+    assert s._confirm_cmd("Get-ChildItem Env:") is False
+    assert seen
+
+
+def test_promise_recovery_forces_next_command_confirmation(monkeypatch):
+    s = _sess(yolo=True)
+    s._force_confirm_next_action = True
+    seen = []
+    monkeypatch.setattr(repl, "_hitl_confirm", lambda p: seen.append(p) or True)
+    assert s._confirm_cmd("python -V") is True
+    assert seen
+    assert s._force_confirm_next_action is False
+
+
 # -- /yolo 切换(仅审批,不再动深度)---------------------------------------
 def test_cmd_yolo_toggles_mode(capsys):
     s = _sess(yolo=False)
@@ -336,7 +357,8 @@ class TestCmdApprovalScope:
         labels = []
         monkeypatch.setattr(
             repl.ReplSession, "_side_effect_ok",
-            lambda self, d, dangerous=False, label="": labels.append(label) or True)
+            lambda self, d, dangerous=False, requires_human=False, label="":
+            labels.append(label) or True)
         s._confirm_cmd("git status -sb")
         assert labels == ["执行 shell 命令(git status)"]
     def test_scoped_all_does_not_leak_to_other_programs(self, monkeypatch):

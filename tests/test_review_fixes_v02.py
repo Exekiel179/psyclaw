@@ -165,7 +165,47 @@ def test_parse_run_requests_kinds():
     reqs = R.parse_run_requests(reply)
     assert reqs == [{"kind": "psyclaw", "cmd": "status"},
                     {"kind": "shell", "cmd": "echo hi"},
-                    {"kind": "shell", "cmd": "python -V"}]
+                    {"kind": "bash", "cmd": "python -V"}]
+
+
+def test_unfulfilled_action_commitment_is_detected():
+    assert R.unfulfilled_action_commitment("我先检查环境，等结果回传后再继续。")
+    assert R.unfulfilled_action_commitment("结果如下：shape=(10, 2)") is None
+    assert R.unfulfilled_action_commitment("不要等待用户说继续，直接执行。") is None
+    assert R.unfulfilled_action_commitment("我现在分析结果如下：没有异常。") is None
+    assert R.unfulfilled_action_commitment("无需等待结果回传后再继续。") is None
+    assert R.unfulfilled_action_commitment('引用：“结果回传后再判断”。') is None
+
+
+def test_unfulfilled_commitment_auto_corrects_without_user_continue(monkeypatch, capsys):
+    s = R.ReplSession.__new__(R.ReplSession)
+    s.file_access = "open"
+    s.plan_mode = False
+    s._auto_depth = 0
+    s.max_auto_depth = 50
+    s._promise_recovery_streak = 0
+    s._followup_prev_sig = None
+    s._followup_repeat = 0
+
+    follow = s._auto_followup("我先检查 Python 环境，等结果回传后再继续。")
+
+    assert follow and "实际调用" in follow
+    assert s._force_confirm_next_action is True
+    assert "未兑现的执行承诺" in capsys.readouterr().out
+
+
+def test_unfulfilled_commitment_respects_zero_auto_depth(capsys):
+    s = R.ReplSession.__new__(R.ReplSession)
+    s.file_access = "open"
+    s.plan_mode = False
+    s._auto_depth = 0
+    s.max_auto_depth = 0
+    s._promise_recovery_streak = 0
+    s._followup_prev_sig = None
+    s._followup_repeat = 0
+
+    assert s._auto_followup("我先检查环境，等结果回传后继续。") is None
+    assert "安全上限" in capsys.readouterr().out
 
 
 def test_shell_block_multiline_quoted_is_one_command():
@@ -176,6 +216,47 @@ def test_shell_block_multiline_quoted_is_one_command():
     reqs = R.parse_run_requests(reply)
     assert len(reqs) == 1
     assert reqs[0]["cmd"].startswith('python3 -c "') and 'import csv' in reqs[0]["cmd"]
+
+
+def test_powershell_fence_keeps_entire_script_as_one_request():
+    """回归:PowerShell 循环曾被拆成 Get-ChildItem/$size/格式化/} 四条 CMD 命令。"""
+    reply = """```powershell
+Get-ChildItem C:\\ -Directory | ForEach-Object {
+    $size = (Get-ChildItem $_.FullName -File | Measure-Object Length -Sum).Sum
+    "{0:N2} {1}" -f ($size / 1GB), $_.FullName
+}
+```"""
+    reqs = R.parse_run_requests(reply)
+    assert reqs == [{"kind": "powershell", "cmd": reply.split("\n", 1)[1][:-3].strip()}]
+    assert reqs[0]["cmd"].count("\n") == 3
+
+
+def test_windows_generic_shell_rejects_ambiguous_powershell(monkeypatch):
+    monkeypatch.setattr(R.sys, "platform", "win32")
+    reply = """```shell
+Get-ChildItem C:\\ -Directory | ForEach-Object {
+    $_.FullName
+}
+```"""
+    reqs = R.parse_run_requests(reply)
+    assert len(reqs) == 1 and reqs[0]["kind"] == "shell"
+    assert reqs[0]["dialect_error"] == "powershell"
+    assert "ForEach-Object" in reqs[0]["cmd"]
+
+
+def test_ambiguous_powershell_is_not_executed():
+    reqs = [{"kind": "shell", "cmd": "Write-Output $env:OPENAI_API_KEY",
+             "dialect_error": "powershell"}]
+    msg, notes = R.run_commands(reqs, confirm=lambda _: True)
+    assert "未执行" in msg and "显式 ```powershell" in msg
+    assert any("方言不明确" in note for note in notes)
+
+
+def test_windows_shell_with_explicit_powershell_launcher_is_not_double_wrapped(monkeypatch):
+    monkeypatch.setattr(R.sys, "platform", "win32")
+    cmd = 'powershell -Command "Get-PSDrive C | Select-Object Used,Free"'
+    reqs = R.parse_run_requests(f"```shell\n{cmd}\n```")
+    assert reqs == [{"kind": "shell", "cmd": cmd}]
 
 
 def test_shell_block_continuation_and_multiple_commands():

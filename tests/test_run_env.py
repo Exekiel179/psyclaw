@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import sys
 
-from psyclaw.repl import _normalize_interpreter, _run_env, _run_shell_cmd
+from psyclaw.repl import (_normalize_interpreter, _run_env, _run_shell_cmd,
+                          _shell_exec_spec)
 
 
 # ---- python→python3 归一(纯函数) --------------------------------------------
@@ -34,6 +35,22 @@ def test_normalize_which_to_where_on_windows(monkeypatch):
                         lambda b: r"C:\\Windows\\System32\\where.exe"
                         if b == "where" else None)
     assert _normalize_interpreter("which kaggle") == "where kaggle"
+
+
+def test_windows_which_is_normalized_even_if_posix_which_is_on_path(monkeypatch):
+    """Git for Windows 可能带 which.exe，但 shell=True 仍由 CMD 执行，必须改 where。"""
+    import os
+    import shutil
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(shutil, "which", lambda b: r"C:\\bin\\" + b + ".exe")
+    assert _normalize_interpreter("which kaggle") == "where kaggle"
+
+
+def test_windows_system_prompt_names_powershell_and_rejects_which(monkeypatch):
+    from psyclaw import repl as R
+    monkeypatch.setattr(R.sys, "platform", "win32")
+    note = R._platform_shell_system()
+    assert "Windows" in note and "```powershell" in note and "不要使用 `which`" in note
 
 
 def test_normalize_keeps_python3(monkeypatch):
@@ -109,6 +126,24 @@ def test_run_env_preserves_existing_pythonpath(monkeypatch):
     monkeypatch.setenv("PYTHONPATH", "/my/existing")
     env = _run_env()
     assert "/my/existing" in env["PYTHONPATH"]
+
+
+def test_run_env_drops_provider_and_integration_secrets(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-private")
+    monkeypatch.setenv("KAGGLE_API_TOKEN", "KGAT_private")
+    monkeypatch.setenv("PATH", "C:\\Tools")
+    env = _run_env()
+    assert "OPENAI_API_KEY" not in env
+    assert "KAGGLE_API_TOKEN" not in env
+    assert env["PATH"] == "C:\\Tools"
+
+
+def test_generic_shell_does_not_guess_powershell(monkeypatch):
+    import os
+    monkeypatch.setattr(os, "name", "nt")
+    cmd, use_shell, name = _shell_exec_spec("echo $env:OPENAI_API_KEY", "shell")
+    assert cmd == "echo $env:OPENAI_API_KEY"
+    assert use_shell is True and name == "Shell"
 
 
 # ---- 端到端:生成脚本能 import psyclaw ----------------------------------------
