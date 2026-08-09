@@ -19,6 +19,11 @@
 - 强化 DOCX 交付：固定导出、OOXML/样式/脚注/表格契约检查、三线表 fixture 与视觉验证脚本。
 - 新增 v0.23.0 使用白皮书 DOCX、预印本草稿和协作交接页。预印本中的历史测试数字仍须在可复跑
   验证后更新；详见 `docs/COLLABORATION_STATUS_v0.23.0.md`。
+- 修复 Windows Agent 执行链：PowerShell/CMD 方言显式分派，多行脚本作为一个执行单元，
+  `which` 自动适配为 `where`；模型声明执行却未调用工具时会有限自动纠偏。
+- 普通操作继续按 `approval=auto` 放行；凭据访问、递归删除、表达式执行等高风险 PowerShell
+  行为始终确认。Shell 子进程不再继承 Provider/MCP Token，输出回传前会脱敏。
+- 发布流程新增 macOS 与 Windows 独立离线包；官网直接链接对应平台资产，在线安装脚本继续保留。
 
 ## v0.22.0(2026-07-22)
 

@@ -1,8 +1,8 @@
 # PsyClaw v0.23.0 协作交接
 
-**快照日期：** 2026-08-08
+**快照日期：** 2026-08-09
 
-**发布提交：** `62ede7d feat: release v0.23.0 academic skill platform`
+**发布标签：** `v0.23.0`
 
 **分支：** `master`，已推送至 `origin/master`
 
@@ -10,7 +10,8 @@
 
 ## 发布结论
 
-`v0.23.0` 已发布。此次版本将 PsyClaw 从“能发现外部 Skill”扩展为草稿。
+`v0.23.0` 已发布。此次版本将 PsyClaw 从“能发现外部 Skill”扩展为可安装的学术
+Skill 平台，并补齐 Windows/macOS 双平台安装包与 Agent 执行可靠性修复。
 
 公开心智模型保持两个入口：
 
@@ -35,9 +36,10 @@
 
 - Skill 相关回归：**53 项通过**。
 - `python3 -m psyclaw eval`：**37/37 通过**。
-- 全量 pytest 最近一次：**2280 项通过，7 项错误**。错误均来自沙箱禁止测试 fixture 绑定 `127.0.0.1`，涉及 PDF/WebBridge 本地服务，不是断言或业务代码失败。应在允许本地端口绑定的 CI/开发机复跑后，才可标记为全绿。
 - `git diff --check`：通过。
 - `python3 -m psyclaw version`：`psyclaw 0.23.0`。
+- 全量 pytest（2026-08-09）：**2325 项通过，12 项跳过，0 项失败**。
+- 安装包：`psyclaw-macos-0.23.0.tar.gz` 与 `psyclaw-windows-0.23.0.zip` 均完成结构校验。
 
 ## 文档状态
 
