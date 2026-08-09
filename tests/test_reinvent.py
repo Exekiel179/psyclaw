@@ -130,3 +130,13 @@ def test_capture_saves_no_nudge_for_clean_script(tmp_path, monkeypatch):
     s = _session(tmp_path, monkeypatch)
     reply = "```save path=ok.py\nimport pandas as pd\n```\n"
     assert s._capture_saves(reply) == []
+
+
+def test_promise_recovery_forces_confirmation_before_new_save(tmp_path, monkeypatch):
+    import psyclaw.repl as repl
+    s = _session(tmp_path, monkeypatch)
+    s._force_confirm_next_action = True
+    monkeypatch.setattr(repl, "_hitl_confirm", lambda _prompt: False)
+    s._capture_saves("```save path=blocked.py\nprint('x')\n```\n")
+    assert not (tmp_path / "blocked.py").exists()
+    assert s._force_confirm_next_action is False

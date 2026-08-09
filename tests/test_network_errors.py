@@ -36,6 +36,17 @@ def test_network_diagnosis_redacts_tokens_and_url_credentials():
     assert "redacted" in msg
 
 
+def test_redact_secrets_covers_provider_tokens_and_proxy_credentials():
+    from psyclaw.network import redact_secrets
+    text = ("sk-ant-abcdefghijklmnopqrstuvwxyz "
+            "ghp_abcdefghijklmnopqrstuvwxyz123456 "
+            "https://alice:private@proxy.example")
+    safe = redact_secrets(text)
+    assert "abcdefghijklmnopqrstuvwxyz" not in safe
+    assert "alice:private" not in safe
+    assert safe.count("redacted") >= 3
+
+
 def test_mcp_eof_uses_network_stderr_instead_of_process_crash(monkeypatch):
     from psyclaw import ui
     from psyclaw.mcp.client import MCPClient

@@ -70,3 +70,15 @@ def test_long_command_shows_background_progress(monkeypatch, capsys):
     monkeypatch.setattr(R, "_RUN_PROGRESS_INTERVAL", 0.0)
     _run_shell_cmd(f'{sys.executable} -c "import time; time.sleep(.1)"')
     assert "后台工作中" in capsys.readouterr().out
+
+
+def test_multiline_powershell_executes_as_one_script_on_windows():
+    import os
+    import pytest
+    if os.name != "nt":
+        pytest.skip("Windows-only PowerShell integration")
+    from psyclaw.repl import parse_run_requests, run_commands
+    reqs = parse_run_requests(
+        "```powershell\n$x = 40\n$x += 2\nWrite-Output \"PS_RESULT=$x\"\n```")
+    msg, _ = run_commands(reqs, confirm=lambda _: True)
+    assert "PS_RESULT=42" in msg and "(rc=0)" in msg
