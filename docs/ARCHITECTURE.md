@@ -20,12 +20,42 @@ L3  实现 Skill + MCP    每个 Step 是薄壳,真正干活委托既有命令 /
 
 | 入口 | 作用 | 底层引擎 |
 |---|---|---|
-| `chat`(缺省 `psyclaw`) | 一起做：边聊边推进 | REPL + toolloop |
+| `chat`(缺省 `psyclaw`) | 一起做：边聊边推进 | REPL + agent_runtime + toolloop |
 | `run <类型>` | 交给它做：按步骤执行一条流程 | workflow |
 | `run`（不带类型） | 交给它做：根据状态继续下一步 | autoloop + workflow |
 
 `psyclaw/modes.py` 是共享路由真源:`run analysis/meta/literature/qualitative` 进入声明式
 workflow。固定 pipeline 和通用 planner→critic 回路只保留旧命令兼容,不再作为公开 `run` 类型。
+
+### chat 的规划/执行分离
+
+交互式 `chat` 与一次性 `psyclaw agent` 共用 `psyclaw/agent_runtime.py`：
+
+```text
+Planner（只产 DAG）
+  → Scheduler（关键路径留在当前线程）
+    → Executor（主线）
+    → Executor forks（同质、独立 provider 实例、有界并发）
+  → Verifier（工具回执 + 必需产物 + 完成契约）
+  → Finisher（只汇总已验收结果，不得再调用工具）
+```
+
+- Planner 只输出 JSON 任务图，不能执行工具或声称任务已完成。
+- Scheduler 默认使用 `agent_workers: 3`，硬上限为 4。只有声明了项目内 `owned_paths`、
+  标记为 `parallel_safe` 且真实写入范围不重叠的就绪任务才会 fork；Windows 路径按大小写
+  无关规则比较，软链接/联接路径拒绝写入，冲突任务自动串行。
+- 每个 Executor 使用同一 `executor` 角色配置和工具能力，但持有独立 Provider 实例与任务上下文。
+  fork 任务只能执行只读工具或写入自己拥有的路径，不能执行网络发布等非文件副作用；自动读文件
+  和列目录也只能访问项目根内、非凭据目录、非链接的路径。
+- Verifier 不采信“已经完成”等自然语言，而是检查结构化工具回执、成功调用数和必需产物；
+  必需任务未通过时 Finisher 不运行。失败任务最多自动纠偏重试一次，但只要已尝试副作用，
+  无论回执成功与否都停止自动重放，避免“提交成功但响应超时”造成重复外部写入。
+- 工具循环会识别“我现在执行/等待结果”等未伴随工具调用的承诺，自动要求模型真正调用工具；
+  连续空转则停止。纠偏状态会保留到副作用真正出现，该批全部副作用都强制人工确认。
+- `max_iters` 是所有 Executor、副本和重试共享的全局模型调用预算，不能被任务拆分放大；角色 Provider
+  与会话 Provider 属于不同端点时，数据发送前只确认一次，并对任务上下文和结果摘要统一脱敏。
+- REPL 持续显示 `plan/fork/main/verify/join` 进度，运行记录写入
+  `.psyclaw/agent_runs.jsonl`，包含计划任务、验收状态、尝试次数与执行线程。
 
 ## L1 流程：声明式 workflow 定义
 

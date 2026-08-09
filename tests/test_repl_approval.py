@@ -47,6 +47,9 @@ def test_tool_policy_keeps_danger_and_overwrite_as_human_decisions(tmp_path):
     assert repl.tool_requires_human({
         "name": "save_file", "args": {"path": str(existing), "content": "new"}
     }) == (True, "覆盖已有文件")
+    assert repl.tool_requires_human({
+        "name": "provider_handoff", "args": {"role": "executor"}
+    }) == (True, "跨 Provider 数据传输")
 
 
 # -- YOLO 放行 / 危险仍问 ---------------------------------------------------

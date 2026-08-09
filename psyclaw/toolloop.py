@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 
 _TOOL_RE = re.compile(r"```tool\s*\r?\n(?P<body>.*?)```", re.S)
 _OPEN_TOOL_RE = re.compile(r"```tool\s*\r?\n")
@@ -33,6 +34,10 @@ _TRUNC_NUDGE = ("你上一条输出在 ```tool 块中被截断,没有形成完�
 _MAX_NOPROGRESS = 2
 _EMPTY_NUDGE = ("你上一条回复为空。请继续:要么输出一个完整的 ```tool 块调用工具,"
                 "要么直接给出最终答案。")
+_PROMISE_NUDGE = (
+    "你刚才声明要执行或等待结果，但没有发出任何工具调用，操作并未发生。"
+    "请立即输出完整的 ```tool 块；如果已经不需要执行，直接给出有依据的最终答案。"
+)
 
 
 def sanitize_messages(messages: list) -> list:
@@ -195,8 +200,69 @@ def parse_tool_calls(reply: str) -> list[dict]:
 # v0.3 安全加固(外审 MEDIUM):save_file 路径允许清单。凭据类文件与目录一律拒写。
 _CRED_DIR_PARTS = frozenset({".ssh", ".aws", ".gnupg", ".kube", ".docker"})
 _CRED_NAMES = frozenset({".netrc", ".env", ".npmrc", ".pypirc", "credentials",
-                         "id_rsa", "id_ed25519", "authorized_keys", "known_hosts"})
+                         ".envrc", "id_rsa", "id_ed25519", "authorized_keys",
+                         "known_hosts", "token.json", "tokens.json", "auth.json",
+                         "kaggle.json", "service-account.json", "service_account.json"})
 _CRED_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".keystore")
+_CRED_STEM_RE = re.compile(
+    r"(?:^|[._-])(?:tokens?|access[._-]?tokens?|refresh[._-]?tokens?|"
+    r"api[._-]?keys?|client[._-]?secrets?|service[._-]account|"
+    r"passwords?|passwd|credentials?)(?:$|[._-])",
+    re.I,
+)
+
+
+def _credential_path(path: Path) -> bool:
+    name = path.name.lower()
+    parts = {part.lower() for part in path.parts}
+    return (name in _CRED_NAMES or name.startswith(".env.")
+            or name.endswith(_CRED_SUFFIXES) or bool(_CRED_DIR_PARTS & parts)
+            or bool(_CRED_STEM_RE.search(name))
+            or "secret" in name or "credential" in name
+            or "service-account" in name or "service_account" in name)
+
+
+def _link_component(target: Path, root: Path) -> Path | None:
+    """Return the first symlink/junction component below root, if any."""
+    try:
+        relative = target.absolute().relative_to(root.absolute())
+    except ValueError:
+        return None
+    probe = root.absolute()
+    for part in relative.parts:
+        probe /= part
+        try:
+            junction = bool(getattr(probe, "is_junction", lambda: False)())
+            if probe.is_symlink() or junction:
+                return probe
+        except OSError:
+            return probe
+    return None
+
+
+def read_path_denied(raw_path: str, project_dir: str = ".",
+                     *, expect_dir: bool = False) -> str | None:
+    """Guard automatic reads/listing to real, non-credential project paths."""
+    raw = (raw_path or "").strip()
+    if not raw:
+        return "拒绝读取:路径为空"
+    root = Path(project_dir).expanduser().resolve()
+    supplied = Path(raw).expanduser()
+    target = supplied if supplied.is_absolute() else root / supplied
+    try:
+        resolved = target.resolve()
+    except OSError as exc:
+        return f"拒绝读取:路径无法解析({exc})"
+    if not resolved.is_relative_to(root):
+        return f"拒绝读取:目标在项目根之外({resolved})"
+    link = _link_component(target, root)
+    if link is not None:
+        return f"拒绝读取:路径包含软链接或联接({link})"
+    if _credential_path(resolved):
+        return f"拒绝读取:凭据类路径({resolved})"
+    if expect_dir and resolved.exists() and not resolved.is_dir():
+        return f"拒绝列目录:目标不是目录({resolved})"
+    return None
 
 
 def save_path_denied(raw_path: str, project_dir: str = ".") -> str | None:
@@ -220,11 +286,10 @@ def save_path_denied(raw_path: str, project_dir: str = ".") -> str | None:
         return f"拒绝写入:路径无法解析({exc})"
     if not resolved.is_relative_to(root):
         return f"拒绝写入:目标在项目根之外({resolved})"
-    if target.exists() and target.is_symlink():
-        return f"拒绝写入:目标是软链接({target} → {resolved})"
-    name = resolved.name.lower()
-    if (name in _CRED_NAMES or name.endswith(_CRED_SUFFIXES)
-            or _CRED_DIR_PARTS & {part.lower() for part in resolved.parts}):
+    link = _link_component(target, root)
+    if link is not None:
+        return f"拒绝写入:路径包含软链接或联接({link} → {resolved})"
+    if _credential_path(resolved):
         return f"拒绝写入:凭据类路径({resolved})"
     return None
 
@@ -254,7 +319,13 @@ def build_tools(project_dir: str = ".") -> dict:
     def _read(a):
         from psyclaw.context import smart_excerpt
         from psyclaw.repl import read_denied
-        p = Path(str(a.get("path", ""))).expanduser()
+        raw = str(a.get("path", ""))
+        path_denial = read_path_denied(raw, project_dir)
+        if path_denial:
+            return path_denial
+        root = Path(project_dir).expanduser().resolve()
+        supplied = Path(raw).expanduser()
+        p = (supplied if supplied.is_absolute() else root / supplied).resolve()
         denial = read_denied(p)          # 评审修复:此前缺 data/raw/密钥守卫(铁律)
         if denial:
             return f"拒绝读取 {p}:{denial}"
@@ -270,8 +341,11 @@ def build_tools(project_dir: str = ".") -> dict:
         denial = save_path_denied(raw, project_dir)   # v0.3:项目根允许清单+凭据护栏
         if denial:
             return denial
+        root = Path(project_dir).expanduser().resolve()
+        supplied = Path(raw).expanduser()
+        resolved = (supplied if supplied.is_absolute() else root / supplied).resolve()
         r = apply_save_block(
-            {"path": raw, "content": str(a.get("content", ""))},
+            {"path": str(resolved), "content": str(a.get("content", ""))},
             confirm=lambda p: True)   # 副作用批准已在循环层做,此处允许覆盖
         tail = f"({r.get('chars')} 字符)" if r.get("chars") is not None else ""
         out = f"{r['status']} {r.get('path', '')} {tail}".strip()
@@ -318,8 +392,13 @@ def build_tools(project_dir: str = ".") -> dict:
 
     def _list_dir(a):
         from psyclaw.project_sense import render_tree, scan_tree
-        target = str(a.get("path", "") or project_dir)
-        p = Path(target).expanduser()
+        target = str(a.get("path", "") or ".")
+        denial = read_path_denied(target, project_dir, expect_dir=True)
+        if denial:
+            return denial
+        root = Path(project_dir).expanduser().resolve()
+        supplied = Path(target).expanduser()
+        p = (supplied if supplied.is_absolute() else root / supplied).resolve()
         if not p.is_dir():
             return f"目录不存在:{p}"
         return render_tree(scan_tree(str(p)))
@@ -804,6 +883,8 @@ def _short(args: dict, n: int = 60) -> str:
 
 
 def _exec_tool(call: dict, tools: dict, approve, emit) -> dict:
+    from psyclaw.network import redact_secrets
+
     name = call.get("name")
     if not name or call.get("error"):
         return {"name": name, "ok": False, "output": call.get("error", "缺少工具名")}
@@ -811,18 +892,22 @@ def _exec_tool(call: dict, tools: dict, approve, emit) -> dict:
     if not tool:
         return {"name": name, "ok": False,
                 "output": f"未知工具 {name}(可用:{', '.join(tools)})"}
+    side_effect = bool(tool["side_effect"])
     if tool["side_effect"]:
         ok = bool(approve(call)) if approve else False
         if not ok:
-            return {"name": name, "ok": False, "output": "用户未批准该副作用工具,已跳过"}
+            return {"name": name, "ok": False, "side_effect": side_effect,
+                    "output": "用户未批准该副作用工具,已跳过"}
     if emit:
         emit(f"调用 {name}({_short(call.get('args') or {})})")
     try:
         out = tool["run"](call.get("args") or {})
     except Exception as exc:  # noqa: BLE001  # 单个工具异常不炸循环
         # v0.6 feat-043:异常如实标 ok=False(此前误标 True 掩盖崩溃,模型无从自纠)
-        return {"name": name, "ok": False, "output": f"工具执行异常:{exc}"}
-    return {"name": name, "ok": True, "output": str(out)[:6000]}
+        return {"name": name, "ok": False, "side_effect": side_effect,
+                "output": redact_secrets(f"工具执行异常:{exc}")}
+    return {"name": name, "ok": True, "side_effect": side_effect,
+            "output": redact_secrets(str(out))[:6000]}
 
 
 def _render_results(results: list[dict]) -> str:
@@ -884,19 +969,40 @@ _RUNS_MAX_HEAD = 200
 
 
 def log_agent_run(project_dir: str, task: str, res: dict) -> None:
-    """把一次 run_tool_loop 结果追加到 .psyclaw/agent_runs.jsonl。失败静默(不拖垮主流程)。"""
+    """把一次 agent 结果追加到 .psyclaw/agent_runs.jsonl。失败静默(不拖垮主流程)。"""
     import json as _json
     import time as _time
     from pathlib import Path
     try:
         d = Path(project_dir) / ".psyclaw"
         d.mkdir(parents=True, exist_ok=True)
+        task_results = res.get("task_results") or {}
+        task_runs = []
+        if isinstance(task_results, dict):
+            for task_id, item in task_results.items():
+                if not isinstance(item, dict):
+                    continue
+                run = item.get("run") if isinstance(item.get("run"), dict) else {}
+                task_runs.append({
+                    "id": str(task_id)[:48],
+                    "passed": bool(item.get("passed")),
+                    "attempts": item.get("attempts"),
+                    "thread_id": item.get("thread_id"),
+                    "stopped": run.get("stopped"),
+                    "reasons": [str(reason)[:_RUNS_MAX_HEAD]
+                                for reason in (item.get("reasons") or [])[:3]],
+                })
+        plan = res.get("plan") or []
+        plan_ids = [str(item.get("id"))[:48] for item in plan
+                    if isinstance(item, dict) and item.get("id")]
         rec = {
             "ts": _time.strftime("%Y-%m-%d %H:%M:%S"),
             "task": (task or "")[:_RUNS_MAX_HEAD],
             "iters": res.get("iters"),
             "stopped": res.get("stopped"),
             "tools": [t.get("name") for t in res.get("trace", [])],
+            "plan": plan_ids,
+            "task_runs": task_runs,
             "final_head": str(res.get("final", ""))[:_RUNS_MAX_HEAD],
         }
         with open(d / _RUNS_FILE, "a", encoding="utf-8") as fh:
@@ -958,7 +1064,7 @@ def collect_env_lessons(results: list[dict], seen_keys: set) -> list[dict]:
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
                   project_dir: str = ".", max_iters: int = 24,
                   approve=None, emit=None, idle_state: dict | None = None,
-                  on_chunk=None) -> dict:
+                  on_chunk=None, iteration_budget=None) -> dict:
     """跑纯工具层循环。返回 {final, iters, stopped, trace, lessons}。
 
     每轮:provider.chat → 解析 tool 块;无块=最终答案;有块=执行(副作用需 approve)→ 回灌 → 续。
@@ -988,9 +1094,17 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
     trunc_streak = 0
     empty_streak = 0
     repeat_streak = 0
+    promise_streak = 0
+    promise_recovery_pending = False
     prev_sig: tuple | None = None
     from psyclaw.ui_input import EscapeWatch, stream_interruptible
+    used_iters = 0
     for it in range(1, max_iters + 1):
+        if iteration_budget is not None and not iteration_budget():
+            return {"final": "(已达到本次任务的全局执行轮次上限，停止继续调用模型)",
+                    "iters": used_iters, "stopped": "global_budget", "trace": trace,
+                    "lessons": lessons}
+        used_iters += 1
         # feat-045:每次调 provider 前规整消息序列(去空 content/合并同角色/首条 user),
         # 防多轮回灌引入的非法序列触发 provider 400。
         # feat-090:流式消费期监听孤立 ESC——多步 agent 循环也能即时取消,
@@ -1028,11 +1142,36 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
                 convo.append({"role": "assistant", "content": "(空回复)"})
                 convo.append({"role": "user", "content": _EMPTY_NUDGE})
                 continue
+            from psyclaw.repl import unfulfilled_action_commitment
+            commitment = unfulfilled_action_commitment(reply)
+            if commitment:
+                promise_streak += 1
+                if promise_streak <= _MAX_NOPROGRESS:
+                    convo.append({"role": "assistant", "content": reply})
+                    convo.append({"role": "user", "content": _PROMISE_NUDGE})
+                    promise_recovery_pending = True
+                    if emit:
+                        emit(f"检测到未兑现执行承诺，自动纠偏 {promise_streak}/{_MAX_NOPROGRESS}")
+                    continue
+                return {
+                    "final": "(模型连续声称执行但没有发出工具调用，已停止空转)",
+                    "iters": it, "stopped": "unfulfilled_commitment", "trace": trace,
+                    "lessons": lessons,
+                }
             return {"final": reply, "iters": it, "stopped": "answered", "trace": trace,
                     "lessons": lessons}
         empty_streak = 0
         # 连续相同 (name,args) 调用 → 判定卡住,收敛而非空转(feat-044)
         if calls:
+            promise_streak = 0
+            if promise_recovery_pending:
+                side_effect_calls = [call for call in calls
+                                     if (tools.get(call.get("name")) or {}).get("side_effect")]
+                for call in side_effect_calls:
+                    call["_force_human"] = True
+                # 只读调用兑现了“检查”，但不会消费首个副作用的强制确认。
+                if side_effect_calls:
+                    promise_recovery_pending = False
             sig = _calls_signature(calls)
             repeat_streak = repeat_streak + 1 if sig == prev_sig else 0
             prev_sig = sig

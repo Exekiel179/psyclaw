@@ -35,6 +35,43 @@ def test_toolloop_read_file_refuses_raw(tmp_path):
     assert "拒绝读取" in out and "1" not in out.split(":")[-1]
 
 
+def test_toolloop_read_and_list_stay_inside_project(tmp_path):
+    from psyclaw.toolloop import build_tools
+
+    outside = tmp_path.parent / "outside-agent-secret.txt"
+    outside.write_text("private", encoding="utf-8")
+    tools = build_tools(str(tmp_path))
+    read = tools["read_file"]["run"]({"path": str(outside)})
+    listing = tools["list_dir"]["run"]({"path": str(tmp_path.parent)})
+    assert "项目根之外" in read
+    assert "项目根之外" in listing
+
+
+def test_toolloop_read_refuses_credential_directories(tmp_path):
+    from psyclaw.toolloop import build_tools
+
+    credential = tmp_path / ".kube" / "config"
+    credential.parent.mkdir()
+    credential.write_text("token: hidden", encoding="utf-8")
+    out = build_tools(str(tmp_path))["read_file"]["run"](
+        {"path": ".kube/config"})
+    assert "凭据类路径" in out and "hidden" not in out
+
+
+def test_toolloop_refuses_common_project_credential_files(tmp_path):
+    from psyclaw.toolloop import build_tools, save_path_denied
+
+    tools = build_tools(str(tmp_path))
+    for name in (".env.local", ".env.production", ".envrc", "token", "token.json",
+                 "token.yaml", "access-token.json", "oauth_token.json",
+                 "service-account.json", "service.account.json", "kaggle.json"):
+        path = tmp_path / name
+        path.write_text("hidden", encoding="utf-8")
+        read = tools["read_file"]["run"]({"path": name})
+        assert "凭据类路径" in read and "hidden" not in read, name
+        assert save_path_denied(name, str(tmp_path)) is not None, name
+
+
 # --- save 块嵌套围栏(修复:内容含 ```python 被截断且谎报已保存) -----------------
 
 def test_save_block_keeps_nested_fences():
