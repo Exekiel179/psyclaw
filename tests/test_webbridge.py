@@ -125,6 +125,7 @@ def test_call_unreachable_honest_error(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_merge_tools_when_binary_present(monkeypatch, fake_daemon):
+    monkeypatch.setenv("PSYCLAW_WEBBRIDGE", "1")
     monkeypatch.setattr(wb, "binary_installed", lambda: True)
     tools: dict = {}
     wb.merge_webbridge_tools(tools)
@@ -136,6 +137,7 @@ def test_merge_tools_when_binary_present(monkeypatch, fake_daemon):
 
 
 def test_merge_tools_absent_without_binary(monkeypatch):
+    monkeypatch.setenv("PSYCLAW_WEBBRIDGE", "1")
     monkeypatch.setattr(wb, "binary_installed", lambda: False)
     tools: dict = {}
     wb.merge_webbridge_tools(tools)
@@ -174,8 +176,16 @@ def test_official_support_arc_is_not():
     assert wb.officially_supported({"bundle_id": "com.microsoft.edgemac"}) is True
     assert wb.officially_supported({"bundle_id": "company.thebrowser.browser"}) is False
     assert wb.officially_supported(None) is False
-def test_search_plan_prefers_webbridge():
+def test_webbridge_is_disabled_by_default(monkeypatch):
+    monkeypatch.delenv("PSYCLAW_WEBBRIDGE", raising=False)
+    monkeypatch.setattr(wb, "binary_installed", lambda: True)
+    tools = {}
+    wb.merge_webbridge_tools(tools)
+    assert not tools
+
+
+def test_search_plan_uses_browser_mcp_or_manual_import():
     from psyclaw.psych.litplan import build_search_plan, render_search_plan_md
     md = render_search_plan_md(build_search_plan("x"))
-    assert "Kimi WebBridge(首选" in md and "psyclaw webbridge install" in md
-    assert "web__navigate" in md
+    assert "浏览器 MCP" in md and "psyclaw lit --import" in md
+    assert "Kimi WebBridge" not in md and "web__navigate" not in md

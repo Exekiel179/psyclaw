@@ -215,7 +215,9 @@ _TOOLS = {
 
 
 def _enabled() -> bool:
-    return os.environ.get("PSYCLAW_WEBBRIDGE", "1").strip().lower() \
+    # WebBridge 涉及本地守护进程和浏览器扩展，默认不加载。需要复用既有
+    # 安装时由用户显式 opt-in，避免普通网页/文献请求暗中启动连接流程。
+    return os.environ.get("PSYCLAW_WEBBRIDGE", "0").strip().lower() \
         not in ("0", "false", "no")
 
 

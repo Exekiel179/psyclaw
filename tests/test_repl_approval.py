@@ -30,6 +30,14 @@ def test_default_config_auto_approves_ordinary_requests():
     assert repl.tool_requires_human({"name": "search", "args": {}}) == (False, "")
 
 
+def test_legacy_default_approval_migrates_to_auto(monkeypatch):
+    monkeypatch.setattr(repl.cfg, "load_config", lambda: {
+        "provider": "mock", "model": "default", "approval": "default",
+    })
+    session = repl.ReplSession()
+    assert session.yolo is True
+
+
 def test_tool_policy_keeps_danger_and_overwrite_as_human_decisions(tmp_path):
     existing = tmp_path / "notes.md"
     existing.write_text("old", encoding="utf-8")

@@ -1,4 +1,4 @@
-"""feat:lit 自动调 WebBridge 进机构库(知网)检索,合并进公开 API 结果。
+"""feat:显式启用时用 WebBridge 检索机构库并合并进公开 API 结果。
 
 lit 只打公开 API(检不到知网/万方);此前只能提示用户手动走桥接。本模块让 psyclaw
 自己驱动 WebBridge(用户已登录的真实浏览器):navigate 到知网检索 → evaluate 抽取
@@ -125,7 +125,7 @@ def test_lit_cli_multi_db_loops_all(tmp_path, monkeypatch, capsys):
                              "oa_url": None, "abstract": "", "pmid": None,
                              "pmcid": None, "arxiv_id": None}]}
     monkeypatch.setattr(litbridge, "bridge_search", _bs)
-    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10)
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10, bridge=True)
     assert rc == 0
     assert calls == ["cnki", "wanfang", "vip"]           # 三库都跑了
     out = capsys.readouterr().out
@@ -170,7 +170,7 @@ def test_second_time_no_prompt_just_hint(capsys):
         input_fn=_inp, is_tty=True, asked_fn=lambda: True,   # 已问过
         mark_fn=lambda: None, install_fn=lambda ui_: None)
     assert called["input"] is False                          # 不再追问
-    assert "一步开启" in capsys.readouterr().out
+    assert "显式开启" in capsys.readouterr().out
 
 
 def test_non_tty_never_prompts(capsys):
@@ -195,17 +195,18 @@ def test_enable_command_maps_reason_to_step():
     assert litbridge.enable_command("") == "psyclaw webbridge install"
 
 
-def test_lit_cli_auto_unavailable_gives_enable_step(tmp_path, monkeypatch, capsys):
-    """默认(auto)桥不可用时:给一步开启指引,而非静默/泛化。"""
+def test_lit_cli_explicit_unavailable_gives_enable_step(tmp_path, monkeypatch, capsys):
+    """只有显式 --bridge 时，桥不可用才给开启指引。"""
     from psyclaw.psych import litsearch, lit_cli as lc
     monkeypatch.setattr(litsearch, "search", _fake_search)
     monkeypatch.setattr(litbridge, "bridge_available",
                         lambda **k: (False, "WebBridge 未安装(psyclaw webbridge install)"))
-    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10)   # 默认 auto
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10,
+                    bridge=True)
     assert rc == 0
     out = capsys.readouterr().out
     assert "psyclaw webbridge install" in out
-    assert "无需 --bridge" in out
+    assert "--bridge" in out
 
 
 def test_bridge_search_unavailable_graceful():
@@ -292,7 +293,7 @@ def _fake_search(query, sources=None, limit=10, year_from=None):
                          "pmcid": None, "arxiv_id": None}]}
 
 
-def test_lit_cli_auto_bridges_and_merges(tmp_path, monkeypatch, capsys):
+def test_lit_cli_explicit_bridge_merges_results(tmp_path, monkeypatch, capsys):
     from psyclaw.psych import litsearch, lit_cli as lc
     monkeypatch.setattr(litsearch, "search", _fake_search)
     monkeypatch.setattr(litbridge, "bridge_available", lambda **k: (True, ""))
@@ -303,7 +304,7 @@ def test_lit_cli_auto_bridges_and_merges(tmp_path, monkeypatch, capsys):
                                                      "source": "知网", "oa_status": "unknown",
                                                      "oa_url": None, "abstract": "", "pmid": None,
                                                      "pmcid": None, "arxiv_id": None}]})
-    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10)
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10, bridge=True)
     assert rc == 0
     out = capsys.readouterr().out
     assert "知网" in out and "新增 1" in out
@@ -312,6 +313,18 @@ def test_lit_cli_auto_bridges_and_merges(tmp_path, monkeypatch, capsys):
     cache = json.loads((tmp_path / "notes" / "lit_search.json").read_text(encoding="utf-8"))
     titles = [r["title"] for r in cache["results"]]
     assert "知网独有中文文献" in titles
+
+
+def test_lit_cli_default_does_not_probe_webbridge(tmp_path, monkeypatch):
+    from psyclaw.psych import litsearch, lit_cli as lc
+    monkeypatch.setattr(litsearch, "search", _fake_search)
+    called = {"bridged": False}
+    monkeypatch.setattr(litbridge, "bridge_available",
+                        lambda **k: called.__setitem__("bridged", True) or (True, ""))
+
+    rc = lc.lit_cli("公正世界信念", project_dir=str(tmp_path), limit=10)
+
+    assert rc == 0 and called["bridged"] is False
 
 
 def test_lit_cli_no_bridge_flag_skips(tmp_path, monkeypatch, capsys):

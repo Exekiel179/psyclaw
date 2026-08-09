@@ -1,4 +1,4 @@
-"""lit 自动调 WebBridge 进机构库(知网/万方)检索并合并(stdlib only)。
+"""显式 ``lit --bridge`` 时驱动 WebBridge 检索机构库并合并(stdlib only)。
 
 lit 只打公开 API(OpenAlex/EuropePMC)——中文文献大量在知网,公开 API 检不到。此前
 只能提示用户手动走浏览器桥;本模块让 psyclaw **自己驱动** Kimi WebBridge(复用用户

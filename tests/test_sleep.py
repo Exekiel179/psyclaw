@@ -96,3 +96,34 @@ def test_merge_clusters_distills_principle(mem_dir, archive):
     assert rep["merge_clusters"] == 1 and rep["merged"] == 1
     pend = _load("lessons")["pending"]
     assert any("睡眠合并原则" in c["lesson"] for c in pend)   # 原则卡待确认
+
+
+def test_repl_exit_memory_is_local_and_visible(monkeypatch, capsys):
+    from psyclaw import repl, ui
+    seen = {}
+    monkeypatch.setattr(ui, "_ENABLED", False)
+    monkeypatch.setattr("psyclaw.sleep.sleep_due", lambda project_dir: True)
+    monkeypatch.setattr(
+        "psyclaw.sleep.run_sleep",
+        lambda project_dir, provider=None: seen.setdefault("provider", provider) or {},
+    )
+    monkeypatch.setattr("psyclaw.sleep.render_report", lambda rep: "本地报告")
+
+    repl._finish_session_memory(".")
+
+    out = capsys.readouterr().out
+    assert seen["provider"] is None
+    assert "本地，不连接网络" in out and "会话记忆已保存" in out
+
+
+def test_repl_exit_memory_swallows_keyboard_interrupt(monkeypatch, capsys):
+    from psyclaw import repl, ui
+    monkeypatch.setattr(ui, "_ENABLED", False)
+    monkeypatch.setattr("psyclaw.sleep.sleep_due", lambda project_dir: True)
+
+    def interrupted(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("psyclaw.sleep.run_sleep", interrupted)
+    repl._finish_session_memory(".")
+    assert "已跳过" in capsys.readouterr().out

@@ -1112,6 +1112,29 @@ def _goal_execution_prompt(goal: str) -> str:
               "信息确实不足时再提出最少量澄清,不要只复述目标或等待用户说『开始/继续』。")
 
 
+def _finish_session_memory(project_dir: str = ".") -> None:
+    """退出时只做本地记忆结算，不再暗中调用模型或等待网络。"""
+    try:
+        from psyclaw.sleep import render_report, run_sleep, sleep_due
+        if not sleep_due(project_dir):
+            return
+    except Exception:  # noqa: BLE001
+        return
+    activity = ui.ActivityIndicator("正在保存会话记忆（本地，不连接网络）")
+    activity.start()
+    try:
+        rep = run_sleep(project_dir, provider=None)
+    except KeyboardInterrupt:
+        activity.stop("会话记忆整理已跳过")
+        return
+    except Exception as exc:  # noqa: BLE001
+        activity.stop("会话记忆整理失败")
+        print(ui.warn(f"  会话已正常退出；记忆整理未完成:{exc}"))
+        return
+    activity.stop("会话记忆已保存（本地）")
+    print(ui.dim("  " + render_report(rep)))
+
+
 class ReplSession:
     def __init__(self, resume_id: str | None = None,
                  approval: str | None = None) -> None:
@@ -1133,7 +1156,8 @@ class ReplSession:
         self.file_access = str(self.conf.get("file_access", "open")).lower()
         # 审批模式:auto(默认放行普通副作用,危险/决策点仍确认)
         # | ask(所有副作用逐条确认);旧 yolo/default 配置值继续兼容。
-        self.yolo = (str(self.conf.get("approval", "")).lower() in ("yolo", "auto")
+        self.yolo = (str(self.conf.get("approval", "auto")).lower()
+                     in ("", "default", "yolo", "auto")
                      or bool(self.conf.get("yolo", False)))
         if approval:
             self.yolo = approval.lower() == "auto"  # suggest 是 ask 的兼容名
@@ -2319,13 +2343,8 @@ class ReplSession:
                     self.ask(line)
             except KeyboardInterrupt:      # 深处的 Ctrl+C 也只取消本轮(评审修复)
                 print(ui.dim("\n  (已中断本轮;继续对话或 /exit 退出)"))
-        # feat-116:会话结束自动睡眠(自上次睡眠新增 ≥20 轮才触发,轻量不扰人)
-        try:
-            from psyclaw.sleep import render_report, run_sleep, sleep_due
-            if sleep_due("."):
-                print(ui.dim("  " + render_report(run_sleep(".", provider=self.provider))))
-        except Exception:  # noqa: BLE001  # 睡眠失败绝不影响退出
-            pass
+        # 退出阶段不得再发网络请求；只做快速本地结算并持续显示状态。
+        _finish_session_memory(".")
         print(ui.dim("再见。研究顺利!"))
         return 0
 
