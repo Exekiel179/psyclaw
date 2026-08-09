@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   platform-test:
@@ -18,6 +27,8 @@ jobs:
         os: [windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -39,6 +50,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -47,9 +60,12 @@ jobs:
         shell: python
         run: |
           import os
-          import psyclaw
-          expected = "v" + psyclaw.__version__
-          actual = os.environ["GITHUB_REF_NAME"]
+          import re
+          from pathlib import Path
+          root = Path(os.environ["GITHUB_WORKSPACE"])
+          text = (root / "psyclaw" / "__init__.py").read_text(encoding="utf-8")
+          expected = "v" + re.search(r'__version__\s*=\s*"([^"]+)"', text).group(1)
+          actual = os.environ["RELEASE_TAG"]
           if actual != expected:
               raise SystemExit(f"tag {actual!r} does not match package {expected!r}")
       - name: Build platform packages
@@ -58,12 +74,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release create "$GITHUB_REF_NAME"
-          dist/psyclaw-${GITHUB_REF_NAME#v}-py3-none-any.whl
-          dist/psyclaw-${GITHUB_REF_NAME#v}.tar.gz
-          dist/psyclaw-macos-${GITHUB_REF_NAME#v}.tar.gz
-          dist/psyclaw-windows-${GITHUB_REF_NAME#v}.zip
+          gh release create "$RELEASE_TAG"
+          dist/psyclaw-${RELEASE_TAG#v}-py3-none-any.whl
+          dist/psyclaw-${RELEASE_TAG#v}.tar.gz
+          dist/psyclaw-macos-${RELEASE_TAG#v}.tar.gz
+          dist/psyclaw-windows-${RELEASE_TAG#v}.zip
           dist/SHA256SUMS.txt
           --repo "$GITHUB_REPOSITORY"
-          --title "PsyClaw $GITHUB_REF_NAME"
+          --title "PsyClaw $RELEASE_TAG"
           --generate-notes
