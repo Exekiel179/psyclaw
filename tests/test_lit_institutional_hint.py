@@ -1,6 +1,6 @@
-"""bug 修:lit 只打公开 API,用户以为会自动调 Kimi WebBridge(机构库)。
+"""bug 修:lit 只打公开 API,机构库补全不自动启动浏览器连接。
 
-lit(OpenAlex/EuropePMC)与 webbridge 是两条独立通道。检索后主动指路机构库桥接,
+lit(OpenAlex/EuropePMC)与机构库检索是两条独立通道。检索后指向浏览器 MCP 或手动导入,
 中文主题尤其(公开 API 检不到知网/万方)。
 """
 from __future__ import annotations
@@ -8,16 +8,16 @@ from __future__ import annotations
 from psyclaw.psych.lit_cli import institutional_hint, _has_cjk
 
 
-def test_cjk_query_points_to_webbridge_and_cnki():
+def test_cjk_query_points_to_browser_mcp_and_cnki():
     h = institutional_hint("公正世界信念")
-    assert "webbridge" in h
+    assert "浏览器 MCP" in h
     assert "知网" in h or "万方" in h
     assert "--plan" in h
 
 
-def test_english_query_points_to_webbridge():
+def test_english_query_points_to_browser_mcp():
     h = institutional_hint("belief in a just world")
-    assert "webbridge" in h and "--plan" in h
+    assert "浏览器 MCP" in h and "--plan" in h
 
 
 def test_has_cjk():

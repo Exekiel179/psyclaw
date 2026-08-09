@@ -1,7 +1,7 @@
 """检索计划包(feat-103)——把「浏览器桥接文献检索」方法论产品化。
 
-源自用户提供的《Claude + Kimi WebBridge 文献综述教学文档》:知网/万方/WoS 等
-机构库没有公开 API,须经浏览器(登录学校代理)人机协作检索。psyclaw 自身
+源自浏览器桥接文献综述方法:知网/万方/WoS 等机构库没有公开 API,须经浏览器
+(登录学校代理)人机协作检索。psyclaw 自身
 **不驱动浏览器**,但把这套流程沉淀为可复用的**检索计划包**:
 
 ① 中英布尔检索式(同义词 OR 块 × AND;provider 可用时定制,否则给模板骨架);
@@ -23,7 +23,7 @@ from pathlib import Path
 # 浏览器桥接分步提示词(逐步,每步可直接粘给带浏览器能力的 agent)
 _BRIDGE_STEPS = [
     ("打开机构电子资源库",
-     "使用浏览器桥接(如 Kimi WebBridge / 浏览器 MCP)打开我机构的电子资源库页面:"
+     "使用浏览器 MCP 打开我机构的电子资源库页面:"
      "<你的图书馆代理地址>。如果需要登录,我手动完成,登录后请继续。"),
     ("进入数据库",
      "请进入「中国知网」(或万方 / Web of Science / Google Scholar)。"
@@ -146,18 +146,14 @@ def render_search_plan_md(plan: dict) -> str:
         "",
         "覆盖 OpenAlex / Europe PMC / arXiv;OA 全文合法直取,付费墙不绕过。",
         "",
-        "## 三、路线 B:机构库(知网/万方/WoS,浏览器桥接分步提示词)",
+        "## 三、路线 B:机构库(知网/万方/WoS,浏览器 MCP 或手动导入)",
         "",
-        "> **psyclaw 可亲自执行**,两种引擎按优先级:",
-        "> ① **Kimi WebBridge(首选,feat-108)**——驱动你**已登录的真实浏览器**,",
-        ">   机构登录态直接复用。一次性配置:`psyclaw webbridge install`(自动识别",
-        ">   默认浏览器并给扩展安装指引),之后 `psyclaw` 对话 `/agent on`,说",
-        ">   「按 notes/search_plan.md 路线 B 执行」——psyclaw 用 web__navigate/",
-        ">   snapshot/click/fill 等工具逐步操作,每个动作过审批。",
-        "> ② **浏览器 MCP(备选,feat-107)**——本机有 node/npx 即可(`psyclaw mcp`",
+        "> **psyclaw 可亲自执行**,推荐使用浏览器 MCP:",
+        "> **浏览器 MCP(可选)**——本机有 node/npx 即可(`psyclaw mcp`",
         ">   可见 browser 条目),mcp__browser__* 工具,独立浏览器实例(登录需在",
-        ">   psyclaw 打开的窗口里完成;附连模式见下)。",
-        "> 两者都没有时,把下面提示词粘给任何带浏览器能力的外部 agent。",
+        ">   psyclaw 打开的窗口里完成;对话中输入 `/agent on` 后按路线执行。附连模式见下。",
+        "> 不使用浏览器 MCP 时,在机构库手动检索并导出 Markdown/CSV,再运行",
+        ">   `psyclaw lit --import <文件>` 合并题录。",
         "> 登录环节永远由你人工完成,凭据不经 psyclaw。",
         "",
         "> **复用已登录浏览器(附连模式,登录态跨会话保留)**:",

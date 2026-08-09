@@ -112,8 +112,15 @@ def test_bridge_ready_says_which_step_is_missing():
     assert r["ok"] is True
 
 
-def test_tool_registered_and_falls_back_when_bridge_down(monkeypatch):
+def test_tool_hidden_by_default(monkeypatch):
     from psyclaw.toolloop import build_tools
+    monkeypatch.delenv("PSYCLAW_WEBBRIDGE", raising=False)
+    assert "lit_fetch_via_browser" not in build_tools(".")
+
+
+def test_tool_registered_on_opt_in_and_falls_back_when_bridge_down(monkeypatch):
+    from psyclaw.toolloop import build_tools
+    monkeypatch.setenv("PSYCLAW_WEBBRIDGE", "1")
     t = build_tools(".")
     assert "lit_fetch_via_browser" in t
     assert t["lit_fetch_via_browser"]["side_effect"] is True

@@ -419,8 +419,7 @@ def build_tools(project_dir: str = ".") -> dict:
             # 付费墙不是终点:用户本人往往有机构权限,缺的只是在真实浏览器里登一下。
             # 此前这里只说「跳过」,模型据此告诉用户「无法获取」——路其实是通的。
             lines.append(f"  🔒 付费墙 {walled} 篇——**别就此作罢**,用用户自己的机构权限取:"
-                         "① 装了 WebBridge 就调 lit_fetch_via_browser(doi) 全自动抓;"
-                         "② 否则 lit_open_institutional(doi) 开机构入口 → 用户点下载 → "
+                         "lit_open_institutional(doi) 开机构入口 → 用户点下载 → "
                          "lit_capture_pdf() 自动收")
             lines += [f"     · 待取:{w}" for w in walled_dois[:8]]
         lines += [f"  ✗ {f}" for f in failed]
@@ -461,11 +460,12 @@ def build_tools(project_dir: str = ".") -> dict:
             str(a.get("name", "")).strip(), doi)
         r = fetch_pdf_via_browser(page, out)
         return r.get("note") or str(r)
-    _t("lit_fetch_via_browser",
-       "付费墙全文**全自动**抓取:用 WebBridge 驱动你已登录的浏览器 fetch PDF 并落盘"
-       "(连点下载都不用;用的仍是你自己的机构权限)。桥没装/没连时会说清缺哪一步并"
-       "退回手动路径",
-       "doi:str, url?:str, name?:str", _lit_fetch_via_browser, side_effect=True)
+    from psyclaw.webbridge import _enabled as _webbridge_enabled
+    if _webbridge_enabled():
+        _t("lit_fetch_via_browser",
+           "付费墙全文**全自动**抓取:用 WebBridge 驱动你已登录的浏览器 fetch PDF 并落盘"
+           "(仅在 PSYCLAW_WEBBRIDGE=1 时提供)。桥没装/没连时退回手动路径",
+           "doi:str, url?:str, name?:str", _lit_fetch_via_browser, side_effect=True)
 
     def _lit_capture_pdf(a):
         from psyclaw.psych.paywall import capture_from_downloads
@@ -567,7 +567,7 @@ def build_tools(project_dir: str = ".") -> dict:
         merge_mcp_tools(tools, project_dir)
     except Exception:  # noqa: BLE001
         pass
-    # Kimi WebBridge(feat-108:真实浏览器登录态,web__ 前缀,逐动作审批)
+    # WebBridge 是显式 opt-in；默认不加载、不启动守护进程。
     try:
         from psyclaw.webbridge import merge_webbridge_tools
         merge_webbridge_tools(tools)

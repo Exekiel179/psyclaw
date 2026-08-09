@@ -90,8 +90,8 @@ def lit_cli(query: str, sources: str = "", limit: int = 10,
         print(ui.dim("取全文:psyclaw lit --fulltext <DOI>(走合法 OA);"
                      "--download 批量下载本次 OA 命中;付费墙用 --zotero <DOI>。"))
 
-    # 自动机构库桥接:公开 API 检不到知网/万方,驱动 WebBridge 补检并合并进结果与缓存
-    bridge_ran = _maybe_bridge(query, r, bridge, ui, limit, dbs=dbs)
+    # WebBridge 默认关闭；只有显式 --bridge 才进入浏览器桥接。
+    _maybe_bridge(query, r, bridge, ui, limit, dbs=dbs)
 
     # PRISMA 计数落盘(对接 LIT.prisma 质量检查)
     notes = Path(project_dir) / "notes"
@@ -111,8 +111,7 @@ def lit_cli(query: str, sources: str = "", limit: int = 10,
     print(ui.dim(f"检索结果缓存 → {notes / 'lit_search.json'}"
                  "(下次 psyclaw research 将据此合成有据综述)"))
 
-    # 机构库桥接的所有提示(可用即自动跑 / 不可用给一步开启指引)由 _maybe_bridge 内部负责;
-    # bridge_ran 为 False 仅当用户显式 --no-bridge——此时不再劝。
+    # 机构库桥接是显式 opt-in；默认检索不启动守护进程、不等待浏览器扩展。
 
     if synthesize:
         _synthesize_review(query, r, project_dir, ui)
@@ -127,13 +126,13 @@ def _has_cjk(s: str) -> bool:
 
 def _maybe_bridge(query: str, r: dict, bridge: bool | None, ui, limit: int,
                   dbs=None) -> bool:
-    """自动驱动 WebBridge 进(多个)机构库补检并合并进 r。返回是否真的处理了桥接。
+    """显式驱动 WebBridge 进机构库补检并合并进 r。
 
-    bridge:None=自动(可用即跑)· True=强制(不可用也报原因)· False=关闭。
+    bridge:True=启用；None/False=关闭，不探测、不启动、不提示安装。
     dbs:None=按查询语言自动选库(中文→知网/万方/维普)· 字符串/列表=指定库。
     全程 fail-safe——litbridge 内部不抛,这里任何异常也吞掉,绝不中断 lit。
     """
-    if bridge is False:
+    if bridge is not True:
         return False
     try:
         from psyclaw.psych import litbridge
@@ -243,24 +242,24 @@ def _first_install_nudge_or_hint(query: str, reason: str, ui, *, input_fn=None,
         return
 
     print(ui.warn(institutional_hint(query)))
-    print(ui.dim(f"  一步开启机构库自动补检:{litbridge.enable_command(reason)}"
-                 f"({reason};开启后 lit 默认自动进,无需 --bridge)"))
+    print(ui.dim(f"  显式开启 WebBridge:{litbridge.enable_command(reason)}；"
+                 f"安装后在检索命令中添加 --bridge。({reason})"))
 
 
 def institutional_hint(query: str) -> str:
     """检索后的机构库补全提示。纯函数,可单测。
 
     lit 只打公开 API(OpenAlex/EuropePMC)——中文文献大量在知网/万方/维普,英文付费
-    文献也检不全。用户实测:搜「公正世界信念」以为会自动调 Kimi WebBridge,其实 lit
-    与 webbridge 是两条独立通道。主动指路:机构库检索走 lit --plan 生成桥接分步 +
-    浏览器桥(Kimi WebBridge)进真实库检索。中文主题时话更重(公开 API 覆盖尤其差)。
+    文献也检不全。机构库检索默认不启动浏览器连接；可使用浏览器 MCP，或在浏览器中
+    手动检索后用 `psyclaw lit --import` 导入结果。中文主题时话更重(公开 API 覆盖尤其差)。
     """
     if _has_cjk(query):
         return ("覆盖提醒:公开 API(OpenAlex/EuropePMC)检不到知网/万方/维普的中文文献。"
-                "要机构库全量检索,走浏览器桥:`psyclaw lit \"%s\" --plan` 生成桥接分步 → "
-                "`psyclaw webbridge`(Kimi WebBridge 驱动真实浏览器进知网检索)。" % query.strip())
-    return ("覆盖提醒:公开 API 检不全付费墙/机构库文献。要更全,走浏览器桥:"
-            "`psyclaw lit --plan` 生成桥接分步 → `psyclaw webbridge`(进 WoS/Scopus 等)。")
+                "要机构库全量检索,使用浏览器 MCP 或手动导出结果:"
+                "`psyclaw lit \"%s\" --plan` 查看步骤,完成后用 `psyclaw lit --import <文件>`。"
+                % query.strip())
+    return ("覆盖提醒:公开 API 检不全付费墙/机构库文献。要更全,使用浏览器 MCP 或手动导入:"
+            "`psyclaw lit --plan` 查看步骤。")
 
 
 def _synthesize_review(query: str, search_result: dict, project_dir: str, ui) -> None:

@@ -445,7 +445,8 @@ class ActivityIndicator:
             thread.join(timeout=1)
         self._thread = None
         failed = bool(final and any(word in final for word in
-                                    ("失败", "错误", "超时", "已结束")))
+                                    ("失败", "错误", "超时", "已结束", "取消",
+                                     "跳过", "未完成")))
         status = f"{'✗' if failed else '✓'} {final}" if final else ""
         if _ENABLED:
             suffix = f"  {status}" if status else ""

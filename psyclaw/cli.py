@@ -1794,7 +1794,20 @@ def cmd_sleep(args: argparse.Namespace) -> int:
         provider = get_provider(load_config())
     except Exception:  # noqa: BLE001
         pass
-    rep = run_sleep(provider=provider)
+    activity = ui.ActivityIndicator("正在整理长期记忆（会请求已配置模型）")
+    activity.start()
+    try:
+        rep = run_sleep(provider=provider)
+    except KeyboardInterrupt:
+        activity.stop("睡眠整合已取消")
+        return 130
+    except Exception as exc:  # noqa: BLE001
+        from psyclaw.network import network_error_message
+        msg = network_error_message(exc)
+        activity.stop("网络连接失败" if msg else "睡眠整合失败")
+        print(ui.err(f"  {msg or exc}"))
+        return 1
+    activity.stop("睡眠整合已完成")
     print(ui.ok(render_report(rep)))
     if rep["fact_candidates"] or rep["lesson_candidates"]:
         print(ui.dim("  候选均为待确认:psyclaw memory list / memory approve <概念> / memory confirm <序号>"))
@@ -2618,9 +2631,9 @@ def build_parser() -> argparse.ArgumentParser:
                       help="从检索语料生成文献矩阵骨架(notes/lit_matrix.md,"
                            "键与 cite-check 语料同源)")
     plit.add_argument("--bridge", dest="bridge", action="store_true", default=None,
-                      help="强制驱动 WebBridge 进机构库补检并合并(默认:可用时自动)")
+                      help="显式启用 WebBridge 进机构库补检(默认关闭)")
     plit.add_argument("--no-bridge", dest="bridge", action="store_false",
-                      help="关闭机构库自动桥接,只用公开 API")
+                      help="关闭 WebBridge,只用公开 API(默认行为)")
     plit.add_argument("--db", dest="dbs", default=None,
                       help="指定机构库(逗号分隔:知网/万方/维普 或 cnki,wanfang,vip);"
                            "默认按查询语言自动选(中文→三库)")
