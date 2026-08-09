@@ -73,7 +73,24 @@ def _brief_detail(error: object) -> str:
 
 def redact_secrets(text: str) -> str:
     """脱敏错误文本中的常见凭据形态，防止诊断输出泄漏 Token。"""
-    safe = re.sub(r"\bKGAT_[A-Za-z0-9._-]+", "KGAT_<redacted>", text,
+    safe = re.sub(
+        r"-----BEGIN [^-\r\n]*PRIVATE KEY-----.*?"
+        r"-----END [^-\r\n]*PRIVATE KEY-----",
+        "<redacted-private-key>", text, flags=re.I | re.S,
+    )
+    safe = re.sub(
+        r"\b(AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN))"
+        r"(\s*[:=]\s*)([^\s;&,]+)",
+        r"\1\2<redacted>", safe, flags=re.I,
+    )
+    safe = re.sub(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b",
+                  "<redacted-aws-key-id>", safe)
+    safe = re.sub(
+        r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\."
+        r"[A-Za-z0-9_-]{8,}\b",
+        "<redacted-jwt>", safe,
+    )
+    safe = re.sub(r"\bKGAT_[A-Za-z0-9._-]+", "KGAT_<redacted>", safe,
                   flags=re.I)
     safe = re.sub(
         r"\b(?:sk-(?:ant-)?[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{20,}|"

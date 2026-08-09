@@ -261,6 +261,17 @@ def test_side_effect_runs_with_approval():
     assert state["writes"] == 1
 
 
+def test_tool_outputs_are_redacted_before_provider_feedback():
+    secret = "KGAT_" + "abcdefghijklmnopqrstuvwxyz123456"
+    prov = FakeProvider(['```tool\n{"name":"echo","args":{}}\n```', "done"])
+    tools = {"echo": {"desc": "echo", "args": "", "side_effect": False,
+                      "run": lambda _args: f"token: {secret}"}}
+    result = TL.run_tool_loop(prov, "s", [{"role": "user", "content": "q"}],
+                              tools=tools)
+    assert secret not in result["trace"][0]["output"]
+    assert "<redacted>" in result["trace"][0]["output"]
+
+
 def test_unknown_tool_reported():
     prov = FakeProvider(['```tool\n{"name":"nope","args":{}}\n```', "done"])
     tools, _ = _tools()
@@ -534,6 +545,28 @@ def test_log_agent_run_truncates_heads(tmp_path):
     r = TL.read_agent_runs(str(tmp_path))[0]
     assert len(r["task"]) == TL._RUNS_MAX_HEAD
     assert len(r["final_head"]) == TL._RUNS_MAX_HEAD
+def test_log_agent_run_includes_plan_verification_and_thread(tmp_path):
+    res = _fake_res()
+    res["plan"] = [{"id": "main"}, {"id": "sources"}]
+    res["task_results"] = {
+        "main": {
+            "passed": True, "attempts": 1, "thread_id": 123,
+            "reasons": [], "run": {"stopped": "answered"},
+        },
+        "sources": {
+            "passed": False, "attempts": 2, "thread_id": 456,
+            "reasons": ["缺少产物"], "run": {"stopped": "answered"},
+        },
+    }
+    TL.log_agent_run(str(tmp_path), "planned", res)
+    record = TL.read_agent_runs(str(tmp_path))[0]
+    assert record["plan"] == ["main", "sources"]
+    assert record["task_runs"] == [
+        {"id": "main", "passed": True, "attempts": 1, "thread_id": 123,
+         "stopped": "answered", "reasons": []},
+        {"id": "sources", "passed": False, "attempts": 2, "thread_id": 456,
+         "stopped": "answered", "reasons": ["缺少产物"]},
+    ]
 def test_sanitize_drops_empty_content():
     msgs = [{"role": "user", "content": "hi"},
             {"role": "assistant", "content": "  "},

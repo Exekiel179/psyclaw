@@ -47,6 +47,21 @@ def test_redact_secrets_covers_provider_tokens_and_proxy_credentials():
     assert safe.count("redacted") >= 3
 
 
+def test_redact_secrets_covers_aws_jwt_and_private_keys():
+    from psyclaw.network import redact_secrets
+
+    aws_id = "AKIA" + "ABCDEFGHIJKLMNOP"
+    aws_secret = "a" * 40
+    jwt = "eyJheader12345.eyJpayload12345.signature12345"
+    pem = "-----BEGIN PRIVATE KEY-----\nprivate-material\n-----END PRIVATE KEY-----"
+    text = (f"AWS_ACCESS_KEY_ID={aws_id}\n"
+            f"AWS_SECRET_ACCESS_KEY={aws_secret}\n{jwt}\n{pem}")
+    safe = redact_secrets(text)
+    for secret in (aws_id, aws_secret, jwt, "private-material"):
+        assert secret not in safe
+    assert safe.count("redacted") >= 4
+
+
 def test_mcp_eof_uses_network_stderr_instead_of_process_crash(monkeypatch):
     from psyclaw import ui
     from psyclaw.mcp.client import MCPClient

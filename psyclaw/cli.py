@@ -135,11 +135,12 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_agent(args: argparse.Namespace) -> int:
-    """agent 一次性任务:模型自主多步调用工具(纯工具层循环,provider 无关保底)。"""
+    """agent 一次性任务:规划/执行分离，支持有界同质副本 fork/join。"""
     from psyclaw import ui
-    from psyclaw.providers import get_provider
+    from psyclaw.agent_runtime import run_planned_agent
+    from psyclaw.providers import get_provider, get_role_provider
     from psyclaw.repl import _build_system_prompt
-    from psyclaw.toolloop import log_agent_run, read_agent_runs, run_tool_loop
+    from psyclaw.toolloop import log_agent_run, read_agent_runs
     if getattr(args, "history", None) is not None:   # feat-037:回看运行痕迹
         runs = read_agent_runs(".", limit=args.history or 10)
         if not runs:
@@ -163,19 +164,35 @@ def cmd_agent(args: argparse.Namespace) -> int:
     def _approve(call: dict) -> bool:
         from psyclaw.repl import _hitl_confirm, tool_requires_human
         needs_human, reason = tool_requires_human(call, ".")
-        if needs_human:
+        forced = bool(call.get("_force_human"))
+        if not auto or needs_human or forced:
             detail = f"{call.get('name', '工具')}({call.get('args') or {}})"
-            return _hitl_confirm(f"确认{reason}:{detail[:180]}?")
+            label = reason or ("纠偏后的首个副作用" if forced else "工具副作用")
+            return _hitl_confirm(f"确认{label}:{detail[:180]}?")
         return True
 
-    approve = _approve if auto else None
+    approve = _approve
     print(ui.title("PsyClaw agent") + ui.dim(f"  {task}"))
     if not auto:
         print(ui.dim("  (审批:ask；副作用工具逐条确认，危险操作始终确认。)"))
-    res = run_tool_loop(provider, _build_system_prompt(),
-                        [{"role": "user", "content": task}], project_dir=".",
-                        max_iters=getattr(args, "max_iters", 24),
-                        approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")))
+    try:
+        workers = int(conf.get("agent_workers", 3))
+    except (TypeError, ValueError):
+        workers = 3
+    try:
+        res = run_planned_agent(
+            get_role_provider(conf, "planner", provider), _build_system_prompt(),
+            [{"role": "user", "content": task}], project_dir=".",
+            executor_factory=lambda: get_role_provider(conf, "executor"),
+            finisher_provider=get_role_provider(conf, "writer"),
+            max_iters=getattr(args, "max_iters", 24), max_workers=workers,
+            approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")),
+            source_provider=provider)
+    except Exception as exc:  # noqa: BLE001
+        from psyclaw.network import network_error_message, redact_secrets
+        message = network_error_message(exc) or f"provider 错误:{redact_secrets(str(exc))}"
+        print(ui.err(f"  [{message}]"))
+        return 1
     print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
     print(res["final"])
     # feat-065:循环内蒸馏的环境教训落跨会话待确认卡(HITL:psyclaw memory confirm 才生效)

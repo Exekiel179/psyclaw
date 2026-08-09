@@ -196,6 +196,8 @@ def tool_requires_human(call: dict, project_dir: str = ".") -> tuple[bool, str]:
     detail = json.dumps(args, ensure_ascii=False)
     if _DANGEROUS_RE.search(detail):
         return True, "危险参数"
+    if name == "provider_handoff":
+        return True, "跨 Provider 数据传输"
     if name in _DECISION_TOOLS:
         return True, "研究决策"
     if name == "save_file":
@@ -1861,58 +1863,42 @@ class ReplSession:
         return None
 
     def _run_agent(self, system: str, activity=None) -> str | None:
-        """agent 模式:跑纯工具层循环(模型自主多步调工具)。返回最终答案;provider 错误返回 None。"""
-        from psyclaw.toolloop import _short, run_tool_loop
+        """agent 模式:Planner → 主线/同质副本 → Verifier → Finisher。"""
+        from psyclaw.agent_runtime import run_planned_agent
+        from psyclaw.toolloop import _short
 
         def _approve(call: dict) -> bool:
             # 普通工具副作用自动放行；危险参数、研究决策和文件覆盖仍确认。
-            needs_human, _reason = tool_requires_human(call, ".")
+            needs_human, reason = tool_requires_human(call, ".")
             forced = bool(getattr(self, "_force_confirm_next_action", False))
             self._force_confirm_next_action = False
+            forced = forced or bool(call.get("_force_human"))
             return self._side_effect_ok(
                 f"{call['name']}({_short(call.get('args') or {}, 120)})",
                 dangerous=bool(_DANGEROUS_RE.search(str(call.get("args") or ""))),
-                requires_human=needs_human or forced, label="工具副作用")
-
-        # 流式输出(feat-188):此前 agent 模式把整段回复 join 完才显示,用户干等。
-        # 现在边流边出,与普通对话观感一致;```tool 协议块由 ToolBlockFilter 藏掉。
-        # 顺序要紧:⚙ 进度行打印前必须先收掉当前 StreamBlock——StreamBlock 关闭时
-        # 要做光标上移覆盖,与穿插的普通 print 混在一起会把画面搞花。
-        cur: list = []                       # 至多一个「当前块」,用列表当可变持有者
-
-        def _close_block() -> None:
-            if cur:
-                cur.pop().close()
-                print()
-
-        def _on_chunk(text: str) -> None:
-            if activity is not None and activity.active:
-                activity.stop("已收到响应")
-            if not cur:
-                cur.append(ui.StreamBlock(f"PsyClaw · {self.provider.name}"))
-            cur[0].write(text)
+                requires_human=needs_human or forced, label=reason or "工具副作用")
 
         def _emit(e) -> None:
             if activity is not None and activity.active:
-                activity.stop("进入工具阶段")
-            _close_block()                   # 先收块,再打进度行
+                activity.stop("进入规划执行阶段")
             print(ui.dim(f"  ⚙ {e}"))
 
-        streamed = False
         try:
-            def _chunk(text: str) -> None:
-                nonlocal streamed
-                streamed = True
-                _on_chunk(text)
-
-            res = run_tool_loop(
-                self.provider, system, self.messages, project_dir=".",
-                approve=_approve, emit=_emit, on_chunk=_chunk,
-                idle_state=self._tool_idle)   # feat-133:跨消息累积工具组闲置,长期不用清走
+            from psyclaw.providers import get_role_provider
+            planner = get_role_provider(self.conf, "planner", self.provider)
+            finisher = get_role_provider(self.conf, "writer")
+            try:
+                workers = int(self.conf.get("agent_workers", 3))
+            except (TypeError, ValueError):
+                workers = 3
+            res = run_planned_agent(
+                planner, system, self.messages, project_dir=".",
+                executor_factory=lambda: get_role_provider(self.conf, "executor"),
+                finisher_provider=finisher, max_workers=workers,
+                approve=_approve, emit=_emit, source_provider=self.provider)
         except KeyboardInterrupt:              # feat-090:ESC/Ctrl+C 取消本轮,不炸 REPL
             if activity is not None:
                 activity.stop("已中断")
-            _close_block()
             print(ui.warn("  [已中断本轮生成(ESC/Ctrl+C)]"))
             return None
         except Exception as exc:  # noqa: BLE001
@@ -1920,10 +1906,8 @@ class ReplSession:
             network_msg = network_error_message(exc)
             if activity is not None:
                 activity.stop("网络连接失败" if network_msg else "请求失败")
-            _close_block()
             print(ui.err(f"  [{network_msg or f'provider 错误: {exc}'}]"))
             return None
-        _close_block()
         if activity is not None:
             activity.stop("已完成")
         if res["trace"]:
@@ -1935,9 +1919,8 @@ class ReplSession:
         task_head = next((m["content"] for m in reversed(self.messages)
                           if m.get("role") == "user"), "")
         log_agent_run(".", task_head, res)   # feat-037:落运行痕迹(失败静默)
-        # 已流式显示过就不再整块重印(否则最终答案出现两遍);provider 不支持流式
-        # 或本轮一个字都没流出时,退回整块渲染,保证答案一定被显示。
-        if not streamed and res.get("final"):
+        # Planner/Executor 的过程只显示结构化进度；最终答案在验收后统一渲染。
+        if res.get("final"):
             blk = ui.StreamBlock(f"PsyClaw · {self.provider.name}")
             blk.write(res["final"])
             blk.close()
