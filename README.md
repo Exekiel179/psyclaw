@@ -30,6 +30,11 @@ irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
 
 <details><summary>手动安装 / 离线分发包</summary>
 
+正式 Release 提供两个独立离线包：
+
+- `psyclaw-macos-0.23.0.tar.gz`：Apple Silicon 与 Intel Mac 通用。
+- `psyclaw-windows-0.23.0.zip`：Windows 10/11，内含 PowerShell 安装器。
+
 ```bash
 # uv(推荐)
 uv tool install --python 3.12 "git+https://github.com/Exekiel179/psyclaw.git@v0.23.0"
@@ -42,8 +47,8 @@ uv tool install --python 3.12 "git+https://gitclone.com/github.com/Exekiel179/ps
 pip install "git+https://github.com/Exekiel179/psyclaw.git@v0.23.0"
 ```
 
-**完全无网的机器**:在有网机器上跑 `sh scripts/build-dist.sh`,把生成的
-`dist/psyclaw-offline-*.tar.gz` 拷过去,解压后执行 `install.sh` 即可(依赖全部打包在内)。
+**完全无网的机器**：从 Release 下载对应平台包，解压后运行其中的 `install.sh`
+或 `install.ps1`。维护者也可在有网机器运行 `python scripts/build_dist.py` 同时重建两个包。
 </details>
 
 ---
