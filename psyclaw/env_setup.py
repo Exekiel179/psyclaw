@@ -1,8 +1,8 @@
 """一键配置缺失的基础环境 —— `psyclaw setup --env`(v0.9 feat-051)。
 
 诊断跑 psyclaw 所需的 **base 环境**,并一键把能自动修的补上:
-  ① 配置文件      —— 建了吗(否则各命令用默认 provider=mock)
-  ② LLM provider  —— 配了 API key 吗(否则 agent/写作只能走 mock 占位)
+  ① 配置文件      —— 建了吗
+  ② LLM provider  —— 是否已配置且可用
   ③ stats 组      —— pingouin/pandas/scipy(pystat MCP 真算、跑生成的统计脚本)
   ④ full 组       —— prompt_toolkit/rich(REPL 实时联想;方向键 readline 已兜底)
 
@@ -55,16 +55,19 @@ def diagnose(project_dir: str = ".", *, detect_fn=None, config_fn=None,
         "fix": "" if has_conf else "psyclaw config  # 交互设置 provider/model",
     })
 
-    # ② LLM provider key(mock 或空 key = 未配)
+    # ② LLM provider:没有可用 provider 时只报告状态，不创建测试 provider。
     try:
         prov = make_provider(conf)
         keyed = bool(getattr(prov, "api_key", "")) and prov.name != "mock"
         pname = prov.name
-    except Exception:  # noqa: BLE001
-        keyed, pname = False, "?"
+    except Exception as exc:  # noqa: BLE001
+        keyed, pname = False, "未配置或不可用"
+        provider_error = str(exc)
+    else:
+        provider_error = ""
     checks.append({
         "key": "provider", "label": "LLM provider", "ok": keyed, "auto": False,
-        "detail": f"{pname}(已配 key)" if keyed else f"{pname}(无 key → 走 mock 占位)",
+        "detail": f"{pname}(已配 key)" if keyed else (provider_error or f"{pname}(不可用)"),
         "fix": "" if keyed else "psyclaw config  或设置对应 API key 环境变量(如 DEEPSEEK_API_KEY)",
     })
 

@@ -17,6 +17,7 @@ from psyclaw import config as cfg
 from psyclaw.gates.checker import run_gates_selfcheck
 from psyclaw.mcp.manager import (is_optional, list_mcp_catalog,
                                   list_mcp_catalog_with_health, probe_capabilities)
+from psyclaw.providers import ProviderConfigurationError
 from psyclaw.skills.loader import list_skills
 
 
@@ -1582,10 +1583,10 @@ def _setup_global(args, online: bool, ni: bool) -> int:
     print(ui.dim("  " + mirror.describe()))
     kinds = {k: kind for k, _n, _d, kind in _SETUP_MODULES}
 
-    # provider/key:无 provider 或 mock 时提示配置(不强制,可后续 config)
-    if conf.get("provider", "mock") == "mock":
+    # provider/key:未配置时明确提示；显式 mock 只用于测试，不作为首配选项。
+    if not str(conf.get("provider") or "").strip():
         print(ui.warn("  ⚠ 尚未配置 LLM provider —— psyclaw config 配 API key"
-                      "(未配则 provider 降级 mock,可先体验)"))
+                      "(配置后才能运行需要模型的能力)"))
     else:
         print(ui.dim(f"  LLM:{conf.get('provider')} · {conf.get('model', 'default')}"))
 
@@ -2766,9 +2767,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if getattr(args, "version", False):
         return cmd_version(args)
-    if not getattr(args, "command", None):
-        return cmd_repl(args)
-    return args.func(args)
+    try:
+        if not getattr(args, "command", None):
+            return cmd_repl(args)
+        return args.func(args)
+    except ProviderConfigurationError as exc:
+        from psyclaw import ui
+        print(ui.err(f"  ✗ {exc}"))
+        print(ui.dim("  修复命令: psyclaw config"))
+        return 2
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ from pathlib import Path
 from psyclaw import __version__, config as cfg
 from psyclaw.gates.checker import GATES_DIR, run_gates_selfcheck
 from psyclaw.mcp.manager import list_mcp_catalog
-from psyclaw.providers import get_provider
+from psyclaw.providers import ProviderConfigurationError, get_provider
 from psyclaw.skills.loader import list_skills
 
 from psyclaw import ui
@@ -1989,6 +1989,18 @@ class ReplSession:
                     f"(进度 {done}/{total})"))
         print(ui.dim("    /tasks 查看看板 · /plan off 退出规划模式开始执行"))
 
+    def _replace_provider(self, conf: dict) -> bool:
+        """尝试切换 provider；配置错误时保留当前会话并给出修复命令。"""
+        try:
+            provider = get_provider(conf)
+        except ProviderConfigurationError as exc:
+            print(ui.err(f"  ✗ {exc}"))
+            print(ui.dim("  修复命令: psyclaw config"))
+            return False
+        self.conf = conf
+        self.provider = provider
+        return True
+
     # -- slash 命令 ---------------------------------------------------------
     def handle_command(self, line: str) -> bool:
         """处理 slash 命令。返回 False 表示退出 REPL。"""
@@ -2002,13 +2014,15 @@ class ReplSession:
             print(HELP_TEXT)
         elif cmd == "/model":
             if arg:
-                self.conf["model"] = arg
-                self.provider = get_provider(self.conf)
+                candidate = dict(self.conf)
+                candidate["model"] = arg
+                self._replace_provider(candidate)
             print(f"  provider: {self.provider.describe()}")
         elif cmd == "/provider":
             if arg:
-                self.conf["provider"] = arg
-                self.provider = get_provider(self.conf)
+                candidate = dict(self.conf)
+                candidate["provider"] = arg
+                self._replace_provider(candidate)
             print(f"  provider: {self.provider.describe()}")
         elif cmd == "/skills":
             for s in list_skills():
@@ -2162,9 +2176,12 @@ class ReplSession:
             from psyclaw.token_meter import render_token_report
             print(render_token_report(self.meter, project_dir="."))
         elif cmd == "/config":
-            cfg.run_config_wizard()
-            self.conf = cfg.load_config()
-            self.provider = get_provider(self.conf)
+            old_conf, old_provider = self.conf, self.provider
+            rc = cfg.run_config_wizard()
+            if rc == 0:
+                candidate = cfg.load_config()
+                if not self._replace_provider(candidate):
+                    self.conf, self.provider = old_conf, old_provider
         elif cmd == "/review":
             from psyclaw.review import review_cli
             review_cli(arg.split() if arg else [])

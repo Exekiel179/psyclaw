@@ -3,7 +3,7 @@
 与 feat-141 assist level 同一根设置:novice 逐段注释并解释统计概念,
 expert 只注释非显然决策。--review 输出审查意见(正确性/统计规范/风格),
 **绝不改文件**。写回(--write)有三重保护:先备份 .bak、输出行数骤减拒写
-(防 LLM 把代码弄丢)、mock provider 明确降级指路 psyclaw config。
+(防 LLM 把代码弄丢)、显式 mock provider 拒绝使用并指路 psyclaw config。
 
 统计规范审查面与 gates/PSYCLAW.md 同源:效应量+CI、不造数、统计外移。
 """

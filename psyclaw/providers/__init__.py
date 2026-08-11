@@ -11,13 +11,18 @@
   lmstudio   本地           免 key
   opencode   OpenCode(Go)   驱动本地 opencode CLI,模型由 opencode 自己配置
   custom     任意 OpenAI 兼容端点(中转站)
-  mock       离线回显
+  mock       显式离线回显（仅测试）
 """
 
 from __future__ import annotations
 
 from psyclaw.providers.base import Provider
 from psyclaw.providers.mock import MockProvider
+
+
+class ProviderConfigurationError(RuntimeError):
+    """模型 provider 未配置或不可用。"""
+
 
 PRESETS: dict = {
     "anthropic": {"label": "Anthropic Claude(官方/中转)", "protocol": "anthropic",
@@ -65,7 +70,7 @@ PRESETS: dict = {
     "custom":    {"label": "自定义 OpenAI 兼容端点(中转站等)", "protocol": "openai",
                   "base_url": "", "model": "", "models": [],
                   "key_env": "OPENAI_API_KEY"},
-    "mock":      {"label": "Mock 离线回显", "protocol": "mock",
+    "mock":      {"label": "Mock 离线回显（测试）", "protocol": "mock",
                   "base_url": "", "model": "mock", "models": [],
                   "key_env": None},
 }
@@ -104,8 +109,18 @@ def get_role_provider(conf: dict, role: str, default: Provider | None = None) ->
 
 
 def get_provider(conf: dict) -> Provider:
-    name = (conf.get("provider") or "mock").lower()
-    preset = PRESETS.get(name, PRESETS["custom"])
+    raw_name = str((conf or {}).get("provider") or "").strip()
+    if not raw_name:
+        raise ProviderConfigurationError(
+            "未配置 LLM provider。运行 `psyclaw config` 选择 provider 并配置模型。"
+        )
+    name = raw_name.lower()
+    preset = PRESETS.get(name)
+    if preset is None:
+        available = ", ".join(n for n in PRESETS if n != "mock")
+        raise ProviderConfigurationError(
+            f"未知 LLM provider: {raw_name}。可用: {available}。"
+        )
     model = conf.get("model") or ""
     if not model or model == "default":
         model = preset["model"] or "default"
@@ -119,21 +134,27 @@ def get_provider(conf: dict) -> Provider:
         p = OpenCodeProvider(model=model)
         if p.available():
             return p
-        print("[provider] 未找到 opencode CLI(npm i -g opencode-ai 或 go install),回落 mock。")
-        return MockProvider(model=model)
+        raise ProviderConfigurationError(
+            "已选择 opencode，但未找到 opencode CLI。"
+            "请安装后重试，或运行 `psyclaw config` 更换 provider。"
+        )
 
     if preset["protocol"] == "anthropic":
         from psyclaw.providers.anthropic_api import AnthropicProvider
         p = AnthropicProvider(model=model, base_url=base_url)
         if p.api_key:
             return p
-        print(f"[provider] 未找到 {preset['key_env']},回落 mock。运行 `psyclaw config`。")
-        return MockProvider(model=model)
+        raise ProviderConfigurationError(
+            f"已选择 {name}，但未找到 {preset['key_env']}。"
+            "运行 `psyclaw config` 配置 API key。"
+        )
 
     from psyclaw.providers.openai_compat import OpenAICompatProvider
     p = OpenAICompatProvider(model=model, base_url=base_url,
                              key_env=preset["key_env"], display=name)
     if p.api_key or preset["key_env"] is None:
         return p
-    print(f"[provider] 未找到 {preset['key_env']},回落 mock。运行 `psyclaw config`。")
-    return MockProvider(model=model)
+    raise ProviderConfigurationError(
+        f"已选择 {name}，但未找到 {preset['key_env']}。"
+        "运行 `psyclaw config` 配置 API key。"
+    )

@@ -13,7 +13,8 @@ CONFIG_FILE = HOME_DIR / "config.yaml"
 ENV_FILE = HOME_DIR / ".env"
 
 DEFAULTS = {
-    "provider": "mock",
+    # provider 必须由用户明确配置；显式 provider=mock 仅供测试使用。
+    "provider": "",
     "model": "default",
     "base_url": "",
     "language": "zh",
@@ -102,13 +103,14 @@ def run_config_wizard(non_interactive: bool = False) -> int:
     if non_interactive:
         _write_config(dict(DEFAULTS), secrets={})
         print(f"已写入默认配置 → {CONFIG_FILE}")
+        print("尚未配置 LLM provider；运行 `psyclaw config` 选择模型并配置 API key。")
         return 0
 
     conf = dict(DEFAULTS)
     secrets: dict = {}
 
     # -- provider 菜单 -------------------------------------------------------
-    names = [n for n in PRESETS if n != "custom"] + ["custom"]
+    names = [n for n in PRESETS if n not in ("custom", "mock")] + ["custom"]
     print(ui.accent("选择 LLM Provider:"))
     for i, n in enumerate(names, 1):
         p = PRESETS[n]
@@ -120,7 +122,8 @@ def run_config_wizard(non_interactive: bool = False) -> int:
     elif sel.lower() in PRESETS:
         provider = sel.lower()
     else:
-        provider = "mock"
+        print(ui.err(f"未知 provider「{sel}」；请重新运行 `psyclaw config` 选择有效项。"))
+        return 2
     preset = PRESETS[provider]
     conf["provider"] = provider
 
