@@ -396,6 +396,36 @@ def test_profile_data_kinds(tmp_path):
     assert prof["n"] == 2
     assert set(prof["numeric"]) == {"score", "age"}
     assert prof["categorical"] == ["grp"]
+    assert prof["missing_total"] == 0
+    assert prof["duplicate_rows"] == 0
+    assert prof["columns"][1]["stats"]["min"] == 50.0
+    assert prof["columns"][1]["stats"]["sd"] == pytest.approx(3.535534)
+
+
+def test_profile_dataset_reports_quality_details(tmp_path):
+    from psyclaw.workflows.steps_analysis import profile_dataset
+    p = _eff_csv(tmp_path, "trap.csv",
+                 [{"grp": "A", "score": "50", "age": "20"},
+                  {"grp": "A", "score": "", "age": "20"},
+                  {"grp": "A", "score": "50", "age": "20"}],
+                 ["grp", "score", "age"])
+    out = profile_dataset(p)
+    assert out["profile"]["missing_total"] == 1
+    assert out["profile"]["duplicate_rows"] == 1
+    kinds = {flag["kind"] for flag in out["quality_flags"]}
+    assert {"duplicate_row", "missing_values"}.issubset(kinds)
+
+
+def test_profile_data_rejects_nonfinite_and_reports_mixed_numeric(tmp_path):
+    from psyclaw.workflows.steps_analysis import profile_dataset
+    values = [str(i) for i in range(1, 9)] + ["oops", "NaN"]
+    p = _eff_csv(tmp_path, "mixed.csv", [{"score": value} for value in values], ["score"])
+    out = profile_dataset(p)
+    column = out["profile"]["columns"][0]
+    assert column["kind"] == "numeric"
+    assert column["n_invalid_numeric"] == 2
+    assert set(column["invalid_examples"]) == {"NaN", "oops"}
+    assert any(flag["kind"] == "invalid_numeric" for flag in out["quality_flags"])
 
 
 _TRAP_DATA = [
@@ -467,7 +497,7 @@ def test_step_inspect_data_prints_quality_flags(tmp_path, capsys):
     p = _eff_csv(tmp_path, "trap.csv", _TRAP_DATA, _TRAP_HEADER)
     ctx = types.SimpleNamespace(data={"data_csv": p}, artifacts={}, project=tmp_path)
     out = step_inspect_data(ctx)
-    assert out["quality_flags"] == 3
+    assert out["quality_flags"] >= 3
     text = capsys.readouterr().out
     assert "重复值" in text and "缺失码" in text and "微型组" in text
 

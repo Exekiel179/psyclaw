@@ -101,10 +101,11 @@ def test_mcp_roundtrip_call_guidance():
     assert "选检验" in out
 
 
-def test_mcp_roundtrip_call_describe_script():
+def test_mcp_roundtrip_call_describe_script(tmp_path):
+    (tmp_path / "x.csv").write_text("value\n1\n2\n3\n", encoding="utf-8")
     with MCPClient(_CMD) as c:
-        out = c.call_tool("pystat_describe", {"csv_path": "x.csv"})
-    assert "read_csv" in out
+        out = c.call_tool("pystat_describe", {"csv_path": str(tmp_path / "x.csv")})
+    assert "read_csv" in out or '"mean"' in out
 
 
 # --- 顶层不 import 统计库(铁律:统计只在工具惰性发生) --------------------------

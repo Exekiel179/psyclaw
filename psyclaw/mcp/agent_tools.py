@@ -25,13 +25,16 @@ import atexit
 import hashlib
 import json
 import os
+import time
 from pathlib import Path
 
 _MERGE_TIMEOUT = 10.0
 _CALL_TIMEOUT = 30.0            # 首次真调用要吞下 npx 冷启,给足余量
 _CACHE_REL = Path(".psyclaw") / "mcp_tools_cache.json"
+_FAILURE_CACHE_TTL = 60.0
 _clients: dict = {}             # command -> MCPClient(进程级复用)
 _refreshed: set[str] = set()    # 本进程内已回填过缓存的 command
+_failures: dict[str, tuple[float, str]] = {}
 
 
 def _get_client(command: str, runtime_env: dict | None = None, runtime_cwd: str = ""):
@@ -46,6 +49,36 @@ def _get_client(command: str, runtime_env: dict | None = None, runtime_cwd: str 
         c = MCPClient(command, timeout=_MERGE_TIMEOUT, env=env, cwd=runtime_cwd or None)
         _clients[identity] = c
     return c
+
+
+def _client_identity(command: str, runtime_env: dict | None = None,
+                     runtime_cwd: str = "") -> str:
+    env = {str(k): str(v) for k, v in (runtime_env or {}).items()}
+    identity = command
+    if env or runtime_cwd:
+        material = json.dumps({"env": env, "cwd": runtime_cwd}, sort_keys=True).encode()
+        identity = f"{command}\0{hashlib.sha256(material).hexdigest()}"
+    return identity
+
+
+def _cached_failure(command: str, runtime_env: dict | None = None,
+                    runtime_cwd: str = "") -> str | None:
+    identity = _client_identity(command, runtime_env, runtime_cwd)
+    item = _failures.get(identity)
+    if not item:
+        return None
+    started, message = item
+    if time.monotonic() - started > _FAILURE_CACHE_TTL:
+        _failures.pop(identity, None)
+        return None
+    return message
+
+
+def _remember_failure(command: str, message: str,
+                      runtime_env: dict | None = None,
+                      runtime_cwd: str = "") -> None:
+    _failures[_client_identity(command, runtime_env, runtime_cwd)] = (
+        time.monotonic(), str(message))
 
 
 @atexit.register
@@ -107,6 +140,44 @@ def _refresh_cache_once(project_dir: str, command: str, client) -> None:
         _save_tool_cache(project_dir, command, metas)
 
 
+def _normalize_mcp_result(result) -> dict:
+    """把 MCP 工具回执规整成 {ok, text, degraded?}。"""
+    if isinstance(result, dict):
+        out = {
+            "ok": bool(result.get("ok", True)),
+            "text": str(result.get("text", "")),
+        }
+        if "degraded" in result:
+            out["degraded"] = bool(result.get("degraded"))
+        if result.get("error_kind"):
+            out["error_kind"] = str(result["error_kind"])
+        return out
+    return {"ok": True, "text": str(result)}
+
+
+def _call_mcp_tool(command: str, tool: str, args: dict, project_dir: str,
+                   runtime_env: dict | None = None, runtime_cwd: str = "") -> dict:
+    cached = _cached_failure(command, runtime_env, runtime_cwd)
+    if cached:
+        status = {"ok": False, "text": cached}
+        if "统计库未安装" in cached:
+            status["degraded"] = True
+        return status
+    client = (_get_client(command, runtime_env, runtime_cwd)
+              if (runtime_env or runtime_cwd) else _get_client(command))
+    client.timeout = max(client.timeout, _CALL_TIMEOUT)
+    status = _normalize_mcp_result(client.call_tool_status(tool, args))
+    text = str(status.get("text", ""))
+    if (not status.get("ok")) or "统计库未安装" in text:
+        if text and (status.get("error_kind") in {"startup", "transport"}
+                     or "统计库未安装" in text):
+            _remember_failure(command, text, runtime_env, runtime_cwd)
+        if "统计库未安装" in text:
+            return {"ok": False, "text": text, "degraded": True}
+    _refresh_cache_once(project_dir, command, client)
+    return status
+
+
 def _provides_names(raw) -> list[str]:
     """registry 的 provides 可能是极简解析出的 "[a, b]" 字符串或真列表。"""
     if isinstance(raw, (list, tuple)):
@@ -125,15 +196,17 @@ def _register_lazy(tools: dict, server: str, command: str, meta: dict,
 
     def _run(a, _cmd=command, _t=tname, _pd=project_dir,
              _env=runtime_env, _cwd=runtime_cwd):
-        client = _get_client(_cmd, _env, _cwd) if (_env or _cwd) else _get_client(_cmd)
-        client.timeout = max(client.timeout, _CALL_TIMEOUT)
-        out = client.call_tool(_t, a)
-        _refresh_cache_once(_pd, _cmd, client)
-        return out
+        status = _call_mcp_tool(_cmd, _t, a, _pd, _env, _cwd)
+        return status["text"]
+
+    def _run_status(a, _cmd=command, _t=tname, _pd=project_dir,
+                    _env=runtime_env, _cwd=runtime_cwd):
+        return _call_mcp_tool(_cmd, _t, a, _pd, _env, _cwd)
 
     tools[f"mcp__{server}__{tname}"] = {"desc": desc,
                                         "args": meta.get("args", ""),
-                                        "run": _run, "side_effect": True}
+                                        "run": _run, "call_status": _run_status,
+                                        "side_effect": True}
 
 
 def merge_mcp_tools(tools: dict, project_dir: str = ".") -> None:
@@ -199,8 +272,19 @@ def merge_mcp_tools(tools: dict, project_dir: str = ".") -> None:
             def _run(a, _client=client, _tname=tname):
                 return _client.call_tool(_tname, a)
 
+            def _run_status(a, _client=client, _tname=tname, _cmd=command):
+                status = _normalize_mcp_result(_client.call_tool_status(_tname, a))
+                text = str(status.get("text", ""))
+                if "统计库未安装" in text:
+                    _remember_failure(_cmd, text, runtime_env, runtime_cwd)
+                    return {"ok": False, "text": text, "degraded": True}
+                if (not status.get("ok") and text
+                        and status.get("error_kind") in {"startup", "transport"}):
+                    _remember_failure(_cmd, text, runtime_env, runtime_cwd)
+                return status
+
             tools[full] = {"desc": desc, "args": args_hint, "run": _run,
-                           "side_effect": True}
+                           "call_status": _run_status, "side_effect": True}
 
 
 def _schema_hint(schema: dict) -> str:

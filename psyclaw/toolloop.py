@@ -404,6 +404,23 @@ def build_tools(project_dir: str = ".") -> dict:
         return render_tree(scan_tree(str(p)))
     _t("list_dir", "看目录结构(有界树;data/raw 只报数不列名)", "path?:str", _list_dir)
 
+    def _profile_dataset(a):
+        from psyclaw.workflows.steps_analysis import profile_dataset
+        raw = str(a.get("csv_path", "") or a.get("path", "") or "").strip()
+        if not raw:
+            return "需要 csv_path"
+        denial = read_path_denied(raw, project_dir)
+        if denial:
+            return denial
+        root = Path(project_dir).expanduser().resolve()
+        supplied = Path(raw).expanduser()
+        p = (supplied if supplied.is_absolute() else root / supplied).resolve()
+        if not p.is_file():
+            return f"文件不存在:{p}"
+        return json.dumps(profile_dataset(str(p)), ensure_ascii=False, indent=2, default=str)
+    _t("profile_dataset", "完整画像 CSV(行列数/缺失/重复/数值范围/分类水平/数据质量标记)",
+       "csv_path:str 或 path:str", _profile_dataset)
+
     # 文献工具(对话原生:检索/引用滚雪球/下载全文,模型直接调,无需用户记 CLI)
     def _fmt_papers(header, papers):
         lines = [header]
@@ -901,13 +918,32 @@ def _exec_tool(call: dict, tools: dict, approve, emit) -> dict:
     if emit:
         emit(f"调用 {name}({_short(call.get('args') or {})})")
     try:
-        out = tool["run"](call.get("args") or {})
+        status = None
+        runner = tool.get("call_status")
+        if callable(runner):
+            status = runner(call.get("args") or {})
+            if not isinstance(status, dict):
+                status = {"ok": True, "text": str(status)}
+            out = status.get("text", "")
+            ok = bool(status.get("ok", True))
+            degraded = bool(status.get("degraded", False))
+        else:
+            out = tool["run"](call.get("args") or {})
+            ok = True
+            degraded = False
     except Exception as exc:  # noqa: BLE001  # 单个工具异常不炸循环
         # v0.6 feat-043:异常如实标 ok=False(此前误标 True 掩盖崩溃,模型无从自纠)
         return {"name": name, "ok": False, "side_effect": side_effect,
                 "output": redact_secrets(f"工具执行异常:{exc}")}
+    rendered = redact_secrets(str(out))[:6000]
+    if isinstance(status, dict) and not ok:
+        return {"name": name, "ok": False, "side_effect": side_effect,
+                "degraded": degraded, "output": rendered}
+    if "统计库未安装" in rendered:
+        return {"name": name, "ok": False, "side_effect": side_effect,
+                "degraded": True, "output": rendered}
     return {"name": name, "ok": True, "side_effect": side_effect,
-            "output": redact_secrets(str(out))[:6000]}
+            "degraded": degraded, "output": rendered}
 
 
 def _render_results(results: list[dict]) -> str:
@@ -1002,6 +1038,8 @@ def log_agent_run(project_dir: str, task: str, res: dict) -> None:
             "stopped": res.get("stopped"),
             "tools": [t.get("name") for t in res.get("trace", [])],
             "plan": plan_ids,
+            "planner_fallback": bool(res.get("planner_fallback")),
+            "planner_parse_error": str(res.get("planner_parse_error") or "")[:_RUNS_MAX_HEAD],
             "task_runs": task_runs,
             "final_head": str(res.get("final", ""))[:_RUNS_MAX_HEAD],
         }

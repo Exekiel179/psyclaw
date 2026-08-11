@@ -27,6 +27,7 @@ def _entry(**kw):
 def teardown_function():
     AT._close_all()
     AT._refreshed.clear()
+    AT._failures.clear()
 
 
 def test_merge_adds_prefixed_mcp_tools(monkeypatch, tmp_path):
@@ -88,6 +89,13 @@ def test_client_cache_reuses_process(monkeypatch, tmp_path):
     AT.merge_mcp_tools({}, str(tmp_path))
     AT.merge_mcp_tools({}, str(tmp_path))
     assert len(AT._clients) == 1              # 同 command 复用一个客户端
+
+
+def test_failure_cache_preserves_stats_degradation(tmp_path):
+    AT._remember_failure("pystat", "统计库未安装(脚本骨架)")
+    status = AT._call_mcp_tool("pystat", "pystat_describe", {}, str(tmp_path))
+    assert status == {"ok": False, "text": "统计库未安装(脚本骨架)",
+                      "degraded": True}
 
 
 # ---- feat-138 惰性化:merge 不冷启子进程,首次真调用才起 ----------------------

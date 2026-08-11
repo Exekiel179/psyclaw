@@ -22,9 +22,17 @@ dependencies = [
 stats = [  # 可选:在本机直接跑统计时安装的成熟库栈(psyclaw 不强制依赖)
     "pingouin>=0.5", "pandas>=2.0", "numpy>=1.22", "scipy>=1.8",
     "statsmodels>=0.14", "lifelines>=0.27", "factor_analyzer>=0.4", "semopy>=2.3",
+    "scikit-learn>=1.3", "linearmodels>=5.3", "matplotlib>=3.7", "seaborn>=0.13",
+    "openpyxl>=3.1", "pyreadstat>=1.2",
 ]
-viz = ["seaborn", "matplotlib"]
-full = ["pyyaml", "rich", "mcp"]   # prompt_toolkit 已提为核心依赖,不再列此
+viz = ["seaborn>=0.13", "matplotlib>=3.7"]
+full = [  # 开箱即用全家桶:统计/可视化/常见社科数据格式 + MCP/CLI 体验
+    "pingouin>=0.5", "pandas>=2.0", "numpy>=1.22", "scipy>=1.8",
+    "statsmodels>=0.14", "lifelines>=0.27", "factor_analyzer>=0.4", "semopy>=2.3",
+    "scikit-learn>=1.3", "linearmodels>=5.3", "matplotlib>=3.7", "seaborn>=0.13",
+    "openpyxl>=3.1", "pyreadstat>=1.2", "pyyaml", "rich", "mcp",
+    "model2vec",
+]   # prompt_toolkit 已提为核心依赖,不再列此
 embed = ["model2vec"]  # 本地语义嵌入(纯 numpy 静态模型);未装时召回用内置哈希向量兜底
 
 [project.scripts]

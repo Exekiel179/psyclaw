@@ -36,14 +36,21 @@ def detect_install_kind(pkg_dir: Path | None = None,
     """
     pkg_dir = pkg_dir or _pkg_dir()
     exe = (executable if executable is not None else (sys.executable or "")).replace("\\", "/")
-    for anc in [pkg_dir, *pkg_dir.parents]:
+    parent = pkg_dir.parent
+    candidates = []
+    try:
+        candidates.append(parent)
+        if parent.name == "src":
+            candidates.append(parent.parent)
+    except OSError:
+        pass
+    for anc in candidates:
         try:
-            if (anc / ".git").exists():
+            if anc and (anc / ".git").exists():
                 return "source", str(anc)
         except OSError:
             break
-    path_s = str(pkg_dir).replace("\\", "/")
-    if "/tools/" in exe and "uv" in exe or "/uv/tools/" in path_s:
+    if "/uv/tools/" in exe or "/.local/share/uv/tools/" in exe:
         return "uv-tool", None
     return "pip", None
 

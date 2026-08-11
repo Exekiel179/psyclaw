@@ -28,6 +28,27 @@ def test_safe_environment_keeps_windows_runtime_paths_not_secrets():
     assert "OPENAI_API_KEY" not in _SAFE_ENV_KEYS
 
 
+def test_credential_env_matches_windows_keys_case_insensitively(monkeypatch):
+    monkeypatch.setenv("systemroot", r"C:\Windows")
+    monkeypatch.setenv("path", r"C:\Windows\System32")
+    client = MCPClient("python -m other_mcp")
+    env = client._credential_env()
+    folded = {k.upper(): v for k, v in env.items()}
+    assert folded["SYSTEMROOT"] == r"C:\Windows"
+    assert folded["PATH"] == r"C:\Windows\System32"
+
+
+def test_call_tool_status_classifies_tool_error(monkeypatch):
+    client = MCPClient("python -m other_mcp")
+    client._initialized = True
+    monkeypatch.setattr(client, "_request", lambda *_a, **_k: {
+        "result": {"isError": True, "content": [{"type": "text", "text": "bad args"}]}
+    })
+    status = client.call_tool_status("demo", {})
+    assert status["ok"] is False
+    assert status["error_kind"] == "tool"
+
+
 def test_kaggle_token_is_scoped_to_kaggle_mcp(monkeypatch, tmp_path):
     from psyclaw.mcp import client as mc
     token_file = tmp_path / ".kaggle" / "access_token"
