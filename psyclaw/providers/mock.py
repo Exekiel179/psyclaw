@@ -1,4 +1,4 @@
-"""Mock provider — 离线回显,保证无 key 也能完整体验 REPL 链路。"""
+"""Mock provider — 显式离线回显，仅用于测试和离线开发。"""
 
 from __future__ import annotations
 

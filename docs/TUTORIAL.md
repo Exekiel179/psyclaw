@@ -22,8 +22,8 @@ python -m psyclaw doctor        # 环境自检:看配置/MCP/质量检查状态
 python -m psyclaw config        # 配置向导:选 LLM provider、填 API key(写 ~/.psyclaw/.env,不入库)
 ```
 
-- 没配 key 也能跑:会用 **mock provider**——流程能走通,但综述/写作是"确定性骨架"
-  (看起来干巴巴的**不是坏了**,是没接 LLM)。
+- 需要模型的命令必须先配置可用的 LLM provider；未配置或缺少 API key 时会明确失败，
+  不会静默生成 mock 骨架。`psyclaw doctor` 可查看状态，`psyclaw config` 可重新配置。
 - 之后所有命令都在你的**研究项目目录**里跑(PsyClaw 把仓库当记忆:产物落 `notes/` `outputs/`)。
 
 ```bash
@@ -166,7 +166,7 @@ python -m psyclaw                              # 通用任务直接在 Chat 中�
 
 | 现象 | 原因 / 解法 |
 |---|---|
-| 综述/写作输出像干巴巴的骨架 | 没配 LLM(mock provider)。`psyclaw config` 接入后重跑 |
+| 需要模型的命令直接失败 | 未配置或缺少 API key。运行 `psyclaw doctor` 查看原因，再用 `psyclaw config` 配置 |
 | 研究准备未完成 | 正式路线先 `psyclaw prepare`;只想探索加 `--exploratory`(留痕+标探索性) |
 | PDF 读出乱码/读不到 | 扫描件/加密件抽不了正文;`pip install pypdf` 提升抽取质量,或先 OCR |
 | 模型说"无法读取文件" | 当前为 `access:safe`。用 `/access open` 放开,或用 `@路径` 引用 |

@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from psyclaw.providers import PRESETS, get_provider
+from psyclaw.providers import (PRESETS, ProviderConfigurationError,
+                               get_provider)
 from psyclaw.providers.base import Provider
 from psyclaw.providers.mock import MockProvider
 
@@ -153,26 +154,33 @@ class TestGetProvider:
         p = get_provider({"provider": "mock"})
         assert isinstance(p, MockProvider)
 
-    def test_empty_conf_returns_mock(self):
-        p = get_provider({})
-        assert isinstance(p, MockProvider)
+    def test_empty_conf_requires_explicit_provider(self):
+        with pytest.raises(ProviderConfigurationError, match="未配置 LLM provider"):
+            get_provider({})
+
+    def test_default_config_does_not_select_mock(self):
+        from psyclaw.config import DEFAULTS
+        assert DEFAULTS["provider"] == ""
 
     def test_model_override(self):
         p = get_provider({"provider": "mock", "model": "my-model"})
         assert p.model == "my-model"
 
-    def test_no_api_key_falls_back_to_mock(self, monkeypatch):
-        """API key 缺失时，anthropic/openai 都应 fallback 到 mock。"""
+    def test_no_api_key_raises_configuration_error(self, monkeypatch):
+        """API key 缺失时不能静默切换到 mock。"""
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        p = get_provider({"provider": "anthropic"})
-        # 无 key → fallback mock
-        assert isinstance(p, MockProvider)
+        with pytest.raises(ProviderConfigurationError, match="ANTHROPIC_API_KEY"):
+            get_provider({"provider": "anthropic"})
 
-    def test_unknown_provider_defaults_to_openai_compat_or_mock(self, monkeypatch):
+    def test_unknown_provider_raises_configuration_error(self, monkeypatch):
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        # unknown 映射到 custom preset，key_env=OPENAI_API_KEY，无 key → mock
-        p = get_provider({"provider": "unknownxyz"})
-        assert isinstance(p, MockProvider)
+        with pytest.raises(ProviderConfigurationError, match="未知 LLM provider"):
+            get_provider({"provider": "unknownxyz"})
+
+    def test_missing_opencode_raises_configuration_error(self, monkeypatch):
+        monkeypatch.setattr("shutil.which", lambda name: None)
+        with pytest.raises(ProviderConfigurationError, match="opencode"):
+            get_provider({"provider": "opencode"})
 import io
 import urllib.error
 import urllib.request

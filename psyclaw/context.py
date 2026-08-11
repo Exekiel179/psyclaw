@@ -329,7 +329,7 @@ _DISTILL_SYSTEM = (
 
 def _llm_distill(dropped: list, provider) -> str | None:
     """用 provider 把被丢弃轮次蒸馏成结构化备忘;失败返回 None 让调用方回落规则蒸馏。"""
-    # 无 provider 或无 key(mock/离线)→ 回落规则蒸馏,别拿 mock 的套话污染备忘
+    # provider 不可用时回落规则蒸馏，避免把测试 provider 的套话写入备忘
     if provider is None or not getattr(provider, "api_key", ""):
         return None
     convo = "\n\n".join(

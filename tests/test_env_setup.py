@@ -43,6 +43,7 @@ def test_diagnose_missing_config_and_key():
     by = {c["key"]: c for c in checks}
     assert by["config"]["ok"] is False and "psyclaw config" in by["config"]["fix"]
     assert by["provider"]["ok"] is False and by["provider"]["auto"] is False
+    assert "不可用" in by["provider"]["detail"]
     assert "mock" in by["provider"]["detail"]
 
 

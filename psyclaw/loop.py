@@ -37,13 +37,22 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.exists() else ""
 
 
+_AGENT_SHARED_RULES = (
+    "# 共享硬约束\n"
+    "详细判据按需读取 `gates/PSYCLAW.md` 与 `gates/rigor.md`，不要把整份规范复制进每轮上下文。\n"
+    "- 信息不足先停并提最少澄清；不猜变量、数据、数值、引用或结论。\n"
+    "- 只依据真实工具回执、文件和检索证据；未运行不报具体数值，未检索不列书目。\n"
+    "- `data/raw` 只读；排除、重编码或改动数据前写 decision_request，等待人工批准。\n"
+    "- 统计按数据质量→描述→主分析→诊断→稳健性→限定性解释；报告效应量与 CI。\n"
+    "- 每一步留下可复核产物；失败要明确停下，不声称稍后完成。"
+)
+
+
 def _agent_prompt(role: str) -> str:
-    """读取 planner/executor/critic 的 agent 定义作为 system 提示。"""
+    """按需组装角色契约；详细规范保留为可读取文件，不重复注入。"""
     p = Path(__file__).parent / "agents" / f"{role}.md"
-    base = _read(p)
-    rigor = _read(Path(__file__).parent / "gates" / "rigor.md")
-    spec = _read(Path(__file__).parent / "gates" / "PSYCLAW.md")
-    return f"{base}\n\n# 严谨性协议\n{rigor}\n\n# 学术规范\n{spec}"
+    base = _read(p).strip()
+    return "\n\n".join(part for part in (base, _AGENT_SHARED_RULES) if part)
 
 
 def _ask_yn(prompt: str, default: bool = True) -> bool:

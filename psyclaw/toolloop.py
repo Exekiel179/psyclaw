@@ -1,7 +1,7 @@
 """纯工具层循环 —— 让模型**自主多步调用工具**,作为 provider 无关的保底。
 
 为什么是文本约定而非 provider 原生 function-calling:PsyClaw 赌"provider 无关 + 优雅降级"
-(mock 无 key 也能跑),原生 tool-calling 只在部分 provider 上有。故这里用**文本约定的工具协议**——
+(测试 provider 可离线运行),原生 tool-calling 只在部分 provider 上有。故这里用**文本约定的工具协议**——
 模型在回复里输出 ```tool JSON 块,循环解析→执行→把结果回灌→模型继续,直到给出不含 tool 块的最终答案。
 任何文本模型都能跑,这就是"保底";以后要为支持原生 tool-calling 的 provider 叠加高性能通道,可另接。
 
