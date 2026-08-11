@@ -85,6 +85,62 @@ def test_cli_agent_auto_only_confirms_guarded_side_effects(monkeypatch):
     assert prompts and "纠偏后的首个副作用" in prompts[-1]
 
 
+def test_cli_agent_shows_background_activity(monkeypatch):
+    from psyclaw import cli
+    import psyclaw.agent_runtime as runtime
+    import psyclaw.repl as repl
+    import psyclaw.toolloop as toolloop
+
+    events = []
+
+    class FakeIndicator:
+        def __init__(self, message=""):
+            self.message = message
+        def start(self):
+            events.append(("start", self.message))
+        def stop(self, final=None):
+            events.append(("stop", final))
+
+    monkeypatch.setattr("psyclaw.ui.ActivityIndicator", FakeIndicator)
+    monkeypatch.setattr(cli.cfg, "load_config", lambda: {"provider": "mock"})
+    monkeypatch.setattr(runtime, "run_planned_agent",
+                        lambda *a, **k: {"final": "done", "iters": 0,
+                                         "stopped": "completed", "trace": [],
+                                         "lessons": [], "plan": [],
+                                         "task_results": {}})
+    monkeypatch.setattr(repl, "_hitl_confirm", lambda prompt: True)
+    monkeypatch.setattr(repl, "render_images_in_text", lambda *_a, **_k: None)
+    monkeypatch.setattr(toolloop, "log_agent_run", lambda *_a, **_k: None)
+
+    assert cli.cmd_agent(Namespace(task=["测试"], ask=False, max_iters=4,
+                                   history=None)) == 0
+    assert events[0][0] == "start" and "后台" in events[0][1]
+    assert events[-1] == ("stop", "Agent 已完成")
+
+
+def test_cli_agent_stops_activity_when_cancelled(monkeypatch):
+    from psyclaw import cli
+    import psyclaw.agent_runtime as runtime
+
+    events = []
+
+    class FakeIndicator:
+        def __init__(self, message=""):
+            pass
+        def start(self):
+            events.append("start")
+        def stop(self, final=None):
+            events.append(final)
+
+    monkeypatch.setattr("psyclaw.ui.ActivityIndicator", FakeIndicator)
+    monkeypatch.setattr(cli.cfg, "load_config", lambda: {"provider": "mock"})
+    monkeypatch.setattr(runtime, "run_planned_agent",
+                        lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt()))
+    with pytest.raises(KeyboardInterrupt):
+        cli.cmd_agent(Namespace(task=["测试"], ask=False, max_iters=4, history=None))
+    assert events == ["start", "已取消"]
+
+
 def _result(task: TaskSpec, passed: bool = True) -> TaskResult:
     return TaskResult(
         task=task,
@@ -340,6 +396,24 @@ def test_planned_agent_forks_homogeneous_executors_and_finishes():
     thread_ids = {item["thread_id"] for item in result["task_results"].values()}
     assert len(thread_ids) == 2
     assert len(created) == 2
+
+
+def test_planner_fallback_is_reported():
+    class BrokenPlanner(_Planner):
+        def chat(self, messages, system=""):
+            self.calls += 1
+            if "Planner" in system:
+                yield "not json at all"
+            else:
+                yield "done"
+
+    result = run_planned_agent(
+        BrokenPlanner(), "system", [{"role": "user", "content": "执行"}],
+        executor_factory=lambda: _ScriptProvider(["done"]), max_workers=1,
+        approve=lambda _call: True,
+    )
+    assert result["planner_fallback"] is True
+    assert result["planner_parse_error"]
 
 
 def test_finisher_not_called_when_required_contract_fails():

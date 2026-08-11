@@ -116,6 +116,22 @@ def test_exec_tool_exception_marked_failure():
     assert r["ok"] is False and "异常" in r["output"]
 
 
+def test_exec_tool_prefers_structured_status_and_marks_degraded():
+    tools = {
+        "pystat": {
+            "desc": "stats",
+            "args": "",
+            "run": lambda _args: "统计库未安装(脚本骨架)",
+            "call_status": lambda _args: {"ok": False, "text": "统计库未安装(脚本骨架)",
+                                          "degraded": True},
+            "side_effect": False,
+        }
+    }
+    r = TL._exec_tool({"name": "pystat", "args": {}}, tools, None, None)
+    assert r["ok"] is False and r["degraded"] is True
+    assert "统计库未安装" in r["output"]
+
+
 # --- 无进展检测(v0.6 feat-044) ------------------------------------------------
 
 def test_calls_signature_stable_and_order_insensitive():
@@ -434,6 +450,11 @@ def test_save_tool_rejects_escape_without_writing(tmp_path):
     out = tools["save_file"]["run"]({"path": "../evil.md", "content": "x"})
     assert "拒绝写入" in out
     assert not (tmp_path.parent / "evil.md").exists()
+
+
+def test_profile_dataset_tool_is_exposed(tmp_path):
+    tools = TL.build_tools(str(tmp_path))
+    assert "profile_dataset" in tools
 
 
 # --- 长会话上下文修剪(v0.3 feat-033) -------------------------------------------

@@ -10,16 +10,47 @@ PsyClaw 只做:画像数据 → 生成设计/分析计划 → 推荐分析 + 出
 from __future__ import annotations
 
 import csv
+from collections import Counter
+import math
 import re
+import statistics
 from pathlib import Path
 
 
 def _is_float(v: str) -> bool:
     try:
-        float(v)
-        return True
+        return math.isfinite(float(v))
     except (TypeError, ValueError):
         return False
+
+
+def _numeric_stats(values: list[float]) -> dict:
+    if not values:
+        return {}
+    out = {
+        "min": min(values),
+        "max": max(values),
+        "mean": statistics.fmean(values),
+    }
+    if len(values) > 1:
+        out["sd"] = statistics.stdev(values)
+    else:
+        out["sd"] = 0.0
+    out["median"] = statistics.median(values)
+    ordered = sorted(values)
+
+    def quantile(p: float) -> float:
+        index = (len(ordered) - 1) * p
+        lower = math.floor(index)
+        upper = math.ceil(index)
+        if lower == upper:
+            return ordered[lower]
+        return ordered[lower] + (ordered[upper] - ordered[lower]) * (index - lower)
+
+    out["p25"] = quantile(0.25)
+    out["p75"] = quantile(0.75)
+    return {k: (round(v, 6) if isinstance(v, float) and math.isfinite(v) else v)
+            for k, v in out.items()}
 
 
 # 因变量语义选择(feat-100):结局语义优先,基线/人口学列绝不当 DV——
@@ -56,6 +87,21 @@ def data_quality_flags(csv_path: str, profile: dict) -> list[dict]:
     with p.open(encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
     flags: list[dict] = []
+
+    if profile.get("duplicate_rows", 0):
+        flags.append({"kind": "duplicate_row", "column": "*",
+                      "detail": f"发现 {profile['duplicate_rows']} 个重复整行——请核对是否为重复记录"})
+
+    for c in profile.get("columns", []):
+        if c.get("n_missing", 0):
+            flags.append({"kind": "missing_values", "column": c["name"],
+                          "detail": f"列 {c['name']} 缺失 {c['n_missing']} 个值"
+                                    f"({c['missing_rate']:.2%})——处理方式需结合缺失机制决定"})
+        if c.get("n_invalid_numeric", 0):
+            examples = ", ".join(c.get("invalid_examples", []))
+            flags.append({"kind": "invalid_numeric", "column": c["name"],
+                          "detail": f"数值列 {c['name']} 有 {c['n_invalid_numeric']} 个无法解析的值"
+                                    f"({examples})——请核对编码或数据类型"})
 
     for col in profile.get("categorical", []):
         if not _ID_COL.search(col):
@@ -108,31 +154,60 @@ def data_quality_flags(csv_path: str, profile: dict) -> list[dict]:
 
 
 def profile_data(csv_path: str) -> dict:
-    """画像数据:逐列判数值/分类(含水平数)。fail-closed:文件不存在/空 抛 ValueError。"""
+    """画像数据:逐列判数值/分类(含水平数与缺失/范围)。fail-closed:文件不存在/空 抛 ValueError。"""
     p = Path(csv_path)
     if not p.exists():
         raise ValueError(f"数据文件不存在:{csv_path}")
     with p.open(encoding="utf-8-sig", newline="") as f:
-        rows = list(csv.DictReader(f))
+        reader = csv.DictReader(f)
+        if not reader.fieldnames or any(name is None or not name.strip()
+                                        for name in reader.fieldnames):
+            raise ValueError("数据 CSV 缺少有效列名")
+        rows = list(reader)
     if not rows:
         raise ValueError("数据 CSV 为空")
 
+    row_signatures = [tuple((k, (r.get(k) or "").strip()) for k in rows[0].keys())
+                      for r in rows]
+    duplicate_rows = len(row_signatures) - len(set(row_signatures))
+    missing_total = 0
     columns, numeric, categorical = [], [], []
     for c in rows[0].keys():
         vals = [(r.get(c) or "").strip() for r in rows]
         vals = [v for v in vals if v != ""]
         n_valid = len(vals)
+        n_missing = len(rows) - n_valid
+        missing_total += n_missing
         n_num = sum(1 for v in vals if _is_float(v))
         if n_valid and n_num / n_valid >= 0.8:
+            nums = [float(v) for v in vals if _is_float(v)]
+            invalid = [v for v in vals if not _is_float(v)]
             numeric.append(c)
-            columns.append({"name": c, "kind": "numeric", "n_valid": n_valid})
+            columns.append({"name": c, "kind": "numeric", "n_valid": n_valid,
+                            "n_missing": n_missing, "missing_rate": round(n_missing / len(rows), 6),
+                            "n_numeric": len(nums), "n_invalid_numeric": len(invalid),
+                            "invalid_examples": sorted(set(invalid))[:5],
+                            "stats": _numeric_stats(nums)})
         else:
             levels = sorted(set(vals))
+            counts = Counter(vals)
             categorical.append(c)
             columns.append({"name": c, "kind": "categorical", "n_valid": n_valid,
-                            "n_levels": len(levels), "levels": levels[:12]})
-    return {"n": len(rows), "columns": columns,
-            "numeric": numeric, "categorical": categorical}
+                            "n_missing": n_missing, "missing_rate": round(n_missing / len(rows), 6),
+                            "n_levels": len(levels), "levels": levels[:12],
+                            "top_levels": [{"value": value, "n": count}
+                                           for value, count in counts.most_common(5)]})
+    return {"n": len(rows), "n_columns": len(rows[0]), "missing_total": missing_total,
+            "missing_rate": round(missing_total / (len(rows) * len(rows[0])), 6)
+            if rows and rows[0] else 0.0,
+            "duplicate_rows": duplicate_rows,
+            "columns": columns, "numeric": numeric, "categorical": categorical}
+
+
+def profile_dataset(csv_path: str) -> dict:
+    """完整数据画像 + 质量标记，供 agent / workflow 直接引用。"""
+    prof = profile_data(csv_path)
+    return {"profile": prof, "quality_flags": data_quality_flags(csv_path, prof)}
 
 
 def recommend_analysis(profile: dict) -> dict:
@@ -268,8 +343,10 @@ def step_inspect_data(ctx) -> dict:
     prof = profile_data(csv_path)
     ctx.data["profile"] = prof
     ctx.artifacts["inspect_data"] = csv_path
-    print(ui.dim(f"  {prof['n']} 行 · 数值列 {len(prof['numeric'])} · "
-                 f"分类列 {len(prof['categorical'])}"))
+    print(ui.dim(f"  {prof['n']} 行 × {prof['n_columns']} 列 · "
+                 f"数值列 {len(prof['numeric'])} · 分类列 {len(prof['categorical'])}"))
+    print(ui.dim(f"  缺失 {prof['missing_total']} 个单元({prof['missing_rate']:.2%}) · "
+                 f"重复整行 {prof['duplicate_rows']}"))
     flags = data_quality_flags(csv_path, prof)     # feat-100:画像即体检,不静默
     ctx.data["quality_flags"] = flags
     for fl in flags:

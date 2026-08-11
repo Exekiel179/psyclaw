@@ -167,7 +167,8 @@ class MCPClient:
 
     def _credential_env(self) -> dict[str, str]:
         """构造最小运行环境；Kaggle token 只给 Kaggle MCP 子进程。"""
-        env = {k: v for k, v in os.environ.items() if k in _SAFE_ENV_KEYS}
+        safe_keys = {key.upper() for key in _SAFE_ENV_KEYS}
+        env = {k: v for k, v in os.environ.items() if k.upper() in safe_keys}
         if "kaggle-mcp" in self.command:
             token = _read_token_file(_kaggle_access_token_path())
             if token:
@@ -310,7 +311,7 @@ class MCPClient:
         return self.call_tool_status(name, arguments)["text"]
 
     def call_tool_status(self, name: str, arguments: dict) -> dict:
-        """调用工具,返回结构化结果 {ok, text}(feat-079)。
+        """调用工具,返回结构化结果 {ok, text, error_kind?}(feat-079)。
 
         ok=False 覆盖:启动失败 / 传输错误 / isError 工具报错 / 空结果。
         文本仍归一为可读串,不抛——但调用方(如 pystat_bridge 的真结果守卫)
@@ -319,19 +320,20 @@ class MCPClient:
         if not self._initialized:
             err = self.start()
             if err is not None:
-                return {"ok": False, "text": err}
+                return {"ok": False, "text": err, "error_kind": "startup"}
         resp = self._request("tools/call", {"name": name, "arguments": arguments or {}})
         if "error" in resp:
             raw = self._error_text(resp["error"])
             return {"ok": False,
-                    "text": network_error_message(raw) or f"MCP 调用失败:{raw}"}
+                    "text": network_error_message(raw) or f"MCP 调用失败:{raw}",
+                    "error_kind": "transport"}
         result = resp.get("result") or {}
         parts = [c.get("text", "") for c in result.get("content", [])
                  if c.get("type") == "text"]
         text = "\n".join(p for p in parts if p)
         if not text:
-            return {"ok": False, "text": "(空结果)"}
+            return {"ok": False, "text": "(空结果)", "error_kind": "empty"}
         if result.get("isError"):
             return {"ok": False, "text": network_error_message(text)
-                    or f"MCP 工具报错:{text}"}
+                    or f"MCP 工具报错:{text}", "error_kind": "tool"}
         return {"ok": True, "text": text}

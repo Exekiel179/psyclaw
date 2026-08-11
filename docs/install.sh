@@ -5,15 +5,22 @@
 #
 # 环境变量(都可选):
 #   PSYCLAW_VERSION=v0.23.0   指定版本 tag(默认最新发行)
-#   PSYCLAW_EXTRAS=[stats]    附带 extra(如本机跑统计:[stats];补全体验:[full])
+#   PSYCLAW_EXTRAS=[stats]    附带 extra(默认值);设为空字符串可裸装,设 [full] 可更全
 #   PSYCLAW_CN=1              强制走国内镜像(默认:探测 GitHub 通不通自动决定)
 #   PSYCLAW_CN=0              强制走官方源
 set -eu
 
 REPO="Exekiel179/psyclaw"
 TAG="${PSYCLAW_VERSION:-v0.23.0}"
-EXTRAS="${PSYCLAW_EXTRAS:-}"
+if [ "${PSYCLAW_EXTRAS+x}" = x ]; then EXTRAS="${PSYCLAW_EXTRAS}"; else EXTRAS="[stats]"; fi
 CN="${PSYCLAW_CN:-auto}"
+if [ -z "${UV_CACHE_DIR:-}" ]; then
+  case "$(uname -s)" in
+    Darwin) UV_CACHE_DIR="$HOME/Library/Caches/PsyClaw/uv" ;;
+    *) UV_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psyclaw/uv" ;;
+  esac
+  export UV_CACHE_DIR
+fi
 
 say()  { printf '\033[36m▸\033[0m %s\n' "$1"; }
 ok()   { printf '\033[32m✓\033[0m %s\n' "$1"; }
@@ -80,8 +87,16 @@ else
   die "安装失败。若因缺 Python:先自行装 Python 3.11+(brew/apt/官网),再重试;或手动 uv tool install \"git+${GIT_URL}@${TAG}\""
 fi
 
-# ── 4. 收尾 ───────────────────────────────────────────────────────────
-ok "PsyClaw ${TAG} 安装完成"
+# ── 4. 收尾与安装后校验 ───────────────────────────────────────────────
+UV_BIN="$(uv tool dir --bin 2>/dev/null | tail -n 1)"
+PSYCLAW_BIN="$UV_BIN/psyclaw"
+[ -x "$PSYCLAW_BIN" ] || die "安装完成但找不到 psyclaw 命令:请运行 uv tool update-shell 后重试"
+VERSION_TEXT="$($PSYCLAW_BIN version 2>&1)" || die "安装后版本校验失败: $VERSION_TEXT"
+case "$VERSION_TEXT" in
+  *"${TAG#v}"*) ;;
+  *) die "安装后版本校验失败: $VERSION_TEXT" ;;
+esac
+ok "PsyClaw ${TAG} 安装完成 · 版本校验通过"
 printf '\n下一步:\n'
 printf '  psyclaw config        # 配 LLM provider / API key\n'
 printf '  psyclaw new 我的研究   # 建一个按文件夹组织的分析,cd 进去开聊\n'

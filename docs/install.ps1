@@ -4,14 +4,18 @@
 #
 # 环境变量(都可选):
 #   $env:PSYCLAW_VERSION = "v0.23.0"   指定版本 tag
-#   $env:PSYCLAW_EXTRAS  = "[stats]"   附带 extra(本机跑统计:[stats];体验:[full])
+#   $env:PSYCLAW_EXTRAS  = "[stats]"   附带 extra(默认值);设为空字符串可裸装,设 [full] 可更全
 #   $env:PSYCLAW_CN      = "1"         强制国内镜像(默认探测 GitHub 自动决定;"0" 强制官方)
 
 $ErrorActionPreference = "Stop"
 $Repo   = "Exekiel179/psyclaw"
 $Tag    = if ($env:PSYCLAW_VERSION) { $env:PSYCLAW_VERSION } else { "v0.23.0" }
-$Extras = if ($env:PSYCLAW_EXTRAS)  { $env:PSYCLAW_EXTRAS  } else { "" }
+$rawExtras = [System.Environment]::GetEnvironmentVariable("PSYCLAW_EXTRAS")
+$Extras = if ($null -eq $rawExtras) { "[stats]" } else { $rawExtras }
 $Cn     = if ($env:PSYCLAW_CN)      { $env:PSYCLAW_CN      } else { "auto" }
+if (-not $env:UV_CACHE_DIR) {
+  $env:UV_CACHE_DIR = Join-Path $env:LOCALAPPDATA "PsyClaw\uv-cache"
+}
 
 function Say($m) { Write-Host "▸ $m" -ForegroundColor Cyan }
 function Ok($m)  { Write-Host "✓ $m" -ForegroundColor Green }
@@ -71,7 +75,14 @@ try {
   } else { Die "安装失败。若缺 Python:先自行装 Python 3.11+(官网/winget),再重试;或手动 uv tool install `"git+$GitUrl@$Tag`"" }
 }
 
-Ok "PsyClaw $Tag 安装完成"
+$toolBin = (& uv tool dir --bin 2>$null | Select-Object -Last 1).Trim()
+$toolExe = Join-Path $toolBin "psyclaw.exe"
+if (-not (Test-Path -LiteralPath $toolExe)) { Die "安装完成但找不到 psyclaw 命令:请运行 uv tool update-shell 后重试" }
+$versionText = (& $toolExe version 2>&1 | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $versionText -notmatch [regex]::Escape($Tag.TrimStart("v"))) {
+  Die "安装后版本校验失败: $versionText"
+}
+Ok "PsyClaw $Tag 安装完成 · 版本校验通过"
 Write-Host "`n下一步:"
 Write-Host "  psyclaw config        # 配 LLM provider / API key"
 Write-Host "  psyclaw new 我的研究   # 建一个按文件夹组织的分析,cd 进去开聊"

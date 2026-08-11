@@ -26,7 +26,8 @@ irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
 ```
 
 脚本自动探测 GitHub 是否可达,**国内不通时切 gitclone.com + 阿里云镜像**。
-可选环境变量:`PSYCLAW_CN=1` 强制国内镜像、`PSYCLAW_EXTRAS=[stats]` 顺带装统计栈。
+可选环境变量:`PSYCLAW_CN=1` 强制国内镜像、`PSYCLAW_EXTRAS=""` 裸装、
+`PSYCLAW_EXTRAS=[full]` 更全。默认会顺带装统计栈(`[stats]`),直接可做分析。
 
 <details><summary>手动安装 / 离线分发包</summary>
 

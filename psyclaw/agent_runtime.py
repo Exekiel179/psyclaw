@@ -169,8 +169,8 @@ def _assert_acyclic(tasks: list[TaskSpec]) -> None:
             remaining.pop(task_id)
 
 
-def parse_plan(text: str, fallback_objective: str = "") -> list[TaskSpec]:
-    """Parse and validate the planner JSON. Invalid output becomes one safe task."""
+def _parse_plan_status(text: str, fallback_objective: str = "") -> tuple[list[TaskSpec], dict]:
+    """Parse and validate planner JSON, returning tasks plus parse status."""
     try:
         payload = _extract_json(text)
         raw_tasks = payload.get("tasks")
@@ -212,14 +212,22 @@ def parse_plan(text: str, fallback_objective: str = "") -> list[TaskSpec]:
             tasks[0] = TaskSpec(**{**asdict(first), "completion": first.completion,
                                    "mainline": True})
         _assert_acyclic(tasks)
-        return tasks
-    except (ValueError, TypeError, json.JSONDecodeError):
+        return tasks, {"ok": True, "fallback": False, "reason": ""}
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
         objective = fallback_objective.strip() or "回答用户当前问题"
-        return [TaskSpec(id="main", objective=objective, mainline=True)]
+        return [TaskSpec(id="main", objective=objective, mainline=True)], {
+            "ok": False, "fallback": True, "reason": str(exc)
+        }
+
+
+def parse_plan(text: str, fallback_objective: str = "") -> list[TaskSpec]:
+    """Parse and validate the planner JSON. Invalid output becomes one safe task."""
+    tasks, _status = _parse_plan_status(text, fallback_objective)
+    return tasks
 
 
 def plan_tasks(provider, task: str, context: list[dict] | None = None,
-               available_tools: tuple[str, ...] = ()) -> tuple[list[TaskSpec], str]:
+               available_tools: tuple[str, ...] = ()) -> tuple[list[TaskSpec], str, dict]:
     from psyclaw.network import redact_secrets
 
     history = [{"role": str(message.get("role") or "user"),
@@ -232,7 +240,8 @@ def plan_tasks(provider, task: str, context: list[dict] | None = None,
     catalog = ("\n\n可用工具名（只用于填写完成契约，Planner 不得调用）：\n"
                + ", ".join(available_tools)) if available_tools else ""
     reply = "".join(provider.chat(messages, system=_PLANNER_SYSTEM + catalog))
-    return parse_plan(reply, task), reply
+    tasks, status = _parse_plan_status(reply, task)
+    return tasks, reply, status
 
 
 def _resolved_owned_paths(paths: tuple[str, ...], project_dir: str = ".") -> tuple[str, ...]:
@@ -464,7 +473,7 @@ def run_planned_agent(
         }
 
     available_tools = tuple(build_tools(project_dir))
-    tasks, planner_reply = plan_tasks(
+    tasks, planner_reply, planner_status = plan_tasks(
         planner_provider, task_text, messages, available_tools=available_tools)
     if executor_factory is None:
         executor_factory = lambda: planner_provider
@@ -483,6 +492,8 @@ def run_planned_agent(
             return True
 
     safe_emit(f"plan: {len(tasks)} tasks · workers={max(1, min(max_workers, MAX_WORKERS))}")
+    if planner_status.get("fallback"):
+        safe_emit(f"planner fallback: {planner_status.get('reason', 'unknown')}")
 
     def execute(task: TaskSpec) -> TaskResult:
         feedback: list[str] = []
@@ -609,6 +620,8 @@ def run_planned_agent(
         "lessons": lessons,
         "plan": [asdict(task) for task in tasks],
         "planner_reply": planner_reply,
+        "planner_fallback": bool(planner_status.get("fallback")),
+        "planner_parse_error": planner_status.get("reason", ""),
         "task_results": {task_id: result.public()
                          for task_id, result in accumulated.items()},
     }

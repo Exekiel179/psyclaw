@@ -179,6 +179,8 @@ def cmd_agent(args: argparse.Namespace) -> int:
         workers = int(conf.get("agent_workers", 3))
     except (TypeError, ValueError):
         workers = 3
+    activity = ui.ActivityIndicator("Agent 正在后台规划与执行")
+    activity.start()
     try:
         res = run_planned_agent(
             get_role_provider(conf, "planner", provider), _build_system_prompt(),
@@ -188,11 +190,16 @@ def cmd_agent(args: argparse.Namespace) -> int:
             max_iters=getattr(args, "max_iters", 24), max_workers=workers,
             approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")),
             source_provider=provider)
+    except KeyboardInterrupt:
+        activity.stop("已取消")
+        raise
     except Exception as exc:  # noqa: BLE001
         from psyclaw.network import network_error_message, redact_secrets
         message = network_error_message(exc) or f"provider 错误:{redact_secrets(str(exc))}"
+        activity.stop("运行失败")
         print(ui.err(f"  [{message}]"))
         return 1
+    activity.stop("Agent 已完成")
     print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
     print(res["final"])
     # feat-065:循环内蒸馏的环境教训落跨会话待确认卡(HITL:psyclaw memory confirm 才生效)
