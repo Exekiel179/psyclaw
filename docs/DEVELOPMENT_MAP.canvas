@@ -1,180 +1,36 @@
 {
-  "nodes": [
-    {
-      "id": "title",
-      "type": "text",
-      "text": "# PsyClaw 开发地图\n\n**当前：** e5f30f4\n**基线：** v0.22.0\n**快照：** 2026-08-12\n\n从品牌与分发，走向研究编排、Agent 原生工具、Skill 平台，再收敛到可验证的 Provider 与上下文工程。\n\n文字版：[[DEVELOPMENT_MAP.md]]",
-      "x": -80,
-      "y": -80,
-      "width": 560,
-      "height": 250,
-      "color": "6"
-    },
-    {
-      "id": "v022",
-      "type": "text",
-      "text": "## v0.22\n\n**主题：** 面向用户的入口重做\n\n- 灵智龙虾品牌与启动页\n- 官网、离线包、安装入口\n- 开发脚手架归入 `dev/`\n- README / 命令 / 白皮书契约收敛\n\n**结果：** 从开发工具转向可安装产品",
-      "x": -760,
-      "y": -20,
-      "width": 420,
-      "height": 300,
-      "color": "3"
-    },
-    {
-      "id": "v023",
-      "type": "text",
-      "text": "## v0.23\n\n**主题：** Skill 平台与 Agent 原生交付\n\n- Skill Registry / Skill Pack\n- 学术编排工具与 Claim-Evidence\n- 宿主 Skill / MCP 只读发现\n- DOCX 契约与视觉验证\n- Windows / macOS 离线包\n\n**结果：** 从命令集合扩展为研究平台",
-      "x": -260,
-      "y": -20,
-      "width": 440,
-      "height": 330,
-      "color": "4"
-    },
-    {
-      "id": "planexec",
-      "type": "text",
-      "text": "## 7c0a850\n\n### Agent 规划 / 执行分离\n\n`Planner → Scheduler → Executor → Verifier → Finisher`\n\n- DAG 计划，不在 Planner 执行\n- 有界并发与 owned_paths\n- 只信工具回执和产物\n- 副作用尝试后不自动重放\n\n解决：假完成、重复副作用、不可审计",
-      "x": 260,
-      "y": -20,
-      "width": 450,
-      "height": 310,
-      "color": "5"
-    },
-    {
-      "id": "harden",
-      "type": "text",
-      "text": "## 3655669\n\n### Agent 与分析流程加固\n\n- PowerShell / CMD 显式分派\n- 多行脚本作为完整执行单元\n- MCP 代理与能力探测\n- 数据画像 → 分析建议 → 脚本 → 统计后端\n- Token 隔离与输出脱敏\n- 高风险动作始终人工确认\n\n解决：Windows、MCP、统计流程中的假执行",
-      "x": 780,
-      "y": -20,
-      "width": 450,
-      "height": 330,
-      "color": "5"
-    },
-    {
-      "id": "prompt",
-      "type": "text",
-      "text": "## e5f30f4\n\n### Provider 与上下文工程\n\n- 无模型不再静默 fallback mock\n- 缺 key / OpenCode 不可用明确失败\n- REPL 配置失败保留当前会话\n- 角色 prompt 只带短契约\n- `PSYCLAW.md` / `rigor.md` 按需读取\n- 新增三份对话教程\n\n解决：配置错误被掩盖、规则重复稀释注意力",
-      "x": 1300,
-      "y": -20,
-      "width": 450,
-      "height": 330,
-      "color": "6"
-    },
-    {
-      "id": "entry",
-      "type": "text",
-      "text": "## 当前入口\n\n### 研究者\n- `chat`：协作推进\n- `run <type>`：按流程执行\n- `run`：根据状态自动继续\n\n### 高级 / 兼容\n- `agent` / `loop` / `auto`\n\n公开心智模型已经从“很多命令”收敛为“chat + run”。",
-      "x": -700,
-      "y": 450,
-      "width": 430,
-      "height": 300,
-      "color": "3"
-    },
-    {
-      "id": "orchestration",
-      "type": "text",
-      "text": "## 编排中枢\n\n### Chat\nREPL + Tool Loop + Agent Runtime\n\n### Run\nWorkflow Registry + Engine\n\n### 状态\nGoal / Plan / Tasks / Checkpoint\n\n### 证据\nVerifier + workflow summary + logs",
-      "x": -210,
-      "y": 430,
-      "width": 400,
-      "height": 300,
-      "color": "5"
-    },
-    {
-      "id": "research",
-      "type": "text",
-      "text": "## 研究流程\n\n- Literature：检索 / 筛选 / 合成 / 评审\n- Meta：效应量校验 / 脚本 / 结果\n- Analysis：数据画像 / 推荐 / 脚本 / 统计\n- Qualitative：转录读取 / 编码 / 研究者复核\n\n共同约束：准备 gate、产物、可恢复检查点、总验收。",
-      "x": 260,
-      "y": 430,
-      "width": 450,
-      "height": 320,
-      "color": "4"
-    },
-    {
-      "id": "extensions",
-      "type": "text",
-      "text": "## 扩展能力\n\n### Skills\nRegistry / Packs / Distill / Validate\n\n### MCP\n统计 / Zotero / MNE / Kaggle / 宿主发现\n\n### 学术工具\nClaim-Evidence / Handoff / Figure Compose / DOCX Contract\n\n原则：Agent 使用结构化工具，CLI 保留人工调试。",
-      "x": 780,
-      "y": 430,
-      "width": 440,
-      "height": 330,
-      "color": "4"
-    },
-    {
-      "id": "safety",
-      "type": "text",
-      "text": "## 安全与诚信\n\n- 效应量 + CI\n- 探索 / 确证分开\n- 相关不等于因果\n- 引用只来自真实检索\n- `data/raw` 只读\n- 删除 / 重编码需批准\n- 项目根路径约束\n- Token 隔离与输出脱敏\n- 危险操作始终 HITL",
-      "x": 1300,
-      "y": 430,
-      "width": 400,
-      "height": 330,
-      "color": "1"
-    },
-    {
-      "id": "context",
-      "type": "text",
-      "text": "## 上下文工程\n\n- 静态 system 前缀稳定，利于缓存\n- 动态知识按消息相关性注入\n- 历史对话蒸馏为决策备忘\n- Skill 只先给索引，详情按需读取\n- 角色 prompt = 角色契约 + 短共享规则\n- 完整规范保留在 `gates/` 单一真源\n\n目标：少重复、少噪声、状态外置、证据可回看。",
-      "x": 1800,
-      "y": 430,
-      "width": 450,
-      "height": 330,
-      "color": "6"
-    },
-    {
-      "id": "evidence",
-      "type": "text",
-      "text": "## 当前证据\n\n### 自动化\n`2368 passed, 12 skipped`\n\n### 已实测\n- 空 provider 明确失败，退出码 2\n- 缺 key 不返回 MockProvider\n- 角色 prompt 约 745–1604 字符\n- Provider / Prompt / Workflow 回归通过\n\n### 远端\n`origin/master = e5f30f4`",
-      "x": 60,
-      "y": 930,
-      "width": 480,
-      "height": 300,
-      "color": "4"
-    },
-    {
-      "id": "pending",
-      "type": "text",
-      "text": "## 待验证队列\n\n### P0\n- 配真实 Provider 跑完三份教程\n- 记录真实流程首个阻塞点\n- 形成流程验证报告\n\n### P1\n- Claude Code / Codex / cc-switch 真实生态\n- 干净目录安装 Skill Pack\n- 真实 Agent 原生工具链\n\n### P2\n- DOCX/PDF 完整视觉回归\n- 可公开复跑 CI 证据\n- 发布时同步开发地图",
-      "x": 640,
-      "y": 930,
-      "width": 530,
-      "height": 330,
-      "color": "2"
-    },
-    {
-      "id": "sources",
-      "type": "text",
-      "text": "## 关键文件\n\n- `docs/ARCHITECTURE.md`：系统架构\n- `docs/COLLABORATION_STATUS_v0.23.0.md`：发布交接\n- `CHANGELOG.md`：版本演进\n- `psyclaw/agent_runtime.py`：Agent 调度\n- `psyclaw/workflows/engine.py`：流程引擎\n- `psyclaw/providers/`：模型后端\n- `psyclaw/gates/`：规则真源\n- `tests/`：可复跑证据",
-      "x": 1250,
-      "y": 930,
-      "width": 470,
-      "height": 300,
-      "color": "3"
-    },
-    {
-      "id": "mapdoc",
-      "type": "file",
-      "file": "docs/DEVELOPMENT_MAP.md",
-      "x": 1820,
-      "y": 930,
-      "width": 420,
-      "height": 300,
-      "color": "6"
-    }
-  ],
-  "edges": [
-    {"id": "e1", "fromNode": "v022", "toNode": "v023", "fromSide": "right", "toSide": "left", "label": "产品化"},
-    {"id": "e2", "fromNode": "v023", "toNode": "planexec", "fromSide": "right", "toSide": "left", "label": "Agent 深化"},
-    {"id": "e3", "fromNode": "planexec", "toNode": "harden", "fromSide": "right", "toSide": "left", "label": "可靠性"},
-    {"id": "e4", "fromNode": "harden", "toNode": "prompt", "fromSide": "right", "toSide": "left", "label": "收敛"},
-    {"id": "e5", "fromNode": "title", "toNode": "prompt", "fromSide": "bottom", "toSide": "top", "label": "当前"},
-    {"id": "e6", "fromNode": "entry", "toNode": "orchestration", "fromSide": "right", "toSide": "left", "label": "路由"},
-    {"id": "e7", "fromNode": "orchestration", "toNode": "research", "fromSide": "right", "toSide": "left", "label": "执行流程"},
-    {"id": "e8", "fromNode": "research", "toNode": "extensions", "fromSide": "right", "toSide": "left", "label": "委托"},
-    {"id": "e9", "fromNode": "extensions", "toNode": "safety", "fromSide": "right", "toSide": "left", "label": "受控调用"},
-    {"id": "e10", "fromNode": "orchestration", "toNode": "context", "fromSide": "bottom", "toSide": "top", "label": "状态与上下文"},
-    {"id": "e11", "fromNode": "safety", "toNode": "evidence", "fromSide": "bottom", "toSide": "top", "label": "审计"},
-    {"id": "e12", "fromNode": "context", "toNode": "pending", "fromSide": "bottom", "toSide": "top", "label": "下一轮"},
-    {"id": "e13", "fromNode": "evidence", "toNode": "sources", "fromSide": "right", "toSide": "left", "label": "追溯"},
-    {"id": "e14", "fromNode": "pending", "toNode": "mapdoc", "fromSide": "right", "toSide": "left", "label": "维护"}
-  ]
+	"nodes":[
+		{"id":"research","type":"text","text":"## 研究流程\n\n- Literature：检索 / 筛选 / 合成 / 评审\n- Meta：效应量校验 / 脚本 / 结果\n- Analysis：数据画像 / 推荐 / 脚本 / 统计\n- Qualitative：转录读取 / 编码 / 研究者复核\n\n共同约束：准备 gate、产物、可恢复检查点、总验收。","x":260,"y":430,"width":450,"height":320,"color":"4"},
+		{"id":"extensions","type":"text","text":"## 扩展能力\n\n### Skills\nRegistry / Packs / Distill / Validate\n\n### MCP\n统计 / Zotero / MNE / Kaggle / 宿主发现\n\n### 学术工具\nClaim-Evidence / Handoff / Figure Compose / DOCX Contract\n\n原则：Agent 使用结构化工具，CLI 保留人工调试。","x":780,"y":430,"width":440,"height":330,"color":"4"},
+		{"id":"safety","type":"text","text":"## 安全与诚信\n\n- 效应量 + CI\n- 探索 / 确证分开\n- 相关不等于因果\n- 引用只来自真实检索\n- `data/raw` 只读\n- 删除 / 重编码需批准\n- 项目根路径约束\n- Token 隔离与输出脱敏\n- 危险操作始终 HITL","x":1300,"y":430,"width":400,"height":330,"color":"1"},
+		{"id":"context","type":"text","text":"## 上下文工程\n\n- 静态 system 前缀稳定，利于缓存\n- 动态知识按消息相关性注入\n- 历史对话蒸馏为决策备忘\n- Skill 只先给索引，详情按需读取\n- 角色 prompt = 角色契约 + 短共享规则\n- 完整规范保留在 `gates/` 单一真源\n\n目标：少重复、少噪声、状态外置、证据可回看。","x":1800,"y":430,"width":450,"height":330,"color":"6"},
+		{"id":"pending","type":"text","text":"## 待验证队列\n\n### P0\n- 配真实 Provider 跑完三份教程\n- 记录真实流程首个阻塞点\n- 形成流程验证报告\n\n### P1\n- Claude Code / Codex / cc-switch 真实生态\n- 干净目录安装 Skill Pack\n- 真实 Agent 原生工具链\n\n### P2\n- DOCX/PDF 完整视觉回归\n- 可公开复跑 CI 证据\n- 发布时同步开发地图","x":640,"y":930,"width":530,"height":330,"color":"2"},
+		{"id":"sources","type":"text","text":"## 关键文件\n\n- `docs/ARCHITECTURE.md`：系统架构\n- `docs/COLLABORATION_STATUS_v0.23.0.md`：发布交接\n- `CHANGELOG.md`：版本演进\n- `psyclaw/agent_runtime.py`：Agent 调度\n- `psyclaw/workflows/engine.py`：流程引擎\n- `psyclaw/providers/`：模型后端\n- `psyclaw/gates/`：规则真源\n- `tests/`：可复跑证据","x":1250,"y":930,"width":470,"height":300,"color":"3"},
+		{"id":"mapdoc","type":"file","file":"docs/DEVELOPMENT_MAP.md","x":1820,"y":930,"width":420,"height":300,"color":"6"},
+		{"id":"v023","type":"text","text":"## v0.23\n\n**主题：** Skill 平台与 Agent 原生交付\n\n- Skill Registry / Skill Pack\n- 学术编排工具与 Claim-Evidence\n- 宿主 Skill / MCP 只读发现\n- DOCX 契约与视觉验证\n- Windows / macOS 离线包\n\n**结果：** 从命令集合扩展为研究平台","x":-300,"y":-640,"width":440,"height":330,"color":"4"},
+		{"id":"v022","type":"text","text":"## v0.22\n\n**主题：** 面向用户的入口重做\n\n- 灵智龙虾品牌与启动页\n- 官网、离线包、安装入口\n- 开发脚手架归入 `dev/`\n- README / 命令 / 白皮书契约收敛\n\n**结果：** 从开发工具转向可安装产品","x":-1440,"y":-20,"width":420,"height":300,"color":"3"},
+		{"id":"planexec","type":"text","text":"## 7c0a850\n\n### Agent 规划 / 执行分离\n\n`Planner → Scheduler → Executor → Verifier → Finisher`\n\n- DAG 计划，不在 Planner 执行\n- 有界并发与 owned_paths\n- 只信工具回执和产物\n- 副作用尝试后不自动重放\n\n解决：假完成、重复副作用、不可审计","x":905,"y":-785,"width":450,"height":310,"color":"5"},
+		{"id":"harden","type":"text","text":"## 3655669\n\n### Agent 与分析流程加固\n\n- PowerShell / CMD 显式分派\n- 多行脚本作为完整执行单元\n- MCP 代理与能力探测\n- 数据画像 → 分析建议 → 脚本 → 统计后端\n- Token 隔离与输出脱敏\n- 高风险动作始终人工确认\n\n解决：Windows、MCP、统计流程中的假执行","x":1790,"y":-640,"width":450,"height":330,"color":"5"},
+		{"id":"prompt","type":"text","text":"## e5f30f4\n\n### Provider 与上下文工程\n\n- 无模型不再静默 fallback mock\n- 缺 key / OpenCode 不可用明确失败\n- REPL 配置失败保留当前会话\n- 角色 prompt 只带短契约\n- `PSYCLAW.md` / `rigor.md` 按需读取\n- 新增三份对话教程\n\n解决：配置错误被掩盖、规则重复稀释注意力","x":2015,"y":-120,"width":450,"height":330,"color":"6"},
+		{"id":"title","type":"text","text":"# PsyClaw 开发地图\n\n**当前：** e5f30f4\n**基线：** v0.22.0\n**快照：** 2026-08-12\n\n从品牌与分发，走向研究编排、Agent 原生工具、Skill 平台，再收敛到可验证的 Provider 与上下文工程。\n\n文字版：[[DEVELOPMENT_MAP.md]]","x":300,"y":-80,"width":560,"height":250,"color":"6"},
+		{"id":"entry","type":"text","text":"## 当前入口\n\n### 研究者\n- `chat`：协作推进\n- `run <type>`：按流程执行\n- `run`：根据状态自动继续\n\n### 高级 / 兼容\n- `agent` / `loop` / `auto`\n\n公开心智模型已经从“很多命令”收敛为“chat + run”。","x":-1020,"y":730,"width":430,"height":300,"color":"3"},
+		{"id":"orchestration","type":"text","text":"## 编排中枢\n\n### Chat\nREPL + Tool Loop + Agent Runtime\n\n### Run\nWorkflow Registry + Engine\n\n### 状态\nGoal / Plan / Tasks / Checkpoint\n\n### 证据\nVerifier + workflow summary + logs","x":-480,"y":780,"width":400,"height":300,"color":"5"},
+		{"id":"evidence","type":"text","text":"## 当前证据\n\n### 自动化\n`2368 passed, 12 skipped`\n\n### 已实测\n- 空 provider 明确失败，退出码 2\n- 缺 key 不返回 MockProvider\n- 角色 prompt 约 745–1604 字符\n- Provider / Prompt / Workflow 回归通过\n\n### 远端\n`origin/master = e5f30f4`","x":20,"y":1260,"width":480,"height":300,"color":"4"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"v022","fromSide":"right","toNode":"v023","toSide":"left","label":"产品化"},
+		{"id":"e2","fromNode":"v023","fromSide":"right","toNode":"planexec","toSide":"left","label":"Agent 深化"},
+		{"id":"e3","fromNode":"planexec","fromSide":"right","toNode":"harden","toSide":"left","label":"可靠性"},
+		{"id":"e4","fromNode":"harden","fromSide":"right","toNode":"prompt","toSide":"left","label":"收敛"},
+		{"id":"e5","fromNode":"title","fromSide":"bottom","toNode":"prompt","toSide":"top","label":"当前"},
+		{"id":"e6","fromNode":"entry","fromSide":"right","toNode":"orchestration","toSide":"left","label":"路由"},
+		{"id":"e7","fromNode":"orchestration","fromSide":"right","toNode":"research","toSide":"left","label":"执行流程"},
+		{"id":"e8","fromNode":"research","fromSide":"right","toNode":"extensions","toSide":"left","label":"委托"},
+		{"id":"e9","fromNode":"extensions","fromSide":"right","toNode":"safety","toSide":"left","label":"受控调用"},
+		{"id":"e10","fromNode":"orchestration","fromSide":"bottom","toNode":"context","toSide":"top","label":"状态与上下文"},
+		{"id":"e11","fromNode":"safety","fromSide":"bottom","toNode":"evidence","toSide":"top","label":"审计"},
+		{"id":"e12","fromNode":"context","fromSide":"bottom","toNode":"pending","toSide":"top","label":"下一轮"},
+		{"id":"e13","fromNode":"evidence","fromSide":"right","toNode":"sources","toSide":"left","label":"追溯"},
+		{"id":"e14","fromNode":"pending","fromSide":"right","toNode":"mapdoc","toSide":"left","label":"维护"}
+	]
 }
