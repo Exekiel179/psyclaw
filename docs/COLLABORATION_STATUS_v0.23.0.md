@@ -1,6 +1,6 @@
 # PsyClaw v0.23.0 协作交接
 
-**快照日期：** 2026-08-09
+**快照日期：** 2026-08-12
 
 **发布标签：** `v0.23.0`
 
@@ -45,11 +45,11 @@ Skill 平台，并补齐 Windows/macOS 双平台安装包与 Agent 执行可靠�
 
 | 文档 | 状态 | 对外使用建议 |
 |---|---|---|
-| `docs/PsyClaw使用白皮书_v0.23.0.docx` | 已更新为当前公开接口与能力边界；Quick Look 内容核验通过 | 可作为 v0.23.0 使用说明；PDF 需在具备中文字体的本机 Word/Pages 或 LibreOffice 环境重新导出并逐页验收 |
+| `docs/PsyClaw使用白皮书_v0.23.0.docx` | 已重新生成；新增文献调研实现链路、检索计划、多源检索、PRISMA、Evidence Map、引用核验和真实验收边界；Pandoc 文本抽取与 OOXML ZIP 校验通过 | 可作为 v0.23.0 使用说明；本机未安装 LibreOffice，PDF 仍保留为历史 v0.21.0 归档 |
 | `docs/PsyClaw预印本_draft.md/.docx` | 本次随代码提交，但仍是**草稿** | 可供内部讨论；其中“2228 全部通过”等测试数字已过时，投稿/公开前必须按可复跑证据修订 |
 | 本页 | 已按 v0.23.0 发布状态整理 | 可直接发送给协作者 |
 
-旧的 v0.21.0 白皮书文件保留为历史归档。当前白皮书由 `scripts/build_whitepaper_docx.py` 与当前公开接口维护；每次功能发布后均应重建 DOCX/PDF 并重新执行命令、链接和版式验收。本轮生成的临时 PDF 因渲染环境缺少稳定的 CJK 字体未纳入发布。
+旧的 v0.21.0 白皮书文件保留为历史归档。当前 DOCX 由 `scripts/build_whitepaper_docx.py` 与当前公开接口维护；本轮未生成新 PDF，因为当前环境没有 LibreOffice/soffice，无法完成可靠的中文分页和字体视觉验收。后续在具备 Word/LibreOffice 与中文字体的环境中，应重新导出 v0.23.0 PDF 并逐页验收。
 
 ## 开发待办
 

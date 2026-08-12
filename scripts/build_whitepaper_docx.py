@@ -410,6 +410,59 @@ def ch2(doc):
         ["格式规整、卷期页码齐全、正文引用与文末列表完全一致的虚构条目,",
          "仅凭人工查阅与格式检查无法识别,须经数据库实际查证。",
          "「查无此文」与「无法查证」为两类不同结果,后者不会误判未被收录的中文文献。"], "blue")
+    heading(doc, "2.4　从主题到可复查的检索计划", level=2)
+    para(doc, "正式综述不建议直接从关键词搜索开始。先把中英文检索式、目标条数和纳入/排除标准"
+              "写入项目,再执行检索,可以避免看到结果后临时改变标准。没有可用模型时,计划仍会生成"
+              "模板骨架,但不会假装已经完成领域同义词扩展。")
+    say(doc, "对话示例",
+        ["先为正念训练与考试焦虑生成中英文检索式和纳入排除标准",
+         "把检索计划写进 notes,我先人工确认标准"])
+    code(doc, ["psyclaw lit \"正念训练对大学生考试焦虑的干预效果\" --plan"])
+    para(doc, "主要产物是 notes/search_plan.md 与 notes/screening_criteria.json。前者包含公开 API"
+              "和机构库的操作路线,后者是筛选标准的机器可读真源。标准确认后,再进入正式检索。")
+    heading(doc, "2.5　多源检索、去重与 PRISMA 记录", level=2)
+    para(doc, "公开检索核支持 OpenAlex、Crossref、Europe PMC、arXiv 和 Semantic Scholar。各来源"
+              "被归一为同一题录格式,保留标题、作者、年份、DOI、摘要、来源、OA 状态和全文链接。"
+              "系统优先按 DOI 去重,没有 DOI 时再按规范化标题去重,并记录原始命中、去重后命中、"
+              "重复数和分来源计数。")
+    code(doc, ["psyclaw lit \"正念训练对大学生考试焦虑的干预效果\" --sources openalex,crossref,europepmc --limit 10"])
+    para(doc, "检索结束后检查 notes/lit_search.json 与 notes/prisma_search.md。中文主题覆盖不足时,"
+              "可显式启用 WebBridge 访问用户已登录的知网、万方或维普,也可以把人工导出的结果回灌:"
+              "psyclaw lit --import <文件>。桥接失败不会伪造结果,而是保留公开 API 结果并提示下一步。")
+    heading(doc, "2.6　筛选、全文与文献矩阵", level=2)
+    para(doc, "正式 literature 流程会对标题和摘要做确定性相关性初筛,并写入 notes/prisma_flow.md。"
+              "这一步是候选排序和人工复核起点,不是语义精筛,也不是研究质量评价。纳入文献的全文"
+              "按 Europe PMC OA XML、Unpaywall、arXiv、明确 OA 链接和机构权限顺序获取;付费墙不会被绕过。")
+    say(doc, "对话示例",
+        ["把纳入候选生成文献矩阵,没有全文的内容全部标待核查",
+         "把开放获取的文献下载到项目里,并记录文件 hash"])
+    code(doc, ["psyclaw lit --matrix \"正念训练对大学生考试焦虑的干预效果\"",
+               "psyclaw lit \"正念训练对大学生考试焦虑的干预效果\" --download"])
+    para(doc, "矩阵产物为 notes/lit_matrix.md 和 notes/evidence_map.json。未知研究对象、方法、发现和"
+              "局限不会由系统猜测,而会标注「待核查」或「全文未获取」。PDF 下载会检查文件魔数、"
+              "规范命名和 SHA-256,审计记录位于 outputs/pdfs/pdf_audit.json。")
+    heading(doc, "2.7　Evidence Map 与有据综述", level=2)
+    para(doc, "Evidence Map 是检索结果和自然语言综述之间的机器可读中间层。它为每篇文献生成可消歧"
+              "的 citation key,记录年份范围、OA 数量、重复主题词以及主题到支持文献的映射。"
+              "配置了真实 Provider 且有检索命中时,模型只能使用 Evidence Map 中的引用键和摘要片段;"
+              "没有 Provider、没有命中或模型调用失败时,系统生成明确标注的确定性骨架。")
+    para(doc, "无模型时不会默认降级为 MockProvider。确定性骨架是可追溯的内部产物,不能当作正式的"
+              "模型综述或真实环境验收证据。")
+    code(doc, ["psyclaw lit \"正念训练对大学生考试焦虑的干预效果\" --synthesize"])
+    heading(doc, "2.8　引用核验与流程验收", level=2)
+    para(doc, "引用核验优先读取 notes/evidence_map.json,回落到 notes/lit_search.json,按首位作者姓氏"
+              "和年份检查文内引用是否来自真实检索语料,并双向检查参考文献表。结果写入"
+              "notes/citation_audit.json 与 notes/citation_audit.md;没有语料或格式特殊时明确标记人工核验。")
+    para(doc, "完整流程的入口是 psyclaw run literature。正式运行先检查研究准备 gate,每一步写检查点,"
+              "最后生成 notes/workflow_summary.json。缺少 Provider 或 API key 会明确失败;"
+              "--exploratory 只能由用户显式选择,跳过的 gate 会写入 notes/gate_skips.md。"
+              "流程中断后可用 --resume 继续,不会把终端的一句「完成」当成唯一证据。")
+    code(doc, ["psyclaw run literature \"正念训练对大学生考试焦虑的干预效果\"",
+               "psyclaw run literature \"正念训练对大学生考试焦虑的干预效果\" --resume"])
+    box(doc, "文献模块当前状态",
+        ["代码与离线自动化测试已覆盖: workflow、检索、初筛、合成、矩阵、桥接、付费墙、引用和 Zotero。",
+         "仍需真实验收: Provider 下的完整流程、真实 WebBridge 三库、机构 SSO、Zotero 文库和全文质量。",
+         "当前初筛是题录级确定性初筛;review 在 literature workflow 中仍是可选步骤。"], "amber")
     page_break(doc)
 def ch3(doc):
     heading(doc, "第三章　统计分析")
