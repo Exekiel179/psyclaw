@@ -1142,6 +1142,11 @@ def cmd_export(args: argparse.Namespace) -> int:
         return cn_journal_cli(argv)
     from psyclaw.output.apa7 import export_cli
     argv = [args.file]
+    output_format = getattr(args, "format", "docx")
+    if output_format == "latex":
+        argv += ["--format", "latex"]
+        if getattr(args, "latex", None):
+            argv += ["--latex", args.latex]
     if args.docx:
         argv += ["--docx", args.docx]
     if args.md:
@@ -2436,7 +2441,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     pex = sub.add_parser("export", help="格式化输出(APA7 / 心理学报 / 心理科学,确定性模板)")
     pex.add_argument("file", help="结构化 Markdown 草稿")
-    pex.add_argument("--docx", default=None, help="docx 输出路径(仅 APA7 格式可用)")
+    pex.add_argument("--format", choices=["docx", "latex"], default="docx",
+                     help="最终论文格式，默认 docx；latex 输出 XeLaTeX 源文件")
+    pex.add_argument("--docx", default=None, help="Word 输出路径（兼容参数）")
+    pex.add_argument("--latex", default=None, help="LaTeX 输出路径")
     pex.add_argument("--md", default=None, help="md 输出路径")
     pex.add_argument(
         "--journal", "-j",

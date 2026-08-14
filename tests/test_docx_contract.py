@@ -44,6 +44,26 @@ def test_contract_fails_closed_for_non_docx(tmp_path: Path):
     assert result["errors"]
 
 
+def test_latex_export_uses_same_document_model(tmp_path: Path):
+    out = tmp_path / "paper.tex"
+    result = _fixture().to_latex(out)
+    text = result.read_text(encoding="utf-8")
+    assert result == out
+    assert "\\documentclass[12pt]{article}" in text
+    assert "\\section{方法}" in text
+    assert "\\begin{tabular}" in text
+    assert "\\textit{t}" in text
+
+
+def test_export_cli_latex(tmp_path: Path, capsys):
+    source = tmp_path / "draft.md"
+    source.write_text("# Title\n\n正文。\n", encoding="utf-8")
+    out = tmp_path / "paper.tex"
+    assert apa7.export_cli([str(source), "--format", "latex", "--latex", str(out)]) == 0
+    assert out.exists()
+    assert "LaTeX 输出完成" in capsys.readouterr().out
+
+
 def test_export_cli_keeps_artifacts_and_fails_when_contract_fails(tmp_path, monkeypatch, capsys):
     source = tmp_path / "draft.md"
     source.write_text("# Title\n\n正文。\n", encoding="utf-8")
