@@ -29,5 +29,38 @@
   "artifacts": {
     "script": "analysis/world_bank_internet.py",
     "data": "data/clean/world_bank_internet.csv"
+  },
+  "primary_analysis": {
+    "input": {
+      "path": "data/clean/world_bank_internet_country.csv",
+      "sha256": "d4cf0bd7b91c87aa584f3a1f719b35c36e94b0f57ea0c8f48f406f5cce6e52b2",
+      "profile": {
+        "n": 2821,
+        "missing_total": 290,
+        "numeric": [
+          "year",
+          "value"
+        ]
+      }
+    },
+    "screening": "World Bank country metadata region != Aggregates",
+    "design": {
+      "analysis": "correlation",
+      "x": "year",
+      "y": "value",
+      "rationale": "两个连续变量 year、value → Pearson 相关"
+    },
+    "execution": {
+      "ok": true,
+      "status": "executed",
+      "path": "analysis/world_bank_internet_country.py",
+      "returncode": 0,
+      "stdout": "⚠ 剔除 290 行(缺失/不可解析)——须如实报告\nPearson 相关:\n            n         r          CI95         p_val       BF10  power\npearson  2531  0.375532  [0.34, 0.41]  1.392456e-85  6.478e+81    1.0\n",
+      "stderr": ""
+    },
+    "artifacts": {
+      "script": "analysis/world_bank_internet_country.py",
+      "data": "data/clean/world_bank_internet_country.csv"
+    }
   }
 }
