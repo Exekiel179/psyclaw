@@ -74,7 +74,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(ui.err(str(exc)))
         return 2
     except KeyboardInterrupt:
-        print("\n运行已中断。已落盘的产物保留在 notes/ outputs/。")
+        print("\n运行已中断。交付物保留在 deliverables/，脚本保留在 analysis/。")
         return 0
 
 
@@ -183,14 +183,19 @@ def cmd_agent(args: argparse.Namespace) -> int:
     activity = ui.ActivityIndicator("Agent 正在后台规划与执行")
     activity.start()
     try:
-        res = run_planned_agent(
+        from psyclaw.langgraph_runtime import run_agent
+        # Minimal injected test configs from older integrations may omit the
+        # backend key; preserve their explicit legacy contract. Normal loaded
+        # configs include DEFAULTS["agent_backend"]="langgraph".
+        res = run_agent(
             get_role_provider(conf, "planner", provider), _build_system_prompt(),
             [{"role": "user", "content": task}], project_dir=".",
             executor_factory=lambda: get_role_provider(conf, "executor"),
             finisher_provider=get_role_provider(conf, "writer"),
             max_iters=getattr(args, "max_iters", 24), max_workers=workers,
             approve=approve, emit=lambda e: print(ui.dim(f"  ⚙ {e}")),
-            source_provider=provider)
+            source_provider=provider,
+            backend=conf.get("agent_backend") or "legacy")
     except KeyboardInterrupt:
         activity.stop("已取消")
         raise
@@ -201,7 +206,12 @@ def cmd_agent(args: argparse.Namespace) -> int:
         print(ui.err(f"  [{message}]"))
         return 1
     activity.stop("Agent 已完成")
-    print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}]"))
+    backend = res.get("backend", "legacy")
+    nodes = ",".join(res.get("graph_nodes", []))
+    route = f" · backend={backend}" + (f" · nodes={nodes}" if nodes else "")
+    if res.get("backend_fallback"):
+        route += f" · fallback={res['backend_fallback'][:160]}"
+    print(ui.dim(f"  [{res['iters']} 轮 · {len(res['trace'])} 次工具调用 · {res['stopped']}{route}]"))
     print(res["final"])
     # feat-065:循环内蒸馏的环境教训落跨会话待确认卡(HITL:psyclaw memory confirm 才生效)
     # feat-087(评审修复):与 REPL 共用 draft_lessons,单卡失败不再 break 丢掉
@@ -755,7 +765,9 @@ def cmd_eval(args: argparse.Namespace) -> int:
         print(ui.err(str(exc)))
         return 1
     # feat-084:先落盘再打印——打印层任何意外都不能吞掉报告工件
-    out = Path(".psyclaw") / "eval_report.json"
+    # Evaluation reports are user-facing deliverables; runtime state stays in
+    # .psyclaw and compatibility artifacts remain under outputs/.
+    out = Path("deliverables") / "eval_report.json"
     saved = False
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -1122,6 +1134,12 @@ def cmd_export(args: argparse.Namespace) -> int:
         prof = get_journal(load_project_config(".").get("target_journal"))
         jid = (prof or {}).get("id")
         journal = jid if jid in ("xinlixuebao", "xinlikexue") else "apa7"
+    output_format = getattr(args, "format", "docx")
+    if getattr(args, "latex", None) and output_format == "docx":
+        output_format = "latex"
+    if journal != "apa7" and output_format == "latex":
+        print("当前中文期刊模板只支持 Markdown；LaTeX 请使用 --journal apa7")
+        return 2
     if journal != "apa7":
         from psyclaw.output.cn_journal import cn_journal_cli
         argv = [args.file, "--journal", journal]
@@ -1130,6 +1148,10 @@ def cmd_export(args: argparse.Namespace) -> int:
         return cn_journal_cli(argv)
     from psyclaw.output.apa7 import export_cli
     argv = [args.file]
+    if output_format == "latex":
+        argv += ["--format", "latex"]
+        if getattr(args, "latex", None):
+            argv += ["--latex", args.latex]
     if args.docx:
         argv += ["--docx", args.docx]
     if args.md:
@@ -1961,7 +1983,7 @@ def cmd_research(args: argparse.Namespace) -> int:
                             revise=getattr(args, "revise", False),
                             rounds=getattr(args, "rounds", 3))
     except KeyboardInterrupt:
-        print("\n流水线已中断。已落盘的产物保留在 notes/ outputs/。")
+        print("\n流水线已中断。交付物保留在 deliverables/，脚本保留在 analysis/。")
         return 0
 
 
@@ -1973,7 +1995,7 @@ def cmd_loop(args: argparse.Namespace) -> int:
         return run_loop(topic=getattr(args, "topic", None),
                         auto=getattr(args, "auto", False))
     except KeyboardInterrupt:
-        print("\n回路已中断。已落盘的产物保留在 notes/ outputs/。")
+        print("\n回路已中断。交付物保留在 deliverables/，脚本保留在 analysis/。")
         return 0
 
 
@@ -2424,7 +2446,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     pex = sub.add_parser("export", help="格式化输出(APA7 / 心理学报 / 心理科学,确定性模板)")
     pex.add_argument("file", help="结构化 Markdown 草稿")
-    pex.add_argument("--docx", default=None, help="docx 输出路径(仅 APA7 格式可用)")
+    pex.add_argument("--format", choices=["docx", "latex"], default="docx",
+                     help="最终论文格式，默认 docx；latex 输出 XeLaTeX 源文件")
+    pex.add_argument("--docx", default=None, help="Word 输出路径（兼容参数）")
+    pex.add_argument("--latex", default=None, help="LaTeX 输出路径")
     pex.add_argument("--md", default=None, help="md 输出路径")
     pex.add_argument(
         "--journal", "-j",

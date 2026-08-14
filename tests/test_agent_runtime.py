@@ -15,6 +15,7 @@ from psyclaw.agent_runtime import (
     Scheduler,
     TaskResult,
     TaskSpec,
+    _task_prompt,
     parse_plan,
     run_planned_agent,
     verify_task,
@@ -180,6 +181,13 @@ def test_parse_plan_builds_valid_dag_and_contract():
     assert tasks[0].completion.allow_reasoning_only is False
 
 
+def test_action_tasks_get_real_execution_contract_even_when_planner_omits_it():
+    raw = json.dumps({"tasks": [{"id": "download", "objective": "下载检索到的论文"}]})
+    task = parse_plan(raw)[0]
+    assert task.completion.allow_reasoning_only is False
+    assert task.completion.min_successful_tool_calls == 1
+
+
 def test_invalid_or_cyclic_plan_falls_back_to_safe_main_task():
     cycle = json.dumps({"tasks": [
         {"id": "a", "objective": "A", "depends_on": ["b"]},
@@ -188,6 +196,43 @@ def test_invalid_or_cyclic_plan_falls_back_to_safe_main_task():
     tasks = parse_plan(cycle, "回答问题")
     assert len(tasks) == 1 and tasks[0].id == "main"
     assert tasks[0].parallel_safe is False
+
+
+def test_multiple_mainlines_are_normalized_without_discarding_tasks():
+    raw = json.dumps({"tasks": [
+        {"id": "search", "objective": "检索", "mainline": True},
+        {"id": "download", "objective": "下载", "mainline": True,
+         "depends_on": ["search"]},
+    ]})
+    tasks = parse_plan(raw, "继续")
+    assert [task.id for task in tasks] == ["search", "download"]
+    assert [task.mainline for task in tasks] == [True, False]
+
+
+def test_multiple_mainlines_are_warning_not_parse_error():
+    import psyclaw.agent_runtime as runtime
+    raw = json.dumps({"tasks": [
+        {"id": "a", "objective": "A", "mainline": True},
+        {"id": "b", "objective": "B", "mainline": True},
+    ]})
+    _, status = runtime._parse_plan_status(raw, "继续")
+    assert status["fallback"] is False
+    assert status["reason"] == ""
+    assert "normalized" in status["warning"]
+
+
+def test_task_prompt_carries_recent_conversation_context():
+    from psyclaw.agent_runtime import _task_prompt
+
+    prompt = _task_prompt(
+        TaskSpec("download", "下载刚才检索到的论文"), {},
+        conversation_context=[
+            {"role": "user", "content": "帮我查最新一期"},
+            {"role": "assistant", "content": "DOI 10.1146/annurev-psych-020425-020958"},
+        ],
+    )
+    assert "10.1146/annurev-psych-020425-020958" in prompt
+    assert "优先复用" in prompt
 
 
 def test_unsafe_owned_path_disables_parallel_execution():
@@ -249,6 +294,44 @@ def test_scheduler_contains_mainline_executor_exception():
     assert results["main"].passed is False
     assert results["main"].run["stopped"] == "error"
     assert "boom" in results["main"].reasons[0]
+
+
+def test_scheduler_fail_closes_unresolvable_dependencies():
+    first = TaskSpec("first", "先做", depends_on=("missing",))
+    second = TaskSpec("second", "后做", depends_on=("first",))
+    scheduler = Scheduler(lambda _task: pytest.fail("blocked task must not execute"),
+                          max_workers=1)
+    result = scheduler.run([first, second])
+    assert set(result) == {"first", "second"}
+    assert all(item.passed is False for item in result.values())
+    assert all(item.run["stopped"] == "blocked" for item in result.values())
+    assert "未产生可用验收结果" in result["first"].reasons[0]
+
+
+def test_task_prompt_carries_dependency_receipts():
+    parent = TaskSpec("search", "检索", mainline=True)
+    child = TaskSpec("download", "下载", depends_on=("search",))
+    result = TaskResult(parent, {
+        "final": "已检索",
+        "stopped": "answered",
+        "trace": [{"name": "lit_search", "ok": True, "output": "notes/lit_search.json"}],
+    }, True, [])
+    prompt = _task_prompt(child, {"search": result}, [], [])
+    assert "lit_search" in prompt
+    assert "notes/lit_search.json" in prompt
+
+
+def test_parse_plan_infers_action_tool_contracts():
+    tasks = parse_plan(json.dumps({"tasks": [
+        {"id": "search", "objective": "检索文献"},
+        {"id": "write", "objective": "写入报告"},
+        {"id": "download", "objective": "下载全文"},
+    ]}))
+    contracts = {task.id: task.completion for task in tasks}
+    assert contracts["search"].required_tools == ("lit_search",)
+    assert contracts["write"].required_tools == ("save_file",)
+    assert contracts["download"].required_tools == ("lit_download",)
+    assert all(contract.allow_reasoning_only is False for contract in contracts.values())
 
 
 def test_verify_task_requires_real_receipts_and_artifacts(tmp_path):

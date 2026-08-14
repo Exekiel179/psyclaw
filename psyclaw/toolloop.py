@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -294,7 +295,7 @@ def save_path_denied(raw_path: str, project_dir: str = ".") -> str | None:
     return None
 
 
-def build_tools(project_dir: str = ".") -> dict:
+def build_tools(project_dir: str = ".", *, include_mcp: bool = True) -> dict:
     """内置工具集:把既有能力(检索/读文件/存文件/KG/召回)暴露为可调用工具。"""
     from pathlib import Path
     tools: dict = {}
@@ -302,6 +303,88 @@ def build_tools(project_dir: str = ".") -> dict:
     def _t(name, desc, args, run, side_effect=False):
         tools[name] = {"desc": desc, "args": args, "run": run,
                        "side_effect": side_effect}
+
+    def _open_data_download(a):
+        import csv
+        import hashlib
+        import urllib.parse
+        import urllib.request
+        indicator = str(a.get("indicator") or "").strip().upper()
+        raw_output = str(a.get("output") or "data/clean/world_bank.csv").strip().replace("\\", "/")
+        output = raw_output if raw_output and not raw_output.startswith("/") \
+            and ".." not in Path(raw_output).parts else None
+        allowed = {"IT.NET.USER.ZS", "SL.TLF.CACT.FE.ZS", "NY.GDP.PCAP.KD"}
+        if indicator not in allowed:
+            return {"ok": False, "status": "denied", "note": "indicator 不在 World Bank 白名单"}
+        if not output or not output.lower().endswith(".csv"):
+            return {"ok": False, "status": "denied", "note": "output 必须是项目内 CSV 路径"}
+        start = str(a.get("start") or "2010").strip()
+        end = str(a.get("end") or "2022").strip()
+        query = urllib.parse.urlencode({"date": f"{start}:{end}", "format": "json", "per_page": "20000"})
+        url = f"https://api.worldbank.org/v2/country/all/indicator/{indicator}?{query}"
+        try:
+            with urllib.request.urlopen(url, timeout=30) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            rows = payload[1] if isinstance(payload, list) and len(payload) > 1 else []
+            if not rows:
+                return {"ok": False, "status": "empty", "url": url, "note": "API 无数据"}
+            root = Path(project_dir).resolve()
+            path = (root / output).resolve()
+            if not path.is_relative_to(root):
+                return {"ok": False, "status": "denied", "note": "路径越界"}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fields = ["country_iso3", "country", "year", "value", "indicator"]
+            with path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fields)
+                writer.writeheader()
+                for row in rows:
+                    writer.writerow({"country_iso3": row.get("countryiso3code", ""),
+                                     "country": (row.get("country") or {}).get("value", ""),
+                                     "year": row.get("date", ""), "value": row.get("value"),
+                                     "indicator": indicator})
+            keys = [(row.get("countryiso3code") or "", row.get("date", "")) for row in rows]
+            nonempty = [key for key in keys if key[0]]
+            duplicate_keys = len(nonempty) - len(set(nonempty))
+            missing_key_rows = len(keys) - len(nonempty)
+            return {"ok": True, "status": "downloaded", "url": url,
+                    "indicator": indicator, "rows": len(rows), "output": output,
+                    "unique_country_year_keys": len(set(nonempty)),
+                    "duplicate_country_year_keys": duplicate_keys,
+                    "missing_country_iso3_rows": missing_key_rows,
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        except Exception as exc:
+            return {"ok": False, "status": "download_error", "url": url,
+                    "note": f"{type(exc).__name__}: {exc}"}
+
+    _t("open_data_download",
+       "从 World Bank 官方 API 下载白名单指标到项目内 CSV；返回 URL、行数和 SHA-256",
+       "indicator:IT.NET.USER.ZS|SL.TLF.CACT.FE.ZS|NY.GDP.PCAP.KD, start?:YYYY, end?:YYYY, output?:str",
+       _open_data_download)
+
+    def _run_analysis_script(a):
+        import subprocess
+        import sys
+        raw = str(a.get("path") or "").strip().replace("\\", "/")
+        if not raw or not raw.endswith(".py") or raw.startswith("/") or ".." in Path(raw).parts:
+            return {"ok": False, "status": "denied", "note": "只能运行项目内 Python 分析脚本"}
+        root = Path(project_dir).resolve()
+        script = (root / raw).resolve()
+        if not script.is_relative_to(root) or not script.is_file():
+            return {"ok": False, "status": "missing", "path": raw}
+        try:
+            # Keep the analysis environment identical to PsyClaw's runtime.
+            interpreter = os.environ.get("PYTHON") or sys.executable
+            proc = subprocess.run([interpreter, str(script)],
+                                  cwd=str(root), capture_output=True, text=True, timeout=120)
+            return {"ok": proc.returncode == 0, "status": "executed" if proc.returncode == 0 else "failed",
+                    "path": raw, "returncode": proc.returncode,
+                    "stdout": proc.stdout[-6000:], "stderr": proc.stderr[-3000:]}
+        except Exception as exc:
+            return {"ok": False, "status": "execution_error", "path": raw,
+                    "note": f"{type(exc).__name__}: {exc}"}
+
+    _t("run_analysis_script", "运行项目内 Python 分析脚本并返回 stdout/stderr/退出码；不允许越界路径",
+       "path:str", _run_analysis_script)
 
     def _search(a):
         from psyclaw.search_router import execute_route, route
@@ -451,6 +534,7 @@ def build_tools(project_dir: str = ".") -> dict:
         # 却拿回 1980 年的经典文献,用户合理地以为「没有新研究」。
         y_from, y_to = _int_or_none(a.get("year_from")), _int_or_none(a.get("year_to"))
         r = litsearch.search(q, sources=srcs, limit=limit, year_from=y_from)
+        record = litsearch.save_search_record(r, project_dir)
         hits = r["results"]
         if y_from or y_to:      # 各源对年份支持不一,统一在结果侧兜一刀,保证约束真生效
             hits = [p for p in hits
@@ -460,9 +544,10 @@ def build_tools(project_dir: str = ".") -> dict:
         head = (f"检索「{q}」{span} · 来源 {r['per_source']} · 去重后 {r['n_deduped']} 条"
                 + (f",年份过滤后 {len(hits)} 条" if (y_from or y_to) else "") + ":")
         if not hits and (y_from or y_to):
-            return (head + f"\n该年份区间内无命中(全库去重后有 {r['n_deduped']} 条)。"
+            return (head + f"\n证据索引: notes/lit_search.json{record.split(' (+', 1)[0]}\n"
+                    + f"该年份区间内无命中(全库去重后有 {r['n_deduped']} 条)。"
                     "放宽年份或换检索式再试——不要据此断定该领域没有新研究。")
-        return _fmt_papers(head, hits[:limit])
+        return _fmt_papers(head, hits[:limit]) + f"\n证据索引: notes/lit_search.json ({record})"
     _t("lit_search",
        "文献检索(OpenAlex/Crossref/EuropePMC 多源,覆盖中英文核心期刊;返回题录+DOI 供下载/滚雪球)",
        "query:str, limit?:int, year_from?:int, year_to?:int, "
@@ -658,11 +743,12 @@ def build_tools(project_dir: str = ".") -> dict:
     except Exception:  # noqa: BLE001
         pass
     # MCP 工具(v0.5 feat-040:已启用+健康的 MCP 服务器工具,mcp__ 前缀,fail-closed)
-    try:
-        from psyclaw.mcp.agent_tools import merge_mcp_tools
-        merge_mcp_tools(tools, project_dir)
-    except Exception:  # noqa: BLE001
-        pass
+    if include_mcp:
+        try:
+            from psyclaw.mcp.agent_tools import merge_mcp_tools
+            merge_mcp_tools(tools, project_dir)
+        except Exception:  # noqa: BLE001
+            pass
     # WebBridge 是显式 opt-in；默认不加载、不启动守护进程。
     try:
         from psyclaw.webbridge import merge_webbridge_tools
@@ -899,22 +985,29 @@ def _short(args: dict, n: int = 60) -> str:
     return s if len(s) <= n else s[:n] + "…"
 
 
-def _exec_tool(call: dict, tools: dict, approve, emit) -> dict:
+def _exec_tool(call: dict, tools: dict, approve, emit, run_state=None,
+               project_dir: str = ".") -> dict:
     from psyclaw.network import redact_secrets
 
     name = call.get("name")
     if not name or call.get("error"):
-        return {"name": name, "ok": False, "output": call.get("error", "缺少工具名")}
+        result = {"name": name, "ok": False, "output": call.get("error", "缺少工具名")}
+        if run_state: run_state.record_receipt(result)
+        return result
     tool = tools.get(name)
     if not tool:
-        return {"name": name, "ok": False,
-                "output": f"未知工具 {name}(可用:{', '.join(tools)})"}
+        result = {"name": name, "ok": False,
+                  "output": f"未知工具 {name}(可用:{', '.join(tools)})"}
+        if run_state: run_state.record_receipt(result)
+        return result
     side_effect = bool(tool["side_effect"])
     if tool["side_effect"]:
         ok = bool(approve(call)) if approve else False
         if not ok:
-            return {"name": name, "ok": False, "side_effect": side_effect,
-                    "output": "用户未批准该副作用工具,已跳过"}
+            result = {"name": name, "ok": False, "side_effect": side_effect,
+                      "output": "用户未批准该副作用工具,已跳过"}
+            if run_state: run_state.record_receipt(result)
+            return result
     if emit:
         emit(f"调用 {name}({_short(call.get('args') or {})})")
     try:
@@ -933,17 +1026,28 @@ def _exec_tool(call: dict, tools: dict, approve, emit) -> dict:
             degraded = False
     except Exception as exc:  # noqa: BLE001  # 单个工具异常不炸循环
         # v0.6 feat-043:异常如实标 ok=False(此前误标 True 掩盖崩溃,模型无从自纠)
-        return {"name": name, "ok": False, "side_effect": side_effect,
-                "output": redact_secrets(f"工具执行异常:{exc}")}
+        result = {"name": name, "ok": False, "side_effect": side_effect,
+                  "output": redact_secrets(f"工具执行异常:{exc}")}
+        if run_state: run_state.record_receipt(result)
+        return result
     rendered = redact_secrets(str(out))[:6000]
     if isinstance(status, dict) and not ok:
-        return {"name": name, "ok": False, "side_effect": side_effect,
-                "degraded": degraded, "output": rendered}
+        result = {"name": name, "ok": False, "side_effect": side_effect,
+                  "degraded": degraded, "output": rendered}
+        if run_state: run_state.record_receipt(result)
+        return result
     if "统计库未安装" in rendered:
-        return {"name": name, "ok": False, "side_effect": side_effect,
-                "degraded": True, "output": rendered}
-    return {"name": name, "ok": True, "side_effect": side_effect,
-            "degraded": degraded, "output": rendered}
+        result = {"name": name, "ok": False, "side_effect": side_effect,
+                  "degraded": True, "output": rendered}
+        if run_state: run_state.record_receipt(result)
+        return result
+    result = {"name": name, "ok": True, "side_effect": side_effect,
+              "degraded": degraded, "output": rendered}
+    if run_state:
+        run_state.record_receipt(result)
+        run_state.add_artifacts(__import__("psyclaw.run_state", fromlist=["infer_artifacts"])
+                                .infer_artifacts(rendered, project_dir))
+    return result
 
 
 def _render_results(results: list[dict]) -> str:
@@ -1102,7 +1206,7 @@ def collect_env_lessons(results: list[dict], seen_keys: set) -> list[dict]:
 def run_tool_loop(provider, system: str, messages: list, tools: dict | None = None,
                   project_dir: str = ".", max_iters: int = 24,
                   approve=None, emit=None, idle_state: dict | None = None,
-                  on_chunk=None, iteration_budget=None) -> dict:
+                  on_chunk=None, iteration_budget=None, run_state=None) -> dict:
     """跑纯工具层循环。返回 {final, iters, stopped, trace, lessons}。
 
     每轮:provider.chat → 解析 tool 块;无块=最终答案;有块=执行(副作用需 approve)→ 回灌 → 续。
@@ -1231,7 +1335,7 @@ def run_tool_loop(provider, system: str, messages: list, tools: dict | None = No
             convo.append({"role": "user", "content": _TRUNC_NUDGE})
             continue
         trunc_streak = 0
-        results = [_exec_tool(c, tools, approve, emit) for c in calls]
+        results = [_exec_tool(c, tools, approve, emit, run_state, project_dir) for c in calls]
         trace.extend(results)
         if idle_state is not None:          # feat-133:被调用组的闲置计数清零(复活)
             for r in results:

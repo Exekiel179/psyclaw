@@ -133,6 +133,44 @@ def _split_inline(text: str) -> list[tuple[str, bool, bool, bool]]:
     return parts or [(text, False, False, False)]
 
 
+def _latex_escape(text: str) -> str:
+    """Escape Markdown text for LaTeX while preserving Unicode prose."""
+    out = str(text)
+    for char, replacement in (("\\", r"\textbackslash{}"), ("&", r"\&"),
+                              ("%", r"\%"), ("$", r"\$"), ("#", r"\#"),
+                              ("_", r"\_"), ("{", r"\{"), ("}", r"\}"),
+                              ("~", r"\textasciitilde{}"), ("^", r"\textasciicircum{}")):
+        out = out.replace(char, replacement)
+    return out
+
+
+def _latex_inline(text: str) -> str:
+    """Convert the small inline Markdown subset used by APA7Document."""
+    tokens: list[str] = []
+
+    def stash(value: str) -> str:
+        tokens.append(value)
+        return f"\x00{len(tokens) - 1}\x00"
+
+    value = re.sub(r"!\[([^]]*)\]\(([^)]+)\)",
+                   lambda m: stash(rf"\href{{{_latex_path(m.group(2))}}}{{{_latex_escape(m.group(1))}}}"),
+                   str(text))
+    value = re.sub(r"\[([^]]+)\]\(([^)]+)\)",
+                   lambda m: stash(rf"\href{{{_latex_path(m.group(2))}}}{{{_latex_escape(m.group(1))}}}"),
+                   value)
+    value = re.sub(r"\*\*(.+?)\*\*", lambda m: stash(rf"\textbf{{{_latex_escape(m.group(1))}}}"), value)
+    value = re.sub(r"\*([^*]+)\*", lambda m: stash(rf"\textit{{{_latex_escape(m.group(1))}}}"), value)
+    value = re.sub(r"`([^`]+)`", lambda m: stash(rf"\texttt{{{_latex_escape(m.group(1))}}}"), value)
+    value = _latex_escape(value)
+    for i, token in enumerate(tokens):
+        value = value.replace(_latex_escape(f"\x00{i}\x00"), token)
+    return value
+
+
+def _latex_path(path: str) -> str:
+    return str(path).replace("\\", "/").replace(" ", r"\ ")
+
+
 # ---------------------------------------------------------------------------
 # 文档模型
 # ---------------------------------------------------------------------------
@@ -223,6 +261,77 @@ class APA7Document:
             for r in sorted(self.references, key=str.lower):
                 out += [r, ""]
         return "\n".join(out)
+
+    def to_latex(self, path: str | Path) -> Path:
+        """Write a UTF-8 XeLaTeX manuscript from the same APA7 document model."""
+        path = Path(path)
+        lines = [
+            r"\documentclass[12pt]{article}",
+            r"\usepackage{fontspec}",
+            r"\usepackage{xeCJK}",
+            r"\usepackage[margin=1in]{geometry}",
+            r"\usepackage{setspace}",
+            r"\usepackage{booktabs}",
+            r"\usepackage{graphicx}",
+            r"\usepackage{hyperref}",
+            r"\setmainfont{Times New Roman}",
+            r"\setCJKmainfont{SimSun}",
+            r"\doublespacing",
+            r"\begin{document}",
+            r"\begin{titlepage}",
+            r"\centering",
+            rf"{{\Large\bfseries {_latex_inline(self.title)}\par}}",
+            r"\vfill",
+        ]
+        for value in (self.authors, self.affiliation, self.course, self.date_str):
+            if value:
+                lines.append(rf"{_latex_inline(value)}\par")
+        lines += [r"\end{titlepage}"]
+        if self.abstract:
+            lines += [r"\begin{abstract}", _latex_inline(self.abstract), r"\end{abstract}"]
+            if self.keywords:
+                lines.append(r"\noindent\textit{Keywords}: " +
+                             "; ".join(_latex_inline(k) for k in self.keywords))
+            lines.append(r"\clearpage")
+        lines.append(rf"\begin{{center}}\textbf{{{_latex_inline(self.title)}}}\end{{center}}")
+        for kind, content in self.blocks:
+            if kind == "p":
+                lines += [_latex_inline(content), ""]
+            elif kind == "pfn":
+                text, footnote_id = content
+                note = self.footnotes[footnote_id - 1] if footnote_id <= len(self.footnotes) else ""
+                lines += [_latex_inline(text) + rf"\footnote{{{_latex_inline(note)}}}", ""]
+            elif kind in {"h1", "h2", "h3"}:
+                command = {"h1": "section", "h2": "subsection", "h3": "subsubsection"}[kind]
+                lines.append(rf"\{command}{{{_latex_inline(content)}}}")
+            elif kind == "table":
+                caption, headers, rows = content
+                lines += [r"\begin{table}[htbp]", r"\centering"]
+                if caption:
+                    lines.append(rf"\caption{{{_latex_inline(caption)}}}")
+                spec = "l" + "c" * max(0, len(headers) - 1)
+                lines.append(rf"\begin{{tabular}}{{{spec}}}")
+                lines.append(r"\toprule")
+                lines.append(" & ".join(_latex_inline(str(v)) for v in headers) + r" \\")
+                lines.append(r"\midrule")
+                for row in rows:
+                    lines.append(" & ".join(_latex_inline(str(v)) for v in row) + r" \\")
+                lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
+            elif kind == "figure":
+                fpath, caption = content
+                lines += [r"\begin{figure}[htbp]", r"\centering",
+                          rf"\includegraphics[width=0.8\textwidth]{{{_latex_path(fpath)}}}"]
+                if caption:
+                    lines.append(rf"\caption{{{_latex_inline(caption)}}}")
+                lines.append(r"\end{figure}")
+        if self.references:
+            lines += [r"\clearpage", r"\section*{References}", r"\begin{hangparas}{0.5in}{1}"]
+            lines.extend(_latex_inline(r) for r in sorted(self.references, key=str.lower))
+            lines.append(r"\end{hangparas}")
+        lines.append(r"\end{document}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
 
     # -- docx 输出 -----------------------------------------------------------
     def to_docx(self, path: str | Path) -> Path:
@@ -427,9 +536,9 @@ _MIN_TABLE_COL_DXA = 480
 
 
 def export_cli(argv: list) -> int:
-    """psyclaw export draft.md [--docx out.docx] [--md out.md]"""
+    """Export one manuscript as Word (default), LaTeX, and Markdown."""
     if not argv:
-        print("用法:psyclaw export <draft.md> [--docx out.docx] [--md out.md]")
+        print("用法:psyclaw export <draft.md> [--format docx|latex] [--docx out.docx] [--latex out.tex] [--md out.md]")
         print("  draft.md 格式:YAML 头(title/authors/affiliation/keywords)+")
         print("  # Abstract / # 标题(#=一级,##=二级)/ # References(每行一条)")
         return 1
@@ -440,10 +549,21 @@ def export_cli(argv: list) -> int:
     parse_md._base_dir = str(src.resolve().parent)   # feat-137:相对图片路径基于 md 目录
     doc = parse_md(src.read_text(encoding="utf-8"))
     parse_md._base_dir = None
+    format_name = argv[argv.index("--format") + 1].lower() if "--format" in argv else "docx"
+    if format_name not in {"docx", "latex"}:
+        print(f"不支持的输出格式:{format_name}(可选:docx|latex)")
+        return 1
     docx_out = Path(argv[argv.index("--docx") + 1]) if "--docx" in argv \
         else src.with_suffix(".apa7.docx")
+    latex_out = Path(argv[argv.index("--latex") + 1]) if "--latex" in argv \
+        else src.with_suffix(".apa7.tex")
     md_out = Path(argv[argv.index("--md") + 1]) if "--md" in argv \
         else src.with_suffix(".apa7.md")
+    if format_name == "latex":
+        doc.to_latex(latex_out)
+        print("LaTeX 输出完成(UTF-8 + XeLaTeX 模板):")
+        print(f"  LaTeX  : {latex_out}")
+        return 0
     doc.to_docx(docx_out)
     md_out.write_text(doc.to_markdown(), encoding="utf-8")
     # A file existing is not sufficient evidence of a usable delivery.  Keep

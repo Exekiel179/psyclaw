@@ -3,6 +3,8 @@
 """
 from __future__ import annotations
 
+import json
+
 from psyclaw.psych import litsearch as ls
 from psyclaw.toolloop import build_tools
 
@@ -23,6 +25,16 @@ def test_lit_search_tool_runs(monkeypatch):
                      "citations": 88}]})
     out = build_tools(".")["lit_search"]["run"]({"query": "公正世界信念"})
     assert "公正世界信念研究" in out and "doi:10.1/x" in out and "被引88" in out
+
+
+def test_lit_search_writes_structured_record(monkeypatch, tmp_path):
+    monkeypatch.setattr(ls, "search", lambda q, **k: {
+        "per_source": {"openalex": 1}, "n_deduped": 1,
+        "results": [{"title": "T", "doi": "10.1/x"}]})
+    out = build_tools(str(tmp_path))["lit_search"]["run"]({"query": "x"})
+    record = tmp_path / "notes" / "lit_search.json"
+    assert record.exists() and "证据索引" in out
+    assert json.loads(record.read_text(encoding="utf-8"))["records"][0]["doi"] == "10.1/x"
 
 
 def test_lit_snowball_tool_runs(monkeypatch):

@@ -17,6 +17,53 @@ if (-not $env:UV_CACHE_DIR) {
   $env:UV_CACHE_DIR = Join-Path $env:LOCALAPPDATA "PsyClaw\uv-cache"
 }
 
+function Show-Banner {
+  Write-Host ""
+  Write-Host "  ██████"
+  Write-Host "  ██  ██"
+  Write-Host "  ████  ██"
+  Write-Host "  ██    ██"
+  Write-Host ""
+  Write-Host "  PsyClaw Installer" -ForegroundColor Cyan
+  Write-Host "  Your research workflow, with evidence at every step."
+  Write-Host ""
+}
+
+function Show-Progress($label, [int]$step, [int]$total) {
+  $width = 32
+  $filled = [Math]::Min($width, [Math]::Max(0, [int](($step / $total) * $width)))
+  $bar = ("#" * $filled) + ("-" * ($width - $filled))
+  Write-Host ("  - {0} [{1}] {2}/{3}" -f $label, $bar, $step, $total) -ForegroundColor DarkCyan
+}
+
+Show-Banner
+$specPreview = if ($Extras) {
+  "psyclaw$Extras @ git+https://github.com/$Repo.git@$Tag"
+} else {
+  "git+https://github.com/$Repo.git@$Tag"
+}
+Write-Host "Install command:" -ForegroundColor DarkGray
+Write-Host "  uv tool install --python >=3.11 --force `"$specPreview`"" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Choose an action:" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  y    Install PsyClaw (default)"
+Write-Host "  n    Do nothing"
+Write-Host ""
+
+$nonInteractive = $env:PSYCLAW_YES -in @("1", "true", "yes", "y")
+if (-not $nonInteractive) {
+  $choice = Read-Host "Install PsyClaw? [Y/n]"
+  if ($choice -and $choice.Trim().ToLowerInvariant() -notin @("y", "yes")) {
+    Write-Host "Nothing changed." -ForegroundColor DarkGray
+    exit 0
+  }
+}
+Write-Host ""
+Write-Host "Will install PsyClaw." -ForegroundColor Green
+Write-Host "This may take a while. Dependencies are installed in an isolated uv tool environment."
+Write-Host ""
+
 function Say($m) { Write-Host "▸ $m" -ForegroundColor Cyan }
 function Ok($m)  { Write-Host "✓ $m" -ForegroundColor Green }
 function Die($m) { Write-Host "✗ $m" -ForegroundColor Red; exit 1 }
@@ -55,6 +102,7 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
   if (-not (Get-Command uv -ErrorAction SilentlyContinue)) { Die "uv 装完但不在 PATH:请重开 PowerShell 后重试" }
 }
 Ok "uv 就绪"
+Show-Progress "uv ready" 1 4
 
 # 3. 安装 psyclaw(官方失败回退镜像)
 function Build-Spec($url) {
@@ -74,15 +122,18 @@ try {
     if ($LASTEXITCODE -ne 0) { Die "安装失败。若缺 Python:先自行装 Python 3.11+(官网/winget),再重试;或手动 uv tool install `"git+$GitUrl@$Tag`"" }
   } else { Die "安装失败。若缺 Python:先自行装 Python 3.11+(官网/winget),再重试;或手动 uv tool install `"git+$GitUrl@$Tag`"" }
 }
+Show-Progress "resolving packages" 2 4
 
 $toolBin = (& uv tool dir --bin 2>$null | Select-Object -Last 1).Trim()
 $toolExe = Join-Path $toolBin "psyclaw.exe"
 if (-not (Test-Path -LiteralPath $toolExe)) { Die "安装完成但找不到 psyclaw 命令:请运行 uv tool update-shell 后重试" }
+Show-Progress "installing PsyClaw" 3 4
 $versionText = (& $toolExe version 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $versionText -notmatch [regex]::Escape($Tag.TrimStart("v"))) {
   Die "安装后版本校验失败: $versionText"
 }
 Ok "PsyClaw $Tag 安装完成 · 版本校验通过"
+Show-Progress "verifying installation" 4 4
 Write-Host "`n下一步:"
 Write-Host "  psyclaw config        # 配 LLM provider / API key"
 Write-Host "  psyclaw new 我的研究   # 建一个按文件夹组织的分析,cd 进去开聊"
