@@ -33,6 +33,12 @@ full = [  # 开箱即用全家桶:统计/可视化/常见社科数据格式 + MC
     "openpyxl>=3.1", "pyreadstat>=1.2", "pyyaml", "rich", "mcp",
     "model2vec",
 ]   # prompt_toolkit 已提为核心依赖,不再列此
+langchain = ["langchain-core>=0.3,<2"]  # 可选适配层;不替换 PsyClaw 执行引擎
+langgraph = ["langchain-core>=0.3,<2", "langgraph>=0.2,<2"]  # 可选图编排入口
+research = [
+    "langchain-core>=0.3,<2", "langgraph>=0.2,<2",
+    "pandas>=2.0", "numpy>=1.22", "scipy>=1.8", "statsmodels>=0.14",
+]  # 研究任务开箱即用环境；分析仍由用户批准后执行
 embed = ["model2vec"]  # 本地语义嵌入(纯 numpy 静态模型);未装时召回用内置哈希向量兜底
 
 [project.scripts]

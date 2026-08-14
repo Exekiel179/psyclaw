@@ -29,6 +29,9 @@ irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
 可选环境变量:`PSYCLAW_CN=1` 强制国内镜像、`PSYCLAW_EXTRAS=""` 裸装、
 `PSYCLAW_EXTRAS=[full]` 更全。默认会顺带装统计栈(`[stats]`),直接可做分析。
 
+Agent 默认使用 LangGraph 编排(`planner → executor → verifier → finisher`)；完整安装请使用
+`PSYCLAW_EXTRAS=[full,langgraph]`，或在已有环境执行 `pip install "psyclaw[langgraph]"`。
+
 <details><summary>手动安装 / 离线分发包</summary>
 
 正式 Release 提供两个独立离线包：
@@ -142,6 +145,7 @@ Skill 只有在 `known/forward/contrast/boundary` 四类验证全部通过、且
 | [TUTORIAL.md](docs/TUTORIAL.md) | 分步教程 |
 | [COMMANDS.md](docs/COMMANDS.md) | 命令地图(`psyclaw commands` 可随时查看) |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构说明(参与开发时看) |
+| [EVALUATION_SYSTEM.md](docs/EVALUATION_SYSTEM.md) | 系统测评维度、评分模型、发布门槛与人工验收 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本变更 |
 
 ---
@@ -165,3 +169,7 @@ claude-code(REPL / 命令 / Tool 抽象)· codex(exec / 审批)· OpenClaw(provi
 AutoResearchClaw(pipeline / skills / MCP)· learn-harness-engineering(harness 工程实践)。
 
 MIT License
+# Architecture
+
+See [`docs/UNIFIED_ARCHITECTURE.md`](docs/UNIFIED_ARCHITECTURE.md) for the
+single execution, capability, policy, evidence, and artifact contract.

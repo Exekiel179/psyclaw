@@ -22,6 +22,21 @@ MAX_PLAN_TASKS = 8
 MAX_WORKERS = 4
 MAX_TASK_ATTEMPTS = 2
 
+
+def _include_mcp_for_task(task_text: str) -> bool:
+    """Avoid probing unrelated MCP servers for ordinary web/data workflows."""
+    text = str(task_text or "").lower()
+    explicit = ("mcp", "mne", "eeg", "spss", "stata", "mplus", "kaggle")
+    return any(word in text for word in explicit)
+
+
+def _build_task_tools(project_dir: str, task_text: str):
+    from psyclaw.toolloop import build_tools
+    try:
+        return build_tools(project_dir, include_mcp=_include_mcp_for_task(task_text))
+    except TypeError:  # compatibility with injected/test builders
+        return build_tools(project_dir)
+
 _PLANNER_SYSTEM = """
 # 角色：Planner（只规划，不执行）
 你不能调用工具、写文件或声称已经执行。把用户目标拆成一个有向无环任务图，只输出一个 JSON 对象：
@@ -33,7 +48,7 @@ _PLANNER_SYSTEM = """
       "depends_on": [],
       "mainline": true,
       "parallel_safe": false,
-      "owned_paths": ["outputs/example.md"],
+      "owned_paths": ["deliverables/example.md"],
       "required": true,
       "completion": {
         "required_tools": [],
@@ -48,6 +63,9 @@ _PLANNER_SYSTEM = """
 - mainline 表示关键路径；至多一个当前无依赖任务设为 true。
 - 只有任务彼此独立且写入路径明确、互不重叠时才设 parallel_safe=true。
 - 需要执行、检索、读取或写文件的任务必须 allow_reasoning_only=false，并填写工具/产物条件。
+- 不要把“规划检索/规划下载/规划分析”当成执行任务；用户要求连续流程时，每个节点必须实际执行对应工具，
+  只有用户明确要求“制定计划”时才创建纯计划任务。
+- 连续流程最多拆成 5 个执行节点；澄清只在缺少关键输入且无法安全推断时创建。
 - owned_paths 只能是项目内相对路径。信息不足且必须由人决策时，创建一个不可执行的澄清任务。
 - 最多 8 个任务。不要输出 JSON 之外的解释。
 """.strip()
@@ -190,8 +208,64 @@ def _parse_plan_status(text: str, fallback_objective: str = "") -> tuple[list[Ta
             objective = str(raw.get("objective") or "").strip()
             if not objective:
                 raise ValueError(f"task {task_id} has no objective")
+            # Models often prefix executable steps with “规划”, accidentally
+            # turning a requested action chain into a plan-writing chain.
+            # Normalize those steps to execution while retaining the DAG.
+            if objective.startswith(("规划", "计划")) and any(
+                    word in objective for word in ("检索", "下载", "分析", "写", "质检", "生成")):
+                objective = re.sub(r"^(规划|计划)(并|：|:)?", "执行", objective, count=1)
             owned = tuple(filter(None, (_safe_relative_path(v)
                                         for v in _string_tuple(raw.get("owned_paths")))))
+            completion = _completion(raw.get("completion"))
+            # Keep the contract executable when a model omits the tool fields.
+            # These are deterministic mappings to the built-in tool surface.
+            inferred_tools = list(completion.required_tools)
+            # Do not require a download receipt merely because the objective
+            # mentions data that was downloaded by a dependency task.
+            explicit_download = (objective.startswith(("下载", "执行下载", "获取"))
+                                 or "使用 open_data_download" in objective
+                                 or "调用 open_data_download" in objective)
+            if not explicit_download:
+                inferred_tools = [name for name in inferred_tools
+                                  if name != "open_data_download"]
+            if "检索" in objective and "lit_search" not in inferred_tools:
+                inferred_tools.append("lit_search")
+            explicit_download = (objective.startswith(("下载", "执行下载", "获取"))
+                                 or "使用 open_data_download" in objective
+                                 or "调用 open_data_download" in objective)
+            if explicit_download and "lit_download" not in inferred_tools:
+                inferred_tools.append("lit_download")
+            if any(word in objective for word in ("写入", "保存", "导出")) \
+                    and "save_file" not in inferred_tools:
+                inferred_tools.append("save_file")
+            if inferred_tools:
+                if "open_data_download" in inferred_tools:
+                    inferred_tools = [name for name in inferred_tools
+                                      if name not in {"lit_download", "download_dataset", "save_file"}]
+                completion = CompletionContract(
+                    required_tools=tuple(inferred_tools),
+                    required_artifacts=completion.required_artifacts,
+                    min_successful_tool_calls=max(1, completion.min_successful_tool_calls),
+                    allow_reasoning_only=False,
+                )
+            # open_data_download writes its CSV atomically; requiring a second
+            # save_file receipt for the same download is redundant and causes
+            # otherwise valid download nodes to fail closed.
+            if "open_data_download" in completion.required_tools:
+                completion = CompletionContract(
+                    required_tools=tuple(name for name in completion.required_tools
+                                         if name != "save_file"),
+                    required_artifacts=completion.required_artifacts,
+                    min_successful_tool_calls=completion.min_successful_tool_calls,
+                    allow_reasoning_only=False,
+                )
+            if any(word in objective for word in ("下载", "导出", "分析", "写入", "保存", "检索", "生成")):
+                completion = CompletionContract(
+                    required_tools=completion.required_tools,
+                    required_artifacts=completion.required_artifacts,
+                    min_successful_tool_calls=max(1, completion.min_successful_tool_calls),
+                    allow_reasoning_only=False,
+                )
             tasks.append(TaskSpec(
                 id=task_id,
                 objective=objective,
@@ -200,23 +274,38 @@ def _parse_plan_status(text: str, fallback_objective: str = "") -> tuple[list[Ta
                 parallel_safe=bool(raw.get("parallel_safe", False)) and bool(owned),
                 owned_paths=owned,
                 required=bool(raw.get("required", True)),
-                completion=_completion(raw.get("completion")),
+                completion=completion,
             ))
         known = {task.id for task in tasks}
         if any(dep not in known or dep == task.id for task in tasks for dep in task.depends_on):
             raise ValueError("task plan has an unknown/self dependency")
-        if sum(task.mainline for task in tasks) > 1:
-            raise ValueError("task plan has multiple mainline tasks")
+        # 模型常把所有首层任务都标成 mainline。它们并不构成安全错误，
+        # 但会让调度器无法确定关键路径，进而整份计划降级为单任务 fallback。
+        # 保留任务图，只确定性地选第一个无依赖任务作为主线；其他任务仍可
+        # 按依赖和 owned_paths 规则执行/并行。
+        mainlines = [task for task in tasks if task.mainline]
+        if len(mainlines) > 1:
+            preferred = next((task for task in mainlines if not task.depends_on),
+                             mainlines[0])
+            tasks = [
+                TaskSpec(**{**asdict(task), "completion": task.completion,
+                            "mainline": task.id == preferred.id})
+                for task in tasks
+            ]
+            normalized = f"normalized {len(mainlines)} mainline tasks to {preferred.id}"
+        else:
+            normalized = ""
         if not any(task.mainline for task in tasks):
             first = tasks[0]
             tasks[0] = TaskSpec(**{**asdict(first), "completion": first.completion,
                                    "mainline": True})
         _assert_acyclic(tasks)
-        return tasks, {"ok": True, "fallback": False, "reason": ""}
+        return tasks, {"ok": True, "fallback": False, "reason": "",
+                       "warning": normalized}
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
         objective = fallback_objective.strip() or "回答用户当前问题"
         return [TaskSpec(id="main", objective=objective, mainline=True)], {
-            "ok": False, "fallback": True, "reason": str(exc)
+            "ok": False, "fallback": True, "reason": str(exc), "warning": ""
         }
 
 
@@ -241,6 +330,24 @@ def plan_tasks(provider, task: str, context: list[dict] | None = None,
                + ", ".join(available_tools)) if available_tools else ""
     reply = "".join(provider.chat(messages, system=_PLANNER_SYSTEM + catalog))
     tasks, status = _parse_plan_status(reply, task)
+    # Domain-specific tool aliases: public-data tasks must use the bounded
+    # World Bank adapter, never the literature PDF downloader.
+    if any(word in task.lower() for word in ("world bank", "开放数据", "公开数据", "open data")):
+        normalized_tasks = []
+        for item in tasks:
+            if any(word in item.objective.lower() for word in ("下载", "数据", "指标")):
+                contract = item.completion
+                tools = tuple("open_data_download" if name in {"lit_download", "download_dataset"}
+                              else name for name in contract.required_tools)
+                if "open_data_download" not in tools:
+                    tools = tools + ("open_data_download",)
+                contract = CompletionContract(
+                    required_tools=tools, required_artifacts=contract.required_artifacts,
+                    min_successful_tool_calls=max(1, contract.min_successful_tool_calls),
+                    allow_reasoning_only=False)
+                item = TaskSpec(**{**asdict(item), "completion": contract})
+            normalized_tasks.append(item)
+        tasks = normalized_tasks
     return tasks, reply, status
 
 
@@ -312,6 +419,11 @@ def verify_task(task: TaskSpec, run: dict, project_dir: str = ".") -> tuple[bool
             f"成功工具调用不足:{len(successful)}/{task.completion.min_successful_tool_calls}")
     if not task.completion.allow_reasoning_only and not successful:
         reasons.append("任务要求实际执行，但没有成功工具回执")
+    # 关键动作不能靠语言承诺完成。即使 Planner 漏填 completion 契约，
+    # 这些目标也必须至少有一次真实工具回执；写入/下载/导出还会继续检查产物。
+    action_words = ("下载", "导出", "分析", "写入", "保存", "检索", "生成")
+    if any(word in task.objective for word in action_words) and not successful:
+        reasons.append("关键动作缺少真实工具回执(禁止只用 reasoning 宣称完成)")
     root = Path(project_dir).resolve()
     for relative in task.completion.required_artifacts:
         artifact = (root / relative).resolve()
@@ -368,7 +480,21 @@ class Scheduler:
                 ready = [task for task in pending.values() if set(task.depends_on) <= passed]
                 if not ready:
                     if pending:
-                        raise RuntimeError("scheduler cannot make progress")
+                        # Fail closed: a malformed/runtime-mutated dependency graph
+                        # must become auditable blocked results, not crash the whole run.
+                        for task in list(pending.values()):
+                            unresolved = sorted(set(task.depends_on) - passed - failed)
+                            reason = ("依赖任务未产生可用验收结果"
+                                      + (f": {', '.join(unresolved)}" if unresolved else ""))
+                            results[task.id] = TaskResult(
+                                task=task,
+                                run={"final": "", "trace": [], "lessons": [],
+                                     "stopped": "blocked", "iters": 0},
+                                passed=False, reasons=[reason],
+                                thread_id=threading.get_ident())
+                            failed.add(task.id)
+                            pending.pop(task.id, None)
+                        self._say("scheduler blocked unresolved dependency tasks")
                     break
                 main = next((task for task in ready if task.mainline), ready[0])
                 children: list[TaskSpec] = []
@@ -404,20 +530,48 @@ class Scheduler:
 
 
 def _task_prompt(task: TaskSpec, dependency_results: dict[str, TaskResult],
-                 verification_feedback: list[str] | None = None) -> str:
+                 verification_feedback: list[str] | None = None,
+                 conversation_context: list[dict] | None = None) -> str:
     from psyclaw.network import redact_secrets
 
-    deps = {
-        task_id: result.run.get("final", "")
-        for task_id, result in dependency_results.items() if task_id in task.depends_on
-    }
+    deps = {}
+    for task_id, result in dependency_results.items():
+        if task_id not in task.depends_on:
+            continue
+        deps[task_id] = {
+            "passed": result.passed,
+            "final": result.run.get("final", ""),
+            "stopped": result.run.get("stopped", ""),
+            "receipts": [
+                {"name": item.get("name"), "ok": item.get("ok"),
+                 "output": item.get("output", "")[:1000]}
+                for item in result.run.get("trace", [])
+            ],
+            "reasons": result.reasons,
+        }
+    # 后续动作（“下载刚才那些”“导出上面的结果”）依赖上一轮的题录/结论。
+    # Executor 是独立 provider，不能只收到当前 TaskSpec，否则会把续接请求
+    # 错当成无上下文的新任务。只带最近 6 条消息并限长，避免复制整个会话。
+    context = []
+    for message in (conversation_context or [])[-6:]:
+        role = str(message.get("role") or "user")
+        content = redact_secrets(str(message.get("content") or ""))
+        if len(content) > 3000:
+            content = content[:3000] + "\n...(该轮已截断)"
+        context.append({"role": role, "content": content})
     payload = {
         "task": asdict(task),
         "dependency_results": deps,
         "previous_verification_failures": verification_feedback or [],
+        "conversation_context": context,
     }
-    return "执行以下结构化任务：\n" + redact_secrets(
-        json.dumps(payload, ensure_ascii=False, indent=2))
+    return ("执行以下结构化任务。conversation_context 是当前会话的真实上下文；"
+            "若任务是‘继续/下载/导出/处理上面的结果’，必须优先复用其中已确认的题录、"
+            "路径和工具回执，不要重新询问已经明确的信息。"
+            "previous_verification_failures 是上一次尝试的机器验收结果；"
+            "若其中指出缺少必需工具回执或产物，下一次尝试必须先调用该工具并写出该产物，"
+            "不要继续只读文件或重复已经成功的副作用操作：\n" + redact_secrets(
+                json.dumps(payload, ensure_ascii=False, indent=2)))
 
 
 def run_planned_agent(
@@ -429,6 +583,8 @@ def run_planned_agent(
     from psyclaw.toolloop import build_tools, run_tool_loop
     from psyclaw.network import redact_secrets
 
+    from psyclaw.run_state import RunState
+
     approval_lock = threading.Lock()
     emit_lock = threading.Lock()
     result_lock = threading.Lock()
@@ -438,6 +594,8 @@ def run_planned_agent(
 
     task_text = next((str(message.get("content") or "") for message in reversed(messages)
                       if message.get("role") == "user"), "")
+    run_state = RunState.load(project_dir, goal=task_text, conversation=messages)
+    run_state.add_pending(task_text)
 
     def provider_allowed(provider, role: str) -> bool:
         source = source_provider or planner_provider
@@ -472,7 +630,7 @@ def run_planned_agent(
             "lessons": [], "plan": [], "planner_reply": "", "task_results": {},
         }
 
-    available_tools = tuple(build_tools(project_dir))
+    available_tools = tuple(_build_task_tools(project_dir, task_text))
     tasks, planner_reply, planner_status = plan_tasks(
         planner_provider, task_text, messages, available_tools=available_tools)
     if executor_factory is None:
@@ -494,6 +652,8 @@ def run_planned_agent(
     safe_emit(f"plan: {len(tasks)} tasks · workers={max(1, min(max_workers, MAX_WORKERS))}")
     if planner_status.get("fallback"):
         safe_emit(f"planner fallback: {planner_status.get('reason', 'unknown')}")
+    elif planner_status.get("warning"):
+        safe_emit(f"planner normalized: {planner_status['warning']}")
 
     def execute(task: TaskSpec) -> TaskResult:
         feedback: list[str] = []
@@ -520,7 +680,7 @@ def run_planned_agent(
                 history.append(last_run)
                 feedback = ["Executor Provider 属于不同信任域，未获确认"]
                 break
-            tools = build_tools(project_dir)
+            tools = _build_task_tools(project_dir, task_text)
 
             def task_approve(call: dict) -> bool:
                 if (task.parallel_safe and call.get("name") != "save_file"):
@@ -538,13 +698,13 @@ def run_planned_agent(
 
             with result_lock:
                 dependency_snapshot = dict(accumulated)
-            prompt = _task_prompt(task, dependency_snapshot, feedback)
+            prompt = _task_prompt(task, dependency_snapshot, feedback, messages)
             last_run = run_tool_loop(
                 provider, redact_secrets(system) + "\n\n" + _EXECUTOR_SYSTEM,
                 [{"role": "user", "content": prompt}], tools=tools,
                 project_dir=project_dir, max_iters=max_iters,
                 approve=task_approve, emit=lambda event: safe_emit(f"{task.id}: {event}"),
-                iteration_budget=take_iteration)
+                iteration_budget=take_iteration, run_state=run_state)
             history.append(last_run)
             passed, reasons = verify_task(task, last_run, project_dir)
             if passed:
@@ -622,6 +782,7 @@ def run_planned_agent(
         "planner_reply": planner_reply,
         "planner_fallback": bool(planner_status.get("fallback")),
         "planner_parse_error": planner_status.get("reason", ""),
+        "planner_warning": planner_status.get("warning", ""),
         "task_results": {task_id: result.public()
                          for task_id, result in accumulated.items()},
     }

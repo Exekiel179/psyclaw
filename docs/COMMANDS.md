@@ -32,7 +32,7 @@
 | `skills` / `mcp` | 列出 skills(内置 + 发现 `.claude/skills`/`PSYCLAW_SKILLS_PATH`;`--for <研究类型>` 按类型推荐)/ MCP 目录(内置 registry + 用户 `.psyclaw/mcp.yaml` 项目/全局)——**均标注 内置/用户·项目/用户·全局**；`mcp --setup kaggle` 配置 Kaggle 数据 MCP，`--access-token-file <文件>` 可导入新版 `KGAT_...` Token |
 | `plugins` | 列出插件(用户 项目 `.psyclaw/plugins/` / 全局 `~/.psyclaw/plugins/`;`register(api)` 注册 agent 工具 / REPL 命令 / system 片段) |
 | `gates` | 质量规则系统自检(高级兼容命令;实际稿件用 `check`) |
-| `eval` | **确定性离线评测**(v0.12):编排/质量检查/自学习契约的端到端 scorecard(6 用例 28 检查,不调 LLM/不联网/无统计库);`--case` 选用例、`--json` 机器可读;报告落 `.psyclaw/eval_report.json`,有失败退出码 1 |
+| `eval` | **确定性离线评测**(v0.12):编排/质量检查/自学习契约的端到端 scorecard(6 用例 28 检查,不调 LLM/不联网/无统计库);`--case` 选用例、`--json` 机器可读;报告落 `deliverables/eval_report.json`,有失败退出码 1 |
 | `commands` | 按职能分类列出全部命令 |
 | `status` | **一屏项目态势**:目标/澄清/回路/等人决策(直接打印内容)/最近产物/下一步建议 |
 
