@@ -54,7 +54,7 @@ def test_save_unknown_type_no_hint(tmp_path, monkeypatch):
 def test_lean_core_mentions_placement_convention():
     from psyclaw.context import LEAN_CORE_BUDGET, lean_core
     core = lean_core()
-    assert "outputs/" in core and "figures/" in core and "scripts/" in core
+    assert "deliverables/" in core and "figures/" in core and "analysis/" in core
     assert "显式" in core or "为准" in core            # 用户显式指定优先
     assert len(core) <= LEAN_CORE_BUDGET
 

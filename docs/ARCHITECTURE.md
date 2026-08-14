@@ -160,3 +160,9 @@ Skill 晋升采用 fail-closed：必须存在带来源的 `verified` claim，并
 `side_effect=True`，由 Agent loop 的审批层 fail-closed。路径解析限制在项目根目录内，并额外禁止
 `data/raw`、`.git` 和 `.psyclaw`。同名 CLI 仅供人类调试，已从 CLI 自动工具化列表排除，避免 Agent
 同时看到两套接口。
+# Unified architecture
+
+The canonical architecture and migration ownership map now lives in
+[`UNIFIED_ARCHITECTURE.md`](UNIFIED_ARCHITECTURE.md). This document retains
+module-level implementation details; new execution, artifact, policy, and
+evidence decisions must follow the unified contract first.

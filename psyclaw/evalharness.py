@@ -3,7 +3,7 @@
 评的是 psyclaw 自身的**编排 / 质量检查 / 自学习契约**是否仍然成立——不调 LLM、
 不联网、不依赖统计库(统计外移铁律),全部用例离线秒级可复跑,结果确定。
 pytest 保证"函数各自正确",eval harness 保证"关键链路端到端仍守约",
-且产出结构化 scorecard 供发布评估 / 回归对比。
+且产出结构化 scorecard 供版本评估 / 回归对比。
 
 用法:
     python -m psyclaw eval                       # 全部用例
@@ -12,7 +12,7 @@ pytest 保证"函数各自正确",eval harness 保证"关键链路端到端仍�
 
 每个用例 = 函数 `case_<id>(tmp: Path) -> list[check]`,check 为
 {name, passed, detail};run_evals 汇总 scorecard 并由 CLI 落
-<项目>/.psyclaw/eval_report.json。新增用例:写函数并注册进 CASES。
+<项目>/deliverables/eval_report.json。新增用例:写函数并注册进 CASES。
 用例自身崩溃 → 记为失败 check(fail-closed),绝不静默跳过。
 """
 
@@ -26,6 +26,34 @@ from pathlib import Path
 
 def _check(name: str, passed: bool, detail: str = "") -> dict:
     return {"name": name, "passed": bool(passed), "detail": detail}
+
+
+def validate_agent_case_spec(spec: dict) -> tuple[bool, list[str]]:
+    """Reject single-turn tasks from the agent-capability benchmark.
+
+    A text-only answer can test a model, but it cannot test orchestration.
+    Effective cases must exercise at least two model decisions plus evidence
+    and verification/recovery.
+    """
+    reasons: list[str] = []
+    try:
+        if int(spec.get("min_model_turns", 0)) < 2:
+            reasons.append("min_model_turns must be >= 2")
+    except (TypeError, ValueError):
+        reasons.append("min_model_turns must be an integer")
+    try:
+        if int(spec.get("min_tool_calls", 0)) < 1:
+            reasons.append("min_tool_calls must be >= 1")
+    except (TypeError, ValueError):
+        reasons.append("min_tool_calls must be an integer")
+    if not spec.get("requires_verification", False):
+        reasons.append("requires_verification must be true")
+    checks = spec.get("checks")
+    if not isinstance(checks, list) or len(checks) < 2:
+        reasons.append("at least two orchestration checks are required")
+    if not spec.get("expected_tools"):
+        reasons.append("expected_tools is required")
+    return not reasons, reasons
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +415,231 @@ def case_delivery_contract(tmp: Path) -> list[dict]:
     return checks
 
 
+def case_continuous_tasks(tmp: Path) -> list[dict]:
+    """连续任务契约：检索→下载、分析→写方法、生成→质检。"""
+    from psyclaw.agent_runtime import CompletionContract, TaskSpec, verify_task
+    from psyclaw.psych.litsearch import save_search_record
+    checks: list[dict] = []
+
+    record = save_search_record({"query": "fixture", "results": [
+        {"title": "Fixture paper", "doi": "10.1000/fixture"}]}, tmp)
+    checks.append(_check("连续链:检索产出可供下载复用",
+                         (tmp / "notes" / "lit_search.json").is_file()
+                         and "lit_search.json" in record))
+    download = TaskSpec("download", "下载检索到的论文",
+                        completion=CompletionContract(
+                            required_tools=("lit_download",),
+                            required_artifacts=("outputs/pdfs/fixture.pdf",),
+                            min_successful_tool_calls=1,
+                            allow_reasoning_only=False))
+    (tmp / "outputs" / "pdfs").mkdir(parents=True)
+    (tmp / "outputs" / "pdfs" / "fixture.pdf").write_bytes(b"%PDF fixture")
+    ok, reasons = verify_task(download, {
+        "stopped": "answered", "final": "已下载",
+        "trace": [{"name": "lit_download", "ok": True}],
+    }, str(tmp))
+    checks.append(_check("连续链:下载必须有工具回执和真实 PDF", ok, str(reasons)))
+
+    method = TaskSpec("method", "写方法部分",
+                      completion=CompletionContract(
+                          required_tools=("save_file",),
+                          required_artifacts=("outputs/method.md",),
+                          min_successful_tool_calls=1,
+                          allow_reasoning_only=False))
+    checks.append(_check("连续链:分析→写方法缺产物时不算完成",
+                         not verify_task(method, {
+                             "stopped": "answered", "final": "已写方法", "trace": [
+                                 {"name": "save_file", "ok": True}]}, str(tmp))[0]))
+    checks.append(_check("连续链:生成→质检拒绝纯文字宣称",
+                         not verify_task(TaskSpec("check", "生成并质检报告"), {
+                             "stopped": "answered", "final": "已完成", "trace": []}, str(tmp))[0]))
+    return checks
+
+
+def case_langgraph_path(tmp: Path) -> list[dict]:
+    """LangGraph 真路径：四节点实际运行，共享 RunState，未调用 legacy 入口。"""
+    from psyclaw.langgraph_runtime import run_langgraph_agent
+    checks: list[dict] = []
+
+    class Provider:
+        name = "eval"
+        base_url = ""
+        api_key = "test"
+        last_stop_reason = ""
+
+        def __init__(self, role="executor"):
+            self.role = role
+
+        def chat(self, messages, system=""):
+            if "Planner" in system:
+                yield json.dumps({"tasks": [{"id": "answer", "objective": "回答问题",
+                                               "mainline": True}]})
+            elif "Finisher" in system or "只汇总" in system:
+                yield "已根据验收结果汇总。"
+            else:
+                yield "执行任务完成。"
+
+    result = run_langgraph_agent(
+        Provider("planner"), "系统", [{"role": "user", "content": "回答问题"}],
+        executor_factory=lambda: Provider("executor"),
+        finisher_provider=Provider("writer"), project_dir=str(tmp),
+        max_iters=4, max_workers=1, approve=lambda _call: True)
+    checks.append(_check("LangGraph:四节点真实执行", result.get("backend") == "langgraph"
+                         and result.get("graph_nodes") == ["planner", "executor", "verifier", "finisher"],
+                         str(result.get("graph_nodes"))))
+    checks.append(_check("LangGraph:任务经 Verifier 验收后才汇总",
+                         result.get("stopped") == "completed"
+                         and result.get("task_results", {}).get("answer", {}).get("passed") is True))
+    state = json.loads((tmp / ".psyclaw" / "run_state.json").read_text(encoding="utf-8"))
+    checks.append(_check("LangGraph:四节点共享同一 RunState",
+                         state.get("goal") == "回答问题"
+                         and state.get("schema") == "psyclaw-run-state/v1"))
+    return checks
+
+
+def case_agent_capability_multiturn(tmp: Path) -> list[dict]:
+    """有效智能体题：规划→工具→回灌→验收→依赖核验。"""
+    from psyclaw.langgraph_runtime import run_langgraph_agent
+    checks: list[dict] = []
+
+    class Provider:
+        name = "agent-capability-eval"
+        base_url = ""
+        api_key = "test"
+        last_stop_reason = ""
+
+        def __init__(self, role="executor"):
+            self.role = role
+            self.turns = 0
+            self.recovered = False
+            self.saved = False
+
+        def chat(self, messages, system=""):
+            self.turns += 1
+            if "Planner" in system:
+                yield json.dumps({"tasks": [
+                    {"id": "collect", "objective": "读取输入并保存证据",
+                     "mainline": True, "owned_paths": ["outputs/evidence.md"],
+                     "completion": {"required_tools": ["save_file"],
+                                    "required_artifacts": ["outputs/evidence.md"],
+                                    "min_successful_tool_calls": 1,
+                                    "allow_reasoning_only": False}},
+                    {"id": "verify", "objective": "核验产物目录",
+                     "depends_on": ["collect"],
+                     "completion": {"required_tools": ["list_dir"],
+                                    "min_successful_tool_calls": 1,
+                                    "allow_reasoning_only": False}},
+                ]})
+                return
+            if "Finisher" in system or "只汇总" in system:
+                yield "已根据工具回执和验收结果完成交接。"
+                return
+            prompt = str(messages[-1].get("content", ""))
+            if "读取输入并保存证据" in prompt and "工具结果" not in prompt:
+                yield ('```tool\n{"name":"save_file","args":{"path":"outputs/evidence.md",'
+                       '"content":"fixture evidence"}}\n```')
+            elif "核验产物目录" in prompt and "工具结果" not in prompt:
+                yield '```tool\n{"name":"list_dir","args":{"path":"outputs"}}\n```'
+            else:
+                yield "已依据最新工具回执完成本步骤。"
+
+    planner = Provider("planner")
+    executors: list[Provider] = []
+
+    def factory():
+        provider = Provider("executor")
+        executors.append(provider)
+        return provider
+
+    result = run_langgraph_agent(
+        planner, "系统", [{"role": "user", "content": "完成证据收集并核验"}],
+        executor_factory=factory, finisher_provider=Provider("writer"),
+        source_provider=planner, project_dir=str(tmp), max_iters=4, max_workers=1,
+        approve=lambda _call: True)
+    results = result.get("task_results", {})
+    checks.append(_check("智能体:至少两步依赖任务均通过",
+                         result.get("stopped") == "completed"
+                         and all(item.get("passed") for item in results.values())))
+    checks.append(_check("智能体:每个执行器经历工具回灌后的第二轮决策",
+                         len(executors) == 2 and all(p.turns >= 2 for p in executors),
+                         str([p.turns for p in executors])))
+    checks.append(_check("智能体:工具回执和真实产物存在",
+                         [item.get("name") for item in result.get("trace", [])]
+                         == ["save_file", "list_dir"]
+                         and (tmp / "outputs" / "evidence.md").is_file()))
+    checks.append(_check("智能体:下游任务收到上游验收结果",
+                         "collect" in str(results["verify"].get("task", {}))
+                         and results["verify"].get("passed") is True))
+    return checks
+
+
+def case_agent_capability_recovery(tmp: Path) -> list[dict]:
+    """有效智能体题：工具失败回灌→换策略→真实产物验收。"""
+    from psyclaw.langgraph_runtime import run_langgraph_agent
+    checks: list[dict] = []
+
+    class Provider:
+        name = "agent-recovery-eval"
+        base_url = ""
+        api_key = "test"
+        last_stop_reason = ""
+
+        def __init__(self, role="executor"):
+            self.role = role
+            self.turns = 0
+
+        def chat(self, messages, system=""):
+            self.turns += 1
+            if "Planner" in system:
+                yield json.dumps({"tasks": [{
+                    "id": "recover", "objective": "创建并核验恢复报告",
+                    "mainline": True, "owned_paths": ["outputs/recovery.md"],
+                    "completion": {"required_tools": ["list_dir"],
+                                   "required_artifacts": ["outputs/recovery.md"],
+                                   "min_successful_tool_calls": 1,
+                                   "allow_reasoning_only": False},
+                }]})
+                return
+            if "Finisher" in system or "只汇总" in system:
+                yield "已依据恢复后的验收结果汇总。"
+                return
+            prompt = str(messages[-1].get("content", ""))
+            if self.turns == 1:
+                yield '```tool\n{"name":"missing_tool","args":{}}\n```'
+            elif "工具结果" in prompt and "失败" in prompt:
+                self.recovered = True
+                self.saved = True
+                yield ('```tool\n{"name":"save_file","args":{"path":"outputs/recovery.md",'
+                       '"content":"recovered"}}\n```')
+            elif self.saved and "save_file" in prompt and "list_dir" not in prompt:
+                yield '```tool\n{"name":"list_dir","args":{"path":"outputs"}}\n```'
+            elif self.recovered and "list_dir" in prompt:
+                yield "已核验恢复报告并完成本步骤。"
+            else:
+                yield '```tool\n{"name":"list_dir","args":{"path":"outputs"}}\n```'
+
+    executor = Provider("executor")
+    planner = Provider("planner")
+    result = run_langgraph_agent(
+        planner, "系统", [{"role": "user", "content": "完成恢复报告并核验"}],
+        executor_factory=lambda: executor, finisher_provider=Provider("writer"),
+        source_provider=planner, project_dir=str(tmp), max_iters=5, max_workers=1,
+        approve=lambda _call: True)
+    trace = result.get("trace", [])
+    checks.append(_check("智能体恢复:失败回执后继续决策", executor.turns >= 3
+                         and any(item.get("ok") is False for item in trace)))
+    checks.append(_check("智能体恢复:换用工具并完成验收",
+                         result.get("stopped") == "completed"
+                         and result.get("task_results", {}).get("recover", {}).get("passed") is True))
+    checks.append(_check("智能体恢复:真实产物存在",
+                         (tmp / "outputs" / "recovery.md").is_file()
+                         and (tmp / "outputs" / "recovery.md").read_text(encoding="utf-8").strip() == "recovered"))
+    checks.append(_check("智能体恢复:失败工具未被无意义重复调用",
+                         [item.get("name") for item in trace].count("missing_tool") == 1,
+                         str([item.get("name") for item in trace])))
+    return checks
+
+
 # ---------------------------------------------------------------------------
 # 注册表 + 运行器
 # ---------------------------------------------------------------------------
@@ -406,7 +659,50 @@ CASES: dict = {
                             "toolloop:失败回灌教训;重复止损;副作用需批准"),
     "delivery_contract": (case_delivery_contract,
                           "交付:确定性 DOCX、资料编译/交接审计、两入口路由"),
+    "continuous_tasks": (case_continuous_tasks,
+                          "连续任务:检索→下载、分析→写方法、生成→质检"),
+    "langgraph_path": (case_langgraph_path,
+                        "LangGraph:planner/executor/verifier/finisher 真路径"),
+    "agent_capability_multiturn": (case_agent_capability_multiturn,
+                                    "智能体能力:多轮工具回灌/依赖/验收"),
+    "agent_capability_recovery": (case_agent_capability_recovery,
+                                   "智能体能力:失败回灌/换策略/产物验收"),
 }
+
+# 面向发布的测评元数据。单项用例仍保持原有契约；元数据只负责把
+# 回归结果聚合成可解释的质量维度，不把“测试通过率”冒充真实研究效果。
+CASE_DIMENSIONS: dict[str, dict[str, object]] = {
+    "analysis_pipeline": {"dimension": "研究编排", "weight": 1.2},
+    "meta_pipeline": {"dimension": "研究编排", "weight": 1.2},
+    "lit_screen": {"dimension": "证据与文献", "weight": 1.0},
+    "gates_enforcement": {"dimension": "学术规范", "weight": 1.5},
+    "error_learning": {"dimension": "可靠性", "weight": 1.0},
+    "toolloop_discipline": {"dimension": "安全与可控", "weight": 1.5},
+    "delivery_contract": {"dimension": "交付与复现", "weight": 1.0},
+    "continuous_tasks": {"dimension": "可靠性", "weight": 1.5},
+    "langgraph_path": {"dimension": "LangGraph 路径", "weight": 2.0},
+    "agent_capability_multiturn": {"dimension": "智能体能力", "weight": 2.0},
+    "agent_capability_recovery": {"dimension": "智能体能力", "weight": 2.0},
+}
+
+
+def _score_dimensions(cases: dict) -> dict:
+    """按用例权重聚合维度分数；缺失/崩溃按 0 分处理。"""
+    grouped: dict[str, dict[str, float]] = {}
+    for cid, result in cases.items():
+        meta = CASE_DIMENSIONS.get(cid, {"dimension": "未分类", "weight": 1.0})
+        dim = str(meta["dimension"])
+        weight = float(meta["weight"])
+        bucket = grouped.setdefault(dim, {"earned": 0.0, "possible": 0.0})
+        bucket["earned"] += result["passed"] * weight
+        bucket["possible"] += result["total"] * weight
+    out = {}
+    for dim, vals in grouped.items():
+        ratio = vals["earned"] / vals["possible"] if vals["possible"] else 0.0
+        out[dim] = {"score": round(ratio * 100, 2),
+                    "passed": int(vals["earned"]),
+                    "total": int(vals["possible"])}
+    return out
 
 
 def run_evals(case_ids: list[str] | None = None) -> dict:
@@ -433,8 +729,16 @@ def run_evals(case_ids: list[str] | None = None) -> dict:
                       "passed": ok, "total": len(checks)}
         total += len(checks)
         passed_n += ok
+    dimensions = _score_dimensions(cases)
+    score = round((passed_n / total) * 100, 2) if total else 0.0
+    # 发布门槛：总分 >= 90，且学术规范/安全与可控两个关键维度不能失守。
+    critical_ok = all(dimensions.get(d, {}).get("score", 0) >= 90
+                       for d in ("学术规范", "安全与可控", "LangGraph 路径"))
     return {"cases": cases, "total": total, "passed": passed_n,
-            "failed": total - passed_n, "all_passed": passed_n == total}
+            "failed": total - passed_n, "all_passed": passed_n == total,
+            "score": score, "dimensions": dimensions,
+            "release_verdict": bool(score >= 90 and critical_ok),
+            "release_threshold": 90}
 
 
 def format_report(report: dict) -> str:
@@ -450,4 +754,10 @@ def format_report(report: dict) -> str:
     lines.append("")
     lines.append(f"合计 {report['passed']}/{report['total']} 项通过"
                  + ("" if report["all_passed"] else f",{report['failed']} 项失败"))
+    if report.get("dimensions"):
+        lines.append(f"加权总分 {report.get('score', 0):.2f}/100")
+        for dim, value in report["dimensions"].items():
+            lines.append(f"  {dim}: {value['score']:.2f}/100")
+        verdict = "可发布" if report.get("release_verdict") else "不可发布"
+        lines.append(f"发布判定: {verdict}(门槛 {report.get('release_threshold', 90)})")
     return "\n".join(lines)

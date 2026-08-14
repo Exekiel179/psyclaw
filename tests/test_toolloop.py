@@ -5,6 +5,28 @@ from __future__ import annotations
 from psyclaw import toolloop as TL
 
 
+def test_build_tools_can_skip_unrelated_mcp(monkeypatch, tmp_path):
+    called = []
+
+    def merge(tools, project_dir):
+        called.append(project_dir)
+
+    monkeypatch.setattr("psyclaw.mcp.agent_tools.merge_mcp_tools", merge)
+    TL.build_tools(str(tmp_path), include_mcp=False)
+    assert called == []
+    TL.build_tools(str(tmp_path), include_mcp=True)
+    assert called == [str(tmp_path)]
+
+
+def test_analysis_script_uses_current_python(tmp_path, monkeypatch):
+    script = tmp_path / "analysis.py"
+    script.write_text("import sys; print(sys.executable)", encoding="utf-8")
+    tools = TL.build_tools(str(tmp_path), include_mcp=False)
+    result = tools["run_analysis_script"]["run"]({"path": "analysis.py"})
+    assert result["ok"] is True
+    assert result["returncode"] == 0
+
+
 class FakeProvider:
     """按脚本逐轮返回回复(每次 chat 弹一条);模拟模型的工具调用与最终答案。"""
     name = "fake"

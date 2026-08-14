@@ -281,6 +281,36 @@ def search(query: str, sources: list | None = None, limit: int = 10,
             "n_duplicates": len(raw) - len(deduped), "results": deduped}
 
 
+def save_search_record(result: dict, project_dir: str | None = ".") -> str:
+    """把检索题录写入可复用的结构化证据索引，按 DOI/标题去重。"""
+    from pathlib import Path
+
+    root = Path(project_dir or ".").resolve()
+    out = root / "notes" / "lit_search.json"
+    existing = {"records": []}
+    if out.exists():
+        try:
+            existing = json.loads(out.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            existing = {"records": []}
+    records = existing.get("records", []) if isinstance(existing, dict) else []
+    seen = {(str(r.get("doi") or "").lower() or str(r.get("title") or "").lower().strip())
+            for r in records if isinstance(r, dict)}
+    added = 0
+    for paper in result.get("results", []):
+        key = (str(paper.get("doi") or "").lower()
+               or str(paper.get("title") or "").lower().strip())
+        if key and key not in seen:
+            records.append(dict(paper))
+            seen.add(key)
+            added += 1
+    payload = {"schema": "psyclaw-literature-record/v1", "query": result.get("query", ""),
+               "records": records, "last_search": result}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return str(out.relative_to(root)).replace("\\", "/") + f" (+{added})"
+
+
 def snowball(doi: str, direction: str = "citations", limit: int = 25) -> list:
     """引用滚雪球:从种子 DOI 沿 OpenAlex 引用网络扩展——文献综述的正道。
 
