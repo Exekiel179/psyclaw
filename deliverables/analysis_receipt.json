@@ -1,0 +1,33 @@
+{
+  "task": "World Bank internet use trend 2010-2022",
+  "input": {
+    "path": "data/clean/world_bank_internet.csv",
+    "sha256": "0ee30ad435a77bf9ef8da39473af41b7c5378e6860819f7f702d34733bbb4f17",
+    "profile": {
+      "n": 3445,
+      "missing_total": 563,
+      "numeric": [
+        "year",
+        "value"
+      ]
+    }
+  },
+  "design": {
+    "analysis": "correlation",
+    "x": "year",
+    "y": "value",
+    "rationale": "两个连续变量 year、value → Pearson 相关"
+  },
+  "execution": {
+    "ok": true,
+    "status": "executed",
+    "path": "analysis/world_bank_internet.py",
+    "returncode": 0,
+    "stdout": "⚠ 剔除 498 行(缺失/不可解析)——须如实报告\nPearson 相关:\n            n         r          CI95          p_val       BF10  power\npearson  2947  0.381807  [0.35, 0.41]  6.662598e-103  1.138e+99    1.0\n",
+    "stderr": ""
+  },
+  "artifacts": {
+    "script": "analysis/world_bank_internet.py",
+    "data": "data/clean/world_bank_internet.csv"
+  }
+}
