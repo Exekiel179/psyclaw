@@ -1134,6 +1134,12 @@ def cmd_export(args: argparse.Namespace) -> int:
         prof = get_journal(load_project_config(".").get("target_journal"))
         jid = (prof or {}).get("id")
         journal = jid if jid in ("xinlixuebao", "xinlikexue") else "apa7"
+    output_format = getattr(args, "format", "docx")
+    if getattr(args, "latex", None) and output_format == "docx":
+        output_format = "latex"
+    if journal != "apa7" and output_format == "latex":
+        print("当前中文期刊模板只支持 Markdown；LaTeX 请使用 --journal apa7")
+        return 2
     if journal != "apa7":
         from psyclaw.output.cn_journal import cn_journal_cli
         argv = [args.file, "--journal", journal]
@@ -1142,7 +1148,6 @@ def cmd_export(args: argparse.Namespace) -> int:
         return cn_journal_cli(argv)
     from psyclaw.output.apa7 import export_cli
     argv = [args.file]
-    output_format = getattr(args, "format", "docx")
     if output_format == "latex":
         argv += ["--format", "latex"]
         if getattr(args, "latex", None):
