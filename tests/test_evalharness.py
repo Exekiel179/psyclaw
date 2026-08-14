@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from psyclaw.evalharness import CASES, format_report, run_evals
+from psyclaw.evalharness import CASES, format_report, run_evals, validate_agent_case_spec
 
 
 class TestRunEvals:
@@ -50,6 +50,54 @@ class TestRunEvals:
         text = json.dumps(report, ensure_ascii=False)
         assert "error_learning" in text
 
+    def test_report_has_dimension_scorecard_and_release_verdict(self):
+        report = run_evals(["gates_enforcement", "toolloop_discipline", "langgraph_path"])
+        assert report["score"] == 100.0
+        assert report["release_verdict"] is True
+        assert report["dimensions"]["学术规范"]["score"] == 100.0
+        assert report["dimensions"]["安全与可控"]["score"] == 100.0
+        assert report["dimensions"]["LangGraph 路径"]["score"] == 100.0
+        assert report["release_threshold"] == 90
+
+    def test_continuous_task_case_is_registered_and_passes(self):
+        report = run_evals(["continuous_tasks"])
+        assert report["all_passed"] is True
+        assert report["cases"]["continuous_tasks"]["total"] >= 4
+
+    def test_langgraph_path_case_is_registered_and_passes(self):
+        report = run_evals(["langgraph_path"])
+        assert report["all_passed"] is True
+        assert report["cases"]["langgraph_path"]["total"] == 3
+
+    def test_critical_dimension_failure_blocks_release(self, monkeypatch):
+        def failing(_tmp):
+            return [{"name": "故意失败", "passed": False, "detail": "fixture"}]
+        monkeypatch.setitem(CASES, "gates_enforcement", (failing, "fixture"))
+        report = run_evals(["gates_enforcement"])
+        assert report["score"] == 0.0
+        assert report["release_verdict"] is False
+        assert report["dimensions"]["学术规范"]["score"] == 0.0
+
+    def test_agent_case_spec_rejects_single_turn_tasks(self):
+        ok, reasons = validate_agent_case_spec({
+            "min_model_turns": 1,
+            "min_tool_calls": 0,
+            "requires_verification": False,
+            "checks": ["text"],
+        })
+        assert ok is False
+        assert len(reasons) >= 3
+
+    def test_agent_case_spec_accepts_multiturn_orchestration_task(self):
+        ok, reasons = validate_agent_case_spec({
+            "min_model_turns": 2,
+            "min_tool_calls": 2,
+            "requires_verification": True,
+            "expected_tools": ["lit_search", "save_file"],
+            "checks": ["dependency_receipt", "artifact_exists"],
+        })
+        assert ok is True and reasons == []
+
 
 class TestFormatReport:
     def test_all_passed_summary(self):
@@ -66,6 +114,10 @@ class TestFormatReport:
         out = format_report(report)
         assert "❌" in out and "✗ 坏检查:细节X" in out and "1 项失败" in out
 
+    def test_scorecard_prints_dimensions_and_verdict(self):
+        out = format_report(run_evals(["gates_enforcement", "toolloop_discipline", "langgraph_path"]))
+        assert "加权总分" in out and "学术规范" in out and "发布判定: 可发布" in out
+
 
 class TestCliEval:
     def test_cli_eval_writes_report_and_exits_zero(self, tmp_path, monkeypatch, capsys):
@@ -75,7 +127,7 @@ class TestCliEval:
         assert rc == 0
         out = capsys.readouterr().out
         assert "lit_screen" in out
-        saved = json.loads(Path(".psyclaw/eval_report.json").read_text(encoding="utf-8"))
+        saved = json.loads(Path("deliverables/eval_report.json").read_text(encoding="utf-8"))
         assert saved["all_passed"] is True
 
     def test_cli_eval_json_output(self, tmp_path, monkeypatch, capsys):
@@ -126,12 +178,12 @@ class TestEvalOutputRobustness:
         except RuntimeError:
             pass
         assert calls["n"] == 1
-        assert (tmp_path / ".psyclaw" / "eval_report.json").exists()
+        assert (tmp_path / "deliverables" / "eval_report.json").exists()
     def test_json_stdout_stays_pure_when_save_fails(self, tmp_path, monkeypatch, capsys):
         """--json 时落盘失败的提示走 stderr,stdout 仍是可解析 JSON。"""
         from psyclaw import cli
         monkeypatch.chdir(tmp_path)
-        ro = tmp_path / ".psyclaw"
+        ro = tmp_path / "deliverables"
         ro.write_text("挡路的文件", encoding="utf-8")   # 同名文件令 mkdir 失败
         rc = cli.main(["eval", "--case", "error_learning", "--json"])
         assert rc == 0

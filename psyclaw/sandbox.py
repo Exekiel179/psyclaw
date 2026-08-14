@@ -19,7 +19,7 @@ FACES = ("file", "tools", "exec", "net")
 # 最小权限默认策略:enabled 时四面都从"拒绝优先"起步,按需在 sandbox.yaml 放开。
 DEFAULT_POLICY: dict = {
     "enabled": False,          # 未配置=不启用(询问后才开,feat-129)
-    "file": {"write_allow": ["outputs/", "notes/", ".psyclaw/"],
+    "file": {"write_allow": ["deliverables/", "analysis/", "figures/", "notes/", "outputs/", ".psyclaw/"],
              "private_paths": ["data/raw/"], "require_codebook": True},
     "tools": {"side_effect_approval": "per-action", "stats_must_delegate": True},
     "exec": {"timeout_s": 180,

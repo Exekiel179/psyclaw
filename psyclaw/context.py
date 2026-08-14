@@ -157,7 +157,7 @@ def lean_core() -> str:
         "领域概况,不落条目。交稿前跑 `cite <稿件> --verify` 逐条查存在性。",
         "**质检不得倒逼失真**:报错先判是否误报(如文献标题的词被当成你的主张),"
         "是则说明并请人复核;绝不为过检换掉贴切的真文献、删限制说明或改已有结果。",
-        "产物归位约定:成稿/导出→outputs/ 图→figures/ 脚本→scripts/ 笔记→notes/ "
+        "产物归位约定:成稿/导出→deliverables/ 图→figures/ 分析脚本→analysis/ 笔记→notes/ "
         "清洗数据→data/clean;用户显式指定路径时以用户为准。",
     ]
     return "\n".join(parts)

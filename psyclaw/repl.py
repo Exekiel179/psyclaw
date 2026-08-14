@@ -140,7 +140,7 @@ _RUN_SYSTEM = (
     "**绝不要写「请你运行」「请在终端执行」把命令甩给用户手动跑**(它本就会自动执行,"
     "那样只会让用户困惑):\n"
     "```psyclaw\nrun analysis data/clean/x.csv\n```\n"
-    "```shell\npython3 outputs/analysis.py\n```\n"
+    "```shell\npython3 analysis/analysis.py\n```\n"
     "```python\nprint('需要执行的 Python 代码')\n```\n"
     "psyclaw 块每行一条子命令；shell/powershell/cmd/bash/sh 块是一个完整脚本,"
     "多行循环、管道和变量赋值必须放在同一个围栏内,不要拆成多条命令。\n"
@@ -1434,6 +1434,13 @@ class ReplSession:
             if path_ctx:
                 text = path_ctx + "\n\n用户问题：" + text
         self.messages.append({"role": "user", "content": text})
+        # RunState 是跨 agent/chat 的统一状态真源；普通流式模式也同步目标、
+        # 最近会话和待执行动作，避免切换模式后丢失上下文。
+        try:
+            from psyclaw.run_state import RunState
+            RunState.load(".", conversation=self.messages).add_pending(text)
+        except Exception:  # noqa: BLE001  # 状态审计失败不阻断对话
+            pass
         # feat-041:传 provider 做结构化 LLM 蒸馏(无 key/异常自动回落规则蒸馏)
         _pre_chars = sum(len(m["content"]) for m in self.messages)   # feat-155
         self.messages, self.memo = compact_history(self.messages, self.memo,
@@ -1864,7 +1871,7 @@ class ReplSession:
 
     def _run_agent(self, system: str, activity=None) -> str | None:
         """agent 模式:Planner → 主线/同质副本 → Verifier → Finisher。"""
-        from psyclaw.agent_runtime import run_planned_agent
+        from psyclaw.langgraph_runtime import run_agent
         from psyclaw.toolloop import _short
 
         def _approve(call: dict) -> bool:
@@ -1891,11 +1898,12 @@ class ReplSession:
                 workers = int(self.conf.get("agent_workers", 3))
             except (TypeError, ValueError):
                 workers = 3
-            res = run_planned_agent(
+            res = run_agent(
                 planner, system, self.messages, project_dir=".",
                 executor_factory=lambda: get_role_provider(self.conf, "executor"),
                 finisher_provider=finisher, max_workers=workers,
-                approve=_approve, emit=_emit, source_provider=self.provider)
+                approve=_approve, emit=_emit, source_provider=self.provider,
+                backend=self.conf.get("agent_backend", "langgraph"))
         except KeyboardInterrupt:              # feat-090:ESC/Ctrl+C 取消本轮,不炸 REPL
             if activity is not None:
                 activity.stop("已中断")
@@ -2334,7 +2342,7 @@ class ReplSession:
         """把 slash 模式运行记进对话,使后续自然语言能承接发生过的操作。"""
         self.messages.append({"role": "user", "content": f"[运行命令] {command}"})
         self.messages.append({"role": "assistant", "content":
-                              f"[运行完成] 退出码 {rc};产物见 notes/ 与 outputs/。"})
+                              f"[运行完成] 退出码 {rc};交付物见 deliverables/，脚本见 analysis/。"})
 
     def _cmd_run_mode(self, arg: str) -> None:
         """/run <类型> <目标> 或 /run:聊天内调用统一执行入口。"""
