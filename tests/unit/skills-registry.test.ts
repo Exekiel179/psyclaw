@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -44,7 +44,7 @@ describe("SkillRegistry", () => {
     const descriptor = report.skills[0]!;
     expect(descriptor.id).toBe("research-brief");
     expect(descriptor.sourcePath).toBe(file);
-    expect(descriptor.resolvedPath).toBe(file);
+    expect(descriptor.resolvedPath).toBe(await realpath(file));
     expect(descriptor.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(descriptor.licenseStatus).toBe("declared");
     expect(descriptor.dependencyStatus).toBe("ready");
