@@ -1,4 +1,4 @@
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -246,6 +246,25 @@ describe("installer security loop", () => {
     }, { now: clock });
     expect(result.receipt.reasonCode).toBe("install.path-invalid");
     expect(calls).toBe(0);
+  });
+
+  it("installs beneath a trusted root with a system-style symlink ancestor", async () => {
+    const actualParent = await mkdtemp(join(tmpdir(), "psyclaw-install-actual-"));
+    const actualRoot = join(actualParent, "project");
+    await mkdir(actualRoot);
+    const links = await mkdtemp(join(tmpdir(), "psyclaw-install-links-"));
+    const alias = join(links, "projects");
+    const root = join(alias, "project");
+    await symlink(actualParent, alias, "junction");
+    const plan = await skillPlan(root, "correct content", { projectRoot: root });
+    const runner = async () => {
+      await writeStaging(plan, "correct content");
+      return { exitCode: 0 };
+    };
+    const result = await installSkillPackage(plan, approved, runner, { now: clock });
+    expect(result.status).toBe("installed");
+    await expect(readFile(join(actualRoot, "skills", "nature-reader", "SKILL.md"), "utf8"))
+      .resolves.toBe("correct content");
   });
 
   it("fails closed when license, dependency audit, or SBOM metadata is absent", async () => {
