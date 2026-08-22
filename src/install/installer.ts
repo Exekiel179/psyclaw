@@ -345,18 +345,36 @@ function assertContained(root: string, target: string, label: string): string {
   return candidate;
 }
 
-async function assertNoSymlinkAncestors(path: string, label: string): Promise<void> {
-  let cursor = resolve(path);
+function commonPathAncestor(left: string, right: string): string {
+  let cursor = resolve(left);
+  const target = resolve(right);
   while (true) {
+    const rel = relative(cursor, target).replaceAll("\\", "/");
+    if (rel === "" || rel !== ".." && !rel.startsWith("../") && !isAbsolute(rel)) return cursor;
+    const parent = dirname(cursor);
+    if (parent === cursor) return cursor;
+    cursor = parent;
+  }
+}
+
+async function assertNoSymlinkAncestors(path: string, label: string, boundary: string): Promise<void> {
+  const target = resolve(path);
+  const base = resolve(boundary);
+  const rel = relative(base, target).replaceAll("\\", "/");
+  if (rel === ".." || rel.startsWith("../") || isAbsolute(rel)) throw new Error(`${label} escapes its trusted boundary`);
+  let cursor = base;
+  const candidates = [cursor, ...rel.split("/").filter(Boolean).map((part) => {
+    cursor = join(cursor, part);
+    return cursor;
+  })];
+  for (const candidate of candidates) {
     try {
-      const stat = await lstat(cursor);
+      const stat = await lstat(candidate);
       if (stat.isSymbolicLink()) throw new Error(`${label} symlink is not allowed`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      break;
     }
-    const parent = dirname(cursor);
-    if (parent === cursor) return;
-    cursor = parent;
   }
 }
 
@@ -382,8 +400,11 @@ async function validateInstallPaths(plan: InstallPlan): Promise<{
   if (plan.projectRoot === undefined && (protectedPath(staging) || protectedPath(target))) {
     throw new Error("protected install path");
   }
-  await assertNoSymlinkAncestors(staging, "staging path");
-  await assertNoSymlinkAncestors(target, "target path");
+  const trustedBoundary = plan.projectRoot === undefined
+    ? commonPathAncestor(staging, target)
+    : resolve(plan.projectRoot);
+  await assertNoSymlinkAncestors(staging, "staging path", trustedBoundary);
+  await assertNoSymlinkAncestors(target, "target path", trustedBoundary);
 
   const contentFile = plan.contentFile ?? "SKILL.md";
   if (contentFile.includes("\u0000") || contentFile.trim() === "" || isAbsolute(contentFile) || contentFile.replaceAll("\\", "/").split("/").includes("..")) {
@@ -676,7 +697,11 @@ async function legacyDownload(
     } else if (protectedPath(downloadPath)) {
       return blockedRecord(plan, at, "install.path-invalid", "protected download path");
     }
-    await assertNoSymlinkAncestors(downloadPath, "download path");
+    await assertNoSymlinkAncestors(
+      downloadPath,
+      "download path",
+      plan.projectRoot === undefined ? dirname(resolve(downloadPath)) : resolve(plan.projectRoot),
+    );
   } catch {
     return blockedRecord(plan, at, "install.path-invalid", "download path is unsafe");
   }

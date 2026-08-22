@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
   type LoadedSkill,
@@ -217,15 +217,28 @@ async function walkSkillFiles(root: { source: string; resolved: string }, diagno
 }
 
 async function verifyFilePath(sourcePath: string, rootPath: string): Promise<string> {
-  const sourceStat = await lstat(sourcePath);
+  const sourceRoot = resolve(rootPath);
+  const source = resolve(sourcePath);
+  assertContained(sourceRoot, source);
+  const rootStat = await lstat(sourceRoot);
+  if (rootStat.isSymbolicLink()) throw new Error(`Skill root is a symlink: ${sourceRoot}`);
+  if (!rootStat.isDirectory()) throw new Error(`Skill root is not a directory: ${sourceRoot}`);
+  const resolvedRoot = await realpath(sourceRoot);
+  let cursor = sourceRoot;
+  for (const part of relative(sourceRoot, source).split(sep).filter(Boolean)) {
+    cursor = join(cursor, part);
+    const stat = await lstat(cursor);
+    if (stat.isSymbolicLink()) throw new Error(`Skill path contains a symlink: ${sourcePath}`);
+  }
+  const sourceStat = await lstat(source);
   if (sourceStat.isSymbolicLink()) throw new Error(`Skill file is a symlink: ${sourcePath}`);
   if (!sourceStat.isFile()) throw new Error(`Skill path is not a file: ${sourcePath}`);
-  const resolved = await realpath(sourcePath);
-  assertContained(rootPath, resolved);
-  // `sourcePath` is produced by a non-symlink directory walk. If its
-  // canonical form later differs, a parent component was replaced by a
-  // junction/symlink (or the path was otherwise swapped); never follow it.
-  if (!samePath(resolve(sourcePath), resolved)) {
+  const resolved = await realpath(source);
+  assertContained(resolvedRoot, resolved);
+  const expectedResolved = resolve(resolvedRoot, relative(sourceRoot, source));
+  // Compare paths relative to the controlled root. Ancestors above that root
+  // may legitimately be OS-managed aliases such as macOS /var -> /private/var.
+  if (!samePath(expectedResolved, resolved)) {
     throw new Error(`Skill path contains a symlink or changed while reading: ${sourcePath}`);
   }
   return resolved;
@@ -434,7 +447,7 @@ export class SkillRegistry {
       for (const sourcePath of files) {
         let descriptor: SkillDescriptor;
         try {
-          const stable = await readSkillFileStable(sourcePath, root.resolved);
+          const stable = await readSkillFileStable(sourcePath, root.source);
           const resolvedPath = stable.resolvedPath;
           const text = stable.text;
           const parsed = parseSkillDocument(text, sourcePath);
@@ -458,7 +471,7 @@ export class SkillRegistry {
             description: identity.description,
             sourcePath,
             resolvedPath,
-            rootPath: root.resolved,
+            rootPath: root.source,
             sha256: stable.sha256,
             licenseStatus: deriveLicenseStatus(parsed.metadata),
             dependencyStatus: deriveDependencyStatus(parsed.metadata),

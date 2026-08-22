@@ -11,7 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { basename, dirname, extname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { ToolReceipt } from "../core/contracts.js";
 import { redactSecrets } from "../core/redact.js";
 import { sha256Text } from "../core/hash.js";
@@ -195,15 +195,19 @@ function hashBytes(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-async function assertNoSymlinkAncestors(path: string): Promise<void> {
+async function assertNoSymlinkAncestors(path: string, boundary: string): Promise<void> {
   const absolute = resolve(path);
-  const root = parse(absolute).root;
-  const parts = relative(root, absolute).split(sep).filter(Boolean);
-  let current = root;
-  for (const part of parts) {
+  const base = resolve(boundary);
+  if (!samePath(base, absolute) && !isWithin(base, absolute)) fail("import.path-invalid", "path escapes its trusted boundary");
+  const parts = relative(base, absolute).split(sep).filter(Boolean);
+  let current = base;
+  const candidates = [current, ...parts.map((part) => {
     current = join(current, part);
+    return current;
+  })];
+  for (const candidate of candidates) {
     try {
-      const stat = await lstat(current);
+      const stat = await lstat(candidate);
       if (stat.isSymbolicLink()) fail("import.symlink-path", "symbolic-link path is not importable");
     } catch (error) {
       if (error instanceof SkillImportError) throw error;
@@ -227,8 +231,8 @@ async function assertProjectTarget(root: string, target: string): Promise<string
   if (parts.some((part) => isProtectedSegment(part))) {
     fail("import.target-protected");
   }
-  await assertNoSymlinkAncestors(base);
-  await assertNoSymlinkAncestors(absolute);
+  await assertNoSymlinkAncestors(base, base);
+  await assertNoSymlinkAncestors(absolute, base);
   return absolute;
 }
 
@@ -240,7 +244,7 @@ async function ensureDirectoryChain(root: string, target: string, created: strin
   let current = base;
   for (const part of parts) {
     current = join(current, part);
-    await assertNoSymlinkAncestors(current);
+    await assertNoSymlinkAncestors(current, base);
     try {
       const stat = await lstat(current);
       if (stat.isSymbolicLink()) fail("import.symlink-target");
@@ -259,8 +263,13 @@ async function ensureDirectoryChain(root: string, target: string, created: strin
   }
 }
 
-async function stableSourceFile(sourcePath: string, relativePath: string): Promise<SourceFileSnapshot> {
-  await assertNoSymlinkAncestors(sourcePath);
+async function stableSourceFile(
+  sourcePath: string,
+  relativePath: string,
+  boundaryPath: string,
+  resolvedBoundaryPath: string,
+): Promise<SourceFileSnapshot> {
+  await assertNoSymlinkAncestors(sourcePath, boundaryPath);
   let before;
   try {
     before = await lstat(sourcePath);
@@ -270,7 +279,8 @@ async function stableSourceFile(sourcePath: string, relativePath: string): Promi
   if (before.isSymbolicLink() || !before.isFile()) fail("import.source-not-regular");
   if (before.size > MAX_FILE_BYTES) fail("import.source-too-large");
   const resolvedBefore = await realpath(sourcePath).catch(() => fail("import.source-unavailable"));
-  if (!samePath(resolvedBefore, sourcePath)) fail("import.source-canonical");
+  const expectedResolved = resolve(resolvedBoundaryPath, relative(resolve(boundaryPath), resolve(sourcePath)));
+  if (!samePath(resolvedBefore, expectedResolved)) fail("import.source-canonical");
   const bytes = await readFile(sourcePath).catch(() => fail("import.source-unavailable"));
   const digest = hashBytes(bytes);
   const after = await lstat(sourcePath).catch(() => fail("import.source-race"));
@@ -341,27 +351,31 @@ function assertAllowedRelativePath(parts: readonly string[], isDirectory: boolea
   if (!ALLOWED_DIRECTORY_ROOTS.has(first)) fail("import.file-not-allowlisted");
 }
 
-async function collectSourceTree(skill: DiscoveredSkill): Promise<SourceTreeSnapshot> {
+async function collectSourceTree(skill: DiscoveredSkill, boundaryPath: string): Promise<SourceTreeSnapshot> {
   const sourcePath = resolve(skill.path);
+  const sourceBoundary = resolve(boundaryPath);
   if (isCrossPlatformAbsolute(skill.path.replaceAll("\\", "/")) === false) fail("import.source-path-invalid");
-  await assertNoSymlinkAncestors(sourcePath);
+  if (!samePath(sourceBoundary, sourcePath) && !isWithin(sourceBoundary, sourcePath)) fail("import.source-root-mismatch");
+  await assertNoSymlinkAncestors(sourcePath, sourceBoundary);
   const rootStat = await lstat(sourcePath).catch(() => fail("import.source-unavailable"));
   if (rootStat.isSymbolicLink()) fail("import.source-symlink");
   const rootKind = skill.kind === "dir" ? rootStat.isDirectory() : rootStat.isFile();
   if (!rootKind) fail("import.source-kind-mismatch");
+  const resolvedBoundaryPath = await realpath(sourceBoundary).catch(() => fail("import.source-unavailable"));
   const resolvedRootPath = await realpath(sourcePath).catch(() => fail("import.source-unavailable"));
-  if (!samePath(resolvedRootPath, sourcePath)) fail("import.source-canonical");
+  const expectedRootPath = resolve(resolvedBoundaryPath, relative(sourceBoundary, sourcePath));
+  if (!samePath(resolvedRootPath, expectedRootPath)) fail("import.source-canonical");
 
   const files: SourceFileSnapshot[] = [];
   if (skill.kind === "file") {
     const sourceName = basename(sourcePath);
     if (!sourceName.toLowerCase().endsWith(".md")) fail("import.file-not-allowlisted");
     assertAllowedRelativePath([sourceName], false);
-    files.push(await stableSourceFile(sourcePath, sourceName));
+    files.push(await stableSourceFile(sourcePath, sourceName, sourceBoundary, resolvedBoundaryPath));
   } else {
     let skillFileFound = false;
     const walk = async (directory: string, parts: string[]): Promise<void> => {
-      await assertNoSymlinkAncestors(directory);
+      await assertNoSymlinkAncestors(directory, sourceBoundary);
       const directoryStat = await lstat(directory).catch(() => fail("import.source-race"));
       if (directoryStat.isSymbolicLink() || !directoryStat.isDirectory()) fail("import.source-not-directory");
       const entries = await readdir(directory, { withFileTypes: true }).catch(() => fail("import.source-unavailable"));
@@ -377,7 +391,7 @@ async function collectSourceTree(skill: DiscoveredSkill): Promise<SourceTreeSnap
         } else if (entry.isFile()) {
           assertAllowedRelativePath(childParts, false);
           if (childParts.length === 1 && entry.name === "SKILL.md") skillFileFound = true;
-          files.push(await stableSourceFile(child, childParts.join("/")));
+          files.push(await stableSourceFile(child, childParts.join("/"), sourceBoundary, resolvedBoundaryPath));
         } else {
           fail("import.source-not-regular");
         }
@@ -397,7 +411,7 @@ async function collectSourceTree(skill: DiscoveredSkill): Promise<SourceTreeSnap
 }
 
 async function verifySourceStable(before: SourceTreeSnapshot, skill: DiscoveredSkill): Promise<void> {
-  const after = await collectSourceTree(skill);
+  const after = await collectSourceTree(skill, before.rootPath);
   if (!samePath(before.resolvedRootPath, after.resolvedRootPath) || before.files.length !== after.files.length) fail("import.source-race");
   for (let index = 0; index < before.files.length; index += 1) {
     const left = before.files[index]!;
@@ -407,19 +421,20 @@ async function verifySourceStable(before: SourceTreeSnapshot, skill: DiscoveredS
   }
 }
 
-async function declaredSourceRoot(agent: AgentScan, sourcePath: string): Promise<void> {
+async function declaredSourceRoot(agent: AgentScan, sourcePath: string): Promise<string> {
   if (agent.skillDirs.length === 0) fail("import.source-root-missing");
   const sourceResolved = await realpath(sourcePath).catch(() => fail("import.source-unavailable"));
-  let matched = false;
+  let matched: string | undefined;
   for (const candidate of agent.skillDirs) {
     if (!isAbsolute(candidate) || isCrossPlatformAbsolute(candidate.replaceAll("\\", "/")) === false) continue;
-    await assertNoSymlinkAncestors(candidate);
+    await assertNoSymlinkAncestors(candidate, candidate);
     const stat = await lstat(candidate).catch(() => undefined);
     if (stat === undefined || stat.isSymbolicLink() || !stat.isDirectory()) continue;
     const resolved = await realpath(candidate).catch(() => undefined);
-    if (resolved !== undefined && (samePath(resolved, sourceResolved) || isWithin(resolved, sourceResolved))) matched = true;
+    if (resolved !== undefined && (samePath(resolved, sourceResolved) || isWithin(resolved, sourceResolved))) matched = resolve(candidate);
   }
-  if (!matched) fail("import.source-root-mismatch");
+  if (matched === undefined) fail("import.source-root-mismatch");
+  return matched;
 }
 
 function sourceNameMatches(skill: DiscoveredSkill): void {
@@ -482,7 +497,7 @@ async function hashRegularFile(path: string): Promise<string> {
 async function collectDestinationFiles(root: string): Promise<Array<{ relativePath: string; sha256: string }>> {
   const files: Array<{ relativePath: string; sha256: string }> = [];
   const walk = async (directory: string, parts: string[]): Promise<void> => {
-    await assertNoSymlinkAncestors(directory);
+    await assertNoSymlinkAncestors(directory, root);
     const entries = await readdir(directory, { withFileTypes: true }).catch(() => fail("import.target-unavailable"));
     entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
@@ -645,11 +660,11 @@ async function manifestMatchesPlans(
   return true;
 }
 
-async function activatePlan(plan: DestinationPlan, stagingRoot: string, created: string[]): Promise<boolean> {
+async function activatePlan(plan: DestinationPlan, stagingRoot: string, targetRoot: string, created: string[]): Promise<boolean> {
   if (plan.status === "already-recorded") return false;
   const source = plan.source;
   const destination = plan.destinationPath;
-  await assertNoSymlinkAncestors(dirname(destination));
+  await assertNoSymlinkAncestors(dirname(destination), targetRoot);
   if (plan.skill.kind === "file") {
     await ensureDirectoryChain(stagingRoot, dirname(join(stagingRoot, "__placeholder__")), []);
     try {
@@ -736,7 +751,7 @@ export async function importAgentSkills(options: ImportAgentSkillsOptions): Prom
   const root = resolve(options.root);
   const rootStat = await lstat(root).catch(() => fail("import.project-unavailable"));
   if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) fail("import.project-invalid");
-  await assertNoSymlinkAncestors(root);
+  await assertNoSymlinkAncestors(root, root);
   const importsRoot = await assertProjectTarget(root, join(root, ".psyclaw", "imports"));
   const destinationRoot = await assertProjectTarget(root, join(importsRoot, agentId));
   await ensureDirectoryChain(root, importsRoot);
@@ -745,8 +760,8 @@ export async function importAgentSkills(options: ImportAgentSkillsOptions): Prom
   const plans: DestinationPlan[] = [];
   for (const skill of options.agent.skills) {
     sourceNameMatches(skill);
-    await declaredSourceRoot(options.agent, skill.path);
-    const source = await collectSourceTree(skill);
+    const sourceBoundary = await declaredSourceRoot(options.agent, skill.path);
+    const source = await collectSourceTree(skill, sourceBoundary);
     const destinationPath = await assertProjectTarget(
       root,
       skill.kind === "dir" ? join(destinationRoot, skill.name) : join(destinationRoot, `${skill.name}.md`),
@@ -784,7 +799,7 @@ export async function importAgentSkills(options: ImportAgentSkillsOptions): Prom
       }
       await verifySourceStable(plan.source, plan.skill);
     }
-    for (const plan of plans) await activatePlan(plan, stagingRoot, activated);
+    for (const plan of plans) await activatePlan(plan, stagingRoot, root, activated);
     const finishedAt = clock();
     if (Number.isNaN(new Date(finishedAt).getTime()) || new Date(finishedAt).getTime() < new Date(startedAt).getTime()) {
       fail("import.invalid-clock");
