@@ -14,7 +14,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync, execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { bootstrapProject } from "../src/project/bootstrap.js";
 import { appendClaim, appendClaimEvidenceLink, appendEvidence } from "../src/research/ledger.js";
 import { runLiteratureReview } from "../src/workflows/literature-review.js";
@@ -204,23 +204,16 @@ async function main(): Promise<void> {
       await new Promise((r) => setTimeout(r, 12_000));
       const notify = rpcEvents.find((e) => e.type === "extension_ui_request" && e.method === "notify");
       if (!notify?.message) return { ok: false, note: "/panel 未产生 notify 事件" };
-      // Find the panel server port and fetch the real workbench page.
-      let listening = "";
+      const panelUrl = notify.message.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
+      if (panelUrl === undefined) return { ok: false, note: "notify 未包含 loopback 页面地址" };
       try {
-        listening = process.platform === "win32"
-          ? execSync("netstat -ano | findstr 127.0.0.1 | findstr LISTENING", { encoding: "utf8" })
-          : execSync("lsof -iTCP -sTCP:LISTEN 2>/dev/null | grep 127.0.0.1", { encoding: "utf8" });
-      } catch { /* no listener listing */ }
-      const ports = [...new Set([...listening.matchAll(/127\.0\.0\.1:(\d+)/g)].map((m) => Number(m[1])))];
-      let found = false;
-      for (const port of ports) {
-        try {
-          const res = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(3000) });
-          const text = await res.text();
-          if (text.includes("手稿编辑与核验") && text.includes("tab-editor")) { found = true; break; }
-        } catch { /* try next */ }
+        const res = await fetch(panelUrl, { signal: AbortSignal.timeout(3000) });
+        const text = await res.text();
+        const found = text.includes("手稿编辑与核验") && text.includes("tab-editor");
+        return { ok: found, note: found ? `notify + 真实页面伺服（${panelUrl}）` : "页面内容不符合工作台契约" };
+      } catch {
+        return { ok: false, note: `无法访问 notify 页面（${panelUrl}）` };
       }
-      return { ok: found, note: found ? `notify + 真实页面伺服（端口 ${ports.join(",")}）` : `notify 已收到但未定位到页面（端口: ${ports.join(",")}）` };
     } finally {
       child.kill("SIGTERM");
       await new Promise((r) => setTimeout(r, 1500));
