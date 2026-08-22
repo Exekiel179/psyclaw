@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "psyclaw/recommended-mcp/v1",
+  "documentVersion": "0.2.0",
+  "sourceDocument": "学术AI_Skill分享资料.pdf + curated research MCP review",
+  "sourceRef": "user-curated",
+  "items": [
+    {
+      "id": "paper-search-mcp",
+      "name": "Paper Search MCP",
+      "stage": "检索",
+      "description": "统一 arXiv、PubMed、OpenAlex、Semantic Scholar、Crossref 等来源的搜索、去重和开放全文回退。",
+      "sourceRef": "https://github.com/openags/paper-search-mcp",
+      "transport": "stdio",
+      "risk": "network",
+      "writeEffects": false,
+      "status": "discover-only"
+    },
+    {
+      "id": "scientific-papers-mcp",
+      "name": "Scientific Papers MCP",
+      "stage": "开放全文",
+      "description": "从 arXiv、OpenAlex、PMC、Europe PMC、bioRxiv/medRxiv 和 CORE 获取论文元数据与开放全文。",
+      "sourceRef": "https://github.com/benedict2310/Scientific-Papers-MCP",
+      "transport": "stdio",
+      "risk": "network",
+      "writeEffects": false,
+      "status": "discover-only"
+    },
+    {
+      "id": "pubmed-search-mcp",
+      "name": "PubMed Search MCP",
+      "stage": "生物医学",
+      "description": "面向 PubMed、Europe PMC 和开放来源的多源检索、全文、引用网络和 PICO 辅助。",
+      "sourceRef": "https://github.com/u9401066/pubmed-search-mcp",
+      "transport": "stdio",
+      "risk": "network",
+      "writeEffects": false,
+      "status": "discover-only"
+    },
+    {
+      "id": "zotero-mcp",
+      "name": "Zotero MCP",
+      "stage": "文献库",
+      "description": "搜索本地 Zotero、读取 PDF 文本和批注、生成引用，并在明确授权后管理条目。",
+      "sourceRef": "https://github.com/richardjlyon/zotero-mcp",
+      "transport": "stdio-or-http",
+      "risk": "local-data",
+      "writeEffects": true,
+      "status": "discover-only"
+    },
+    {
+      "id": "academic-mcp",
+      "name": "Academic MCP",
+      "stage": "文献图谱",
+      "description": "连接 Zotero、Semantic Scholar 和 OpenAlex，支持检索、阅读、作者和引用关系探索。",
+      "sourceRef": "https://github.com/veale/academic-mcp",
+      "transport": "stdio",
+      "risk": "network-and-local-data",
+      "writeEffects": false,
+      "status": "discover-only"
+    },
+    {
+      "id": "scholar-mcp",
+      "name": "Scholar MCP",
+      "stage": "引用图谱",
+      "description": "跨论文、专利、标准和作者关系检索，支持 DOI、Semantic Scholar、OpenAlex 和引用路径。",
+      "sourceRef": "https://github.com/pvliesdonk/scholar-mcp",
+      "transport": "stdio",
+      "risk": "network",
+      "writeEffects": false,
+      "status": "discover-only"
+    },
+    {
+      "id": "playwright-mcp",
+      "name": "Microsoft Playwright MCP",
+      "stage": "机构全文",
+      "description": "通过浏览器访问出版社、机构代理和登录后的页面；下载动作必须单独人工确认。",
+      "sourceRef": "https://github.com/microsoft/playwright-mcp",
+      "transport": "stdio",
+      "risk": "browser-session",
+      "writeEffects": true,
+      "status": "discover-only"
+    },
+    {
+      "id": "mne-mcp",
+      "name": "MNE MCP",
+      "stage": "神经生理",
+      "description": "为 EEG、MEG、iEEG 等 MNE-Python 分析提供受控工具；当前作为本机 MNE skill 的 MCP 候选入口。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "transport": "stdio",
+      "risk": "local-data-and-compute",
+      "writeEffects": true,
+      "status": "discover-only"
+    },
+    {
+      "id": "spss-mcp",
+      "name": "SPSS MCP",
+      "stage": "统计分析",
+      "description": "为 SPSS syntax 执行、输出读取和统计分析提供受控工具；只保存可复现脚本和结果。",
+      "sourceRef": "https://github.com/Exekiel179/SPSS-MCP",
+      "transport": "stdio",
+      "risk": "local-data-and-compute",
+      "writeEffects": true,
+      "status": "discover-only"
+    }
+  ],
+  "installPrep": [
+    {"id":"paper-search-mcp","sourceKind":"github","ref":"c8b642183bb725f0a7faec89e58b558df09079d1","license":"MIT","command":"git clone https://github.com/openags/paper-search-mcp .psyclaw/mcp-src/paper-search-mcp && git -C .psyclaw/mcp-src/paper-search-mcp checkout c8b642183bb725f0a7faec89e58b558df09079d1","target":".psyclaw/mcp/paper-search-mcp.json","dependencies":["Git","Python/uv per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify package entrypoint and lockfile before registering a stdio server."},
+    {"id":"scientific-papers-mcp","sourceKind":"github","ref":"646da8d8af653f6b833f3725bae4cafc38a9428e","license":"unknown","command":"git clone https://github.com/benedict2310/Scientific-Papers-MCP .psyclaw/mcp-src/scientific-papers-mcp && git -C .psyclaw/mcp-src/scientific-papers-mcp checkout 646da8d8af653f6b833f3725bae4cafc38a9428e","target":".psyclaw/mcp/scientific-papers-mcp.json","dependencies":["Git","repository runtime requirements"],"status":"blocked","requiresApproval":true,"blockedReason":"License metadata is not verified."},
+    {"id":"pubmed-search-mcp","sourceKind":"github","ref":"master","license":"NOASSERTION","command":"git clone https://github.com/u9401066/pubmed-search-mcp .psyclaw/mcp-src/pubmed-search-mcp && git -C .psyclaw/mcp-src/pubmed-search-mcp checkout master","target":".psyclaw/mcp/pubmed-search-mcp.json","dependencies":["Git","PubMed/NCBI access configuration"],"status":"blocked","requiresApproval":true,"blockedReason":"License and immutable commit were not verified."},
+    {"id":"zotero-mcp","sourceKind":"github","ref":"d57892db395c38d7782f037bc9fc8222e6a429ae","license":"unknown","command":"git clone https://github.com/richardjlyon/zotero-mcp .psyclaw/mcp-src/zotero-mcp && git -C .psyclaw/mcp-src/zotero-mcp checkout d57892db395c38d7782f037bc9fc8222e6a429ae","target":".psyclaw/mcp/zotero-mcp.json","dependencies":["Git","Zotero local library","Zotero API/token only if explicitly configured"],"status":"blocked","requiresApproval":true,"blockedReason":"License is not verified and local-library write effects require a separate trust decision."},
+    {"id":"academic-mcp","sourceKind":"github","ref":"main","license":"MIT","command":"git clone https://github.com/veale/academic-mcp .psyclaw/mcp-src/academic-mcp && git -C .psyclaw/mcp-src/academic-mcp checkout main","target":".psyclaw/mcp/academic-mcp.json","dependencies":["Git","Zotero/OpenAlex/Semantic Scholar configuration per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Immutable commit and external API terms require preflight."},
+    {"id":"scholar-mcp","sourceKind":"github","ref":"f94eac6a49c6d35a83f35148375eebfa08459e9b","license":"MIT","command":"git clone https://github.com/pvliesdonk/scholar-mcp .psyclaw/mcp-src/scholar-mcp && git -C .psyclaw/mcp-src/scholar-mcp checkout f94eac6a49c6d35a83f35148375eebfa08459e9b","target":".psyclaw/mcp/scholar-mcp.json","dependencies":["Git","provider/API configuration per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify executable entrypoint and API terms before registration."},
+    {"id":"playwright-mcp","sourceKind":"github","ref":"7e0457a7cbf88823bf0146d12c46ae12c6818247","license":"Apache-2.0","command":"npx -y @playwright/mcp@latest","target":".psyclaw/mcp/playwright-mcp.json","dependencies":["Node.js >=18","npm or pnpm","optional browser extension for existing login session"],"status":"review-required","requiresApproval":true,"blockedReason":"Pin npm package version before execution; browser navigation/download remains separately approved."},
+    {"id":"mne-mcp","sourceKind":"github","ref":"627142cb5beebe1a210a8e0fb1e15afbec8b8010","license":"MIT","command":"uvx --from mne-mcp==0.3.0 mne-mcp","target":".psyclaw/mcp/mne-mcp.json","dependencies":["Python >=3.10","uv","MNE-Python data dependencies"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify PyPI artifact hash and local-data write policy before registration."},
+    {"id":"spss-mcp","sourceKind":"github","ref":"fb4f020189b28b8acfb23a710875a7f9ae4e1e62","license":"MIT","command":"git clone https://github.com/Exekiel179/SPSS-MCP .psyclaw/mcp-src/spss-mcp && git -C .psyclaw/mcp-src/spss-mcp checkout fb4f020189b28b8acfb23a710875a7f9ae4e1e62","target":".psyclaw/mcp/spss-mcp.json","dependencies":["Git","IBM SPSS Statistics","Python runtime per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify repository entrypoint and SPSS license/runtime before registration."}
+  ]
+}

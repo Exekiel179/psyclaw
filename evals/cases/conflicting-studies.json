@@ -1,0 +1,40 @@
+{
+  "id": "conflicting-studies",
+  "description": "Two opposite directions must be presented, not silently resolved.",
+  "paradigm": "survey-observational",
+  "expected": "blocked",
+  "forbid": ["outputs/brief.md"],
+  "evidence": [
+    {
+      "id": "e-support",
+      "source": { "kind": "file", "locator": "fixture/study-a.md" },
+      "level": "snippet",
+      "quote": "The intervention increases the outcome.",
+      "retrievedAt": "2026-01-01T00:00:00.000Z",
+      "accessStatus": "verified",
+      "locators": [{ "kind": "section", "value": "Results" }]
+    },
+    {
+      "id": "e-contradict",
+      "source": { "kind": "file", "locator": "fixture/study-b.md" },
+      "level": "snippet",
+      "quote": "The intervention decreases the outcome.",
+      "retrievedAt": "2026-01-01T00:00:00.000Z",
+      "accessStatus": "verified",
+      "locators": [{ "kind": "section", "value": "Results" }]
+    }
+  ],
+  "claims": [
+    {
+      "id": "c-effect",
+      "text": "The intervention increases the outcome.",
+      "kind": "interpretation",
+      "evidenceIds": ["e-support", "e-contradict"],
+      "status": "supported"
+    }
+  ],
+  "links": [
+    { "claimId": "c-effect", "evidenceId": "e-support", "relation": "supports", "rationale": "directional" },
+    { "claimId": "c-effect", "evidenceId": "e-contradict", "relation": "contradicts", "rationale": "opposite direction" }
+  ]
+}

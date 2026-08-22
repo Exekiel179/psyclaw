@@ -5,18 +5,14 @@
       "Edit",
       "Write",
       "WebSearch",
-      "Bash(python -m pytest:*)",
-      "Bash(python -m psyclaw:*)",
-      "Bash(python -m py_compile:*)",
-      "Bash(python:*)",
-      "Bash(pip install:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm eval:*)",
+      "Bash(node dist/src/cli.js:*)",
       "Bash(git status:*)",
       "Bash(git log:*)",
       "Bash(git diff:*)",
-      "Bash(git checkout -b:*)",
-      "Bash(git branch:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(grep:*)",
@@ -29,35 +25,8 @@
       "Bash(rm -rf:*)",
       "Bash(git reset --hard:*)",
       "Bash(git push:*)",
-      "Bash(git push --force:*)",
       "Bash(git clean:*)",
-      "Bash(sudo:*)",
-      "Bash(curl:*)",
-      "Bash(wget:*)"
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect-paths.py\""
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/compile-check.py\""
-          }
-        ]
-      }
+      "Bash(sudo:*)"
     ]
   },
   "enabledPlugins": {

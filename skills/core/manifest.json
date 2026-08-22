@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "psyclaw/skill-pack/v1",
+  "id": "psyclaw-core",
+  "version": "0.1.0",
+  "skills": [
+    "research-intake",
+    "evidence-capture",
+    "citation-audit",
+    "research-brief"
+  ],
+  "enabledByDefault": ["research-intake", "evidence-capture", "citation-audit", "research-brief"],
+  "source": {"kind": "workspace", "ref": "initial-mvp"},
+  "license": {"spdx": "MIT", "evidenceRef": "../../LICENSE"},
+  "dependencyStatus": "ready"
+}

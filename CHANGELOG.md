@@ -1,4 +1,20 @@
 # Changelog
+
+## v0.24.0 (2026-08-22)
+
+> 主题：**以经审计的 0.4.1 前身实现为基线，统一为 PsyClaw 独立产品。**
+
+> 发布通道：先以 GitHub Pre-release 与 npm `next` 提供；完成真实网络/provider/MCP、跨进程写锁和 OS 级隔离门槛后再提升为稳定通道。
+
+- 将主运行时升级为锁定官方 Pi 0.84.1 的 TypeScript/Node adapter，不 fork 或复制 Pi runtime。
+- 对外包名、CLI、TUI、启动横幅、科研面板与网站统一为 PsyClaw；命令为 `psyclaw`，项目状态继续写入 `.psyclaw/`。
+- 发布链迁移到 Node 22/pnpm/npm；GitHub Release 提供 npm tarball 与 SHA256 校验文件，旧 Python wheel/uv 安装链不再用于 v0.24。
+- 移除安装期对官方 Pi 包的 `node_modules` 改写；PsyClaw 仅通过公开 adapter、extension、Skill 和启动参数接入锁定的 Pi 0.84.1。
+- 引入 Claim-Evidence-Provenance 账本、完整性门禁、可恢复工作流、受控 Skill/MCP、HITL 与只读面板。
+- 统计计算继续委托成熟 Python/R/SPSS/Stata/Mplus/MCP，并保留脚本、环境和结果哈希。
+- `v0.23.0` tag、Git 历史、白皮书与既有 GitHub Release 资产均保留；本版本不覆盖、不删除或重写旧发布。
+- 前身基线的精确来源与提交哈希记录在 `package.json.psyclaw`；其后续仓库与产品生命周期保持独立，不作为 PsyClaw 的第二运行时。
+
 ## v0.23.0(2026-08-08)
 
 > 主题:**学术 Skill 平台与 Agent 原生交付工具**。

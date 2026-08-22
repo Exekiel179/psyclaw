@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "psyclaw/hard-fail/v1",
+  "rules": [
+    "fabricated-doi-author-title-data-statistic-review",
+    "supported-claim-without-locatable-sufficient-evidence",
+    "metadata-abstract-snippet-posed-as-fulltext",
+    "contradicting-evidence-silently-dropped",
+    "side-effect-without-gate-or-approval",
+    "write-to-raw-git-credential-or-symlink-target",
+    "artifact-without-hash-input-env-script-or-provenance",
+    "resume-drift-silently-reusing-stale-checkpoint",
+    "blind-replay-after-side-effect-timeout",
+    "missing-ethics-privacy-conflict-checks",
+    "exploratory-result-posed-as-confirmatory"
+  ]
+}

@@ -1,175 +1,67 @@
 # PsyClaw
 
-> 心理学研究编排 Agent CLI —— 文献、统计分析、论文写作润色,用日常语言完成。
-> 装好之后不需要记命令:说你要做什么,它去做。
+> v0.24.0 adopts the audited 0.4.1 predecessor Node/Pi baseline as an independent
+> PsyClaw product. PsyClaw v0.23.0 remains intact in Git history, its
+> `v0.23.0` tag, documentation, and existing release assets.
 
-📘 **[使用白皮书(DOCX)](docs/PsyClaw使用白皮书_v0.23.0.docx)** —— 完整用法、对话示例、常见问题,建议先读这份。
+面向社会科学研究者的 Pi 科研智能体层。
 
-📋 **[v0.23.0 协作交接](docs/COLLABORATION_STATUS_v0.23.0.md)** —— 当前交付、开发待办、人工测试与文档更新状态。
+正式版安装（Node.js >= 22.19）：
 
----
-
-## 安装
-
-需要 Python ≥ 3.11(用 uv 安装时无需自己准备,它会自动处理)。
-
-**macOS / Linux:**
-
-```bash
-curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
+```text
+npm install -g psyclaw@0.24.0 --registry https://registry.npmjs.org
+psyclaw --help
 ```
 
-**Windows(PowerShell):**
+PsyClaw 的目标不是再造一个重量级 Agent，而是在官方 Pi 之上提供少量、可审计、可组合的科研契约：研究项目状态、Claim-Evidence-Provenance 账本、完整性门禁、可恢复工作流、受控记忆和按需技能。统计计算交给成熟库或外接 MCP；Pi 的会话、模型、Skill、Package 和 TUI/RPC 能力继续由 Pi 提供。
 
-```powershell
-irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
+当前仓库已完成第一条 M1/MVP-0 可运行切片，并落地 M2 的技能注册与受限多智能体编排基础、M3 的只读并行契约、真实 stdio MCP transport（argv/显式 env/超时隔离）、Skill 恶意正文 preflight、许可证/SBOM 门与 M4 的 literature-review/analysis-delegation/writing-review 三个 workflow 包。官方 Pi 的 `AgentSession`、`SessionManager`、`DefaultResourceLoader`、模型网关和严格 JSONL RPC 已由 adapter 接入；完成项目级 package 安装后提供原生只读 `/agents` 多智能体入口，面板扩展可选安装。联网检索、统计计算和并行写入仍按规划后置。先阅读：
+
+- [开工纪要](docs/开工纪要.md)
+- [架构蓝图](docs/架构蓝图.md)
+- [多智能体开发与运行框架](docs/多智能体开发与运行框架.md)
+- [评测框架](docs/评测框架.md)
+- [技能与生态准入清单](docs/技能与生态准入清单.md)
+- [威胁模型](docs/威胁模型.md)
+
+代号：`psyclaw`。当前可用命令：
+
+```text
+pnpm install
+pnpm check:branding            # 发布前阻断活动产品面中的旧品牌残留
+pnpm build
+pnpm exec pi install -l .       # 一次性把 psyclaw 作为项目级 Pi package 启用
+pnpm exec pi --approve           # 运行 Pi 时信任已审查的项目 package
+node dist/src/cli.js init "研究问题" --paradigm survey-observational
+node dist/src/cli.js evidence add notes/source.md --level user
+node dist/src/cli.js brief
+node dist/src/cli.js chat              # 以自然语言启动文献、分析或写作工作流
+node dist/src/cli.js agents
+node dist/src/cli.js install claude-code --yes  # 当前 agent 全局命令仍为 discover-only
+node dist/src/cli.js import claude-code --yes
+node dist/src/cli.js shell
+/skills                         # 查看推荐 Skill 的启用状态
+/skills enable <skill-id>       # 启用项目级 Skill
+/skills disable <skill-id>      # 禁用项目级 Skill
+/mcp                            # 查看推荐 MCP 的启用状态
+/mcp enable <mcp-id>            # 启用项目级 MCP
+/mcp disable <mcp-id>           # 禁用项目级 MCP
+/install skill|mcp <id>         # 生成安装预检计划
+pnpm exec pi --extension ./dist/src/extension.js --approve  # 未安装 package 时的临时入口
+pi --extension ./dist/src/panel/extension.js                # 可选：在 Pi 中启停 /panel
 ```
 
-脚本自动探测 GitHub 是否可达,**国内不通时切 gitclone.com + 阿里云镜像**。
-可选环境变量:`PSYCLAW_CN=1` 强制国内镜像、`PSYCLAW_EXTRAS=""` 裸装、
-`PSYCLAW_EXTRAS=[full]` 更全。默认会顺带装统计栈(`[stats]`),直接可做分析。
+在 `pi-workbench` 中使用时，先在研究项目根目录安装 psyclaw package：
 
-Agent 默认使用 LangGraph 编排(`planner → executor → verifier → finisher`)；完整安装请使用
-`PSYCLAW_EXTRAS=[full,langgraph]`，或在已有环境执行 `pip install "psyclaw[langgraph]"`。
-
-<details><summary>手动安装 / 离线分发包</summary>
-
-正式 Release 提供两个独立离线包：
-
-- `psyclaw-macos-0.23.0.tar.gz`：Apple Silicon 与 Intel Mac 通用。
-- `psyclaw-windows-0.23.0.zip`：Windows 10/11，内含 PowerShell 安装器。
-
-```bash
-# uv(推荐)
-uv tool install --python 3.12 "git+https://github.com/Exekiel179/psyclaw.git@v0.23.0"
-
-# 国内:换镜像地址 + 国内 PyPI 索引
-UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/ \
-uv tool install --python 3.12 "git+https://gitclone.com/github.com/Exekiel179/psyclaw.git@v0.23.0"
-
-# pip
-pip install "git+https://github.com/Exekiel179/psyclaw.git@v0.23.0"
+```text
+pi install -l F:\Projects\psyclaw
+pi-workbench
 ```
 
-**完全无网的机器**：从 Release 下载对应平台包，解压后运行其中的 `install.sh`
-或 `install.ps1`。维护者也可在有网机器运行 `python scripts/build_dist.py` 同时重建两个包。
-</details>
+workbench 启动的每个 Pi 会话都会加载 psyclaw 的 `/research`、`/brief`、`/agents` 和 `/panel` 命令。在 Pi 中执行 `/panel` 后，用浏览器打开提示的 `http://127.0.0.1:8787` 地址即可查看当前项目的只读运行状态。
 
----
+`brief` 与 `workflow` 在证据门禁失败时退出码为 `2`，并保留 manifest 与 HANDOFF，不生成貌似完成的正文。`serve` 启动本机面板：运行事实、Agent/Skill 和模型目录为只读；模型配置表单是唯一明确的本地写入入口，会将 provider 元数据写入 Pi `models.json`，API key 交给 Pi `auth.json` 管理。
 
-## 上手
+内置 agent 下载器/安装器：`agents`/`scan` 只读识别本机其他智能体（Claude Code、OpenAI Codex、Gemini CLI、opencode、Aider、Cursor、Windsurf、Continue、Orca、Copilot CLI）的配置与技能目录，绝不读取凭据内容；安装计划必须有来源、版本、artifact SHA、许可证/依赖审计和 SBOM，缺任何一项都会 `blocked`。当前 agent catalog 只有全局 npm/pipx 命令，尚未绑定可验证 staging artifact，因此即使人工确认也保持 `agent-staging-required`，不会执行全局安装；`import <id> --yes` 将其他 agent 的允许 Skill 文件以来源/SHA-256 溯源导入 `.psyclaw/imports/`；`shell` 启动 ink 交互式表格 TUI（↑/↓ 选择、`i` 安装、`m` 导入、`r` 重扫、`q` 退出）。
 
-```bash
-psyclaw setup          # 首次:配模型服务与密钥(配一次,所有项目通用)
-psyclaw new 我的研究     # 建一个独立研究目录
-cd 我的研究 && psyclaw   # 进去开始对话
-```
-
-进去之后就是打字说话:
-
-```
-帮我找工作倦怠与离职意向近三年的研究,15 篇左右
-把上面这几篇下载下来
-帮我做个中介分析,自变量工作满意度,中介变量倦怠,因变量离职意向
-根据分析结果帮我写方法部分
-帮我按 APA 规范检查一下,然后导出成心理学报格式的 Word
-```
-
-写文件、下载、改动你的文库前都会先问你一句。四个常用入口:
-
-| 入口 | 用途 |
-|---|---|
-| `psyclaw` | 直接进入对话 |
-| `psyclaw new <名称>` | 新建研究(独立目录,目标与进度隔离) |
-| `psyclaw resume` | 续接上次会话 |
-| `psyclaw status` | 查看进度:目标、待办、最近产出、下一步建议 |
-
----
-
-## 它能做什么
-
-**文献** — 多源检索(OpenAlex / Crossref / EuropePMC)+ 引用滚雪球;
-OA 直接下载,付费墙走你自己的机构权限(LibKey / EZProxy / 浏览器扩展三级降级);
-Zotero 文库联动;**交稿前逐条查证参考文献是否真实存在**。
-
-**统计分析** — 不在本体内计算,而是生成可复现脚本委托 scipy / pingouin / statsmodels 运行,
-脚本留在 `scripts/` 供他人复现。效应量 + 95% CI 必报,不使用「边缘显著」话术,
-确证性与探索性严格区分。也可通过 MCP 接入你原有的 SPSS / Stata / Mplus / R。
-
-**写作润色** — 统计数值只用真实跑出的结果,缺失处占位不编造;JARS 清单检查;
-Nature 级审稿模拟(1287 篇审稿报告蒸馏);一键导出 APA7 / 心理学报 / 心理科学版式 Word。
-
-**四类研究流程** — `analysis` / `meta` / `literature` / `qualitative`,
-自动串联「设计 → 执行 → 产出 → 评审」,每步留可复现记录。
-
-**资料中间层** — `psyclaw convert materials.docx` 将异构资料统一成 Markdown，
-并写入源文件 SHA-256 与转换后 SHA-256 审计；常见文本/表格格式无需额外依赖，DOCX/PDF
-等复杂格式可选接入 MarkItDown。
-
-**资料编译与交接** — `psyclaw compile notes/materials --out notes/compiled-skill` 将一批资料编译成
-可导航 `INDEX.md`、逐文件 Markdown、源文件哈希清单和 `staged/v0` Skill 草稿；
-`psyclaw handoff --goal "..." --next-step "..."` 生成可核验的 `HANDOFF.md` 与 JSON 清单。
-视频 URL 可用 `psyclaw convert --url <地址>`，字幕不可得时明确标记 `partial`，不把简介冒充转录。
-Skill 只有在 `known/forward/contrast/boundary` 四类验证全部通过、且 Claim-Evidence 中有带来源的
-`verified` claim 后，才能用 `psyclaw compile --bundle notes/compiled-skill --promote` 晋升为 `v3`。
-
-**科研组图** — `psyclaw figures --compose figures/a.png figures/b.png --out figures/fig1.png`
-将已有科研图做确定性多面板排版；统计图本身仍由成熟绘图库生成，并通过 `FIG.honest` 检查。
-
-以上命令是人工调试入口。Agent 不需要拼 CLI：`build_tools()` 原生提供
-`material_convert`、`material_compile`、`skill_claim_record`、`skill_validate`、
-`skill_promote`、`skill_bundle_status`、`session_handoff_write` 和 `figure_compose`。
-写盘工具统一走副作用审批，并拒绝项目外路径、`data/raw`、`.git` 和 `.psyclaw`。
-
-**三个入口最小案例** — 同一个目标“分析 `data/clean/scores.csv`”可分别：
-记住两句话：`chat` 一起做，`run` 交给它做。
-`run analysis data/clean/scores.csv` 是按步骤执行；只输入 `psyclaw run` 则让它根据项目状态继续下一步。
-旧命令 `psyclaw auto` 仍兼容，但不再作为主要入口。
-
----
-
-## 三条不可妥协的底线
-
-1. **不编造文献** —— 检索失败就如实说失败,绝不用记忆凑书目;交稿前可逐条查证存在性。
-2. **不编造数据** —— 脚本没真跑过,不给带具体数值的「示例结果」。
-3. **不碰你的原始数据** —— `data/` 目录只读,永不写入。
-
----
-
-## 文档
-
-| 文档 | 内容 |
-|---|---|
-| [使用白皮书(DOCX)](docs/PsyClaw使用白皮书_v0.23.0.docx) | **推荐先读**:完整用法与对话示例 |
-| [v0.23.0 协作交接](docs/COLLABORATION_STATUS_v0.23.0.md) | 当前能力、待办、人工验收与文档状态 |
-| [TUTORIAL.md](docs/TUTORIAL.md) | 分步教程 |
-| [COMMANDS.md](docs/COMMANDS.md) | 命令地图(`psyclaw commands` 可随时查看) |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 架构说明(参与开发时看) |
-| [EVALUATION_SYSTEM.md](docs/EVALUATION_SYSTEM.md) | 系统测评维度、评分模型、发布门槛与人工验收 |
-| [CHANGELOG.md](CHANGELOG.md) | 版本变更 |
-
----
-
-## 参与开发
-
-```bash
-git clone https://github.com/Exekiel179/psyclaw.git && cd psyclaw
-uv run --python 3.12 --with pytest python -m pytest -q     # 全量测试
-python -m psyclaw gates                                     # 质量规则自检
-```
-
-开发脚手架(自主循环、计划与状态文件)统一在 [`dev/`](dev/) 目录下,
-使用者无需关心。约定见 [CLAUDE.md](CLAUDE.md)。
-
----
-
-## 血统
-
-claude-code(REPL / 命令 / Tool 抽象)· codex(exec / 审批)· OpenClaw(provider)·
-AutoResearchClaw(pipeline / skills / MCP)· learn-harness-engineering(harness 工程实践)。
-
-MIT License
-# Architecture
-
-See [`docs/UNIFIED_ARCHITECTURE.md`](docs/UNIFIED_ARCHITECTURE.md) for the
-single execution, capability, policy, evidence, and artifact contract.
+Pi 集成分两层：完成一次 `pi install -l .` 后，项目级 package 默认加载 `src/extension.ts`，注册研究命令和原生只读 `/agents`；未安装时可用上面的 `--extension` 临时入口。worker 通过独立 Pi RPC 子进程、`read/grep/find/ls` 工具和结构化 WorkerReport 回传，但进程边界仍不是 OS sandbox。`src/panel/extension.ts` 是可选扩展，使用 `/panel [--port 8787]` 启停仅绑定 `127.0.0.1` 的只读可视化界面。面板的 Agents/Skills 下载页只展示发现结果、来源、版本、许可证、SHA、风险和审批前计划；模型页读取 Pi 本地模型注册表，并在没有对应注册项时显示 psyclaw 的 DeepSeek 模板元数据。页面只显示环境变量名称，不接收或显示 API key；`configured` 只表示环境变量存在，不代表实际认证成功。模型适配沿用 Pi `models.json`/`registerProvider` 契约，DeepSeek helper 只输出 `$DEEPSEEK_API_KEY` 引用。
