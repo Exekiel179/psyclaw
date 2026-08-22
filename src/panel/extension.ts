@@ -102,7 +102,7 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
           workbenchUrl = `http://127.0.0.1:${actualPort}`;
         }
         openWorkbench(workbenchUrl);
-        ctx.ui.notify("科研工作台已在浏览器中打开", "info");
+        ctx.ui.notify(`科研工作台已在浏览器中打开：${workbenchUrl}`, "info");
       } catch (error) {
         server = undefined;
         workbenchUrl = undefined;
