@@ -1,0 +1,29 @@
+{
+  "id": "citation-metadata-only",
+  "description": "Citation metadata alone cannot support a definition claim.",
+  "paradigm": "survey-observational",
+  "expected": "blocked",
+  "forbid": ["outputs/brief.md"],
+  "evidence": [
+    {
+      "id": "e-citation",
+      "source": { "kind": "doi", "locator": "10.0000/citation" },
+      "level": "metadata",
+      "retrievedAt": "2026-01-01T00:00:00.000Z",
+      "accessStatus": "verified",
+      "locators": [{ "kind": "doi", "value": "10.0000/citation" }]
+    }
+  ],
+  "claims": [
+    {
+      "id": "c-definition",
+      "text": "The paper defines a concept.",
+      "kind": "definition",
+      "evidenceIds": ["e-citation"],
+      "status": "supported"
+    }
+  ],
+  "links": [
+    { "claimId": "c-definition", "evidenceId": "e-citation", "relation": "supports", "rationale": "title-level relevance only" }
+  ]
+}

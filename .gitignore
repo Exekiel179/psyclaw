@@ -1,45 +1,32 @@
-# Python
+node_modules/
+dist/
+.psyclaw/
+coverage/
+*.local.json
 __pycache__/
 *.py[cod]
-*.egg-info/
 .pytest_cache/
-build/
-dist/
 
-# PsyClaw 运行期产物（不入库）
-.psyclaw/
-~/.psyclaw/
-ralph.log
-logs/
-/forest.png
-notes/mission.md
-notes/blocked.md
-notes/pending_for_human.md
-notes/decision_request.md
-
-/outputs/
-/figures/
-/notes/
-/data/
-/dist2/
-/scripts/fig_*.py
-/.remember/
-/*.pdf
-
-# 根目录个人文档（申报表等，不入库；examples/ 下的示例产物不受影响）
-/*.docx
-
-# 密钥 / 个人覆盖（绝不入库）
-key.md
-*.env
+# Credentials and local overrides must never enter version control.
 .env
+.env.*
+*.key
+*.pem
+*credentials*
+*secret*
 .claude/CLAUDE.local.md
 .claude/settings.local.json
 
-# 编辑器
-.vscode/
-.idea/
-.DS_Store
+# Versioned eval reports: keep the current baseline, ignore timestamped runs.
+evals/reports/*.json
+!evals/reports/latest.json
+!evals/reports/modules-latest.json
 
-# 内置 skill 的上游同步产物(skills --sync 克隆,含上游自己的测试,不入库)
-psyclaw/skills/*/upstream/
+# psyclaw runtime artifacts created when psyclaw runs inside its own repo dir.
+artifacts/
+logs/
+notes/
+outputs/
+panel-*.png
+psyclaw-session-*.html
+.tmp-*

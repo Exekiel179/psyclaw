@@ -1,0 +1,73 @@
+{
+  "name": "psyclaw",
+  "version": "0.24.0",
+  "description": "A standalone, evidence-grounded social-science research agent that bundles Pi with PsyClaw's research contracts, evidence gates, and workflows",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Exekiel179/psyclaw.git"
+  },
+  "homepage": "https://github.com/Exekiel179/psyclaw#readme",
+  "bugs": {
+    "url": "https://github.com/Exekiel179/psyclaw/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "bin": {
+    "psyclaw": "dist/src/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "package.json.psyclaw"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "research",
+    "social-science",
+    "evidence",
+    "pi"
+  ],
+  "packageManager": "pnpm@10.28.2",
+  "pi": {
+    "extensions": [
+      "./dist/src/extension.js",
+      "./dist/src/panel/extension.js"
+    ],
+    "skills": [
+      "./skills/core"
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-panel.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "eval": "tsx evals/harness.ts",
+    "eval:modules": "tsx evals/modules.ts",
+    "check:branding": "node scripts/check-branding.mjs",
+    "prepublishOnly": "pnpm check:branding && pnpm build"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.84.1",
+    "@earendil-works/pi-coding-agent": "0.84.1",
+    "ink": "^7.1.1",
+    "react": "^19.2.8",
+    "typebox": "1.3.7",
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.4",
+    "@types/react": "^19.2.18",
+    "tsx": "4.20.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.9"
+  }
+}

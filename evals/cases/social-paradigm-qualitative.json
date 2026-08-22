@@ -1,0 +1,30 @@
+{
+  "id": "social-paradigm-qualitative",
+  "description": "A located coded excerpt supports a qualitative interpretation without numeric results.",
+  "paradigm": "qualitative-thematic",
+  "expected": "pass",
+  "forbid": [],
+  "evidence": [
+    {
+      "id": "e-theme",
+      "source": { "kind": "file", "locator": "fixture/interview.md" },
+      "level": "snippet",
+      "quote": "Participants described the process as gradual and contested.",
+      "retrievedAt": "2026-01-01T00:00:00.000Z",
+      "accessStatus": "verified",
+      "locators": [{ "kind": "section", "value": "Theme: contested process" }]
+    }
+  ],
+  "claims": [
+    {
+      "id": "c-theme",
+      "text": "Participants framed the process as contested.",
+      "kind": "interpretation",
+      "evidenceIds": ["e-theme"],
+      "status": "supported"
+    }
+  ],
+  "links": [
+    { "claimId": "c-theme", "evidenceId": "e-theme", "relation": "supports", "rationale": "coded excerpt" }
+  ]
+}
