@@ -1,0 +1,18 @@
+{
+  "id": "unsupported-claim",
+  "description": "A claim with no evidence must fail closed.",
+  "paradigm": "survey-observational",
+  "expected": "blocked",
+  "forbid": ["outputs/brief.md"],
+  "evidence": [],
+  "claims": [
+    {
+      "id": "c-unsupported",
+      "text": "A claim that has no supporting evidence.",
+      "kind": "definition",
+      "evidenceIds": [],
+      "status": "supported"
+    }
+  ],
+  "links": []
+}

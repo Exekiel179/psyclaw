@@ -1,0 +1,3416 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PsyClaw 科研工作台 & 交互中心</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ==============================================================
+     4 nteract-Inspired Themes Palette (Dark / Light / Paper / Nord)
+     ============================================================== */
+  :root, [data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #090d14;
+    --bg-card: rgba(18, 24, 38, 0.72);
+    --bg-card-solid: #121826;
+    --bg-inner: #090d14;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-highlight: rgba(46, 196, 182, 0.28);
+
+    --ink: #f0f4fc;
+    --ink-muted: #8e9bb2;
+    --ink-faint: #5a667d;
+
+    --accent: #2ec4b6;
+    --accent-glow: rgba(46, 196, 182, 0.25);
+    --accent-ink: #64e5d9;
+    --accent-bg: rgba(46, 196, 182, 0.12);
+
+    --ok: #22c55e;
+    --ok-bg: rgba(34, 197, 94, 0.12);
+    --ok-ink: #4ade80;
+
+    --warn: #f59e0b;
+    --warn-bg: rgba(245, 158, 11, 0.12);
+    --warn-ink: #fbbf24;
+
+    --crit: #f43f5e;
+    --crit-bg: rgba(244, 63, 94, 0.12);
+    --crit-ink: #fb7185;
+
+    --grad-1: radial-gradient(50rem 35rem at 85% -10%, rgba(46, 196, 182, 0.12), transparent 70%);
+    --grad-2: radial-gradient(45rem 30rem at 10% 20%, rgba(99, 102, 241, 0.08), transparent 65%);
+    --grad-3: radial-gradient(60rem 40rem at 50% 110%, rgba(14, 165, 233, 0.07), transparent 70%);
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+    --bg: #f8fafc;
+    --bg-card: rgba(255, 255, 255, 0.88);
+    --bg-card-solid: #ffffff;
+    --bg-inner: #f1f5f9;
+    --line: rgba(0, 0, 0, 0.09);
+    --line-highlight: rgba(13, 148, 136, 0.4);
+
+    --ink: #0f172a;
+    --ink-muted: #475569;
+    --ink-faint: #94a3b8;
+
+    --accent: #0d9488;
+    --accent-glow: rgba(13, 148, 136, 0.2);
+    --accent-ink: #0f766e;
+    --accent-bg: rgba(13, 148, 136, 0.1);
+
+    --ok: #16a34a;
+    --ok-bg: rgba(22, 163, 74, 0.1);
+    --ok-ink: #15803d;
+
+    --warn: #d97706;
+    --warn-bg: rgba(217, 119, 6, 0.1);
+    --warn-ink: #b45309;
+
+    --crit: #e11d48;
+    --crit-bg: rgba(225, 29, 72, 0.1);
+    --crit-ink: #be123c;
+
+    --grad-1: radial-gradient(50rem 35rem at 85% -10%, rgba(13, 148, 136, 0.08), transparent 70%);
+    --grad-2: radial-gradient(45rem 30rem at 10% 20%, rgba(59, 130, 246, 0.06), transparent 65%);
+    --grad-3: radial-gradient(60rem 40rem at 50% 110%, rgba(14, 165, 233, 0.05), transparent 70%);
+  }
+
+  [data-theme="paper"] {
+    color-scheme: light;
+    --bg: #f5f0e6;
+    --bg-card: rgba(255, 253, 247, 0.92);
+    --bg-card-solid: #fffdf8;
+    --bg-inner: #ece4d2;
+    --line: rgba(80, 60, 40, 0.12);
+    --line-highlight: rgba(180, 83, 9, 0.38);
+
+    --ink: #2b261f;
+    --ink-muted: #665c4e;
+    --ink-faint: #9c907e;
+
+    --accent: #b45309;
+    --accent-glow: rgba(180, 83, 9, 0.2);
+    --accent-ink: #92400e;
+    --accent-bg: rgba(180, 83, 9, 0.1);
+
+    --ok: #2e7d32;
+    --ok-bg: rgba(46, 125, 50, 0.1);
+    --ok-ink: #1b5e20;
+
+    --warn: #c2410c;
+    --warn-bg: rgba(194, 65, 12, 0.1);
+    --warn-ink: #9a3412;
+
+    --crit: #b91c1c;
+    --crit-bg: rgba(185, 28, 28, 0.1);
+    --crit-ink: #991b1b;
+
+    --grad-1: radial-gradient(50rem 35rem at 85% -10%, rgba(180, 83, 9, 0.08), transparent 70%);
+    --grad-2: radial-gradient(45rem 30rem at 10% 20%, rgba(217, 119, 6, 0.06), transparent 65%);
+    --grad-3: radial-gradient(60rem 40rem at 50% 110%, rgba(161, 98, 7, 0.05), transparent 70%);
+  }
+
+  [data-theme="nord"] {
+    color-scheme: dark;
+    --bg: #0f172a;
+    --bg-card: rgba(30, 41, 59, 0.8);
+    --bg-card-solid: #1e293b;
+    --bg-inner: #0b1120;
+    --line: rgba(148, 163, 184, 0.14);
+    --line-highlight: rgba(56, 189, 248, 0.38);
+
+    --ink: #f8fafc;
+    --ink-muted: #94a3b8;
+    --ink-faint: #64748b;
+
+    --accent: #38bdf8;
+    --accent-glow: rgba(56, 189, 248, 0.25);
+    --accent-ink: #7dd3fc;
+    --accent-bg: rgba(56, 189, 248, 0.12);
+
+    --ok: #22c55e;
+    --ok-bg: rgba(34, 197, 94, 0.12);
+    --ok-ink: #4ade80;
+
+    --warn: #f59e0b;
+    --warn-bg: rgba(245, 158, 11, 0.12);
+    --warn-ink: #fbbf24;
+
+    --crit: #f43f5e;
+    --crit-bg: rgba(244, 63, 94, 0.12);
+    --crit-ink: #fb7185;
+
+    --grad-1: radial-gradient(50rem 35rem at 85% -10%, rgba(56, 189, 248, 0.12), transparent 70%);
+    --grad-2: radial-gradient(45rem 30rem at 10% 20%, rgba(99, 102, 241, 0.1), transparent 65%);
+    --grad-3: radial-gradient(60rem 40rem at 50% 110%, rgba(14, 165, 233, 0.08), transparent 70%);
+  }
+
+  :root {
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+    --shadow-card: 0 10px 30px -5px rgba(0, 0, 0, 0.2), 0 0 0 1px var(--line);
+    --shadow-glow: 0 0 25px -3px var(--accent-glow), 0 0 0 1px var(--line-highlight);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    background-image: var(--grad-1), var(--grad-2), var(--grad-3);
+    background-attachment: fixed;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Top Navigation */
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--line);
+    padding: 0.75rem 1.5rem;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+  }
+  .header-inner {
+    max-width: 82rem;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.2rem;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+  }
+  .brand-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), #3b82f6);
+    display: grid;
+    place-items: center;
+    color: #05141b;
+    font-weight: 800;
+    font-size: 1.25rem;
+    line-height: 1;
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .brand-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .brand-tag {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: var(--accent-bg);
+    color: var(--accent-ink);
+    border: 1px solid var(--line-highlight);
+  }
+
+  /* Tabs Bar */
+  .nav-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: var(--bg-inner);
+    padding: 0.25rem;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .nav-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: 9px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .nav-tab:hover {
+    color: var(--ink);
+  }
+  .nav-tab.active {
+    color: var(--ink);
+    background: var(--bg-card-solid);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12), 0 0 0 1px var(--line-highlight);
+  }
+
+  /* Theme Switcher Segmented Control */
+  .theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--bg-inner);
+    border: 1px solid var(--line);
+    padding: 3px;
+    border-radius: 999px;
+  }
+  .theme-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .theme-btn:hover { color: var(--ink); }
+  .theme-btn.active {
+    color: var(--ink);
+    background: var(--bg-card-solid);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    font-weight: 750;
+  }
+
+  /* Header Trust Indicator */
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+  }
+  .pulse-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    background: var(--ok-bg);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    color: var(--ok-ink);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  @media (max-width: 430px) {
+    .header { padding: 0.65rem 0.75rem; }
+    .header-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 0.6rem;
+      width: 100%;
+    }
+    .brand { min-width: 0; gap: 0.5rem; }
+    .brand-tag { display: none; }
+    .nav-tabs {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      min-width: 0;
+      width: 100%;
+    }
+    .header-status { gap: 0.35rem; }
+    .theme-btn { padding-inline: 5px; }
+    .pulse-indicator { padding-inline: 0.45rem; }
+    #heartbeat-text { display: none; }
+    main { padding: 1rem 0.75rem 4rem; }
+  }
+  .pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+    animation: livePulse 2s infinite ease-in-out;
+  }
+  @keyframes livePulse {
+    0%, 100% { transform: scale(0.85); opacity: 0.6; }
+    50% { transform: scale(1.2); opacity: 1; }
+  }
+
+  /* Main Container */
+  main {
+    max-width: 82rem;
+    margin: 0 auto;
+    padding: 1.5rem 1.5rem 6rem;
+  }
+
+  /* Tab Views */
+  .tab-pane {
+    display: none;
+    animation: fadeIn 0.25s ease-out;
+  }
+  .tab-pane.active {
+    display: block;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Typography & Utilities */
+  h2 {
+    font-size: 1.45rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin-bottom: 0.3rem;
+  }
+  .lead {
+    color: var(--ink-muted);
+    font-size: 0.92rem;
+    margin-bottom: 1.4rem;
+  }
+  .kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.4rem;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--bg-inner);
+    padding: 0.15rem 0.4rem;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+    color: var(--accent-ink);
+  }
+  a { color: var(--accent-ink); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Pill Badges */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 650;
+    border: 1px solid transparent;
+  }
+  .pill.neutral { color: var(--ink-muted); background: var(--bg-inner); border-color: var(--line); }
+  .pill.accent { color: var(--accent-ink); background: var(--accent-bg); border-color: var(--line-highlight); box-shadow: 0 0 10px var(--accent-glow); }
+  .pill.ok { color: var(--ok-ink); background: var(--ok-bg); border-color: rgba(34, 197, 94, 0.3); }
+  .pill.warn { color: var(--warn-ink); background: var(--warn-bg); border-color: rgba(245, 158, 11, 0.3); }
+  .pill.crit { color: var(--crit-ink); background: var(--crit-bg); border-color: rgba(244, 63, 94, 0.3); }
+  .pill .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* Glass Bento Card Layout */
+  .card-bento {
+    background: var(--bg-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 1.3rem 1.4rem;
+    box-shadow: var(--shadow-card);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+  .card-bento:hover {
+    border-color: var(--line-highlight);
+  }
+
+  /* ==============================================================
+     1. 交互工作台 (Assistant & Interactive Chat Tab)
+     ============================================================== */
+  .chat-workspace {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 1024px) {
+    .chat-workspace { grid-template-columns: 1fr; }
+  }
+
+  .chat-main {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    height: 74vh;
+    min-height: 540px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .chat-header {
+    padding: 0.9rem 1.25rem;
+    background: var(--bg-inner);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chat-header-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .chips-container {
+    padding: 0.65rem 1.1rem;
+    background: var(--bg-inner);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .chips-container::-webkit-scrollbar { display: none; }
+  .prompt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.32rem 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-muted);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .prompt-chip:hover {
+    color: var(--accent-ink);
+    background: var(--accent-bg);
+    border-color: var(--line-highlight);
+    transform: translateY(-1px);
+  }
+
+  .chat-stream {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .msg-bubble {
+    display: flex;
+    gap: 0.85rem;
+    max-width: 88%;
+    animation: msgIn 0.25s ease-out;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg-bubble.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+  .msg-bubble.assistant {
+    align-self: flex-start;
+  }
+
+  .msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+  .msg-bubble.assistant .msg-avatar {
+    background: linear-gradient(135deg, var(--accent), #3b82f6);
+    color: #05141b;
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  .msg-bubble.user .msg-avatar {
+    background: var(--bg-inner);
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+
+  .msg-content {
+    background: var(--bg-card-solid);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0.85rem 1.1rem;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--ink);
+    position: relative;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  }
+  .msg-bubble.user .msg-content {
+    background: var(--accent-bg);
+    border-color: var(--line-highlight);
+  }
+  .msg-content pre {
+    background: var(--bg-inner);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-family: var(--mono);
+    font-size: 0.84em;
+    overflow-x: auto;
+    margin: 0.6rem 0;
+    color: var(--accent-ink);
+  }
+  .msg-content blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 0.75rem;
+    margin: 0.5rem 0;
+    color: var(--ink-muted);
+    font-style: italic;
+  }
+
+  .chat-composer-box {
+    padding: 0.9rem 1.1rem;
+    background: var(--bg-inner);
+    border-top: 1px solid var(--line);
+  }
+  .chat-composer-form {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-end;
+  }
+  .chat-textarea {
+    flex: 1;
+    min-height: 48px;
+    max-height: 160px;
+    background: var(--bg-card-solid);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    padding: 0.7rem 0.85rem;
+    font-family: var(--font);
+    font-size: 0.92rem;
+    line-height: 1.45;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .chat-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+
+  .btn-send {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: linear-gradient(135deg, var(--accent), #0ea5e9);
+    color: #05141b;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 0.75rem 1.3rem;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .btn-send:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+  }
+  .btn-send:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Chat Sidebar */
+  .chat-side-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* ==============================================================
+     2. 运行概览 Dashboard (Overview Tab)
+     ============================================================== */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1rem;
+  }
+  .bento-12 { grid-column: span 12; }
+  .bento-8 { grid-column: span 8; }
+  .bento-6 { grid-column: span 6; }
+  .bento-4 { grid-column: span 4; }
+
+  @media (max-width: 900px) {
+    .bento-8, .bento-6, .bento-4 { grid-column: span 12; }
+  }
+
+  .goal-box {
+    font-size: 1.12rem;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.5;
+    margin-top: 0.2rem;
+  }
+
+  .progress-track {
+    height: 8px;
+    background: var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    margin: 0.6rem 0 0.4rem;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--accent), #38bdf8);
+    box-shadow: 0 0 10px var(--accent-glow);
+    transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Key-Value Detail List */
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 0.9rem;
+  }
+  .detail-row:last-child { border-bottom: 0; }
+  .detail-key { color: var(--ink-muted); font-size: 0.85rem; }
+
+  /* Claim-Evidence Probe Styles */
+  .probe-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    align-items: start;
+  }
+  @media (max-width: 960px) {
+    .probe-grid { grid-template-columns: 1fr; }
+  }
+  .manuscript-box {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 1.4rem;
+    font-size: 0.94rem;
+    line-height: 1.85;
+    color: var(--ink);
+  }
+  .claim-interactive-tag {
+    background: var(--accent-bg);
+    border-bottom: 2px solid var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+    padding: 0.12rem 0.4rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline;
+  }
+  .claim-interactive-tag:hover, .claim-interactive-tag.active {
+    background: var(--accent);
+    color: #05141b;
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+  .claim-interactive-tag.uncertain {
+    background: var(--warn-bg);
+    border-bottom-color: var(--warn);
+    color: var(--warn-ink);
+  }
+  .claim-interactive-tag.uncertain:hover, .claim-interactive-tag.uncertain.active {
+    background: var(--warn);
+    color: #05141b;
+  }
+
+  .probe-drawer {
+    background: var(--bg-card-solid);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 1.3rem 1.4rem;
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  /* Interactive Manuscript & Word Editor Styles */
+  .editor-workspace {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 1024px) {
+    .editor-workspace { grid-template-columns: 1fr; }
+  }
+  .editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    padding: 0.65rem 1rem;
+    background: var(--bg-inner);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    margin-bottom: 0.9rem;
+  }
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .tool-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 0.35rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .tool-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .tool-btn.active {
+    background: var(--accent-bg);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+  .editor-paper {
+    background: var(--bg-card-solid);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 2.2rem 2.4rem;
+    min-height: 580px;
+    max-height: 72vh;
+    outline: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    font-family: var(--font);
+    font-size: 0.96rem;
+    line-height: 1.85;
+    color: var(--ink);
+    overflow-y: auto;
+  }
+  .editor-paper:focus {
+    border-color: var(--line-highlight);
+  }
+  .editor-paper h1, .editor-paper h2, .editor-paper h3 {
+    margin-top: 1.4rem;
+    margin-bottom: 0.6rem;
+    color: var(--ink);
+    line-height: 1.25;
+  }
+  .editor-paper p {
+    margin-bottom: 1rem;
+  }
+  .editor-paper blockquote {
+    border-left: 3px solid var(--accent);
+    padding-left: 1rem;
+    margin: 1rem 0;
+    color: var(--ink-muted);
+    font-style: italic;
+  }
+  .editor-paper .md-image,
+  .manuscript-preview .md-image {
+    max-width: 82%;
+    height: auto;
+    display: block;
+    margin: 0.9rem auto;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    cursor: zoom-in;
+  }
+  .editor-paper .md-table,
+  .manuscript-preview .md-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.88rem;
+    border-top: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+  }
+  .editor-paper .md-table th,
+  .manuscript-preview .md-table th {
+    border-bottom: 1px solid var(--ink);
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    font-weight: 700;
+  }
+  .editor-paper .md-table td,
+  .manuscript-preview .md-table td {
+    padding: 0.35rem 0.6rem;
+  }
+  .editor-paper .md-list,
+  .manuscript-preview .md-list {
+    padding-left: 1.4rem;
+    margin: 0.6rem 0;
+  }
+  .editor-paper code {
+    background: var(--bg-inner);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.05rem 0.3rem;
+    font-size: 0.86em;
+  }
+
+  .editor-markdown-raw {
+    width: 100%;
+    min-height: 580px;
+    max-height: 72vh;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.7;
+    padding: 1.5rem;
+    background: var(--bg-inner);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    color: var(--ink);
+    resize: vertical;
+    display: none;
+    outline: none;
+  }
+
+  .auditor-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 1.3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .claim-list-item {
+    background: var(--bg-inner);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-bottom: 0.5rem;
+  }
+  .claim-list-item:hover, .claim-list-item.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px var(--accent-glow);
+  }
+
+  /* Tables */
+  .table-responsive {
+    overflow-x: auto;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--bg-card);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    text-align: left;
+  }
+  th {
+    background: var(--bg-inner);
+    color: var(--ink-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--line);
+  }
+  td {
+    padding: 0.75rem 0.9rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg-inner); }
+
+  /* Form Elements */
+  input, select, textarea {
+    width: 100%;
+    font-family: var(--font);
+    font-size: 0.9rem;
+    color: var(--ink);
+    background: var(--bg-inner);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 0.65rem 0.8rem;
+    outline: none;
+    transition: all 0.15s ease;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.9rem;
+  }
+  .form-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    font-weight: 650;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #0ea5e9);
+    color: #05141b;
+    box-shadow: 0 0 14px var(--accent-glow);
+  }
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--bg-inner);
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .btn-secondary:hover { background: var(--bg-card-solid); border-color: var(--line-highlight); }
+  .btn-danger {
+    background: var(--crit-bg);
+    color: var(--crit-ink);
+    border-color: rgba(244, 63, 94, 0.3);
+  }
+  .btn-danger:hover { background: rgba(244, 63, 94, 0.2); }
+
+  /* Skills & Capability Shelf */
+  .capability-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .capability-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s ease;
+  }
+  .capability-card:hover {
+    border-color: var(--line-highlight);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow);
+  }
+  .capability-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+  }
+  .capability-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .capability-desc {
+    color: var(--ink-muted);
+    font-size: 0.84rem;
+    line-height: 1.5;
+    margin-bottom: 0.9rem;
+    flex: 1;
+  }
+
+  /* Modal / Drawer for Preview */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: none;
+    place-items: center;
+    padding: 1.5rem;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.active { display: grid; }
+  .modal-content {
+    background: var(--bg-card-solid);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    width: min(840px, 95vw);
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px var(--line-highlight);
+  }
+  .modal-header {
+    padding: 1rem 1.4rem;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-body {
+    padding: 1.25rem 1.4rem;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--ink);
+    white-space: pre-wrap;
+    background: var(--bg-inner);
+    line-height: 1.6;
+  }
+
+  .feedback-text {
+    font-size: 0.82rem;
+    margin-top: 0.4rem;
+    min-height: 1.2rem;
+    color: var(--ink-muted);
+  }
+  .feedback-text.ok { color: var(--ok-ink); }
+</style>
+</head>
+<body>
+
+<!-- Header Top Bar -->
+<header class="header">
+  <div class="header-inner">
+    <a href="#" class="brand">
+      <div class="brand-logo">ψ</div>
+      <div>
+        <div class="brand-title">PsyClaw</div>
+      </div>
+      <span class="brand-tag">工作台 v0.24.0</span>
+    </a>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="nav-tabs" aria-label="工作台导航">
+      <button class="nav-tab active" data-tab="tab-chat">💬 交互助手</button>
+      <button class="nav-tab" data-tab="tab-editor">📝 手稿编辑与核验</button>
+      <button class="nav-tab" data-tab="tab-overview">📊 运行看板</button>
+      <button class="nav-tab" data-tab="tab-artifacts">📁 产物证据</button>
+      <button class="nav-tab" data-tab="tab-hitl">⚖️ 人工确认</button>
+      <button class="nav-tab" data-tab="tab-skills">🧩 技能生态</button>
+      <button class="nav-tab" data-tab="tab-rules">🛡️ 规则约束</button>
+      <button class="nav-tab" data-tab="tab-tokens">📈 成本分析</button>
+      <button class="nav-tab" data-tab="tab-settings">⚙️ Provider</button>
+    </nav>
+
+    <!-- Theme Switcher & Trust Indicator -->
+    <div class="header-status">
+      <div class="theme-switcher" role="group" aria-label="主题配色切换">
+        <button class="theme-btn active" data-set-theme="dark" title="曜石暗夜 (Dark)">🌙</button>
+        <button class="theme-btn" data-set-theme="light" title="晨曦纯白 (Light)">☀️</button>
+        <button class="theme-btn" data-set-theme="paper" title="暖阳古籍 (Sepia / Paper)">📜</button>
+        <button class="theme-btn" data-set-theme="nord" title="极光深黛 (Nord / Ocean)">🌌</button>
+      </div>
+
+      <div class="pulse-indicator">
+        <span class="pulse-dot"></span>
+        <span id="heartbeat-text">Local</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ==============================================================
+       TAB 1: 交互助手工作台 (Interactive Chat & Console)
+       ============================================================== -->
+  <section id="tab-chat" class="tab-pane active">
+    <div class="chat-workspace">
+      <!-- Main Chat Area -->
+      <div class="chat-main">
+        <div class="chat-header">
+          <div class="chat-header-info">
+            <span class="pill accent"><span class="dot"></span> 研究智能体</span>
+            <span id="chat-sub-badge" class="pill neutral">社科范式就绪</span>
+          </div>
+          <button class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.75rem;" id="btn-clear-chat">清屏</button>
+        </div>
+
+        <!-- Quick Prompt Chips -->
+        <div class="chips-container">
+          <button class="prompt-chip" data-prompt="检查当前文献综述的证据覆盖率和支持链条">📖 查证据覆盖率</button>
+          <button class="prompt-chip" data-prompt="交叉核验所有引用的 DOI、作者与出版年真实性">🔍 核验 DOI 真实性</button>
+          <button class="prompt-chip" data-prompt="审查统计分析方案：是否报告效应量、置信区间与缺失值处理？">📊 审查统计与效应量</button>
+          <button class="prompt-chip" data-prompt="准备符合 APA 7 规范的标准交付物与图表清单">📝 准备 APA 7 交付</button>
+          <button class="prompt-chip" data-prompt="列出当前所有需要人工确认的待办项或阻断点">⚖️ 检查 HITL 待办</button>
+        </div>
+
+        <!-- Conversation Message Stream -->
+        <div id="chat-stream" class="chat-stream">
+          <div class="msg-bubble assistant">
+            <div class="msg-avatar">ψ</div>
+            <div class="msg-content">
+              <strong>您好，我是 PsyClaw 科研智能助手。</strong><br>
+              我基于严密的证据链（Claim-Evidence Ledger）工作。您可以直接向我提问、委托文献综述核验、审查统计方案，或点击上方的快速快捷指令开始。
+            </div>
+          </div>
+        </div>
+
+        <!-- Composer Form -->
+        <div class="chat-composer-box">
+          <div id="chat-status" class="detail-key" style="display:none;font-size:0.72rem;padding:0.1rem 0.2rem 0.4rem;">🧠 助手思考中…（只读智能体，最长等待 120 秒）</div>
+          <form id="chat-form" class="chat-composer-form">
+            <textarea id="chat-input" class="chat-textarea" placeholder="输入研究指令或提问（Enter 发送，Shift+Enter 换行）…" rows="1"></textarea>
+            <button type="submit" id="btn-send-msg" class="btn-send">
+              <span>发送</span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Chat Right Sidebar: Status Quick Snapshot -->
+      <div class="chat-side-cards">
+        <div class="card-bento">
+          <div class="kicker">当前运行状态</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:0.4rem 0 0.8rem;">
+            <span id="quick-phase-pill" class="pill neutral">读取中</span>
+            <span id="quick-run-id" class="detail-key">--</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-key">范式</span>
+            <span id="quick-paradigm" style="font-weight:600">--</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-key">证据覆盖</span>
+            <span id="quick-evidence" style="font-weight:600">0 / 0</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-key">待决事项</span>
+            <span id="quick-hitl-count" class="pill ok">0 项待办</span>
+          </div>
+        </div>
+
+        <div class="card-bento">
+          <div class="kicker">快捷操作</div>
+          <div style="display:grid;gap:0.5rem;margin-top:0.4rem;">
+            <button class="btn btn-secondary" style="width:100%;justify-content:flex-start;" onclick="switchTab('tab-overview')">📊 查看全景看板</button>
+            <button class="btn btn-secondary" style="width:100%;justify-content:flex-start;" onclick="switchTab('tab-artifacts')">📁 浏览研究交付物</button>
+            <button class="btn btn-secondary" style="width:100%;justify-content:flex-start;" onclick="switchTab('tab-hitl')">⚖️ 记录人工决定</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==============================================================
+       TAB: 交互式手稿编辑器与证据核验 (Interactive Manuscript & Word/Markdown Editor)
+       ============================================================== -->
+  <section id="tab-editor" class="tab-pane">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.5rem;flex-wrap:wrap;gap:0.8rem;">
+      <div>
+        <h2>交互式手稿编辑与证据核验</h2>
+        <p class="lead">直接在此修改手稿内容、划词关联新 Claim、实时联网核验 DOI，并一键导出 Word (.doc) 或 Markdown。</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+        <span class="pill accent" id="manuscript-version-badge" title="当前手稿版本">v—</span>
+        <select id="version-select" style="font-size:0.75rem;padding:0.2rem 0.4rem;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);" title="切换历史版本（存档于 paper/archive/）">
+          <option value="">版本…</option>
+        </select>
+        <span class="pill accent" id="editor-stats-badge"><span class="dot"></span> 3 个 Claim · 67% 覆盖率</span>
+        <button class="btn btn-secondary" style="font-size:0.8rem;" id="btn-export-word">📄 发布 Word (APA7)</button>
+        <button class="btn btn-secondary" style="font-size:0.8rem;" id="btn-export-md">📝 发布 Markdown</button>
+        <button class="btn btn-primary" style="font-size:0.8rem;" id="btn-save-manuscript">💾 保存手稿</button>
+      </div>
+    </div>
+
+    <!-- Editor Toolbar -->
+    <div class="editor-toolbar">
+      <div class="toolbar-group">
+        <button class="tool-btn" onclick="formatDoc('bold')" title="加粗"><b>B</b></button>
+        <button class="tool-btn" onclick="formatDoc('italic')" title="斜体"><i>I</i></button>
+        <button class="tool-btn" onclick="formatDoc('formatBlock', '<h2>')" title="二级标题">H2</button>
+        <button class="tool-btn" onclick="formatDoc('formatBlock', '<h3>')" title="三级标题">H3</button>
+        <button class="tool-btn" onclick="formatDoc('formatBlock', '<blockquote>')" title="引用块">引用</button>
+        <button class="tool-btn" onclick="formatDoc('insertUnorderedList')" title="无序列表">• 列表</button>
+      </div>
+
+      <div class="toolbar-group">
+        <button class="tool-btn" id="btn-mark-selected-claim" title="将选中文本标记为新论断并校验">🏷️ 选词关联 Claim</button>
+        <button class="tool-btn" id="btn-mark-selected-uncertain" title="将选中文本标记为证据缺口">⚠️ 标为 Uncertain</button>
+        <button class="tool-btn" id="btn-insert-image" title="从产物列表插入图片（SVG 可点击拖拽编辑）">🖼️ 插入图片</button>
+      </div>
+
+      <div class="toolbar-group">
+        <button class="tool-btn active" id="btn-mode-wysiwyg">📄 富文本视图</button>
+        <button class="tool-btn" id="btn-mode-markdown">💻 Markdown 源码</button>
+      </div>
+    </div>
+
+    <!-- Workspace Split -->
+    <div class="editor-workspace">
+      <!-- Left: Editor Canvas -->
+      <div>
+        <div id="editor-canvas" class="editor-paper" contenteditable="true" spellcheck="false">
+          <p class="detail-key">正在加载项目手稿…</p>
+        </div>
+
+        <textarea id="editor-markdown" class="editor-markdown-raw"></textarea>
+      </div>
+
+      <!-- Right: Live Evidence Auditor & Registry -->
+      <div class="auditor-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="kicker" style="margin:0;">证据核验审查器 (Evidence Auditor)</div>
+          <span class="pill neutral" id="auditor-status-pill">待选择论断</span>
+        </div>
+
+        <div style="display:grid;gap:0.6rem;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:0.75rem;">论断标识 (Claim ID)</label>
+            <input id="audit-input-id" value="—" style="font-family:var(--mono);font-size:0.8rem;" readonly>
+          </div>
+
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:0.75rem;">文献来源标题 / 作者 (Citation)</label>
+            <input id="audit-input-title" placeholder="如：Smith et al. (2021). Title…">
+          </div>
+
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:0.75rem;">DOI 唯一标识符</label>
+            <div style="display:flex;gap:0.4rem;">
+              <input id="audit-input-doi" placeholder="10.xxxx/xxxx">
+              <button class="btn btn-secondary" style="font-size:0.75rem;padding:0.2rem 0.6rem;" id="btn-verify-doi">🔍 实时核验</button>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:0.75rem;">原始论文引文摘录 (Evidence Quote)</label>
+            <textarea id="audit-input-quote" rows="3" style="font-size:0.8rem;line-height:1.5;" placeholder="粘贴论文中的原句摘录…"></textarea>
+          </div>
+
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:0.75rem;">核验状态判定</label>
+            <select id="audit-select-status" style="font-size:0.82rem;">
+              <option value="verified">✅ 双源核验通过 (Verified)</option>
+              <option value="uncertain">⚠️ 证据缺口标定 (Uncertain)</option>
+              <option value="rejected">❌ 证据不足/拒绝 (Rejected)</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
+            <button class="btn btn-primary" style="flex:1;font-size:0.8rem;" id="btn-save-claim-edit">💾 更新证据账本</button>
+            <button class="btn btn-secondary" style="font-size:0.8rem;" id="btn-ask-ai-checker">🤖 委托 AI 核验</button>
+          </div>
+          <div id="audit-feedback" class="feedback-text" style="font-size:0.78rem;"></div>
+        </div>
+
+        <div style="border-top:1px solid var(--line);padding-top:0.8rem;margin-top:0.4rem;">
+          <div class="kicker" style="margin-bottom:0.5rem;">手稿内全部 Claim 索引</div>
+          <div id="editor-claims-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==============================================================
+       TAB 2: 运行看板 (Overview Dashboard Tab)
+       ============================================================== -->
+  <section id="tab-overview" class="tab-pane">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.5rem;">
+      <div>
+        <h2>运行监控与研究进度</h2>
+        <p class="lead">实时展示当前智能体正在执行的子任务、门禁检查状态与证据覆盖度。</p>
+      </div>
+      <span id="overview-phase-pill" class="pill neutral">读取中</span>
+    </div>
+
+    <div class="overview-grid">
+      <!-- Current Goal Hero Card -->
+      <div class="card-bento bento-8">
+        <div class="kicker">当前研究目标 (Research Goal)</div>
+        <div id="goal-display" class="goal-box">暂无活跃研究任务。回到终端或交互助手描述目标即可开始。</div>
+      </div>
+
+      <!-- Evidence Coverage Card -->
+      <div class="card-bento bento-4">
+        <div class="kicker">证据链覆盖率 (Evidence Ledger)</div>
+        <div id="evidence-progress-container">
+          <div class="progress-track"><div id="evidence-bar" class="progress-fill" style="width:0%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--ink-muted);">
+            <span id="evidence-ratio">0 / 0 条 Claim 已验证</span>
+            <span id="evidence-pct">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Tasks Card -->
+      <div class="card-bento bento-6">
+        <div class="kicker">智能体调度任务 (Active Tasks)</div>
+        <div id="tasks-list" style="display:grid;gap:0.4rem;margin-top:0.4rem;">
+          <div class="detail-key">暂无任务</div>
+        </div>
+      </div>
+
+      <!-- Gates Checklist Card -->
+      <div class="card-bento bento-6">
+        <div class="kicker">质量与安全门禁 (Gates)</div>
+        <ul id="gates-list" style="list-style:none;display:grid;gap:0.4rem;margin-top:0.4rem;">
+          <li class="detail-key">等待读取…</li>
+        </ul>
+      </div>
+
+      <!-- Action & Control Snapshot -->
+      <div class="card-bento bento-12">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.8rem;">
+          <div>
+            <div class="kicker">运行控制与快照</div>
+            <div id="snapshot-summary" class="detail-key">Run ID: --</div>
+            <div id="next-step" class="pill accent" style="margin-top:0.45rem;">读取中…</div>
+          </div>
+          <div id="run-actions-holder" style="display:flex;gap:0.5rem;align-items:center;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==============================================================
+       TAB 3: 产物证据与探针 (Artifacts & Claim-Evidence Probe Tab)
+       ============================================================== -->
+  <section id="tab-artifacts" class="tab-pane">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.5rem;">
+      <div>
+        <h2>研究产物与证据探针 (Claim-Evidence Probe)</h2>
+        <p class="lead">点击手稿中的高亮论断（Claim），即刻透视背后的双向核验证据链、DOI 与 SHA-256 指纹。</p>
+      </div>
+      <button class="btn btn-secondary" style="font-size:0.78rem;" id="btn-export-ris">📋 导出全量 RIS / BibTeX</button>
+    </div>
+
+    <!-- Live Claim-Evidence Probe Container -->
+    <div class="probe-grid">
+      <!-- Left: Real Manuscript Preview (loaded from the project) -->
+      <div class="manuscript-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+          <span class="kicker" style="margin:0;">MANUSCRIPT · <span id="manuscript-preview-path" class="mono" style="font-size:0.7rem;">读取中…</span></span>
+          <span class="pill neutral" id="manuscript-preview-count" style="font-size:0.7rem;">— 个论断</span>
+        </div>
+        <div id="manuscript-preview" class="manuscript-preview" style="font-size:0.85rem;color:var(--ink);line-height:1.65;">
+          <p class="detail-key">正在读取手稿…</p>
+        </div>
+      </div>
+
+      <!-- Right: Interactive Evidence Ledger Card (populated from the real ledger) -->
+      <div class="probe-drawer" id="probe-drawer">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="pill neutral" id="probe-status-pill"><span class="dot"></span> 尚无论断</span>
+          <span class="detail-key mono" id="probe-claim-id">—</span>
+        </div>
+
+        <div>
+          <h4 style="font-size:1.02rem;color:var(--ink);margin-bottom:0.3rem;" id="probe-source-title">（从真实证据账本加载）</h4>
+          <div class="mono" style="font-size:0.78rem;color:var(--ink-muted);" id="probe-doi-link">DOI: —</div>
+        </div>
+
+        <div style="background:var(--bg-inner);border:1px solid var(--line);border-radius:8px;padding:0.75rem;font-size:0.82rem;color:var(--ink-muted);line-height:1.6;" id="probe-quote-box">
+          点击左侧手稿中的高亮论断，查看其在 .psyclaw 账本中的真实证据链。
+        </div>
+
+        <div style="display:grid;gap:0.3rem;font-size:0.75rem;color:var(--ink-faint);" class="mono">
+          <div style="display:flex;justify-content:space-between;">
+            <span>SHA-256:</span>
+            <span id="probe-hash-val" style="color:var(--ink);">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span>Cross-Check:</span>
+            <span id="probe-source-match" style="color:var(--ink-muted);">—</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
+          <button class="btn btn-secondary" style="flex:1;font-size:0.78rem;" id="btn-probe-ask-chat">💬 追问此论断</button>
+          <button class="btn btn-secondary" style="font-size:0.78rem;" id="btn-probe-copy-cite">📋 复制引文</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Project Document Registry / Import (standard locations: paper/ docs/ data/ outputs/) -->
+    <div class="card-bento">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+        <span class="kicker" style="margin:0;">📥 项目文档清单 (Documents · paper/ docs/ data/)</span>
+        <span class="pill neutral" style="font-size:0.7rem;" id="documents-count">读取中…</span>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>文档路径</th>
+              <th>类型</th>
+              <th>大小</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="documents-table-body">
+            <tr><td colspan="5" class="detail-key">正在扫描项目文档…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Reference Archive & In-text Citation Check -->
+    <div class="card-bento">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:.5rem;">
+        <span class="kicker" style="margin:0;">🔖 参考文献存档与核验 (References · .psyclaw/references.jsonl)</span>
+        <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">
+          <input id="ref-doi-input" placeholder="10.xxxx/xxxx" style="font-size:0.75rem;padding:0.25rem 0.5rem;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:180px;">
+          <button class="btn btn-secondary" style="font-size:0.72rem;padding:0.2rem 0.5rem;" id="btn-ref-verify">🔍 核验并存档</button>
+          <button class="btn btn-secondary" style="font-size:0.72rem;padding:0.2rem 0.5rem;" id="btn-ref-check-text">🧾 核验正文引用</button>
+        </div>
+      </div>
+      <div id="ref-check-result" class="feedback-text" style="margin-bottom:0.6rem;font-size:0.78rem;white-space:pre-wrap;"></div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>DOI</th>
+              <th>文献</th>
+              <th>年份</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="references-table-body">
+            <tr><td colspan="5" class="detail-key">正在读取参考文献存档…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="border-top:1px solid var(--line);padding-top:0.8rem;margin-top:0.8rem;display:grid;gap:0.5rem;">
+        <div class="kicker" style="margin:0;">📑 登记引用用途（证据 + 引用原因 → .psyclaw/citations.jsonl）</div>
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
+          <input id="cite-doi-input" placeholder="DOI" style="font-size:0.75rem;padding:0.25rem 0.5rem;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:150px;">
+          <input id="cite-reason-input" placeholder="引用原因（一句，如：支持社会支持缓冲压力假说）" style="font-size:0.75rem;padding:0.25rem 0.5rem;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);flex:1;min-width:220px;">
+          <input id="cite-context-input" placeholder="被引句上下文（可空）" style="font-size:0.75rem;padding:0.25rem 0.5rem;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);flex:1;min-width:160px;">
+          <button class="btn btn-secondary" style="font-size:0.72rem;padding:0.2rem 0.5rem;" id="btn-record-cite">📝 登记引用</button>
+        </div>
+        <div id="citation-uses" style="display:grid;gap:0.35rem;font-size:0.78rem;"></div>
+      </div>
+    </div>
+
+    <!-- Artifacts Table Below -->
+    <div class="card-bento">
+      <div class="kicker" style="margin-bottom:0.8rem;">已固化交付物清单 (Artifacts Registry)</div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>产物路径</th>
+              <th>格式</th>
+              <th>状态</th>
+              <th>SHA-256 指纹</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="artifacts-table-body">
+            <tr><td colspan="5" class="detail-key">正在读取产物列表…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==============================================================
+       TAB 4: 人工确认 (HITL Decisions Tab)
+       ============================================================== -->
+  <section id="tab-hitl" class="tab-pane">
+    <h2>人类参与与决策记录 (HITL)</h2>
+    <p class="lead">任何重要假设、设计调整或计划推进均在此明确记录，并存入不可篡改的结构化 Receipt。</p>
+
+    <div class="overview-grid">
+      <div class="card-bento bento-6">
+        <div class="kicker">待确认与检查点列表</div>
+        <div id="hitl-files-list" style="display:grid;gap:0.5rem;margin-top:0.5rem;">
+          <p class="detail-key">正在读取…</p>
+        </div>
+      </div>
+
+      <div class="card-bento bento-6">
+        <div class="kicker">记录人类裁决</div>
+        <form id="decision-form" style="margin-top:0.6rem;">
+          <div class="form-group">
+            <label class="form-label">裁决结果</label>
+            <select id="decision-val">
+              <option value="approved">✅ 批准继续 (Approved)</option>
+              <option value="needs-changes">⚠️ 要求修改补充 (Needs Changes)</option>
+              <option value="denied">🚫 暂不通过 (Denied)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">裁决理由 / 补充要求（至少 3 字）</label>
+            <textarea id="decision-rationale" rows="3" placeholder="例如：批准进入下一阶段；需补充跨学科文献..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%;">提交裁决记录</button>
+          <div id="decision-feedback" class="feedback-text"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==============================================================
+       TAB 5: 技能与 MCP (Skills & Ecosystem Tab)
+       ============================================================== -->
+  <section id="tab-skills" class="tab-pane">
+    <h2>推荐学术能力与扩展 (Skills & MCP)</h2>
+    <p class="lead">一键安装领域技能与受控数据服务。安装后在终端输入 <code>/reload</code> 即可生效。</p>
+
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="font-size:1.1rem;margin-bottom:0.8rem;">🌟 推荐科研 Skill</h3>
+      <div id="recommended-skills-shelf" class="capability-grid"><p class="detail-key">读取中…</p></div>
+    </div>
+
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="font-size:1.1rem;margin-bottom:0.8rem;">🔌 推荐 MCP 扩展</h3>
+      <div id="recommended-mcps-shelf" class="capability-grid"><p class="detail-key">读取中…</p></div>
+    </div>
+
+    <div>
+      <h3 style="font-size:1.1rem;margin-bottom:0.8rem;">⚙️ 已启用能力管理</h3>
+      <div id="enabled-shelf" class="overview-grid"><p class="detail-key">读取中…</p></div>
+    </div>
+  </section>
+
+  <!-- ==============================================================
+       TAB 6: 规则约束 (Rules & Hooks Tab)
+       ============================================================== -->
+  <section id="tab-rules" class="tab-pane">
+    <h2>研究约束与禁止事项 (Rules & Hooks)</h2>
+    <p class="lead">系统提示词只增不改，内置规则保障数据安全，用户可按需添加分析前/中的检查 Hook。</p>
+
+    <div class="overview-grid">
+      <div class="card-bento bento-6">
+        <div class="kicker">系统提示词补充 (System Prompt)</div>
+        <form id="system-prompt-form" style="margin-top:0.5rem;">
+          <details style="margin-bottom:0.7rem;">
+            <summary style="cursor:pointer;color:var(--ink-muted);font-size:0.82rem;">查看基础提示词（只读固定）</summary>
+            <pre id="system-prompt-base" style="background:var(--bg-inner);padding:0.6rem;border-radius:6px;font-family:var(--mono);font-size:0.78rem;color:var(--ink-faint);margin-top:0.4rem;max-height:140px;overflow:auto;"></pre>
+          </details>
+          <div class="form-group">
+            <label class="form-label">补充个人研究要求（追加在基础后）</label>
+            <textarea id="system-prompt-supplement" rows="5" placeholder="例如：重点关注心理测量学信效度分析..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">保存补充提示词</button>
+          <div id="system-prompt-feedback" class="feedback-text"></div>
+        </form>
+      </div>
+
+      <div class="card-bento bento-6">
+        <div class="kicker">自定义禁止事项 Hooks</div>
+        <div style="margin-top:0.5rem;">
+          <div style="font-size:0.82rem;font-weight:600;color:var(--ink-muted);margin-bottom:0.3rem;">研究前禁止事项</div>
+          <ul id="hook-before-list" style="list-style:none;display:grid;gap:0.3rem;margin-bottom:0.6rem;"></ul>
+          <div style="display:flex;gap:0.4rem;">
+            <input id="hook-before-input" placeholder="例如：禁止修改 raw 目录">
+            <select id="hook-before-sev" style="width:90px;"><option value="warn">警告</option><option value="block">阻断</option></select>
+            <button class="btn btn-secondary" onclick="addHook('before')">添加</button>
+          </div>
+        </div>
+
+        <div style="margin-top:1.1rem;padding-top:0.8rem;border-top:1px solid var(--line);">
+          <div style="font-size:0.82rem;font-weight:600;color:var(--ink-muted);margin-bottom:0.3rem;">研究中禁止事项</div>
+          <ul id="hook-during-list" style="list-style:none;display:grid;gap:0.3rem;margin-bottom:0.6rem;"></ul>
+          <div style="display:flex;gap:0.4rem;">
+            <input id="hook-during-input" placeholder="例如：禁止只报 p 值不报效应量">
+            <select id="hook-during-sev" style="width:90px;"><option value="warn">警告</option><option value="block">阻断</option></select>
+            <button class="btn btn-secondary" onclick="addHook('during')">添加</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==============================================================
+       TAB 7: 成本分析 (Token Analytics Tab)
+       ============================================================== -->
+  <section id="tab-tokens" class="tab-pane">
+    <h2>Token 用量与成本分析</h2>
+    <p class="lead">按模型与日期详细统计 Token 消耗及实际/预估费用，数据源于本地会话，绝不上报外部。</p>
+    <div id="token-usage-content">正在读取…</div>
+  </section>
+
+  <!-- ==============================================================
+       TAB 8: Provider 设置 (Settings Tab)
+       ============================================================== -->
+  <section id="tab-settings" class="tab-pane">
+    <h2>模型与 Provider 设置</h2>
+    <p class="lead">管理模型提供商、连接地址与默认模型；API Key 始终由环境变量或 Pi 独立存储管理。</p>
+
+    <div class="overview-grid">
+      <div class="card-bento bento-6">
+        <div class="kicker">快捷切换当前模型</div>
+        <div style="display:grid;gap:0.8rem;margin-top:0.6rem;">
+          <div class="form-group">
+            <label class="form-label">Provider</label>
+            <select id="quick-prov-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Model</label>
+            <select id="quick-model-select"></select>
+          </div>
+          <button id="btn-save-active-provider" class="btn btn-primary">应用并保存切换</button>
+          <div id="quick-prov-feedback" class="feedback-text"></div>
+        </div>
+      </div>
+
+      <div class="card-bento bento-6">
+        <div class="kicker">项目文件与统计</div>
+        <div id="project-stats-container" style="margin-top:0.6rem;">
+          <div class="detail-key">读取中…</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Modal: Artifact Preview Drawer -->
+<div id="preview-modal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <strong id="modal-title" style="font-size:0.95rem;">产物预览</strong>
+      <button class="btn btn-secondary" style="padding:0.2rem 0.5rem;" onclick="closeModal()">关闭 ✕</button>
+    </div>
+    <pre id="modal-body" class="modal-body"></pre>
+  </div>
+</div>
+
+<script>
+/* ==============================================================
+   psyclaw Web Platform Core Script
+   ============================================================== */
+
+let allRuns = [];
+let latestSnapshot = null;
+let allProjectRoot = "";
+let catalogCache = null;
+let enabledSet = { skill: [], mcp: [] };
+let recommendCache = { skill: [], mcp: [] };
+let userHooks = [];
+
+// Theme Management
+function setTheme(name) {
+  document.documentElement.setAttribute("data-theme", name);
+  localStorage.setItem("psyclaw_panel_theme", name);
+  document.querySelectorAll("[data-set-theme]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.setTheme === name);
+  });
+}
+document.querySelectorAll("[data-set-theme]").forEach(btn => {
+  btn.addEventListener("click", () => setTheme(btn.dataset.setTheme));
+});
+const savedTheme = localStorage.getItem("psyclaw_panel_theme") || "dark";
+setTheme(savedTheme);
+
+async function fetchJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function pill(text, tone, dot = false) {
+  return `<span class="pill ${tone}">${dot ? '<span class="dot"></span>' : ""}${esc(text)}</span>`;
+}
+
+const PHASE_MAP = {
+  executing: ["执行中", "accent", true],
+  verifying: ["核验中", "accent", true],
+  planned: ["已规划", "neutral", false],
+  completed: ["已完成", "ok", false],
+  paused: ["已暂停", "warn", false],
+  blocked: ["需处理", "warn", false],
+  unknown: ["等待中", "neutral", false],
+};
+
+function phaseBadge(phase) {
+  const [text, tone, dot] = PHASE_MAP[phase] || PHASE_MAP.unknown;
+  return pill(text, tone, dot);
+}
+
+function taskBadge(status) {
+  const map = {
+    running: ["执行中", "accent", true],
+    pending: ["待执行", "neutral", false],
+    succeeded: ["已完成", "ok", false],
+    failed: ["未通过", "crit", false],
+    blocked: ["受阻", "warn", false]
+  };
+  const [text, tone, dot] = map[status] || map.pending;
+  return pill(text, tone, dot);
+}
+
+/* Tabs Switching */
+function switchTab(tabId) {
+  document.querySelectorAll(".nav-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabId);
+  });
+  document.querySelectorAll(".tab-pane").forEach(pane => {
+    pane.classList.toggle("active", pane.id === tabId);
+  });
+}
+document.querySelectorAll(".nav-tab").forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+/* Modal controls */
+function openModal(title, content) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").textContent = content;
+  document.getElementById("preview-modal").classList.add("active");
+}
+function closeModal() {
+  document.getElementById("preview-modal").classList.remove("active");
+}
+document.getElementById("preview-modal").addEventListener("click", (e) => {
+  if (e.target.id === "preview-modal") closeModal();
+});
+
+/* ==============================================================
+   Chat & Assistant System
+   ============================================================== */
+function addChatMessage(role, text) {
+  const stream = document.getElementById("chat-stream");
+  const bubble = document.createElement("div");
+  bubble.className = `msg-bubble ${role}`;
+  bubble.innerHTML = `
+    <div class="msg-avatar">${role === "user" ? "You" : "ψ"}</div>
+    <div class="msg-content">${formatMessageText(text)}</div>
+  `;
+  stream.appendChild(bubble);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function formatMessageText(text) {
+  let formatted = esc(text)
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\n/g, "<br>");
+  return formatted;
+}
+
+document.getElementById("chat-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("chat-input");
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  addChatMessage("user", msg);
+  input.value = "";
+  const sendBtn = document.getElementById("btn-send-msg");
+  sendBtn.disabled = true;
+  const statusEl = document.getElementById("chat-status");
+  if (statusEl) statusEl.style.display = "block";
+
+  // Client-side timeout so a stalled spawned assistant can never hang silently.
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), 125_000);
+  try {
+    const res = await fetch("/api/assistant", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: msg }),
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "助手暂时不可用");
+    addChatMessage("assistant", data.text || "已处理完毕。");
+  } catch (err) {
+    if (err.name === "AbortError") {
+      addChatMessage("assistant", "⚠️ 助手响应超时（>120 秒）。面板聊天会单独启动一个只读智能体；超时通常是模型通道未配置或该任务需要完整工具链。请在 psyclaw 对话中直接提问（可获得完整读写/统计工具），或在项目里为论断先登记证据/下载全文后再追问。");
+    } else {
+      addChatMessage("assistant", `⚠️ 暂时无法处理：${err.message}`);
+    }
+  } finally {
+    clearTimeout(abortTimer);
+    if (statusEl) statusEl.style.display = "none";
+    sendBtn.disabled = false;
+    input.focus();
+  }
+});
+
+/* Prompt Chips Handler */
+document.querySelectorAll(".prompt-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const prompt = chip.dataset.prompt;
+    const input = document.getElementById("chat-input");
+    input.value = prompt;
+    document.getElementById("btn-send-msg").click();
+  });
+});
+
+document.getElementById("btn-clear-chat").addEventListener("click", () => {
+  document.getElementById("chat-stream").innerHTML = `
+    <div class="msg-bubble assistant">
+      <div class="msg-avatar">ψ</div>
+      <div class="msg-content">已清空会话记录。随时向我提出新的研究课题。</div>
+    </div>
+  `;
+});
+
+/* ==============================================================
+   Live Polling & Renderers
+   ============================================================== */
+async function pollActivity() {
+  try {
+    const { runs, projectRoot } = await fetchJson("/api/runs");
+    allRuns = runs || [];
+    allProjectRoot = projectRoot || "";
+    if (allRuns.length > 0) {
+      const runId = allRuns[allRuns.length - 1].runId;
+      latestSnapshot = await fetchJson("/api/snapshot?runId=" + encodeURIComponent(runId));
+      renderOverview(latestSnapshot);
+    } else {
+      renderEmptyOverview();
+    }
+  } catch (e) {
+    // Keep last rendered state on transient network error
+  }
+}
+
+function renderOverview(snap) {
+  if (!snap) return;
+
+  // Phase pills
+  const badgeHtml = phaseBadge(snap.phase);
+  document.getElementById("quick-phase-pill").innerHTML = badgeHtml;
+  document.getElementById("overview-phase-pill").innerHTML = badgeHtml;
+  document.getElementById("quick-run-id").textContent = snap.runId;
+  document.getElementById("quick-paradigm").textContent = snap.paradigm || "未指定";
+
+  // Goal
+  document.getElementById("goal-display").textContent = snap.goal || "（未指定目标）";
+  document.getElementById("snapshot-summary").textContent = `工作目录: ${allProjectRoot || "—"} · 事件数: ${snap.eventCount}`;
+  document.getElementById("snapshot-summary").title = snap.nextStep || "";
+  const nextStepEl = document.getElementById("next-step");
+  if (nextStepEl) nextStepEl.textContent = snap.nextStep || "";
+
+  // Evidence
+  const cov = snap.evidenceCoverage;
+  if (cov && cov.totalClaims > 0) {
+    const pct = Math.round((cov.supportedClaims / cov.totalClaims) * 100);
+    document.getElementById("evidence-bar").style.width = `${pct}%`;
+    document.getElementById("evidence-ratio").textContent = `${cov.supportedClaims} / ${cov.totalClaims} 条 Claim 已获证据支持`;
+    document.getElementById("evidence-pct").textContent = `${pct}%`;
+    document.getElementById("quick-evidence").textContent = `${cov.supportedClaims} / ${cov.totalClaims}`;
+  } else {
+    document.getElementById("evidence-bar").style.width = "0%";
+    document.getElementById("evidence-ratio").textContent = "尚无证据账本数据";
+    document.getElementById("evidence-pct").textContent = "0%";
+    document.getElementById("quick-evidence").textContent = "0/0";
+  }
+
+  // Tasks
+  const tasks = snap.tasks || [];
+  document.getElementById("tasks-list").innerHTML = tasks.length
+    ? tasks.map(t => `<div class="detail-row"><span>${esc(t.id)} <span class="detail-key">${esc(t.summary || "")}</span></span>${taskBadge(t.status)}</div>`).join("")
+    : `<div class="detail-key">暂无子任务执行</div>`;
+
+  // Gates
+  const gates = snap.gates || [];
+  document.getElementById("gates-list").innerHTML = gates.length
+    ? gates.map(g => `<li class="detail-row"><span>${esc(g.gateId)} <span class="detail-key">${esc(g.reason)}</span></span>${g.ok ? pill("通过", "ok") : pill("需处理", "warn")}</li>`).join("")
+    : `<li class="detail-key">门禁尚未触发</li>`;
+
+  // Actions
+  const actionBtn = snap.phase === "executing"
+    ? `<button class="btn btn-danger" onclick="triggerRunAction('pause', '${esc(snap.runId)}')">请求暂停 (Pause)</button>`
+    : snap.phase === "paused"
+    ? `<button class="btn btn-primary" onclick="triggerRunAction('resume', '${esc(snap.runId)}')">恢复执行 (Resume)</button>`
+    : "";
+  document.getElementById("run-actions-holder").innerHTML = actionBtn;
+
+  // HITL Count
+  const waiting = (snap.waitingOnHuman || []).length;
+  document.getElementById("quick-hitl-count").textContent = `${waiting} 项待办`;
+  document.getElementById("quick-hitl-count").className = waiting > 0 ? "pill warn" : "pill ok";
+}
+
+function renderEmptyOverview() {
+  document.getElementById("goal-display").textContent = "还没有研究任务。请在终端运行 psyclaw init 或在交互助手中输入研究课题。";
+  document.getElementById("quick-phase-pill").innerHTML = pill("就绪", "neutral");
+  document.getElementById("overview-phase-pill").innerHTML = pill("就绪", "neutral");
+}
+
+async function triggerRunAction(action, runId) {
+  const reason = prompt(action === "pause" ? "请输入暂停理由：" : "请输入恢复理由：", "研究者指令");
+  if (!reason || reason.trim().length < 3) return;
+  try {
+    const res = await fetch(`/api/runs/${encodeURIComponent(runId)}/${action}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ approved: true, actor: "researcher", reason: reason.trim() })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "操作失败");
+    alert(`操作成功：${data.status}`);
+    pollActivity();
+  } catch (e) { alert(e.message); }
+}
+
+/* ==============================================================
+   Artifacts, HITL, Skills, Settings
+   ============================================================== */
+function isImage(fmt) { return ["svg", "png", "jpg", "jpeg", "gif"].includes(String(fmt || "").toLowerCase()); }
+
+async function loadArtifacts() {
+  const data = await fetchJson("/api/artifacts");
+  const items = data.artifacts || [];
+  document.getElementById("artifacts-table-body").innerHTML = items.length
+    ? items.map(item => `
+      <tr>
+        <td><strong>${esc(item.path)}</strong></td>
+        <td><code>${esc(item.format || "file")}</code></td>
+        <td>${pill(item.status || "ready", "ok")}</td>
+        <td><code style="font-size:0.75rem;">${esc(item.sha256 ? item.sha256.slice(0, 12) + "…" : "—")}</code></td>
+        <td>${isImage(item.format)
+          ? `<img src="/api/artifact?path=${encodeURIComponent(item.path)}" loading="lazy" style="max-width:140px;max-height:84px;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;" onclick="viewArtifact('${esc(item.path)}','${esc(item.format)}')" alt="${esc(item.path)}" title="点击放大">`
+          : `<button class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.75rem;" onclick="viewArtifact('${esc(item.path)}','${esc(item.format)}')">预览</button>`}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="5" class="detail-key">还没有经过工作流登记的产物文件。</td></tr>`;
+}
+
+function openImageModal(title, path) {
+  document.getElementById("modal-title").textContent = title;
+  const body = document.getElementById("modal-body");
+  body.style.whiteSpace = "normal";
+  body.innerHTML = `<img src="/api/artifact?path=${encodeURIComponent(path)}" style="max-width:100%;height:auto;display:block;border-radius:6px;">`;
+  document.getElementById("preview-modal").classList.add("active");
+}
+
+async function viewArtifact(path, format) {
+  if (String(format).toLowerCase() === "svg") { openSvgEditor(`产物预览：${path}`, path); return; }
+  if (isImage(format)) { openImageModal(`产物预览：${path}`, path); return; }
+  try {
+    const res = await fetch(`/api/artifact?path=${encodeURIComponent(path)}`);
+    const text = await res.text();
+    openModal(`产物预览：${path}`, text);
+  } catch (e) { alert("读取产物失败：" + e.message); }
+}
+
+/* ---- Lightweight inline SVG editor: drag text + double-click to edit ---- */
+let editingSvgPath = "";
+let svgDragState = null;
+
+async function openSvgEditor(title, path) {
+  editingSvgPath = path;
+  document.getElementById("modal-title").textContent = title + " · 拖拽文字移动 · 双击改字";
+  const body = document.getElementById("modal-body");
+  body.style.whiteSpace = "normal";
+  body.innerHTML = `
+    <div style="margin-bottom:.6rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
+      <button class="btn" onclick="saveSvgEdit()">保存</button>
+      <button class="btn btn-secondary" onclick="loadArtifacts();closeModal();">返回列表</button>
+      <span id="svg-edit-status" class="detail-key" style="font-size:0.78rem;"></span>
+    </div>
+    <div id="svg-edit-host" style="background:#fff;border-radius:8px;overflow:auto;max-height:72vh;padding:.5rem;"></div>`;
+  document.getElementById("preview-modal").classList.add("active");
+  try {
+    const res = await fetch("/api/artifact?path=" + encodeURIComponent(path));
+    let text = await res.text();
+    text = text.replace(/<script[\s\S]*?<\/script>/gi, "");
+    const host = document.getElementById("svg-edit-host");
+    host.innerHTML = text;
+    enableSvgTextEditing(host);
+  } catch (e) {
+    document.getElementById("svg-edit-status").textContent = "读取失败：" + e.message;
+  }
+}
+
+function enableSvgTextEditing(host) {
+  const svg = host.querySelector("svg");
+  if (!svg) { document.getElementById("svg-edit-status").textContent = "未找到可编辑的 SVG"; return; }
+  svg.querySelectorAll("text").forEach((el) => {
+    el.style.cursor = "move";
+    el.addEventListener("pointerdown", (ev) => startSvgTextDrag(el, ev));
+    el.addEventListener("dblclick", (ev) => { ev.stopPropagation(); editSvgText(el); });
+  });
+}
+
+function startSvgTextDrag(el, ev) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const base = el.getAttribute("transform") || "";
+  svgDragState = { el, base, startX: ev.clientX, startY: ev.clientY };
+  const onMove = (e) => {
+    if (!svgDragState || svgDragState.el !== el) return;
+    const dx = e.clientX - svgDragState.startX;
+    const dy = e.clientY - svgDragState.startY;
+    el.setAttribute("transform", (svgDragState.base ? svgDragState.base + " " : "") + `translate(${dx.toFixed(1)},${dy.toFixed(1)})`);
+  };
+  const onUp = () => {
+    svgDragState = null;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+
+function editSvgText(el) {
+  const current = el.textContent || "";
+  const next = window.prompt("编辑文字", current);
+  if (next !== null) el.textContent = next;
+}
+
+async function saveSvgEdit() {
+  const host = document.getElementById("svg-edit-host");
+  const svg = host ? host.querySelector("svg") : null;
+  const status = document.getElementById("svg-edit-status");
+  if (!svg || !editingSvgPath) { status.textContent = "无可保存的 SVG"; return; }
+  status.textContent = "正在保存…";
+  try {
+    const content = svg.outerHTML;
+    const res = await fetch("/api/artifact/save", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: editingSvgPath, content })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "保存失败");
+    status.textContent = `已保存（${data.bytes} 字节），可到产物列表重新预览`;
+  } catch (e) { status.textContent = e.message; }
+}
+
+async function loadHitl() {
+  const data = await fetchJson("/api/hitl?contents=1");
+  const files = data.files || [];
+  document.getElementById("hitl-files-list").innerHTML = files.length
+    ? files.map(f => `
+      <div class="detail-row">
+        <span><strong>${esc(f.label)}</strong><br><code style="font-size:0.75rem;">${esc(f.path)}</code></span>
+        ${pill(f.status !== "missing" ? "已就绪" : "待创建", f.status !== "missing" ? "ok" : "neutral")}
+      </div>
+    `).join("")
+    : `<div class="detail-key">没有需要人工处理的事项。</div>`;
+}
+
+document.getElementById("decision-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const decision = document.getElementById("decision-val").value;
+  const rationale = document.getElementById("decision-rationale").value.trim();
+  const fb = document.getElementById("decision-feedback");
+  fb.textContent = "正在提交…"; fb.className = "feedback-text";
+  try {
+    const res = await fetch("/api/hitl/decision", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ decision, rationale, actor: "researcher" })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "记录失败");
+    fb.textContent = `✅ 裁决已记录 (${data.decision})，Receipt 已落盘`;
+    fb.className = "feedback-text ok";
+    document.getElementById("decision-rationale").value = "";
+    loadHitl();
+  } catch (err) { fb.textContent = err.message; }
+});
+
+const DEFAULT_RECOMMENDED_SKILLS = [
+  { id: "markitdown", name: "MarkItDown", stage: "统一", description: "把 PDF、Word、PPT、Excel、HTML 等转换为结构化 Markdown。", sourceRef: "https://github.com/microsoft/markitdown" },
+  { id: "markitdown-pro", name: "MarkItDown Pro", stage: "统一", description: "字幕优先、转录回退，把 B 站课程和讲座转成带来源状态的 Markdown。", sourceRef: "https://github.com/LHT666-hub/markItdown-pro" },
+  { id: "session-handoff", name: "Session Handoff", stage: "接力", description: "把长任务的目标、进度、阻塞和下一步写成可核验的交接状态。", sourceRef: "https://github.com/LHT666-hub/session-handoff" },
+  { id: "zotero-translators", name: "Zotero Translators", stage: "题录", description: "从出版社和数据库页面提取规范题录、DOI、PDF 和补充材料。", sourceRef: "https://github.com/zotero/translators" },
+  { id: "scansci-pdf", name: "ScanSci PDF", stage: "获取", description: "按开放来源、官方接口和用户授权会话尝试获取论文全文。", sourceRef: "https://github.com/Rimagination/scansci-pdf" },
+  { id: "scholarbridge", name: "ScholarBridge", stage: "质控", description: "连接文献清单、PDF 完整性校验、哈希去重和 Zotero 交接。", sourceRef: "https://github.com/LHT666-hub/ScholarBridge" },
+  { id: "mentorforge", name: "MentorForge", stage: "蒸馏", description: "从学者主页、论文和全文信号卡中提炼可追问的科研方法论。", sourceRef: "https://github.com/qwqalice/MentorForge" },
+  { id: "supervisor-skills", name: "Supervisor-Skills", stage: "写作", description: "覆盖 idea、调研、写作、图表、评审和投稿前检查的科研规范。", sourceRef: "https://github.com/HKUSTDial/Supervisor-Skills" },
+  { id: "openkb", name: "OpenKB", stage: "知识库", description: "把异构资料编译成可链接、可检索、可持续更新的 Wiki。", sourceRef: "https://github.com/VectifyAI/OpenKB" },
+  { id: "smartplot", name: "SmartPlot", stage: "绘图", description: "科研绘图、样式统一、多面板组图和可见确认的 MCP 控制。", sourceRef: "https://smartplot.app" }
+];
+
+const DEFAULT_RECOMMENDED_MCPS = [
+  { id: "paper-search-mcp", name: "Paper Search MCP", stage: "检索", description: "统一 arXiv、PubMed、OpenAlex、Crossref 等开放来源的论文检索和去重。", sourceRef: "https://github.com/openags/paper-search-mcp" },
+  { id: "playwright-mcp", name: "Microsoft Playwright MCP", stage: "Web Bridge", description: "结构化浏览器操作；可使用独立浏览器，也可通过 Chrome 扩展连接已有标签页和登录状态。", sourceRef: "https://github.com/microsoft/playwright-mcp" },
+  { id: "computer-use-mcp", name: "Computer Use MCP", stage: "Computer Use", description: "Windows、macOS、Linux 原生窗口、截图、鼠标键盘和应用控制；必须单独审批权限。", sourceRef: "https://github.com/zavora-ai/computer-use-mcp" }
+];
+
+async function loadSkillsAndEcosystem() {
+  try {
+    const [skills, mcps, enabled] = await Promise.all([
+      fetchJson("/api/recommended-skills").catch(() => ({ items: [] })),
+      fetchJson("/api/recommended-mcps").catch(() => ({ items: [] })),
+      fetchJson("/api/enabled-capabilities").catch(() => ({ skills: [], mcp: [] }))
+    ]);
+
+    const skillItems = (skills && skills.items && skills.items.length) ? skills.items : DEFAULT_RECOMMENDED_SKILLS;
+    const mcpItems = (mcps && mcps.items && mcps.items.length) ? mcps.items : DEFAULT_RECOMMENDED_MCPS;
+
+    recommendCache = { skill: skillItems, mcp: mcpItems };
+    enabledSet = { skill: ((enabled && enabled.skills) || []).map(s => s.id), mcp: ((enabled && enabled.mcp) || []).map(s => s.id) };
+
+    renderCapabilityShelf("recommended-skills-shelf", "skill", recommendCache.skill);
+    renderCapabilityShelf("recommended-mcps-shelf", "mcp", recommendCache.mcp);
+    renderEnabledList(enabled || { skills: [], mcp: [] });
+  } catch (err) {
+    recommendCache = { skill: DEFAULT_RECOMMENDED_SKILLS, mcp: DEFAULT_RECOMMENDED_MCPS };
+    renderCapabilityShelf("recommended-skills-shelf", "skill", recommendCache.skill);
+    renderCapabilityShelf("recommended-mcps-shelf", "mcp", recommendCache.mcp);
+  }
+}
+
+function renderCapabilityShelf(targetId, kind, items) {
+  document.getElementById(targetId).innerHTML = items.length
+    ? items.map(item => {
+      const isEnabled = enabledSet[kind].includes(item.id);
+      return `
+        <div class="capability-card" tabindex="0" data-kind="${kind}" data-id="${esc(item.id)}" style="cursor:pointer;outline:none;" onkeydown="handleCardKey(event, '${kind}', '${esc(item.id)}')">
+          <div>
+            <div class="capability-header">
+              <span class="capability-title">${esc(item.name)}</span>
+              <span class="pill accent">${esc(item.stage || "nature")}</span>
+            </div>
+            <p class="capability-desc">${esc(item.description)}</p>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;border-top:1px solid var(--line);padding-top:0.6rem;">
+            <a href="${esc(item.sourceRef)}" target="_blank" rel="noreferrer" style="font-size:0.78rem;">来源仓库 ↗</a>
+            ${isEnabled
+              ? pill("已启用", "ok")
+              : `<button class="btn btn-primary" style="padding:0.25rem 0.65rem;font-size:0.78rem;" onclick="installCapability('${kind}', '${esc(item.id)}')">安装</button>`}
+          </div>
+        </div>
+      `;
+    }).join("")
+    : `<p class="detail-key">没有推荐项</p>`;
+}
+
+function handleCardKey(e, kind, id) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    installCapability(kind, id);
+    return;
+  }
+  const cards = Array.from(document.querySelectorAll(".capability-card"));
+  const idx = cards.indexOf(e.currentTarget);
+  if (idx < 0) return;
+  if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+    e.preventDefault();
+    const next = cards[(idx + 1) % cards.length];
+    next?.focus();
+  } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+    e.preventDefault();
+    const prev = cards[(idx - 1 + cards.length) % cards.length];
+    prev?.focus();
+  }
+}
+
+async function installCapability(kind, id) {
+  const item = (recommendCache[kind] || []).find(c => c.id === id);
+  const prep = (item?.installPrep || [])[0];
+  const cmd = prep?.command || "";
+  if (!confirm(`将执行安装命令：\n\n${cmd}\n\n确认安装吗？`)) return;
+
+  try {
+    const res = await fetch("/api/install/execute", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind, id, approved: true, actor: "researcher" })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "安装失败");
+    alert(data.ok ? `安装成功！在终端输入 /reload 重新加载。` : `安装退出码：${data.exitCode}\n${data.output || ""}`);
+    loadSkillsAndEcosystem();
+  } catch (e) { alert(e.message); }
+}
+
+function renderEnabledList(enabled) {
+  const core = enabled.coreSkills || [];
+  const skills = enabled.skills || [];
+  const mcps = enabled.mcp || [];
+  document.getElementById("enabled-shelf").innerHTML = `
+    <div class="card-bento bento-6">
+      <div class="kicker">核心 Skill（内置）</div>
+      <div style="display:grid;gap:0.4rem;margin-top:0.4rem;">
+        ${core.map(s => `<div class="detail-row"><span>${esc(s.name)}</span>${s.enabled ? `<button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="toggleCapability('core-skill','${esc(s.id)}',false)">停用</button>` : `<button class="btn" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="toggleCapability('core-skill','${esc(s.id)}',true)">启用</button>`}</div>`).join("") || '<div class="detail-key">暂无</div>'}
+      </div>
+    </div>
+    <div class="card-bento bento-6">
+      <div class="kicker">已启用 Skills</div>
+      <div style="display:grid;gap:0.4rem;margin-top:0.4rem;">
+        ${skills.map(s => `<div class="detail-row"><span>${esc(s.name)}</span><button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="toggleCapability('skills', '${esc(s.id)}', false)">停用</button></div>`).join("") || '<div class="detail-key">暂无</div>'}
+      </div>
+    </div>
+    <div class="card-bento bento-6">
+      <div class="kicker">已启用 MCP</div>
+      <div style="display:grid;gap:0.4rem;margin-top:0.4rem;">
+        ${mcps.map(m => `<div class="detail-row"><span>${esc(m.name)}</span><button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem;" onclick="toggleCapability('mcp', '${esc(m.id)}', false)">停用</button></div>`).join("") || '<div class="detail-key">暂无</div>'}
+      </div>
+    </div>
+  `;
+}
+
+async function toggleCapability(kind, id, enabled) {
+  try {
+    const res = await fetch("/api/recommendation-state", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind, id, enabled })
+    });
+    if (!res.ok) throw new Error("设置失败");
+    loadSkillsAndEcosystem();
+  } catch (e) { alert(e.message); }
+}
+
+/* ==============================================================
+   Rules & Hooks
+   ============================================================== */
+async function loadConfig() {
+  const config = await fetchJson("/api/config");
+  document.getElementById("system-prompt-base").textContent = config.systemPromptBase || "";
+  document.getElementById("system-prompt-supplement").value = config.systemPromptSupplement || "";
+  userHooks = config.hooks?.hooks || [];
+  renderHooks();
+}
+
+function renderHooks() {
+  const before = userHooks.filter(h => h.event === "before-analysis");
+  const during = userHooks.filter(h => ["before-write", "after-analysis"].includes(h.event));
+
+  document.getElementById("hook-before-list").innerHTML = before.map(h => `
+    <li class="detail-row">
+      <span>${pill(h.severity === "block" ? "阻断" : "警告", h.severity === "block" ? "crit" : "warn")} ${esc(h.message)}</span>
+      <button class="btn btn-secondary" style="padding:0.15rem 0.4rem;font-size:0.75rem;" onclick="removeHook('${esc(h.id)}')">✕</button>
+    </li>
+  `).join("") || `<li class="detail-key">无前置禁止事项</li>`;
+
+  document.getElementById("hook-during-list").innerHTML = during.map(h => `
+    <li class="detail-row">
+      <span>${pill(h.severity === "block" ? "阻断" : "警告", h.severity === "block" ? "crit" : "warn")} ${esc(h.message)}</span>
+      <button class="btn btn-secondary" style="padding:0.15rem 0.4rem;font-size:0.75rem;" onclick="removeHook('${esc(h.id)}')">✕</button>
+    </li>
+  `).join("") || `<li class="detail-key">无过程禁止事项</li>`;
+}
+
+function addHook(type) {
+  const input = document.getElementById(type === "before" ? "hook-before-input" : "hook-during-input");
+  const msg = input.value.trim();
+  if (!msg) return;
+  const sev = document.getElementById(type === "before" ? "hook-before-sev" : "hook-during-sev").value;
+  userHooks.push({ id: "u-" + Date.now(), event: type === "before" ? "before-analysis" : "before-write", severity: sev, message: msg });
+  input.value = "";
+  renderHooks();
+  saveHooks();
+}
+
+async function removeHook(id) {
+  userHooks = userHooks.filter(h => h.id !== id);
+  renderHooks();
+  saveHooks();
+}
+
+async function saveHooks() {
+  await fetch("/api/hooks", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ schemaVersion: "psyclaw/user-analysis-hooks/v1", hooks: userHooks })
+  });
+}
+
+document.getElementById("system-prompt-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = document.getElementById("system-prompt-supplement").value;
+  const fb = document.getElementById("system-prompt-feedback");
+  fb.textContent = "正在保存…";
+  try {
+    const res = await fetch("/api/system-prompt", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ systemPrompt: text })
+    });
+    if (!res.ok) throw new Error("保存失败");
+    fb.textContent = "✅ 已保存补充。重启 Pi 会话后生效。"; fb.className = "feedback-text ok";
+  } catch (err) { fb.textContent = err.message; }
+});
+
+/* ==============================================================
+   Token Analytics & Provider Settings
+   ============================================================== */
+function fmt(n) { return Number(n || 0).toLocaleString(); }
+function usd(n) { return `$${Number(n || 0).toFixed(4)}`; }
+function cny(n) { return `¥${Number(n || 0).toFixed(4)}`; }
+let tokenCurrency = "cny"; // "usd" | "cny"
+
+function tokenView(t, m, mode) {
+  const money = (usdVal, cnyVal) => (mode === "usd" ? usd(usdVal) : cny(cnyVal));
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;flex-wrap:wrap;gap:.5rem;">
+      <div class="kicker" style="margin:0;">Token 消耗与实际/预估费用（数据源于本地会话，绝不上报外部）</div>
+      <div style="display:flex;gap:.3rem;">
+        <button class="btn ${mode === "usd" ? "btn-primary" : "btn-secondary"}" style="font-size:0.72rem;padding:0.15rem 0.5rem;" onclick="tokenCurrency='usd';loadTokens()">USD $</button>
+        <button class="btn ${mode === "cny" ? "btn-primary" : "btn-secondary"}" style="font-size:0.72rem;padding:0.15rem 0.5rem;" onclick="tokenCurrency='cny';loadTokens()">人民币 ¥</button>
+      </div>
+    </div>
+    <div class="overview-grid" style="margin-bottom:1.5rem;">
+      <div class="card-bento bento-4"><div class="kicker">总 Token 消耗</div><div class="goal-box">${fmt(t.tokens)}</div></div>
+      <div class="card-bento bento-4"><div class="kicker">实际报告费用</div><div class="goal-box">${money(t.cost, t.costCny)}</div></div>
+      <div class="card-bento bento-4"><div class="kicker">预估总费用</div><div class="goal-box" style="color:var(--accent);">${money(t.estimatedCost, t.estimatedCostCny)}</div></div>
+    </div>
+    ${mode === "cny" ? `<p class="detail-key" style="font-size:0.72rem;margin-bottom:1rem;">人民币：国内厂商（DeepSeek/通义/智谱/Kimi）按官方人民币价估算；实际费用按汇率 ¥1≈$${ (1 / 7.2).toFixed(4) } 折算（Pi 记录为 USD）。</p>` : ""}
+
+    <div class="card-bento" style="margin-bottom:1.5rem;">
+      <div class="kicker" style="margin-bottom:0.6rem;">按模型统计明细</div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>模型</th><th>输入</th><th>输出</th><th>缓存</th><th>合计 Token</th><th>实际费用</th><th>预估费用</th></tr></thead>
+          <tbody>
+            ${m.map(row => `<tr><td><strong>${esc(row.model)}</strong><br><span class="detail-key">${esc(row.provider)}</span></td><td>${fmt(row.input)}</td><td>${fmt(row.output)}</td><td>${fmt(row.cacheRead + row.cacheWrite)}</td><td><strong>${fmt(row.tokens)}</strong></td><td>${money(row.cost, row.costCny)}</td><td><strong style="color:var(--accent);">${money(row.estimatedCost, row.estimatedCostCny)}</strong></td></tr>`).join("") || '<tr><td colspan="7" class="detail-key">无用量记录</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+async function loadTokens() {
+  const rep = await fetchJson("/api/token-usage");
+  const t = rep.totals || { tokens: 0, cost: 0, estimatedCost: 0, costCny: 0, estimatedCostCny: 0 };
+  const models = rep.byModel || [];
+  document.getElementById("token-usage-content").innerHTML = tokenView(t, models, tokenCurrency);
+}
+
+async function loadProvidersAndStats() {
+  const [catalog, active, stats, files] = await Promise.all([
+    fetchJson("/api/catalog"),
+    fetchJson("/api/active-provider"),
+    fetchJson("/api/stats"),
+    fetchJson("/api/files")
+  ]);
+
+  catalogCache = catalog;
+  const provSelect = document.getElementById("quick-prov-select");
+  const modelSelect = document.getElementById("quick-model-select");
+
+  const provs = [...new Set(catalog.models.map(m => m.provider))].sort();
+  provSelect.innerHTML = provs.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
+
+  const updateModels = () => {
+    const cur = provSelect.value;
+    const list = catalog.models.filter(m => m.provider === cur);
+    modelSelect.innerHTML = list.map(m => `<option value="${esc(m.id.split("/").slice(1).join("/"))}">${esc(m.name)}</option>`).join("");
+  };
+  provSelect.onchange = updateModels;
+  updateModels();
+
+  if (active.provider) provSelect.value = active.provider;
+  updateModels();
+  if (active.model) modelSelect.value = active.model;
+
+  // Stats
+  document.getElementById("project-stats-container").innerHTML = `
+    <div class="detail-row"><span class="detail-key">运行次数</span><strong>${stats.runs || 0}</strong></div>
+    <div class="detail-row"><span class="detail-key">收录证据</span><strong>${stats.evidence || 0}</strong></div>
+    <div class="detail-row"><span class="detail-key">Claim 计数</span><strong>${stats.claims || 0}</strong></div>
+    <div class="detail-row"><span class="detail-key">审计事件</span><strong>${stats.auditEvents || 0}</strong></div>
+    <div class="detail-row"><span class="detail-key">产物交付</span><strong>${stats.outputs || 0}</strong></div>
+    <div class="detail-row"><span class="detail-key">追踪文件</span><strong>${(files.files || []).length}</strong></div>
+  `;
+}
+
+document.getElementById("btn-save-active-provider").addEventListener("click", async () => {
+  const provider = document.getElementById("quick-prov-select").value;
+  const model = document.getElementById("quick-model-select").value;
+  const fb = document.getElementById("quick-prov-feedback");
+  fb.textContent = "正在保存…";
+  try {
+    const res = await fetch("/api/active-provider", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider, model })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "保存失败");
+    fb.textContent = `✅ 已切换为 ${provider} / ${model}，重启会话后生效。`;
+    fb.className = "feedback-text ok";
+  } catch (e) { fb.textContent = e.message; }
+});
+
+/* ==============================================================
+   Claim-Evidence Live Probe Interactive Logic
+   ============================================================== */
+// Claims are loaded from the real append-only ledger (.psyclaw/claims.jsonl),
+// never from hardcoded demo data. The panel only ever displays what the
+// research engine actually recorded.
+let PANEL_CLAIMS = [];
+
+const CLAIM_STATUS_LABEL = {
+  supported:   { status: "✔ 已获证据支持", statusClass: "pill ok" },
+  uncertain:   { status: "⚠️ 证据缺口标定 (Uncertain)", statusClass: "pill warn" },
+  unsupported: { status: "❌ 证据不足 (Unsupported)", statusClass: "pill crit" },
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function inlineMd(src) {
+  let s = escapeHtml(src);
+  // images first: ![alt](path)
+  s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, path) =>
+    `<img src="/api/artifact?path=${encodeURIComponent(path)}" data-md-src="${escAttr(path)}" alt="${escAttr(alt)}" class="md-image" title="点击预览/编辑" loading="lazy">`);
+  // claim markers
+  s = s.replace(/\[([^\]]*)\]\(claim:(\d+)\)/g, '<span class="claim-interactive-tag" data-claim-idx="$2">$1</span>');
+  // links
+  s = s.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+  // emphasis
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  s = s.replace(/~~([^~]+)~~/g, "<del>$1</del>");
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  return s;
+}
+
+const isMdListLine = (line) => /^\s*([-*+]|\d+\.)\s+/.test(line);
+const isMdTableLine = (line) => /^\s*\|.*\|/.test(line);
+const isMdTableSep = (line) => /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line) && line.includes("-");
+
+function markdownToEditorHtml(md) {
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    if (!trimmed) { i++; continue; }
+    const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) { const level = heading[1].length; out.push(`<h${level}>${inlineMd(heading[2])}</h${level}>`); i++; continue; }
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) { out.push("<hr>"); i++; continue; }
+    if (trimmed.startsWith(">")) {
+      const quote = [];
+      while (i < lines.length && lines[i].trim().startsWith(">")) { quote.push(lines[i].trim().replace(/^>\s?/, "")); i++; }
+      out.push(`<blockquote>${inlineMd(quote.join(" "))}</blockquote>`);
+      continue;
+    }
+    if (isMdTableLine(trimmed) && i + 1 < lines.length && isMdTableSep(lines[i + 1].trim())) {
+      const cellsOf = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+      const header = cellsOf(trimmed);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && isMdTableLine(lines[i].trim())) { rows.push(cellsOf(lines[i].trim())); i++; }
+      out.push(`<table class="md-table"><thead><tr>${header.map((c) => `<th>${inlineMd(c)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inlineMd(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
+    if (isMdListLine(trimmed)) {
+      const items = [];
+      while (i < lines.length && lines[i].trim() && (isMdListLine(lines[i].trim()) || /^\s{2,}\S/.test(lines[i]))) {
+        const t = lines[i].trim();
+        const li = t.replace(/^([-*+]|\d+\.)\s+/, "");
+        if (li) items.push(li);
+        i++;
+      }
+      out.push(`<ul class="md-list">${items.map((li) => `<li>${inlineMd(li)}</li>`).join("")}</ul>`);
+      continue;
+    }
+    const para = [];
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6})\s/.test(lines[i].trim()) && !isMdListLine(lines[i].trim()) && !lines[i].trim().startsWith(">") && !isMdTableLine(lines[i].trim()) && !/^(-{3,}|\*{3,})$/.test(lines[i].trim())) {
+      para.push(lines[i].trim());
+      i++;
+    }
+    if (para.length) {
+      out.push(`<p>${inlineMd(para.join(" "))}</p>`);
+    } else {
+      // table-looking line without a separator after it → ordinary paragraph
+      out.push(`<p>${inlineMd(trimmed)}</p>`);
+      i++;
+    }
+  }
+  return out.join("\n");
+}
+
+function editorHtmlToMarkdown() {
+  return editorCanvas.innerHTML
+    .replace(/<img[^>]*data-md-src="([^"]*)"[^>]*>/gi, (m, p) => `![图](${decodeURIComponent(p)})`)
+    .replace(/<img[^>]*src="\/api\/artifact\?path=([^"&]*)[^>]*>/gi, (m, p) => `![图](${decodeURIComponent(p)})`)
+    .replace(/<a href="([^"]*)"[^>]*>(.*?)<\/a>/gi, "[$2]($1)")
+    .replace(/<span class="claim-interactive-tag[^"]*" data-claim-idx="(\d+)">(.*?)<\/span>/gi, "[$2](claim:$1)")
+    .replace(/<h([1-6])>(.*?)<\/h\1>/gi, (m, lv, content) => `${"#".repeat(Number(lv))} ${content}`)
+    .replace(/<blockquote>(.*?)<\/blockquote>/gi, "> $1")
+    .replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, (m, inner) => {
+      const rows = [...inner.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)].map((r) => [...r[1].matchAll(/<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi)].map((c) => c[1].trim()));
+      const header = rows[0] || [];
+      return ["", header.join(" | "), header.map(() => "---").join(" | "), ...rows.slice(1).map((r) => r.join(" | ")), ""].join("\n");
+    })
+    .replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (m, inner) => [...inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((li) => `- ${li[1].trim()}`).join("\n"))
+    .replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (m, inner) => [...inner.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((li, idx) => `${idx + 1}. ${li[1].trim()}`).join("\n"))
+    .replace(/<strong>(.*?)<\/strong>/gi, "**$1**")
+    .replace(/<em>(.*?)<\/em>/gi, "*$1*")
+    .replace(/<del>(.*?)<\/del>/gi, "~~$1~~")
+    .replace(/<code>(.*?)<\/code>/gi, "`$1`")
+    .replace(/<hr[^>]*>/gi, "\n---\n")
+    .replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n")
+    .replace(/<br\s*[\/]?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Reload only the claim/evidence side from the real ledger (keeps unsaved editor text). */
+async function loadLedgerData() {
+  const res = await fetch("/api/ledger");
+  if (!res.ok) throw new Error(`ledger ${res.status}`);
+  const ledger = await res.json();
+  PANEL_CLAIMS = (ledger.claims || []).map((claim) => {
+    const evidenceFor = (ledger.links || [])
+      .filter((l) => l.claimId === claim.id)
+      .map((l) => (ledger.evidence || []).find((e) => e.id === l.evidenceId))
+      .filter(Boolean);
+    const first = evidenceFor[0];
+    const doi = first?.locators?.find((l) => l.kind === "doi")?.value ?? "";
+    const label = CLAIM_STATUS_LABEL[claim.status] || CLAIM_STATUS_LABEL.uncertain;
+    return {
+      id: claim.id,
+      status: label.status,
+      statusClass: label.statusClass,
+      title: first?.source?.title || first?.source?.locator || claim.text.slice(0, 60),
+      doi: doi || "UNRESOLVED",
+      doiUrl: doi ? `https://doi.org/${doi}` : "#",
+      quote: first?.quote || claim.text,
+      hash: first?.sha256 || "（待登记）",
+      sourceMatch: evidenceFor.length >= 2 ? `${evidenceFor.length} 个来源已登记` : evidenceFor.length === 1 ? "1 个来源已登记" : "尚无证据来源",
+      claimId: claim.id,
+      kind: claim.kind,
+      text: claim.text,
+    };
+  });
+  renderEditorClaimsList();
+  updateEditorStatsBadge();
+  const countEl = document.getElementById("manuscript-preview-count");
+  if (countEl) countEl.textContent = `${PANEL_CLAIMS.length} 个论断`;
+  return ledger;
+}
+
+/** Render the real manuscript file into the editor canvas. */
+async function renderManuscriptFromServer() {
+  const res = await fetch("/api/manuscript");
+  if (!res.ok) throw new Error(`manuscript ${res.status}`);
+  const manuscript = await res.json();
+  if (manuscript.exists && manuscript.markdown.trim()) {
+    editorCanvas.innerHTML = markdownToEditorHtml(manuscript.markdown);
+  } else {
+    editorCanvas.innerHTML = `<p class="detail-key">尚无手稿文件。点击「💾 保存手稿」把内容写入 notes/manuscript.md；或先运行文献综述 / 元分析工作流生成真实报告。</p>`;
+  }
+  bindEditorClaimClicks();
+  const preview = document.getElementById("manuscript-preview");
+  const previewPath = document.getElementById("manuscript-preview-path");
+  if (preview) {
+    if (manuscript.exists && manuscript.markdown.trim()) {
+      if (previewPath) previewPath.textContent = manuscript.path;
+      const md = manuscript.markdown.slice(0, 2200);
+      preview.innerHTML = markdownToEditorHtml(md);
+      preview.querySelectorAll(".claim-interactive-tag").forEach((tag) => {
+        tag.addEventListener("click", () => applyClaimProbe(parseInt(tag.dataset.claimIdx, 10)));
+      });
+      bindEditorImages(preview);
+    } else {
+      if (previewPath) previewPath.textContent = "";
+      preview.innerHTML = `<p class="detail-key">尚无手稿文件 — 在「手稿编辑与核验」页编辑并保存，或先运行工作流生成真实报告。</p>`;
+    }
+  }
+  return manuscript;
+}
+
+async function loadManuscriptData() {
+  try {
+    await Promise.all([renderManuscriptFromServer(), loadLedgerData()]);
+    if (PANEL_CLAIMS.length) applyClaimProbe(0);
+  } catch (error) {
+    console.error("loadManuscriptData failed:", error);
+  }
+}
+
+let activeClaimIdx = 0;
+function applyClaimProbe(idx) {
+  activeClaimIdx = idx;
+  document.querySelectorAll(".claim-interactive-tag").forEach(tag => {
+    tag.classList.toggle("active", parseInt(tag.dataset.claimIdx, 10) === idx);
+  });
+  const data = PANEL_CLAIMS[idx];
+  document.getElementById("probe-claim-id").textContent = data.id;
+
+  const statusPill = document.getElementById("probe-status-pill");
+  statusPill.className = data.statusClass;
+  statusPill.innerHTML = `<span class="dot"></span> ${data.status}`;
+
+  document.getElementById("probe-source-title").textContent = data.title;
+  const doiEl = document.getElementById("probe-doi-link");
+  if (data.doiUrl !== "#") {
+    doiEl.innerHTML = `DOI: <a href="${data.doiUrl}" target="_blank" rel="noreferrer">${data.doi} ↗</a>`;
+  } else {
+    doiEl.textContent = `DOI: ${data.doi}`;
+  }
+  document.getElementById("probe-quote-box").textContent = data.quote;
+  document.getElementById("probe-hash-val").textContent = data.hash;
+  document.getElementById("probe-source-match").textContent = data.sourceMatch;
+}
+
+document.querySelectorAll(".claim-interactive-tag").forEach(tag => {
+  tag.addEventListener("click", () => {
+    applyClaimProbe(parseInt(tag.dataset.claimIdx, 10));
+  });
+});
+
+// "Ask in Chat" integration
+document.getElementById("btn-probe-ask-chat")?.addEventListener("click", () => {
+  const data = PANEL_CLAIMS[activeClaimIdx];
+  switchTab("tab-chat");
+  const input = document.getElementById("chat-input");
+  input.value = `针对手稿中的论断 [${data.id}]（文献：${data.title}），请深入分析其证据覆盖度与潜在的边界条件：`;
+  input.focus();
+});
+
+// Copy Citation
+document.getElementById("btn-probe-copy-cite")?.addEventListener("click", () => {
+  const data = PANEL_CLAIMS[activeClaimIdx];
+  const citeText = `@article{psyclaw_claim_${activeClaimIdx + 1},\n  title={${data.title}},\n  doi={${data.doi}},\n  note={Verified by psyclaw Claim-Evidence Ledger SHA-256: ${data.hash}}\n}`;
+  navigator.clipboard.writeText(citeText).then(() => {
+    const btn = document.getElementById("btn-probe-copy-cite");
+    btn.textContent = "✅ 已复制 BibTeX";
+    setTimeout(() => { btn.textContent = "📋 复制引文"; }, 1800);
+  });
+});
+
+// Export RIS — built from the real ledger, persisted to outputs/evidence.ris
+document.getElementById("btn-export-ris")?.addEventListener("click", async () => {
+  const withDoi = PANEL_CLAIMS.filter((c) => c.doi && c.doi !== "UNRESOLVED");
+  const risText = (withDoi.length
+    ? withDoi.map((c) => `TY  - JOUR\nTI  - ${c.title}\nDO  - ${c.doi}\nN1  - psyclaw claim ${c.id}\nER  - `).join("\n\n")
+    : "TY  - GEN\nTI  - (暂无已登记 DOI 的论断)\nER  - "
+  );
+  try {
+    const res = await fetch("/api/manuscript", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: risText, path: "outputs/evidence.ris" }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (error) {
+    alert("导出到项目 outputs/evidence.ris 失败：" + error.message);
+  }
+  const blob = new Blob([risText], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "psyclaw_evidence_ledger.ris";
+  a.click();
+});
+
+/* ==============================================================
+   Interactive Manuscript Editor & Evidence Auditor Logic
+   ============================================================== */
+function formatDoc(cmd, value = null) {
+  document.execCommand(cmd, false, value);
+  document.getElementById("editor-canvas")?.focus();
+}
+
+// WYSIWYG <-> Markdown Source Sync
+const btnModeWysiwyg = document.getElementById("btn-mode-wysiwyg");
+const btnModeMarkdown = document.getElementById("btn-mode-markdown");
+const editorCanvas = document.getElementById("editor-canvas");
+const editorMarkdown = document.getElementById("editor-markdown");
+
+btnModeWysiwyg?.addEventListener("click", () => {
+  btnModeWysiwyg.classList.add("active");
+  btnModeMarkdown.classList.remove("active");
+  editorCanvas.style.display = "block";
+  editorMarkdown.style.display = "none";
+});
+
+btnModeMarkdown?.addEventListener("click", () => {
+  btnModeMarkdown.classList.add("active");
+  btnModeWysiwyg.classList.remove("active");
+  editorMarkdown.value = editorHtmlToMarkdown();
+  editorCanvas.style.display = "none";
+  editorMarkdown.style.display = "block";
+});
+
+editorMarkdown?.addEventListener("input", () => {
+  editorCanvas.innerHTML = markdownToEditorHtml(editorMarkdown.value);
+  bindEditorClaimClicks();
+});
+
+function bindEditorImages(container) {
+  const host = container || editorCanvas;
+  host?.querySelectorAll("img.md-image").forEach((img) => {
+    img.onclick = (e) => {
+      e.stopPropagation();
+      const path = img.dataset.mdSrc;
+      if (!path) return;
+      if (/\.svg$/i.test(path)) openSvgEditor(`SVG 编辑：${path}`, path);
+      else openImageModal(`图片预览：${path}`, path);
+    };
+  });
+}
+
+function bindEditorClaimClicks() {
+  editorCanvas?.querySelectorAll(".claim-interactive-tag").forEach(tag => {
+    tag.onclick = (e) => {
+      e.stopPropagation();
+      const idx = parseInt(tag.dataset.claimIdx, 10);
+      selectAuditorClaim(idx);
+    };
+  });
+  bindEditorImages(editorCanvas);
+}
+
+let auditorSelectedIdx = 0;
+function selectAuditorClaim(idx) {
+  if (!PANEL_CLAIMS[idx]) return;
+  auditorSelectedIdx = idx;
+  const d = PANEL_CLAIMS[idx];
+
+  document.getElementById("audit-input-id").value = d.id;
+  document.getElementById("audit-input-title").value = d.title;
+  document.getElementById("audit-input-doi").value = d.doi;
+  document.getElementById("audit-input-quote").value = d.quote;
+  document.getElementById("audit-select-status").value = d.status.includes("缺口") || d.status.includes("不足") ? "uncertain" : "verified";
+
+  const pill = document.getElementById("auditor-status-pill");
+  pill.className = d.statusClass;
+  pill.textContent = d.status;
+
+  renderEditorClaimsList();
+  applyClaimProbe(idx);
+}
+
+function renderEditorClaimsList() {
+  const listEl = document.getElementById("editor-claims-list");
+  if (!listEl) return;
+  listEl.innerHTML = PANEL_CLAIMS.map((c, idx) => `
+    <div class="claim-list-item ${idx === auditorSelectedIdx ? 'selected' : ''}" onclick="selectAuditorClaim(${idx})">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.2rem;">
+        <span class="mono" style="font-size:0.75rem;font-weight:700;color:var(--accent-ink);">${esc(c.id)}</span>
+        <span class="pill ${c.statusClass.split(' ')[1] || 'neutral'}" style="font-size:0.68rem;padding:0.1rem 0.4rem;">${esc(c.status)}</span>
+      </div>
+      <div style="font-size:0.82rem;color:var(--ink);">${esc(c.title)}</div>
+      <div class="mono" style="font-size:0.72rem;color:var(--ink-muted);">DOI: ${esc(c.doi)}</div>
+    </div>
+  `).join("");
+}
+
+// Mark Selection as Claim — persisted to the real ledger (append-only).
+async function createClaimFromSelection(kind) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || sel.isCollapsed) {
+    alert("请先用鼠标在左侧手稿中划选一段要作为论断（Claim）的文字。");
+    return;
+  }
+  const selectedText = sel.toString().trim();
+  if (!selectedText) return;
+  try {
+    const res = await fetch("/api/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: selectedText, kind, status: "uncertain" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const newIdx = PANEL_CLAIMS.length;
+    const label = CLAIM_STATUS_LABEL.uncertain;
+    PANEL_CLAIMS.push({
+      id: data.claim.id,
+      status: label.status,
+      statusClass: label.statusClass,
+      title: `新论断: "${selectedText.slice(0, 30)}${selectedText.length > 30 ? "…" : ""}"`,
+      doi: "UNRESOLVED",
+      doiUrl: "#",
+      quote: selectedText,
+      hash: "（待登记）",
+      sourceMatch: "已写入 .psyclaw/claims.jsonl",
+      claimId: data.claim.id,
+      kind,
+      text: selectedText,
+    });
+
+    const span = document.createElement("span");
+    span.className = "claim-interactive-tag active";
+    span.dataset.claimIdx = newIdx;
+    span.textContent = selectedText;
+
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(span);
+
+    bindEditorClaimClicks();
+    selectAuditorClaim(newIdx);
+    updateEditorStatsBadge();
+  } catch (error) {
+    alert("创建论断失败：" + error.message);
+  }
+}
+
+document.getElementById("btn-mark-selected-claim")?.addEventListener("click", () => createClaimFromSelection("result"));
+
+document.getElementById("btn-mark-selected-uncertain")?.addEventListener("click", () => createClaimFromSelection("interpretation"));
+
+// Real-Time Verify DOI — real Crossref + OpenAlex cross-check, never faked.
+document.getElementById("btn-verify-doi")?.addEventListener("click", async () => {
+  const doi = document.getElementById("audit-input-doi").value.trim();
+  const fb = document.getElementById("audit-feedback");
+  if (!doi) {
+    fb.textContent = "请输入要核验的 DOI。";
+    return;
+  }
+  fb.innerHTML = `🔍 正在通过 Crossref 与 OpenAlex 实时检索解析: ${esc(doi)}…`;
+  fb.className = "feedback-text";
+  try {
+    const res = await fetch("/api/doi/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ doi }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const statusSelect = document.getElementById("audit-select-status");
+    if (data.status === "verified") {
+      const cr = data.crossref || {};
+      const authorLine = cr.authors?.length ? ` — ${cr.authors.slice(0, 3).join(", ")}${cr.authors.length > 3 ? " 等" : ""}` : "";
+      fb.innerHTML = `✅ <span style="color:var(--ok-ink);">双源核验通过</span>: ${esc(cr.title || doi)}${authorLine}${cr.year ? ` (${cr.year})` : ""}`;
+      fb.className = "feedback-text ok";
+      statusSelect.value = "verified";
+      const titleInput = document.getElementById("audit-input-title");
+      if (cr.title && !titleInput.value.trim()) titleInput.value = cr.title;
+    } else if (data.status === "unverified") {
+      fb.innerHTML = `⚠️ <span style="color:var(--warn-ink);">来源间不一致</span>: ${esc(data.mismatch || "Crossref 与 OpenAlex 结果冲突")}`;
+      fb.className = "feedback-text warn";
+      statusSelect.value = "uncertain";
+    } else {
+      fb.innerHTML = `❌ <span style="color:var(--crit-ink);">核验失败</span>: ${esc(data.error || "未知错误")}`;
+      fb.className = "feedback-text crit";
+      statusSelect.value = "uncertain";
+    }
+  } catch (error) {
+    fb.innerHTML = `❌ <span style="color:var(--crit-ink);">核验失败</span>: ${esc(error.message)}`;
+    fb.className = "feedback-text crit";
+  }
+});
+
+// Save Claim Edits — attaches the auditor form as REAL evidence to the claim
+// in the append-only ledger (.psyclaw/evidence.jsonl), with a supports link.
+document.getElementById("btn-save-claim-edit")?.addEventListener("click", async () => {
+  const cur = PANEL_CLAIMS[auditorSelectedIdx];
+  if (!cur) return;
+  const title = document.getElementById("audit-input-title").value.trim();
+  const doi = document.getElementById("audit-input-doi").value.trim();
+  const quote = document.getElementById("audit-input-quote").value.trim();
+  if (!title && !doi && !quote) {
+    alert("请至少填写文献标题、DOI 或引文摘录之一（账本为追加式写入，登记的是该论断的证据来源）。");
+    return;
+  }
+  try {
+    const res = await fetch("/api/evidence", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ claimId: cur.claimId, title, doi, quote }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const fb = document.getElementById("audit-feedback");
+    fb.textContent = `✅ 已登记证据 ${data.evidence.id} 至 .psyclaw/evidence.jsonl，并与论断 ${cur.claimId} 建立「支持」链接。accessStatus=partial：需独立核验后才能提升为 verified。`;
+    fb.className = "feedback-text ok";
+    await loadLedgerData();
+    const refreshedIdx = Math.max(0, PANEL_CLAIMS.findIndex((c) => c.claimId === cur.claimId));
+    selectAuditorClaim(refreshedIdx);
+  } catch (error) {
+    alert("登记证据失败：" + error.message);
+  }
+});
+
+// Ask AI Checker
+document.getElementById("btn-ask-ai-checker")?.addEventListener("click", () => {
+  const cur = PANEL_CLAIMS[auditorSelectedIdx];
+  switchTab("tab-chat");
+  const input = document.getElementById("chat-input");
+  input.value = `请对论断 [${cur.id}]（文献：${cur.title}，DOI：${cur.doi}）进行深度方法学交叉复核，检查样本量、效应量计算是否存在偏倚：`;
+  input.focus();
+});
+
+function updateEditorStatsBadge() {
+  const total = PANEL_CLAIMS.length;
+  // 证据覆盖率 = 有证据支持的论断（supported + unsupported），uncertain 视为缺口
+  const covered = PANEL_CLAIMS.filter(c => c.status === CLAIM_STATUS_LABEL.supported.status || c.status === CLAIM_STATUS_LABEL.unsupported.status).length;
+  const pct = total ? Math.round((covered / total) * 100) : 0;
+  const badge = document.getElementById("editor-stats-badge");
+  if (badge) badge.innerHTML = `<span class="dot"></span> ${total} 个 Claim · ${pct}% 证据覆盖率`;
+}
+
+// 发布手稿（约定位置 paper/）：Word 导出 = paper/<name>_APA7.docx（服务端 pandoc），
+// 同时落 paper/<name>.md 可编辑源。生成时即满足文档规范，panel 自动识别。
+async function publishManuscriptFromEditor(exportDocx) {
+  const md = editorHtmlToMarkdown();
+  if (!md.trim()) {
+    alert("手稿内容为空，无法发布。");
+    return;
+  }
+  let full = md;
+  if (PANEL_CLAIMS.length) {
+    full += "\n\n## References\n\n";
+    PANEL_CLAIMS.forEach((c, i) => {
+      full += `[^${i}]: **${c.title}** DOI: [${c.doi}](${c.doiUrl}) (SHA-256: \`${c.hash}\`)\n`;
+    });
+  }
+  try {
+    const res = await fetch("/api/publish", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: full, name: "论文初稿", exportDocx }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const targets = [data.markdownPath, data.docxPath].filter(Boolean);
+    alert(`✅ 已发布到约定位置：\n\n${targets.map((p) => `• ${p}`).join("\n")}\n\n证据已登记：${data.evidenceIds.length} 条（含 SHA-256 指纹）。panel 文档清单会自动识别。`);
+    await loadDocuments();
+    await loadArtifacts();
+    await loadManuscriptVersions();
+  } catch (error) {
+    alert("发布失败：" + error.message);
+  }
+}
+
+document.getElementById("btn-export-word")?.addEventListener("click", () => publishManuscriptFromEditor(true));
+
+document.getElementById("btn-export-md")?.addEventListener("click", () => publishManuscriptFromEditor(false));
+
+// Save Manuscript to the real project file (notes/manuscript.md) with a receipt.
+document.getElementById("btn-save-manuscript")?.addEventListener("click", async () => {
+  const btn = document.getElementById("btn-save-manuscript");
+  const md = editorHtmlToMarkdown();
+  if (!md.trim()) {
+    alert("手稿内容为空，未保存。");
+    return;
+  }
+  try {
+    const res = await fetch("/api/manuscript", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: md, path: "notes/manuscript.md" }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    btn.textContent = `✅ 已保存 ${data.path} (${data.bytes} B)`;
+    setTimeout(() => { btn.textContent = "💾 保存手稿"; }, 2500);
+  } catch (error) {
+    alert("保存手稿失败：" + error.message);
+  }
+});
+
+// Initialize Editor Bindings
+bindEditorClaimClicks();
+renderEditorClaimsList();
+updateEditorStatsBadge();
+
+/* ==============================================================
+   Project Documents (standardized locations: paper/ docs/ data/ outputs/)
+   ============================================================== */
+const DOC_KIND_LABEL = {
+  manuscript: "手稿", reference: "参考文献", data: "数据", report: "报告", document: "文档",
+};
+
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
+
+function escAttr(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function loadDocuments() {
+  const body = document.getElementById("documents-table-body");
+  const countEl = document.getElementById("documents-count");
+  if (!body) return;
+  try {
+    const res = await fetch("/api/documents");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const docs = data.documents || [];
+    if (countEl) countEl.textContent = `${docs.length} 个文档`;
+    if (!docs.length) {
+      body.innerHTML = `<tr><td colspan="5" class="detail-key">未发现文档。约定位置：paper/（手稿 .md 源 + .docx 导出）、docs/（资料）、data/（数据）、outputs/（报告）。</td></tr>`;
+      return;
+    }
+    body.innerHTML = docs.map((doc) => `
+      <tr>
+        <td style="font-family:var(--mono);font-size:0.75rem;">${esc(doc.path)}</td>
+        <td>${esc(DOC_KIND_LABEL[doc.kind] || doc.kind)}</td>
+        <td class="mono" style="font-size:0.72rem;">${formatBytes(doc.bytes)}</td>
+        <td>${doc.imported ? '<span class="pill ok">已导入</span>' : doc.isManuscript ? '<span class="pill accent">当前手稿</span>' : '<span class="pill neutral">未导入</span>'}</td>
+        <td>${doc.imported
+          ? '<span class="pill neutral" style="font-size:0.7rem;">已登记账本</span>'
+          : `<button class="btn btn-secondary" style="font-size:0.72rem;padding:0.2rem 0.5rem;" onclick="importDocument('${escAttr(doc.path)}')">📥 导入</button>`}</td>
+      </tr>`).join("");
+  } catch (error) {
+    body.innerHTML = `<tr><td colspan="5" class="detail-key">扫描失败：${esc(error.message)}</td></tr>`;
+  }
+}
+
+async function importDocument(path) {
+  try {
+    const res = await fetch("/api/documents/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (data.markdown) {
+      editorCanvas.innerHTML = markdownToEditorHtml(data.markdown);
+      bindEditorClaimClicks();
+      switchTab("tab-editor");
+      alert(`已导入 ${data.path}（证据 ${data.evidenceId} 已登记，accessStatus=partial）。内容已载入手稿编辑器，编辑后点「💾 保存手稿」持久化到 notes/manuscript.md。`);
+    } else {
+      alert(`已导入 ${data.path}（证据 ${data.evidenceId}，${data.format} 文档已登记，不转换文本）。`);
+    }
+    await loadDocuments();
+  } catch (error) {
+    alert("导入失败：" + error.message);
+  }
+}
+
+/* ==============================================================
+   Manuscript versions (paper/archive/ + .psyclaw/versions.jsonl)
+   ============================================================== */
+let manuscriptVersions = [];
+
+async function loadManuscriptVersions() {
+  const badge = document.getElementById("manuscript-version-badge");
+  const select = document.getElementById("version-select");
+  try {
+    const res = await fetch("/api/versions");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    manuscriptVersions = data.versions || [];
+    if (badge) badge.textContent = data.current ? `v${data.current.version}` : "v—";
+    if (select) {
+      const previous = select.value;
+      select.innerHTML = (manuscriptVersions.length
+        ? manuscriptVersions.map((v) => `<option value="${v.version}">v${v.version} · ${new Date(v.publishedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</option>`).join("")
+        : `<option value="">暂无版本</option>`) + `<option value="">查看版本…</option>`;
+      if (previous) select.value = previous;
+    }
+  } catch (error) {
+    if (badge) badge.textContent = "v—";
+  }
+}
+
+async function loadVersionMarkdown(version) {
+  const record = manuscriptVersions.find((v) => v.version === Number(version));
+  if (!record) return;
+  try {
+    const res = await fetch(`/api/artifact?path=${encodeURIComponent(record.markdownLoadPath)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    editorCanvas.innerHTML = markdownToEditorHtml(text);
+    bindEditorClaimClicks();
+    const badge = document.getElementById("manuscript-version-badge");
+    if (badge) badge.innerHTML = `v${record.version} <span style="font-weight:400;">历史</span>`;
+  } catch (error) {
+    alert("读取版本失败：" + error.message);
+  }
+}
+
+document.getElementById("version-select")?.addEventListener("change", (e) => {
+  const value = e.target.value;
+  if (value === "") { loadManuscriptData(); return; }
+  loadVersionMarkdown(value);
+});
+
+/* ==============================================================
+   插入图片（从产物列表选取，SVG 可点击进入拖拽编辑）
+   ============================================================== */
+document.getElementById("btn-insert-image")?.addEventListener("click", async () => {
+  try {
+    const res = await fetch("/api/artifacts");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const figures = (data.artifacts || []).filter((a) => /\.(svg|png|jpg|jpeg|gif)$/i.test(a.path));
+    if (!figures.length) {
+      alert("尚无图片产物——先运行分析/图表工作流生成 figure（SVG+PNG 双格式）再插入。");
+      return;
+    }
+    const list = figures.map((f, idx) => `${idx + 1}. ${f.path}`).join("\n");
+    const raw = prompt(`选择要插入的图片（输入序号）：\n\n${list}`, "1");
+    const idx = Number(raw) - 1;
+    const path = figures[idx]?.path;
+    if (!path) return;
+    const imgHtml = `<img src="/api/artifact?path=${encodeURIComponent(path)}" data-md-src="${escAttr(path)}" alt="图" class="md-image" style="max-width:80%;border-radius:6px;border:1px solid var(--line);">`;
+    editorCanvas.focus();
+    document.execCommand("insertHTML", false, imgHtml);
+    bindEditorImages();
+  } catch (error) {
+    alert("插入图片失败：" + error.message);
+  }
+});
+
+/* ==============================================================
+   参考文献存档与核验（.psyclaw/references.jsonl）
+   ============================================================== */
+const REF_STATUS = (r) => {
+  const parts = [];
+  if (r.verified) parts.push('<span class="pill ok">双源已核验</span>');
+  else parts.push('<span class="pill warn">未核验</span>');
+  if (r.oaPdfUrl) parts.push('<span class="pill accent">开放获取</span>');
+  if (r.downloadedPath) parts.push('<span class="pill neutral">已下载</span>');
+  return parts.join(" ") || '<span class="pill neutral">存档</span>';
+};
+
+async function loadReferences() {
+  const body = document.getElementById("references-table-body");
+  if (!body) return;
+  try {
+    const [refsRes, citesRes] = await Promise.all([fetch("/api/references"), fetch("/api/citations")]);
+    if (!refsRes.ok) throw new Error(`HTTP ${refsRes.status}`);
+    const data = await refsRes.json();
+    const cites = citesRes.ok ? (await citesRes.json()).citations || [] : [];
+    const citeCount = new Map();
+    cites.forEach((u) => citeCount.set(u.doi, (citeCount.get(u.doi) || 0) + 1));
+    const refs = data.references || [];
+    body.innerHTML = refs.length
+      ? refs.map((r) => `
+        <tr>
+          <td class="mono" style="font-size:0.72rem;">${esc(r.doi)}</td>
+          <td style="font-size:0.78rem;">${esc(r.title)}<div class="mono" style="font-size:0.7rem;color:var(--ink-muted);">${esc(r.authors.slice(0, 3).join(", "))}${r.authors.length > 3 ? " 等" : ""}</div></td>
+          <td class="mono" style="font-size:0.75rem;">${r.year ?? "—"}</td>
+          <td>${REF_STATUS(r)}${citeCount.get(r.doi) ? ` <span class="pill accent" style="font-size:0.65rem;">已引用 ${citeCount.get(r.doi)} 次</span>` : ""}</td>
+          <td style="white-space:nowrap;">
+            ${r.downloadedPath
+              ? `<span class="mono" style="font-size:0.7rem;color:var(--ink-muted);">${esc(r.downloadedPath)}</span>`
+              : r.oaPdfUrl
+                ? `<button class="btn btn-secondary" style="font-size:0.7rem;padding:0.15rem 0.45rem;" onclick="downloadReference('${escAttr(r.doi)}')">⬇ 下载 PDF</button>`
+                : `<button class="btn btn-secondary" style="font-size:0.7rem;padding:0.15rem 0.45rem;" onclick="verifyReference('${escAttr(r.doi)}')">🔍 核验</button>`}
+          </td>
+        </tr>`).join("")
+      : `<tr><td colspan="5" class="detail-key">存档为空 — 输入 DOI 点击「核验并存档」，或运行「核验正文引用」自动列出缺口。</td></tr>`;
+  } catch (error) {
+    body.innerHTML = `<tr><td colspan="5" class="detail-key">读取失败：${esc(error.message)}</td></tr>`;
+  }
+}
+
+async function loadCitationUses() {
+  const el = document.getElementById("citation-uses");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/citations");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const uses = data.citations || [];
+    el.innerHTML = uses.length
+      ? uses.slice().reverse().slice(0, 30).map((u) => `
+        <div style="display:flex;gap:.4rem;align-items:baseline;border-bottom:1px dashed var(--line);padding-bottom:0.3rem;">
+          <span class="mono" style="font-size:0.7rem;color:var(--ink-muted);">${esc(u.surname)} ${u.year ?? ""}</span>
+          <span style="flex:1;">${esc(u.reason)}<span class="mono" style="color:var(--ink-faint);font-size:0.7rem;"> · ${esc(u.doi)}</span></span>
+          ${u.verified ? '<span class="pill ok" style="font-size:0.65rem;">已核验</span>' : '<span class="pill warn" style="font-size:0.65rem;">未核验</span>'}
+        </div>`).join("")
+      : `<span class="detail-key">尚无引用用途登记 — 写作时智能体会经 psyclaw_cite 工具自动登记（DOI + 原因 + 上下文），也可在此手动登记。</span>`;
+  } catch (error) {
+    el.innerHTML = `<span class="detail-key">读取失败：${esc(error.message)}</span>`;
+  }
+}
+
+document.getElementById("btn-record-cite")?.addEventListener("click", async () => {
+  const doi = document.getElementById("cite-doi-input").value.trim();
+  const reason = document.getElementById("cite-reason-input").value.trim();
+  const context = document.getElementById("cite-context-input").value.trim() || "（未提供上下文）";
+  const fb = document.getElementById("ref-check-result");
+  if (!doi || !reason) { alert("请填写 DOI 与引用原因。"); return; }
+  try {
+    const res = await fetch("/api/citations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ doi, reason, context }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (fb) fb.textContent = `📝 已登记引用 ${data.record.citationId}：${data.record.surname} ${data.record.year ?? ""} — ${data.record.reason}${data.record.verified ? "（双源已核验，并已同步存档）" : "（未核验，如实记录，请补核验）"}`;
+    document.getElementById("cite-reason-input").value = "";
+    document.getElementById("cite-context-input").value = "";
+    await loadCitationUses();
+    await loadReferences();
+  } catch (error) {
+    if (fb) fb.textContent = `❌ 登记失败：${error.message}`;
+  }
+});
+
+async function verifyReference(doi) {
+  const feedback = document.getElementById("ref-check-result");
+  if (feedback) feedback.textContent = `🔍 正在核验 ${doi}（Crossref + OpenAlex + OA 查询）…`;
+  try {
+    const res = await fetch("/api/references/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ doi }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (!data.ok) {
+      if (feedback) feedback.textContent = `❌ ${doi} 无法核验：${data.verification?.error || "无元数据"}`;
+      return;
+    }
+    if (feedback) feedback.textContent = `✅ ${data.appended ? "已存档" : "已存在"}：${data.record.title}（${data.record.authors.slice(0, 3).join(", ")}${data.record.year ? `, ${data.record.year}` : ""}）${data.record.oaPdfUrl ? " · 开放获取" : ""}`;
+    await loadReferences();
+  } catch (error) {
+    if (feedback) feedback.textContent = `❌ 核验失败：${error.message}`;
+  }
+}
+
+async function downloadReference(doi) {
+  const feedback = document.getElementById("ref-check-result");
+  if (feedback) feedback.textContent = `⬇ 正在下载 ${doi}（OpenAlex OA 链接）…`;
+  try {
+    const res = await fetch("/api/references/download", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ doi }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (!data.ok) {
+      if (feedback) feedback.textContent = data.reason === "not-open-access"
+        ? `⛔ ${doi} 非开放获取：在对话中让智能体走机构全文下载（psyclaw_workbench），需人工浏览器登录。`
+        : `⛔ 下载失败（${data.reason}）。`;
+      return;
+    }
+    if (feedback) feedback.textContent = `✅ 已下载 ${data.path}（${data.bytes} B，证据 ${data.evidenceId}）。`;
+    await loadReferences();
+    await loadDocuments();
+  } catch (error) {
+    if (feedback) feedback.textContent = `❌ 下载失败：${error.message}`;
+  }
+}
+
+async function checkManuscriptCitations() {
+  const feedback = document.getElementById("ref-check-result");
+  if (feedback) feedback.textContent = "🧾 正在提取正文引用并对照存档…";
+  const md = editorHtmlToMarkdown();
+  try {
+    const res = await fetch("/api/references/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: md }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const lines = [];
+    lines.push(`🧾 正文引用 ${data.citations.length} 处：已存档匹配 ${data.matched}，缺口 ${data.unmatched}（存档 ${data.archiveSize} 条）`);
+    for (const cite of data.citations) {
+      if (cite.missing) {
+        lines.push(`  ⚠️ ${cite.surname} ${cite.years.join(", ")} — 存档中无匹配（可输入 DOI 核验并存档）`);
+      } else {
+        const ref = cite.matched[0];
+        lines.push(`  ✔ ${cite.surname} ${cite.years.join(", ")} → ${ref.title.slice(0, 50)}${ref.title.length > 50 ? "…" : ""}${ref.verified ? "（已核验）" : "（存档未核验）"}`);
+      }
+    }
+    if (feedback) feedback.textContent = lines.join("\n");
+  } catch (error) {
+    if (feedback) feedback.textContent = `❌ 核验失败：${error.message}`;
+  }
+}
+
+document.getElementById("btn-ref-verify")?.addEventListener("click", () => {
+  const doi = document.getElementById("ref-doi-input").value.trim();
+  if (!doi) { alert("请输入 DOI。"); return; }
+  verifyReference(doi);
+});
+
+document.getElementById("btn-ref-check-text")?.addEventListener("click", checkManuscriptCitations);
+
+/* ==============================================================
+   Master Init
+   ============================================================== */
+async function initApp() {
+  await Promise.all([
+    pollActivity(),
+    loadArtifacts(),
+    loadHitl(),
+    loadSkillsAndEcosystem(),
+    loadConfig(),
+    loadTokens(),
+    loadProvidersAndStats(),
+    loadManuscriptData(),
+    loadDocuments(),
+    loadReferences(),
+    loadCitationUses(),
+    loadManuscriptVersions()
+  ]);
+  setInterval(pollActivity, 3500);
+}
+
+initApp().catch(err => console.error("psyclaw init failed:", err));
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "id": "supported-definition",
+  "description": "An abstract-level source with a section locator supports a definition claim.",
+  "paradigm": "survey-observational",
+  "expected": "pass",
+  "forbid": [],
+  "evidence": [
+    {
+      "id": "e-definition",
+      "source": { "kind": "file", "locator": "fixture/source.md" },
+      "level": "abstract",
+      "quote": "A bounded definition from the supplied source.",
+      "retrievedAt": "2026-01-01T00:00:00.000Z",
+      "accessStatus": "verified",
+      "locators": [{ "kind": "section", "value": "Abstract" }]
+    }
+  ],
+  "claims": [
+    {
+      "id": "c-definition",
+      "text": "The source defines the bounded concept.",
+      "kind": "definition",
+      "evidenceIds": ["e-definition"],
+      "status": "supported"
+    }
+  ],
+  "links": [
+    { "claimId": "c-definition", "evidenceId": "e-definition", "relation": "supports", "rationale": "explicit definition" }
+  ]
+}

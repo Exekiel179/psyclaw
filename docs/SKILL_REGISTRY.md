@@ -1,3 +1,5 @@
+> **v0.23 legacy documentation.** 本页保留用于复现 PsyClaw v0.23.0；v0.24.0 的当前范围、接口与验收标准请以 开工纪要.md、架构蓝图.md 和 评测框架.md 为准。
+
 # Skill Registry
 
 PsyClaw 的 Skill 检索面向 Agent，而不是把一长串 `SKILL.md` 原文注入每轮上下文。

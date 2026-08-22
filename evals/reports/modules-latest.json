@@ -1,0 +1,292 @@
+{
+  "schemaVersion": "psyclaw/module-eval/v1",
+  "suite": "module-by-module-usage",
+  "generatedAt": "2026-08-22T12:48:16.611Z",
+  "modules": [
+    {
+      "module": "M1",
+      "label": "安装与启动",
+      "passed": 1,
+      "total": 1,
+      "score": 1
+    },
+    {
+      "module": "M2",
+      "label": "CLI 命令面",
+      "passed": 7,
+      "total": 7,
+      "score": 1
+    },
+    {
+      "module": "M3",
+      "label": "对话工具",
+      "passed": 4,
+      "total": 4,
+      "score": 1
+    },
+    {
+      "module": "M4",
+      "label": "研究工作流",
+      "passed": 6,
+      "total": 6,
+      "score": 1
+    },
+    {
+      "module": "M5",
+      "label": "发布与版本",
+      "passed": 2,
+      "total": 2,
+      "score": 1
+    },
+    {
+      "module": "M6",
+      "label": "文档导入",
+      "passed": 3,
+      "total": 3,
+      "score": 1
+    },
+    {
+      "module": "M7",
+      "label": "引用体系",
+      "passed": 3,
+      "total": 3,
+      "score": 1
+    },
+    {
+      "module": "M8",
+      "label": "手稿与面板",
+      "passed": 3,
+      "total": 3,
+      "score": 1
+    },
+    {
+      "module": "M9",
+      "label": "安全与门禁",
+      "passed": 2,
+      "total": 2,
+      "score": 1
+    }
+  ],
+  "probes": [
+    {
+      "module": "M1",
+      "moduleLabel": "安装与启动",
+      "name": "CLI 版本横幅",
+      "ok": true,
+      "note": "ψ PsyClaw [v0.24.0]"
+    },
+    {
+      "module": "M2",
+      "moduleLabel": "CLI 命令面",
+      "name": "CLI init 真实执行（空目录）",
+      "ok": true,
+      "note": "paradigm=meta-analysis，.psyclaw/ + notes/ 就位"
+    },
+    {
+      "module": "M2",
+      "moduleLabel": "CLI 命令面",
+      "name": "重复 init 不覆盖（幂等保护）",
+      "ok": true,
+      "note": "二次 init 被拒绝（幂等保护）"
+    },
+    {
+      "module": "M2",
+      "moduleLabel": "CLI 命令面",
+      "name": "hitl init",
+      "ok": true,
+      "note": "创建 HITL 工作区"
+    },
+    {
+      "module": "M2",
+      "moduleLabel": "CLI 命令面",
+      "name": "handoff 生成",
+      "ok": true,
+      "note": "notes/HANDOFF.md 已生成"
+    },
+    {
+      "module": "M2",
+      "moduleLabel": "CLI 命令面",
+      "name": "evidence add 登记证据",
+      "ok": true,
+      "note": "证据已登记含指纹"
+    },
+    {
+      "module": "M2",
+      "moduleLabel": "CLI 命令面",
+      "name": "冗余 workflow 命令已移除（去重）",
+      "ok": true,
+      "note": "CLI 无 workflow 命令，工作流走对话工具路径"
+    },
+    {
+      "module": "M2",
+      "moduleLabel": "CLI 命令面",
+      "name": "check-updates 可执行",
+      "ok": true,
+      "note": "检查报告正常输出"
+    },
+    {
+      "module": "M3",
+      "moduleLabel": "对话工具",
+      "name": "psyclaw_workbench 未知工作流阻断",
+      "ok": true,
+      "note": "未知工作流诚实阻断"
+    },
+    {
+      "module": "M3",
+      "moduleLabel": "对话工具",
+      "name": "psyclaw_workbench 元分析缺 target 阻断",
+      "ok": true,
+      "note": "缺 target 诚实阻断"
+    },
+    {
+      "module": "M3",
+      "moduleLabel": "对话工具",
+      "name": "psyclaw_cite 登记引用（含原因）",
+      "ok": true,
+      "note": "引用用途+证据已登记 (cite_2da4abb122a4b7c4)"
+    },
+    {
+      "module": "M3",
+      "moduleLabel": "对话工具",
+      "name": "真实运行时 /panel（Pi RPC + 扩展）",
+      "ok": true,
+      "note": "notify + 真实页面伺服（端口 4001,4301,4310,5283,6505,6506,6982,9210,9222,9277,9410,10808,10812,14369,21083,49890,54996,57207）"
+    },
+    {
+      "module": "M4",
+      "moduleLabel": "研究工作流",
+      "name": "文献综述通过（有证据）",
+      "ok": true,
+      "note": "verdict=pass 产物就位"
+    },
+    {
+      "module": "M4",
+      "moduleLabel": "研究工作流",
+      "name": "文献综述无来源阻断",
+      "ok": true,
+      "note": "review:sources 门禁阻断"
+    },
+    {
+      "module": "M4",
+      "moduleLabel": "研究工作流",
+      "name": "统计委托（不造数，写脚本契约）",
+      "ok": true,
+      "note": "委托 1 个统计任务（脚本契约，核心不含统计数值）"
+    },
+    {
+      "module": "M4",
+      "moduleLabel": "研究工作流",
+      "name": "写作评审标记因果语言",
+      "ok": true,
+      "note": "检出因果语言缺结果产物"
+    },
+    {
+      "module": "M4",
+      "moduleLabel": "研究工作流",
+      "name": "元分析（有数据集，fake OpenAlex）",
+      "ok": true,
+      "note": "I²/Egger 委托 R，不伪造"
+    },
+    {
+      "module": "M4",
+      "moduleLabel": "研究工作流",
+      "name": "元分析无数据集诚实阻断",
+      "ok": true,
+      "note": "缺效应量数据集阻断"
+    },
+    {
+      "module": "M5",
+      "moduleLabel": "发布与版本",
+      "name": "发布 v1→v2 并归档",
+      "ok": true,
+      "note": "v1→v2，归档+版本账本就位"
+    },
+    {
+      "module": "M5",
+      "moduleLabel": "发布与版本",
+      "name": "内容未变不产生新版本",
+      "ok": true,
+      "note": "幂等，无新版本"
+    },
+    {
+      "module": "M6",
+      "moduleLabel": "文档导入",
+      "name": "文档清单识别 paper 手稿",
+      "ok": true,
+      "note": "paper/论文初稿.md 标记为手稿"
+    },
+    {
+      "module": "M6",
+      "moduleLabel": "文档导入",
+      "name": "md 导入登记证据（幂等）",
+      "ok": true,
+      "note": "证据 evidence_55f7a09a786c72c5，重导幂等"
+    },
+    {
+      "module": "M6",
+      "moduleLabel": "文档导入",
+      "name": "路径逃逸拒绝",
+      "ok": true,
+      "note": "HTTP 400 拒绝"
+    },
+    {
+      "module": "M7",
+      "moduleLabel": "引用体系",
+      "name": "正文引文提取与缺口",
+      "ok": true,
+      "note": "提取 2 处，全部标缺口（存档空）"
+    },
+    {
+      "module": "M7",
+      "moduleLabel": "引用体系",
+      "name": "OA 全文下载（fake）",
+      "ok": true,
+      "note": "已下载 literature/10.1000_oa.pdf"
+    },
+    {
+      "module": "M7",
+      "moduleLabel": "引用体系",
+      "name": "付费墙诚实阻断",
+      "ok": true,
+      "note": "非开放获取，如实阻断"
+    },
+    {
+      "module": "M8",
+      "moduleLabel": "手稿与面板",
+      "name": "手稿发现 paper/*.md",
+      "ok": true,
+      "note": "paper/论文初稿.md"
+    },
+    {
+      "module": "M8",
+      "moduleLabel": "手稿与面板",
+      "name": "版本接口与归档可读",
+      "ok": true,
+      "note": "2 个版本，v1 可回读"
+    },
+    {
+      "module": "M8",
+      "moduleLabel": "手稿与面板",
+      "name": "中文文件名产物可伺服（RFC 5987）",
+      "ok": true,
+      "note": "HTTP 200"
+    },
+    {
+      "module": "M9",
+      "moduleLabel": "安全与门禁",
+      "name": "发布名称逃逸拒绝",
+      "ok": true,
+      "note": "HTTP 400 | 包含内路径 HTTP 200"
+    },
+    {
+      "module": "M9",
+      "moduleLabel": "安全与门禁",
+      "name": "副作用有 receipt（.psyclaw/manifests）",
+      "ok": true,
+      "note": "receipt 数量 6（≥2 次写入）"
+    }
+  ],
+  "passed": 31,
+  "total": 31,
+  "allPassed": true
+}

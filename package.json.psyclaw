@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "psyclaw/package-governance/v1",
+  "id": "psyclaw",
+  "apiVersion": "0.24",
+  "capabilities": ["research-brief", "evidence-ledger", "integrity-gates"],
+  "permissions": {
+    "read": ["project-root"],
+    "write": [".psyclaw", "notes", "outputs", "data/clean"],
+    "network": "disabled-by-default",
+    "destructive": "denied-by-default"
+  },
+  "trust": "builtin",
+  "license": {
+    "spdx": "MIT",
+    "evidenceRef": "LICENSE"
+  },
+  "source": {
+    "kind": "workspace",
+    "ref": "psypi@fb0012a1035d18bc1f5c6ae75f66c979f1ae3ee0"
+  }
+}

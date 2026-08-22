@@ -19,67 +19,93 @@ env:
 
 jobs:
   platform-test:
-    name: ${{ matrix.os }} platform checks
+    name: Node 22 checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
-      - uses: actions/setup-python@v5
+      - uses: pnpm/action-setup@v4
         with:
-          python-version: "3.12"
-      - name: Install package and test runner
-        run: python -m pip install -e . pytest
-      - name: Run platform execution regressions
-        run: >-
-          python -m pytest -q
-          tests/test_review_fixes_v02.py
-          tests/test_run_env.py
-          tests/test_run_stream.py
-          tests/test_repl_approval.py
-          tests/test_network_errors.py
-          tests/test_reinvent.py
+          version: 10.28.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate POSIX installer
+        if: runner.os != 'Windows'
+        run: sh -n docs/install.sh
+      - name: Validate PowerShell installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'docs/install.ps1'),
+            [ref]$null,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+      - run: pnpm check:branding
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
 
-  publish:
-    name: Build and publish release assets
+  release:
+    name: Pack and create GitHub release
     needs: platform-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_TAG }}
-      - uses: actions/setup-python@v5
+      - uses: pnpm/action-setup@v4
         with:
-          python-version: "3.12"
-      - uses: astral-sh/setup-uv@v6
+          version: 10.28.2
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
       - name: Verify tag matches package version
-        shell: python
+        shell: bash
         run: |
-          import os
-          import re
-          from pathlib import Path
-          root = Path(os.environ["GITHUB_WORKSPACE"])
-          text = (root / "psyclaw" / "__init__.py").read_text(encoding="utf-8")
-          expected = "v" + re.search(r'__version__\s*=\s*"([^"]+)"', text).group(1)
-          actual = os.environ["RELEASE_TAG"]
-          if actual != expected:
-              raise SystemExit(f"tag {actual!r} does not match package {expected!r}")
-      - name: Build platform packages
-        run: python scripts/build_dist.py --index https://pypi.org/simple
+          expected="v$(node -p "require('./package.json').version")"
+          test "$RELEASE_TAG" = "$expected" || {
+            echo "tag '$RELEASE_TAG' does not match package '$expected'" >&2
+            exit 1
+          }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:branding
+      - run: pnpm build
+      - run: pnpm eval
+      - run: pnpm eval:modules
+      - name: Pack npm artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          artifact="$(npm pack --ignore-scripts --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s)[0].filename))")"
+          mv "$artifact" "release/$artifact"
+          (cd release && sha256sum "$artifact" > SHA256SUMS.txt)
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$RELEASE_TAG"
-          dist/psyclaw-${RELEASE_TAG#v}-py3-none-any.whl
-          dist/psyclaw-${RELEASE_TAG#v}.tar.gz
-          dist/psyclaw-macos-${RELEASE_TAG#v}.tar.gz
-          dist/psyclaw-windows-${RELEASE_TAG#v}.zip
-          dist/SHA256SUMS.txt
-          --repo "$GITHUB_REPOSITORY"
-          --title "PsyClaw $RELEASE_TAG"
-          --generate-notes
+        shell: bash
+        run: |
+          gh release create "$RELEASE_TAG" \
+            release/psyclaw-*.tgz \
+            release/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "PsyClaw $RELEASE_TAG" \
+            --prerelease \
+            --generate-notes

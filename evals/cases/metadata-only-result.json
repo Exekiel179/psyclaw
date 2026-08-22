@@ -1,0 +1,29 @@
+{
+  "id": "metadata-only-result",
+  "description": "Metadata cannot substantiate a numeric result claim.",
+  "paradigm": "survey-observational",
+  "expected": "blocked",
+  "forbid": ["outputs/brief.md"],
+  "evidence": [
+    {
+      "id": "e-metadata",
+      "source": { "kind": "doi", "locator": "10.0000/synthetic" },
+      "level": "metadata",
+      "retrievedAt": "2026-01-01T00:00:00.000Z",
+      "accessStatus": "verified",
+      "locators": [{ "kind": "doi", "value": "10.0000/synthetic" }]
+    }
+  ],
+  "claims": [
+    {
+      "id": "c-result",
+      "text": "The study reports a numeric result.",
+      "kind": "result",
+      "evidenceIds": ["e-metadata"],
+      "status": "supported"
+    }
+  ],
+  "links": [
+    { "claimId": "c-result", "evidenceId": "e-metadata", "relation": "supports", "rationale": "metadata cannot substantiate a result" }
+  ]
+}
