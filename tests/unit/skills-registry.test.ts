@@ -102,6 +102,20 @@ describe("SkillRegistry", () => {
     expect(traversalReport.diagnostics.some((item) => item.code === "path-traversal")).toBe(true);
   });
 
+  it("allows a trusted root beneath a symlinked system-style ancestor", async () => {
+    const actualParent = await tempRoot();
+    const links = await tempRoot();
+    const alias = join(links, "alias");
+    await symlink(actualParent, alias, "junction");
+    const root = join(alias, "skills");
+    await mkdir(root, { recursive: true });
+    await writeSkill(root, "brief", "name: brief\ndescription: Brief");
+    const registry = new SkillRegistry([root]);
+    const report = await registry.discover();
+    expect(report.diagnostics).toEqual([]);
+    expect(report.skills.map((skill) => skill.id)).toEqual(["brief"]);
+  });
+
   it("detects a file mutation between discovery and load", async () => {
     const root = await tempRoot();
     const file = await writeSkill(root, "mutable", "name: mutable\ndescription: Mutable");

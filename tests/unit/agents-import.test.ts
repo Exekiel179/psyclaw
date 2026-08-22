@@ -141,6 +141,33 @@ describe("skill import", () => {
     })).rejects.toMatchObject({ code: "import.symlink-path" } satisfies Partial<SkillImportError>);
   });
 
+  it("imports when trusted source and project roots have system-style symlink ancestors", async () => {
+    const actualHome = await setupHome();
+    const actualProjectParent = await mkdtemp(join(tmpdir(), "psyclaw-import-actual-root-"));
+    const actualProject = join(actualProjectParent, "project");
+    await mkdir(actualProject);
+    const links = await mkdtemp(join(tmpdir(), "psyclaw-import-links-"));
+    const home = join(links, "home");
+    const projectAlias = join(links, "projects");
+    const root = join(projectAlias, "project");
+    await symlink(actualHome, home, "junction");
+    await symlink(actualProjectParent, projectAlias, "junction");
+    const [discovered] = (await discoverAgents({ homeDir: actualHome })).filter((candidate) => candidate.id === "claude-code");
+    const scan = {
+      ...discovered!,
+      skillDirs: discovered!.skillDirs.map((path) => path.replace(actualHome, home)),
+      skills: discovered!.skills.map((skill) => ({ ...skill, path: skill.path.replace(actualHome, home) })),
+    };
+    const result = await importAgentSkills({
+      root,
+      agent: scan,
+      approval: { approved: true, actor: "researcher", reason: "test" },
+    });
+    expect(result.importedCount).toBe(2);
+    await expect(readFile(join(actualProject, ".psyclaw", "imports", "claude-code", "foo", "SKILL.md"), "utf8"))
+      .resolves.toBe("# foo\n");
+  });
+
   it("replays an identical import without overwriting the manifest", async () => {
     const home = await setupHome();
     const root = await mkdtemp(join(tmpdir(), "psyclaw-import-replay-"));
