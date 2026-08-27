@@ -163,11 +163,41 @@ export type CredentialSource = "process-env" | "macos-launchctl" | "auth-store" 
 
 function execFileText(file: string, args: readonly string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
-    execFile(file, [...args], { encoding: "utf8", timeout: 3_000, windowsHide: true }, (error, stdout) => {
+    execFile(file, [...args], { encoding: "utf8", timeout: 3_000, maxBuffer: 64 * 1024, windowsHide: true }, (error, stdout) => {
       const value = error ? "" : stdout.trim();
       resolve(value || undefined);
     });
   });
+}
+
+function assertApiKeyEnv(apiKeyEnv: string): void {
+  if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw new Error("Invalid API key environment name");
+}
+
+export async function readMacOsLaunchctlCredential(apiKeyEnv: string): Promise<string | undefined> {
+  assertApiKeyEnv(apiKeyEnv);
+  if (process.platform !== "darwin") return undefined;
+  return execFileText("/bin/launchctl", ["getenv", apiKeyEnv]);
+}
+
+/** Explicit import only: a login shell may execute user-controlled profile code. */
+export async function readMacOsLoginShellCredential(apiKeyEnv: string): Promise<string | undefined> {
+  assertApiKeyEnv(apiKeyEnv);
+  if (process.platform !== "darwin") return undefined;
+  const shell = process.env.SHELL?.trim() || "/bin/zsh";
+  if (shell !== "/bin/zsh" && shell !== "/bin/bash") throw new Error("Only /bin/zsh and /bin/bash login shells are supported");
+  const nonce = randomUUID().replaceAll("-", "");
+  const start = `__PSYCLAW_KEY_${nonce}__`;
+  const end = `__PSYCLAW_END_${nonce}__`;
+  const output = await execFileText(shell, ["-lc", `command printf '${start}%s${end}' "\${${apiKeyEnv}-}"`]);
+  if (!output) return undefined;
+  if (!output.startsWith(start) || !output.endsWith(end)
+    || output.indexOf(start, start.length) >= 0 || output.indexOf(end) !== output.length - end.length) {
+    throw new Error("Login shell produced unexpected output; import was refused");
+  }
+  const value = output.slice(start.length, -end.length);
+  if (!value || /[\u0000-\u001f\u007f]/u.test(value)) throw new Error("Login shell credential is empty or contains control characters");
+  return value;
 }
 
 async function hasStoredCredential(providerId: string, agentDir: string): Promise<boolean> {
@@ -185,7 +215,7 @@ export async function providerCredentialSource(
   preset: Pick<ProviderPreset, "id" | "apiKeyEnv">,
   options: { agentDir?: string; platform?: NodeJS.Platform } = {},
 ): Promise<CredentialSource> {
-  if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(preset.apiKeyEnv)) throw new Error("Invalid API key environment name");
+  assertApiKeyEnv(preset.apiKeyEnv);
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(preset.id)) throw new Error("Invalid provider id");
   const processValue = process.env[preset.apiKeyEnv]?.trim();
   if (processValue) return "process-env";
@@ -300,14 +330,16 @@ function providerConfig(input: ProviderConfigInput): Record<string, unknown> {
 export async function saveProviderConfig(input: ProviderConfigInput, options: { agentDir?: string } = {}): Promise<SetupResult> {
   const agentDir = options.agentDir ?? getAgentDir();
   const modelsPath = join(agentDir, "models.json");
+  assertApiKeyEnv(input.apiKeyEnv);
   await mkdir(agentDir, { recursive: true });
-  if (input.apiKey?.trim()) {
+  const apiKey = input.apiKey?.trim();
+  if (apiKey) {
     // AuthStorage is intentionally not part of Pi's public root export. Resolve
     // the locked runtime's implementation without reading or logging secrets.
     const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
     const { AuthStorage } = await import(pathToFileURL(join(dirname(entry), "core", "auth-storage.js")).href);
     const auth = AuthStorage.create(join(agentDir, "auth.json"));
-    await auth.modify(input.id, async () => ({ type: "api_key", key: input.apiKey!.trim() }));
+    await auth.modify(input.id, async () => ({ type: "api_key", key: apiKey }));
   }
   await withModelsLock(modelsPath, async () => {
     const existing = await readProviderCatalog(modelsPath);

@@ -2,20 +2,20 @@
 
 PsyClaw 是面向社会科学研究的 Pi 工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到官方 Pi runtime 上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.26.2`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
+当前版本：`0.26.3`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.26.2
+npm install -g psyclaw@0.26.3
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.26.2 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.26.3 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
@@ -24,7 +24,7 @@ npm install -g psyclaw@0.26.2 --registry=https://registry.npmmirror.com
 psyclaw --help
 ```
 
-直接运行 `psyclaw` 会启动交互研究工作台；首次没有模型配置时会进入配置向导。也可显式运行 `psyclaw wizard`，或使用 `psyclaw setup --provider deepseek`。不要把 API key 写进项目、README 或 Git 仓库。
+直接运行 `psyclaw` 会启动交互研究工作台；首次没有模型配置时会进入配置向导。向导会检查当前进程、macOS `launchctl` 和已有用户凭据，也允许直接遮罩输入 Key。`launchctl` Key 只注入当前运行进程、不落盘；登录 shell 仅在用户明确按 `Ctrl+I` 后读取。直接输入或明确导入的 Key 只保存到 Pi 用户级 `auth.json`，不会写入项目或 `models.json`。也可显式运行 `psyclaw wizard`，或使用 `psyclaw setup --provider deepseek` 写入仅引用环境变量的预设。不要把 API key 写进命令参数、项目、README 或 Git 仓库。
 
 ## 五分钟开始
 
@@ -60,6 +60,8 @@ psyclaw brief
 | 查看 Pi runtime 更新 | `psyclaw check-updates` |
 | 更新 Pi runtime | `psyclaw update --yes` |
 | 打开科研面板 | 在对话中输入 `/panel` |
+| 查看或切换 Provider | 在对话中输入 `/provider` 或 `/provider <id>` |
+| 管理启动横幅宠物 | `/pet status`、`/pet on`、`/pet off`（默认关闭） |
 
 `psyclaw update` 只更新捆绑的 Pi runtime；它不是从 Git 拉取 PsyClaw 源码。全局安装用户通过 `npm install -g psyclaw@<version>` 获取 PsyClaw 新版本；本仓库开发者直接修改源码并构建。
 
@@ -87,7 +89,7 @@ where.exe psyclaw
 
 ```powershell
 npm uninstall -g psyclaw
-npm install -g psyclaw@0.26.2
+npm install -g psyclaw@0.26.3
 psyclaw --help
 ```
 

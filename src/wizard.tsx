@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, render, useInput } from "ink";
-import { PROVIDER_PRESETS, providerCredentialSource, saveProviderConfig } from "./setup.js";
+import { PROVIDER_PRESETS, providerCredentialSource, readMacOsLoginShellCredential, saveProviderConfig } from "./setup.js";
 import { PSYCLAW_ACCENT, PSYCLAW_ERROR, PSYCLAW_OK, PSYCLAW_VERSION } from "./branding.js";
 
 export type WizardStep = "welcome" | "provider" | "model" | "credential" | "confirm" | "done";
@@ -65,6 +65,7 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
   const [modelIndex, setModelIndex] = useState(0);
   const [apiKey, setApiKey] = useState("");
   const [credentialSource, setCredentialSource] = useState<string>("checking");
+  const [credentialError, setCredentialError] = useState("");
 
   const provider = wizardProviders[providerIndex];
   const model = provider?.models[modelIndex];
@@ -89,7 +90,7 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
   };
 
   useInput((input, key) => {
-    if (input === "q" && step !== "done") {
+    if (input === "q" && step !== "done" && step !== "credential") {
       onDone({ completed: false });
       return;
     }
@@ -113,6 +114,12 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
       case "credential":
         if (key.escape) setStep("model");
         else if (key.return && (keyConfigured || apiKey.trim())) setStep("confirm");
+        else if (key.ctrl && input.toLowerCase() === "i" && process.platform === "darwin") {
+          setCredentialError("");
+          void readMacOsLoginShellCredential(apiKeyEnv)
+            .then((value) => value ? setApiKey(value) : setCredentialError(`登录 shell 中未找到 ${apiKeyEnv}`))
+            .catch((error: unknown) => setCredentialError(error instanceof Error ? error.message : "登录 shell 导入失败"));
+        }
         else if (key.backspace || key.delete) setApiKey((value) => value.slice(0, -1));
         else if (input && !key.ctrl && !key.meta) setApiKey((value) => value + input.replace(/[\r\n]/g, ""));
         break;
@@ -149,7 +156,7 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
 
       {step === "provider" && (
         <Box flexDirection="column">
-          <Text bold color={PSYCLAW_ACCENT}>[1/3] 选择模型提供商 (Provider)</Text>
+          <Text bold color={PSYCLAW_ACCENT}>[1/4] 选择模型提供商 (Provider)</Text>
           <Selectable lines={providerLines} selected={providerIndex} />
           <Hint>[↑/↓] 移动光标  ·  [Enter] 确认选择  ·  [Q] 退出</Hint>
         </Box>
@@ -157,7 +164,7 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
 
       {step === "model" && (
         <Box flexDirection="column">
-          <Text bold color={PSYCLAW_ACCENT}>[2/3] 选择默认模型 ({provider?.name})</Text>
+          <Text bold color={PSYCLAW_ACCENT}>[2/4] 选择默认模型 ({provider?.name})</Text>
           <Selectable lines={modelLines} selected={modelIndex} />
           <Hint>[↑/↓] 移动光标  ·  [Enter] 确认选择  ·  [Q] 退出</Hint>
         </Box>
@@ -183,13 +190,14 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
           <Text dimColor>已检查当前进程、macOS launchctl 与用户凭据存储。</Text>
           <Box marginY={1}><Text>Key: </Text><Text color={PSYCLAW_ACCENT}>{apiKey ? "•".repeat(Math.min(apiKey.length, 48)) : keyConfigured ? "已检测到，可直接继续" : "请输入 API Key"}</Text></Box>
           {!keyConfigured && !apiKey.trim() && <Text color={PSYCLAW_ERROR}>未检测到 ${apiKeyEnv}</Text>}
-          <Hint>直接输入 Key（内容不回显） · [Enter] 继续 · [Esc] 返回</Hint>
+          {credentialError && <Text color={PSYCLAW_ERROR}>{credentialError}</Text>}
+          <Hint>直接输入 Key（内容不回显）{process.platform === "darwin" ? " · [Ctrl+I] 明确从 login shell 导入并保存" : ""} · [Enter] 继续 · [Esc] 返回</Hint>
         </Box>
       )}
 
       {step === "done" && (
         <Box flexDirection="column">
-          <Text color={PSYCLAW_OK} bold>✔ 配置已成功写入 models.json 与环境缓存！</Text>
+          <Text color={PSYCLAW_OK} bold>✔ Provider 与凭据配置已保存！</Text>
           <Text dimColor>马上启动 PsyClaw 智能研究助手…</Text>
           <Hint>[Enter] 立即进入对话  ·  [Q] 退出</Hint>
         </Box>

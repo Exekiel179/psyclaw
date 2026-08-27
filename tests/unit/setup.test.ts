@@ -33,8 +33,20 @@ describe("provider setup and first-run detection", () => {
     expect(Object.keys(parsed.providers).sort()).toEqual(["deepseek", "openai"]);
   });
 
+  it("does not create credential storage without an explicitly supplied key", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
+    const preset = PROVIDER_PRESETS.find((item) => item.id === "google")!;
+    await saveProviderConfig(preset, { agentDir });
+    await expect(access(join(agentDir, "auth.json"))).rejects.toThrow();
+  });
+
   it("includes the Google Gemini preset", () => {
-    expect(PROVIDER_PRESETS).toContainEqual(expect.objectContaining({ id: "google", apiKeyEnv: "GEMINI_API_KEY" }));
+    expect(PROVIDER_PRESETS).toContainEqual(expect.objectContaining({
+      id: "google",
+      name: "Google Gemini",
+      apiKeyEnv: "GEMINI_API_KEY",
+      models: expect.arrayContaining([expect.objectContaining({ id: "gemini-2.5-pro" })]),
+    }));
   });
 
   it("detects a process environment credential without exposing it", async () => {

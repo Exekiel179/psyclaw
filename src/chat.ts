@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensurePsyClawTheme, ensureQuietStartup, PSYCLAW_IDENTITY_PROMPT } from "./branding.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
+import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -92,6 +93,14 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     ...process.env,
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
   };
+  if (process.platform === "darwin") {
+    const missing = PROVIDER_PRESETS.filter((preset) => !spawnEnv[preset.apiKeyEnv]);
+    const values = await Promise.all(missing.map((preset) => readMacOsLaunchctlCredential(preset.apiKeyEnv)));
+    for (const [index, preset] of missing.entries()) {
+      const value = values[index];
+      if (value) spawnEnv[preset.apiKeyEnv] = value;
+    }
+  }
   if (manifest?.version !== undefined) spawnEnv.PSYCLAW_VERSION = manifest.version;
   try {
     const settings = JSON.parse(await readFile(join(getAgentDir(), "psyclaw-settings.json"), "utf8")) as { psyclawPet?: unknown };
