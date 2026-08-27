@@ -2,7 +2,8 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PSYCLAW_IDENTITY_PROMPT } from "./branding.js";
+import { ensurePsyClawTheme, ensureQuietStartup, PSYCLAW_IDENTITY_PROMPT } from "./branding.js";
+import { resolvePsyClawManifest } from "./updates/manifest.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -21,6 +22,22 @@ function resolvePiCli(): string {
     throw new Error(
       "Cannot locate the bundled Pi CLI (@earendil-works/pi-coding-agent). Run `pnpm install` or `npm install` first.",
     );
+  }
+}
+
+async function applyRuntimeBranding(root: string): Promise<void> {
+  const script = join(root, "scripts", "rebrand-pi.mjs");
+  const exitCode = await new Promise<number>((resolve) => {
+    const child = spawn(process.execPath, [script], {
+      cwd: root,
+      stdio: "ignore",
+      shell: false,
+    });
+    child.on("error", () => resolve(1));
+    child.on("close", (code) => resolve(code ?? 1));
+  });
+  if (exitCode !== 0) {
+    throw new Error("Unable to prepare the bundled Pi runtime for PsyClaw. Reinstall psyclaw or run `psyclaw rebrand` from its package directory.");
   }
 }
 
@@ -46,6 +63,9 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   const extensionPath = options.extensionPath ?? join(root, "dist", "src", "extension.js");
   const panelExtensionPath = join(root, "dist", "src", "panel", "extension.js");
   const skillsPath = options.skillsPath ?? join(root, "skills", "core");
+  // Branding is applied on first launch, not during npm installation, so the
+  // package install itself never mutates dependency files.
+  await applyRuntimeBranding(root);
   const developerMode = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const toolAllowlist = developerMode
     ? "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench"
@@ -59,10 +79,19 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   } catch { /* no user supplement */ }
   const args = ["--extension", extensionPath, "--extension", panelExtensionPath, "--skill", skillsPath, "--tools", toolAllowlist, "--append-system-prompt", identityPrompt, ...(options.args ?? [])];
 
+  // Brand the startup: psyclaw theme + native "ψ psyclaw v<psyclaw version>" header
+  // (opt into a quiet screen with PSYCLAW_QUIET_STARTUP=1), and keep the model's
+  // identity as psyclaw rather than "pi".
+  await ensureQuietStartup();
+  await ensurePsyClawTheme();
+
+  // The header banner renders psyclaw's own version (not the bundled pi 0.84.x).
+  const manifest = await resolvePsyClawManifest();
   const spawnEnv: NodeJS.ProcessEnv = {
     ...process.env,
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
   };
+  if (manifest?.version !== undefined) spawnEnv.PSYCLAW_VERSION = manifest.version;
 
   return new Promise<number>((resolve, reject) => {
     const child = spawn(process.execPath, [piCli, ...args], {

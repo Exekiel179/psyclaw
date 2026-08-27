@@ -689,7 +689,7 @@ export async function enrichAssistantMessage(root: string, message: string): Pro
  * persistence to Pi's auth storage.
  */
 export function createPanelServer(root: string, options: PanelServerOptions = {}): Server {
-  // Resolve against the package rather than the process cwd, so `the PsyClaw /panel extension`
+  // Resolve against the package rather than the process cwd, so `psyclaw serve`
   // works from any project directory. The build step copies `apps/panel` into
   // `dist/apps/panel`, keeping the same relative layout in src and dist.
   const panelHtmlPath = options.panelHtmlPath ??

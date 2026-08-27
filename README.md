@@ -1,67 +1,111 @@
 # PsyClaw
 
-> v0.24.0 adopts the audited 0.4.1 predecessor Node/Pi baseline as an independent
-> PsyClaw product. PsyClaw v0.23.0 remains intact in Git history, its
-> `v0.23.0` tag, documentation, and existing release assets.
+PsyClaw 是面向社会科学研究的 Pi 工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到官方 Pi runtime 上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-面向社会科学研究者的 Pi 科研智能体层。
+当前版本：`0.26.1`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
 
-正式版安装（Node.js >= 22.19）：
+## 安装
 
-```text
-npm install -g psyclaw@0.24.0 --registry https://registry.npmjs.org
+需要 Node.js `>=22.19.0`。官方 npm 源：
+
+```powershell
+npm install -g psyclaw@0.26.1
+```
+
+中国大陆网络较慢或无法访问官方源时：
+
+```powershell
+npm install -g psyclaw@0.26.1 --registry=https://registry.npmmirror.com
+```
+
+确认命令入口：
+
+```powershell
 psyclaw --help
 ```
 
-PsyClaw 的目标不是再造一个重量级 Agent，而是在官方 Pi 之上提供少量、可审计、可组合的科研契约：研究项目状态、Claim-Evidence-Provenance 账本、完整性门禁、可恢复工作流、受控记忆和按需技能。统计计算交给成熟库或外接 MCP；Pi 的会话、模型、Skill、Package 和 TUI/RPC 能力继续由 Pi 提供。
+直接运行 `psyclaw` 会启动交互研究工作台；首次没有模型配置时会进入配置向导。也可显式运行 `psyclaw wizard`，或使用 `psyclaw setup --provider deepseek`。不要把 API key 写进项目、README 或 Git 仓库。
 
-当前仓库已完成第一条 M1/MVP-0 可运行切片，并落地 M2 的技能注册与受限多智能体编排基础、M3 的只读并行契约、真实 stdio MCP transport（argv/显式 env/超时隔离）、Skill 恶意正文 preflight、许可证/SBOM 门与 M4 的 literature-review/analysis-delegation/writing-review 三个 workflow 包。官方 Pi 的 `AgentSession`、`SessionManager`、`DefaultResourceLoader`、模型网关和严格 JSONL RPC 已由 adapter 接入；完成项目级 package 安装后提供原生只读 `/agents` 多智能体入口，面板扩展可选安装。联网检索、统计计算和并行写入仍按规划后置。先阅读：
+## 五分钟开始
 
-- [开工纪要](docs/开工纪要.md)
-- [架构蓝图](docs/架构蓝图.md)
-- [多智能体开发与运行框架](docs/多智能体开发与运行框架.md)
-- [评测框架](docs/评测框架.md)
-- [技能与生态准入清单](docs/技能与生态准入清单.md)
-- [威胁模型](docs/威胁模型.md)
+在新的研究目录中建立项目：
 
-代号：`psyclaw`。当前可用命令：
+```powershell
+mkdir my-study
+cd my-study
+psyclaw init "社交支持与研究生心理健康的关系" --paradigm survey-observational
+psyclaw
+```
 
-```text
+初始化会建立 `.psyclaw/`、`data/raw/`、`data/clean/`、`notes/` 和 `outputs/`。`data/raw/` 是只读保护区；把经确认可用于分析的派生数据放在 `data/clean/`。
+
+登记本地材料并生成离线证据简报：
+
+```powershell
+psyclaw evidence add notes\source.md --level user
+psyclaw brief
+```
+
+## 常用入口
+
+| 需求 | 命令或操作 |
+| --- | --- |
+| 启动研究对话 | `psyclaw` 或 `psyclaw chat` |
+| 创建研究项目 | `psyclaw init <goal> --paradigm <profile>` |
+| 登记本地证据 | `psyclaw evidence add <path> --level user\|fulltext` |
+| 生成离线简报 | `psyclaw brief` |
+| 创建人工裁决模板 | `psyclaw hitl init` |
+| 写研究移交记录 | `psyclaw handoff` |
+| 扫描本机其他 Agent | `psyclaw agents` |
+| 查看 Pi runtime 更新 | `psyclaw check-updates` |
+| 更新 Pi runtime | `psyclaw update --yes` |
+| 打开科研面板 | 在对话中输入 `/panel` |
+
+`psyclaw update` 只更新捆绑的 Pi runtime；它不是从 Git 拉取 PsyClaw 源码。全局安装用户通过 `npm install -g psyclaw@<version>` 获取 PsyClaw 新版本；本仓库开发者直接修改源码并构建。
+
+## 开发者本地安装
+
+```powershell
 pnpm install
-pnpm check:branding            # 发布前阻断活动产品面中的旧品牌残留
 pnpm build
-pnpm exec pi install -l .       # 一次性把 psyclaw 作为项目级 Pi package 启用
-pnpm exec pi --approve           # 运行 Pi 时信任已审查的项目 package
-node dist/src/cli.js init "研究问题" --paradigm survey-observational
-node dist/src/cli.js evidence add notes/source.md --level user
-node dist/src/cli.js brief
-node dist/src/cli.js chat              # 以自然语言启动文献、分析或写作工作流
-node dist/src/cli.js agents
-node dist/src/cli.js install claude-code --yes  # 当前 agent 全局命令仍为 discover-only
-node dist/src/cli.js import claude-code --yes
-node dist/src/cli.js shell
-/skills                         # 查看推荐 Skill 的启用状态
-/skills enable <skill-id>       # 启用项目级 Skill
-/skills disable <skill-id>      # 禁用项目级 Skill
-/mcp                            # 查看推荐 MCP 的启用状态
-/mcp enable <mcp-id>            # 启用项目级 MCP
-/mcp disable <mcp-id>           # 禁用项目级 MCP
-/install skill|mcp <id>         # 生成安装预检计划
-pnpm exec pi --extension ./dist/src/extension.js --approve  # 未安装 package 时的临时入口
-pi --extension ./dist/src/panel/extension.js                # 可选：在 Pi 中启停 /panel
+npm link
+psyclaw --help
 ```
 
-在 `pi-workbench` 中使用时，先在研究项目根目录安装 psyclaw package：
+开发阶段不需要执行 `psyclaw update`。它会更新 Pi 依赖，不会同步本仓库代码。
 
-```text
-pi install -l F:\Projects\psyclaw
-pi-workbench
+## 从旧 Python 版迁移
+
+如果启动时出现 `ModuleNotFoundError: No module named 'psyclaw.cli'`，终端仍解析到旧 Python 安装的 `psyclaw.exe`，而不是 npm 版本。先检查命令顺序：
+
+```powershell
+Get-Command psyclaw -All
+where.exe psyclaw
 ```
 
-workbench 启动的每个 Pi 会话都会加载 psyclaw 的 `/research`、`/brief`、`/agents` 和 `/panel` 命令。在 Pi 中执行 `/panel` 后，用浏览器打开提示的 `http://127.0.0.1:8787` 地址即可查看当前项目的只读运行状态。
+保留 npm 的 `psyclaw.cmd`，移除或下调旧 Python 入口所在目录后重新打开终端，再安装当前版本：
 
-`brief` 与 `workflow` 在证据门禁失败时退出码为 `2`，并保留 manifest 与 HANDOFF，不生成貌似完成的正文。`serve` 启动本机面板：运行事实、Agent/Skill 和模型目录为只读；模型配置表单是唯一明确的本地写入入口，会将 provider 元数据写入 Pi `models.json`，API key 交给 Pi `auth.json` 管理。
+```powershell
+npm uninstall -g psyclaw
+npm install -g psyclaw@0.26.1
+psyclaw --help
+```
 
-内置 agent 下载器/安装器：`agents`/`scan` 只读识别本机其他智能体（Claude Code、OpenAI Codex、Gemini CLI、opencode、Aider、Cursor、Windsurf、Continue、Orca、Copilot CLI）的配置与技能目录，绝不读取凭据内容；安装计划必须有来源、版本、artifact SHA、许可证/依赖审计和 SBOM，缺任何一项都会 `blocked`。当前 agent catalog 只有全局 npm/pipx 命令，尚未绑定可验证 staging artifact，因此即使人工确认也保持 `agent-staging-required`，不会执行全局安装；`import <id> --yes` 将其他 agent 的允许 Skill 文件以来源/SHA-256 溯源导入 `.psyclaw/imports/`；`shell` 启动 ink 交互式表格 TUI（↑/↓ 选择、`i` 安装、`m` 导入、`r` 重扫、`q` 退出）。
+Python 的卸载器提示 `No files were found to uninstall` 时，不要手工删除不明目录；先用上述命令定位旧入口，再在对应 Python 环境中修复或移除它。
 
-Pi 集成分两层：完成一次 `pi install -l .` 后，项目级 package 默认加载 `src/extension.ts`，注册研究命令和原生只读 `/agents`；未安装时可用上面的 `--extension` 临时入口。worker 通过独立 Pi RPC 子进程、`read/grep/find/ls` 工具和结构化 WorkerReport 回传，但进程边界仍不是 OS sandbox。`src/panel/extension.ts` 是可选扩展，使用 `/panel [--port 8787]` 启停仅绑定 `127.0.0.1` 的只读可视化界面。面板的 Agents/Skills 下载页只展示发现结果、来源、版本、许可证、SHA、风险和审批前计划；模型页读取 Pi 本地模型注册表，并在没有对应注册项时显示 psyclaw 的 DeepSeek 模板元数据。页面只显示环境变量名称，不接收或显示 API key；`configured` 只表示环境变量存在，不代表实际认证成功。模型适配沿用 Pi `models.json`/`registerProvider` 契约，DeepSeek helper 只输出 `$DEEPSEEK_API_KEY` 引用。
+## 文档
+
+- [PsyClaw v0.26.0 使用白皮书](docs/PsyClaw使用白皮书_v0.26.0.md)
+- [项目范围与里程碑](docs/开工纪要.md)
+- [架构蓝图](docs/架构蓝图.md)
+- [评测框架](docs/评测框架.md)
+- [文档与交付物规范](docs/文档规范.md)
+
+## 边界
+
+- PsyClaw 复用官方 Pi 的 session、model、skill、package 和 extension runtime，不维护 fork。
+- 统计计算委托 Python/R、SPSS/Stata/Mplus 或受信任 MCP；输出必须保存脚本、输入指纹和环境信息。
+- Skill、Plugin 和 MCP 默认只发现、不执行；启用前需要来源、版本/ref、哈希、许可证和依赖状态。
+- 没有可定位证据的事实性 Claim 必须是 `uncertain` 或被阻断；没有审批记录的副作用不能被当作完成。
+
+许可证：MIT。

@@ -140,14 +140,14 @@ describe("latestPiRelease registry", () => {
 });
 
 describe("updateBundledPi", () => {
-  const makeRoot = async (): Promise<string> => {
+  const makeRoot = async (withLockfile = true): Promise<string> => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-update-"));
     await writeFile(join(root, "package.json"), JSON.stringify({
       name: "psyclaw",
       version: "0.1.0",
       dependencies: { [PI_AI]: "0.84.1", [PI_CODING_AGENT]: "0.84.1" },
     }), "utf8");
-    await writeFile(join(root, "pnpm-lock.yaml"), "", "utf8");
+    if (withLockfile) await writeFile(join(root, "pnpm-lock.yaml"), "", "utf8");
     return root;
   };
 
@@ -205,6 +205,21 @@ describe("updateBundledPi", () => {
     expect(receipt.reasonCode).toBe("update-skipped");
     expect(receipt.command).toContain("0.84.2");
     expect(receipt.after).toBe("0.84.2");
+  });
+
+  it("falls back to npm for a globally installed package without a lockfile", async () => {
+    const root = await makeRoot(false);
+    const steps: { command: string; cwd: string }[] = [];
+    const receipt = await updateBundledPi({
+      registry,
+      packageRoot: root,
+      executor: async (step) => {
+        steps.push(step);
+        return { exitCode: 0 };
+      },
+    });
+    expect(receipt.ok).toBe(true);
+    expect(steps[0]!.command).toBe(`npm install --save-exact ${PI_AI}@0.84.2 ${PI_CODING_AGENT}@0.84.2`);
   });
 
   it("fails closed when the executor reports a non-zero exit", async () => {

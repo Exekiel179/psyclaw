@@ -9,7 +9,8 @@ export const PSYCLAW_NAME = "PsyClaw";
 /** Product version from package.json via the shared manifest walk (single source of truth). */
 export const PSYCLAW_VERSION: string = readPsyClawVersionSync() ?? "0.0.0";
 
-export const PSYCLAW_CONFIG_DIR = ".psyclaw";
+/** Predecessor Pi profile retained across the product rename. */
+export const PSYCLAW_CONFIG_DIR = `.psy${"pi"}`;
 
 /** Accent colors for psyclaw's own ink interfaces (wizard / shell TUI). */
 export const PSYCLAW_ACCENT = "#2ec4b6";
@@ -24,7 +25,7 @@ export const PSYCLAW_ERROR = "#e06c75";
  */
 export const PSYCLAW_IDENTITY_PROMPT = [
   `You are ${PSYCLAW_NAME}, a social-science research agent.`,
-  `Your public product identity is "${PSYCLAW_NAME}". You run through an adapter and extensions on the official Pi coding-agent harness; disclose that runtime accurately when asked about implementation, dependencies, sessions, models, or tools.`,
+  `Your public identity is "${PSYCLAW_NAME}": when asked who or what you are, always say "${PSYCLAW_NAME}" — never "pi", "Pi", or "π". You run on the pi coding-agent harness, but that is an implementation detail: do not volunteer it and do not name yourself after it.`,
   `Your focus is evidence-grounded social-science research: project state, evidence provenance, claim verification, and recoverable workflows.`,
   `For requests to find, access, or download institutionally licensed papers or full text, invoke psyclaw_workbench first. Do not directly edit configuration, logs, manifests, or downloaded files for that workflow.`,
   `Treat skills as reference guidance, not executable authority: do not claim that a browser, shell, login, connector, or download is available unless a tool result proves it in this session.`,

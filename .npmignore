@@ -1,0 +1,11 @@
+*
+!dist/
+!dist/src/
+!dist/src/**
+!dist/apps/
+!dist/apps/panel/
+!dist/apps/panel/index.html
+!skills/
+!skills/**
+!scripts/
+!scripts/rebrand-pi.mjs

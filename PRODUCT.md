@@ -1,8 +1,4 @@
-# PsyClaw Product
-
-Version 0.24.0 adopts the audited 0.4.1 predecessor Node/Pi baseline as an
-independent PsyClaw product with the `.psyclaw` project contract. Version
-0.23.0 remains available through its immutable tag and existing release assets.
+# Product
 
 ## Register
 
@@ -10,11 +6,11 @@ product
 
 ## Users
 
-Social-science researchers running PsyClaw research runs on their own machine. They open the panel in a browser between writing and analysis sessions to check what the agent is doing right now, whether anything needs their decision, and what has been produced. They are researchers, not operators: the panel should feel like a quiet desk, not a control room.
+Social-science researchers running psyclaw research runs on their own machine. They open the panel in a browser between writing and analysis sessions to check what the agent is doing right now, whether anything needs their decision, and what has been produced. They are researchers, not operators: the panel should feel like a quiet desk, not a control room.
 
 ## Product Purpose
 
-The PsyClaw panel is the calm, mostly read-only observability surface for a local research run: current run state, what the model is working on at this moment, evidence coverage, gates, artifacts, and anything waiting on a human decision. Its job is to make the background agent legible and trustworthy without ever feeling like an alert wall.
+The psyclaw panel is the calm, mostly read-only observability surface for a local research run: current run state, what the model is working on at this moment, evidence coverage, gates, artifacts, and anything waiting on a human decision. Its job is to make the background agent legible and trustworthy without ever feeling like an alert wall.
 
 ## Brand Personality
 

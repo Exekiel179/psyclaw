@@ -1,4 +1,4 @@
-> **v0.23 legacy documentation.** 本页保留用于复现 PsyClaw v0.23.0；v0.24.0 的当前范围、接口与验收标准请以 开工纪要.md、架构蓝图.md 和 评测框架.md 为准。
+> **历史文档。** 本页仅保留用于复现 Python 时代的 PsyClaw v0.23.0 命令，不能用于当前 npm 发行版。请阅读 [v0.26.0 使用白皮书](PsyClaw使用白皮书_v0.26.0.md) 和根目录 README。
 
 # PsyClaw 命令地图
 
