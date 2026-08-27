@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.26.3 - 2026-08-27
+
+- 修复 macOS GUI/全局 npm 启动时的 Provider Key 识别：`launchctl` Key 仅注入当前进程；login shell Key 仅在用户明确选择导入后保存。
+- 修复首次向导输入包含 `q` 的 API Key 时意外退出，并统一四步进度与完成提示。
+- 横幅改用终端显示列宽计算 CJK/emoji，所有字模在窄终端下均完整回退；宠物继续默认关闭，仅通过 `/pet on` 启用。
+- 明确 Google Gemini 配置与 `/provider` Provider 列表、切换管理入口。
+
 ## 0.26.2 - 2026-08-27
 
 - 修复 macOS 从 Finder 或全局 npm 启动时无法识别登录 shell Provider 环境变量的问题，并在首次向导中安全迁移到用户级凭据存储。

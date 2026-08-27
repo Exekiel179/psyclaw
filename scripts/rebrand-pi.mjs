@@ -130,9 +130,19 @@ const compactBanner = ${VAR_COMPACT};
 const petBanner = ${VAR_COMPACT_PET};
 const terminalColumns = process.stdout.columns ?? 80;
 const ansiPattern = /\\x1b\\[[0-9;]*m/g;
-const bannerWidth = (rows) => Math.max(...rows.map((row) => Array.from(row.replace(ansiPattern, "")).length));
+const cellWidth = (text) => Array.from(text.replace(ansiPattern, "")).reduce((width, char) => {
+  const code = char.codePointAt(0) ?? 0;
+  const wide = code >= 0x1100 && (code <= 0x115f || code === 0x2329 || code === 0x232a ||
+    (code >= 0x2e80 && code <= 0xa4cf) || (code >= 0xac00 && code <= 0xd7a3) ||
+    (code >= 0xf900 && code <= 0xfaff) || (code >= 0xfe10 && code <= 0xfe6f) ||
+    (code >= 0xff00 && code <= 0xff60) || (code >= 0x1f300 && code <= 0x1faff));
+  return width + (wide ? 2 : 1);
+}, 0);
+const bannerWidth = (rows) => Math.max(...rows.map(cellWidth));
 const fittingBanners = bannerCandidates.filter((rows) => bannerWidth(rows) <= terminalColumns - 4);
-const tinyBanner = [\`  ψ PsyClaw v\${process.env.PSYCLAW_VERSION ?? this.version}\`];
+const tinyBanner = [terminalColumns >= 22
+  ? \`  ψ PsyClaw v\${process.env.PSYCLAW_VERSION ?? this.version}\`
+  : "  PsyClaw"];
 const defaultPool = fittingBanners.length > 0 ? fittingBanners : [tinyBanner];
 const chosenBanner = process.env.PSYCLAW_PET === "1" && bannerWidth(petBanner) <= terminalColumns - 4
   ? petBanner
