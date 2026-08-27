@@ -8,13 +8,16 @@
  * 3. 3D 侧影电路方块字 (3D Isometric Shadow Block: ██████╗)
  * 4. 学术罗马衬线体 (Academic Roman Serif: ╔══╗)
  *
- * Paired with Kaomoji Academic Puppies (✨ / 💤) & 24-Bit TrueColor Gemini Aurora Gradient.
+ * Pets are opt-in via /pet and only render when the terminal is wide enough.
  */
-import { readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { execFile } from "node:child_process";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NAME = "PsyClaw";
+const LOCKED_PI_VERSION = "0.84.1";
 // Retain the predecessor Pi profile so existing models, themes, packages, and
 // skills survive the product rename. PsyClaw's project data remains separate.
 const CONFIG_DIR = `.psy${"pi"}`;
@@ -54,44 +57,12 @@ const AURORA_STOPS = ["#38bdf8", "#60a5fa", "#818cf8", "#a855f7", "#ec4899", "#2
 // Colors
 const WHITE = "\\x1b[1m\\x1b[38;2;255;255;255m";
 const GLASSES = "\\x1b[1m\\x1b[38;2;56;189;248m";
-const ZZZ = "\\x1b[38;2;168;85;247m";
 const GOLD = "\\x1b[38;2;251;191;36m";
 const RESET = "\\x1b[0m";
 
 // Kaomoji Pups
 const PUP_SCHOLAR_TOP = `${WHITE}( ᐡ ${RESET}${GLASSES}⌐■-■${RESET}${WHITE} ᐡ )${RESET} ${GOLD}✨${RESET}`;
 const PUP_SCHOLAR_BOT = `${WHITE}c( づ 📜 づ )${RESET}`;
-
-const PUP_SLEEP_TOP = `${ZZZ}z z Z${RESET}`;
-const PUP_SLEEP_BOT = `${WHITE}( ᐡ ${RESET}${GLASSES}⌐■-■${RESET}${WHITE} ᐡ )${RESET} ${ZZZ}💤${RESET}`;
-
-const PUP_SCHOLAR_5ROW = [
-  `    ${WHITE}/ᐢ⑅ᐢ/ ${RESET} ${GOLD}✨${RESET}`,
-  `  ${WHITE}( ${RESET}${GLASSES}⌐■-■${RESET}${WHITE} )${RESET} `,
-  ` c${WHITE}(づ 📜 づ${RESET}`,
-  `  ${WHITE}(  "   " )${RESET}`,
-  `   ${WHITE}∪-----∪${RESET} `,
-];
-
-const PUP_SLEEPING_5ROW = [
-  `       ${ZZZ}z z Z${RESET}  `,
-  `    ${WHITE}/ᐢ⑅ᐢ/ ${RESET}${ZZZ}💤${RESET} `,
-  ` ${WHITE}( ${RESET}${GLASSES}⌐■-■${RESET}${WHITE} )~${RESET} `,
-  `${WHITE}c(  - ᴥ - )づ${RESET}`,
-  ` ${WHITE}(______)'${RESET}  `,
-];
-
-const PUP_SCHOLAR_3ROW = [
-  `    ${WHITE}/ᐢ⑅ᐢ/ ${RESET} ${GOLD}✨${RESET}`,
-  `  ${WHITE}( ${RESET}${GLASSES}⌐■-■${RESET}${WHITE} )${RESET} `,
-  ` c${WHITE}(づ 📜 づ${RESET}`,
-];
-
-const PUP_SLEEPING_3ROW = [
-  `       ${ZZZ}z z Z${RESET}  `,
-  `    ${WHITE}/ᐢ⑅ᐢ/ ${RESET}${ZZZ}💤${RESET} `,
-  ` ${WHITE}( ${RESET}${GLASSES}⌐■-■${RESET}${WHITE} )~${RESET} `,
-];
 
 // 1. 紧凑型对称衬线 I 方块字 (2-Row Compact)
 const FONT_2ROW_ROW0 = "█▀█ █▀▀ █ █ █▀▀ █    █▀█ █ █";
@@ -109,7 +80,13 @@ const FONT_SLANT_CLASSIC = [
 ];
 
 // 3. 3D 侧影电路方块 (3D Isometric Shadow Block - 5-Row)
-const FONT_3D_BLOCK = FONT_SLANT_CLASSIC;
+const FONT_3D_BLOCK = [
+  " ██████╗ ███████╗██╗   ██╗ ██████╗██╗      █████╗ ██╗    ██╗",
+  " ██╔══██╗██╔════╝╚██╗ ██╔╝██╔════╝██║     ██╔══██╗██║    ██║",
+  " ██████╔╝███████╗ ╚████╔╝ ██║     ██║     ███████║██║ █╗ ██║",
+  " ██╔═══╝ ╚════██║  ╚██╔╝  ██║     ██║     ██╔══██║██║███╗██║",
+  " ██║     ███████║   ██║   ╚██████╗███████╗██║  ██║╚███╔███╔╝",
+];
 
 // 4. 学术罗马衬线体 (Academic Roman Serif - 3-Row)
 const FONT_SERIF = [
@@ -129,46 +106,47 @@ function buildCustomVariant(fontLines, dogLines = []) {
   return `[\n${rows.join(",\n")}\n  ]`;
 }
 
-// 组合变体
-const VAR_COMPACT_SCHOLAR = `[
-    \`  \\x1b[1m${GRAD_2ROW_0}\\x1b[0m   \\x1b[38;2;100;116;139m·\\x1b[0m   \\x1b[1m${gradientText("P S Y C L A W", ["#38bdf8", "#818cf8", "#2dd4bf"])}\\x1b[0m  \\x1b[38;2;148;163;184mv\${process.env.PSYCLAW_VERSION ?? this.version}\\x1b[0m   ${PUP_SCHOLAR_TOP}\`,
-    \`  \\x1b[1m${GRAD_2ROW_1}\\x1b[0m       \\x1b[38;2;148;163;184mEvidence-Grounded Social-Science Research Agent\\x1b[0m   ${PUP_SCHOLAR_BOT}\`
+// Every default variant is pet-free. Pet variants are selected only when
+// PSYCLAW_PET=1 and the complete row fits the current terminal.
+const VAR_COMPACT = `[
+    \`  \\x1b[1m${GRAD_2ROW_0}\\x1b[0m   \\x1b[38;2;148;163;184mv\${process.env.PSYCLAW_VERSION ?? this.version}\\x1b[0m\`,
+    \`  \\x1b[1m${GRAD_2ROW_1}\\x1b[0m\`
   ]`;
-
-const VAR_COMPACT_SLEEP = `[
-    \`  \\x1b[1m${GRAD_2ROW_0}\\x1b[0m   \\x1b[38;2;100;116;139m·\\x1b[0m   \\x1b[1m${gradientText("P S Y C L A W", ["#38bdf8", "#818cf8", "#2dd4bf"])}\\x1b[0m  \\x1b[38;2;148;163;184mv\${process.env.PSYCLAW_VERSION ?? this.version}\\x1b[0m   ${PUP_SLEEP_TOP}\`,
-    \`  \\x1b[1m${GRAD_2ROW_1}\\x1b[0m       \\x1b[38;2;148;163;184mEvidence-Grounded Social-Science Research Agent\\x1b[0m   ${PUP_SLEEP_BOT}\`
+const VAR_COMPACT_PET = `[
+    \`  \\x1b[1m${GRAD_2ROW_0}\\x1b[0m   ${PUP_SCHOLAR_TOP}\`,
+    \`  \\x1b[1m${GRAD_2ROW_1}\\x1b[0m   ${PUP_SCHOLAR_BOT}\`
   ]`;
-
-const VAR_SLANT_CLASSIC_SCHOLAR = buildCustomVariant(FONT_SLANT_CLASSIC, PUP_SCHOLAR_5ROW);
-const VAR_SLANT_CLASSIC_SLEEP = buildCustomVariant(FONT_SLANT_CLASSIC, PUP_SLEEPING_5ROW);
-const VAR_3D_BLOCK_SCHOLAR = buildCustomVariant(FONT_3D_BLOCK, PUP_SCHOLAR_5ROW);
-const VAR_3D_BLOCK_SLEEP = buildCustomVariant(FONT_3D_BLOCK, PUP_SLEEPING_5ROW);
-const VAR_SERIF_SCHOLAR = buildCustomVariant(FONT_SERIF, PUP_SCHOLAR_3ROW);
-const VAR_SERIF_SLEEP = buildCustomVariant(FONT_SERIF, PUP_SLEEPING_3ROW);
-const VAR_SLANT_CLASSIC_NARROW = buildCustomVariant(FONT_SLANT_CLASSIC);
-const VAR_SERIF_NARROW = buildCustomVariant(FONT_SERIF);
-
+const VAR_SLANT_CLASSIC = buildCustomVariant(FONT_SLANT_CLASSIC);
+const VAR_3D_BLOCK = buildCustomVariant(FONT_3D_BLOCK);
+const VAR_SERIF = buildCustomVariant(FONT_SERIF);
 const GRAD_PIPELINE = "\\x1b[38;2;45;212;191m• Pipeline  :\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mintake\\x1b[0m \\x1b[38;2;99;102;241m➔\\x1b[0m \\x1b[1m\\x1b[38;2;129;140;248mcapture\\x1b[0m \\x1b[38;2;168;85;247m➔\\x1b[0m \\x1b[1m\\x1b[38;2;168;85;247mcitation-audit\\x1b[0m \\x1b[38;2;236;72;153m➔\\x1b[0m \\x1b[1m\\x1b[38;2;45;212;191mbrief\\x1b[0m";
 const GRAD_PROTOCOL = "\\x1b[38;2;45;212;191m• Protocol  :\\x1b[0m \\x1b[1m\\x1b[38;2;52;211;153m✔ 2+ Source Cross-Check\\x1b[0m \\x1b[38;2;100;116;139m·\\x1b[0m \\x1b[1m\\x1b[38;2;45;212;191m✔ SHA-256 Provenance Ledger\\x1b[0m";
 const GRAD_WORKBENCH = "\\x1b[38;2;45;212;191m• Workbench :\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mhttp://127.0.0.1:3721\\x1b[0m \\x1b[38;2;168;85;247m(Interactive Panel Active)\\x1b[0m";
 
-const PSYCLAW_DYNAMIC_BANNER = `const wideBannerVariants = [
-  ${VAR_COMPACT_SCHOLAR}, ${VAR_COMPACT_SLEEP},
-  ${VAR_SLANT_CLASSIC_SCHOLAR}, ${VAR_SLANT_CLASSIC_SLEEP},
-  ${VAR_3D_BLOCK_SCHOLAR}, ${VAR_3D_BLOCK_SLEEP},
-  ${VAR_SERIF_SCHOLAR}, ${VAR_SERIF_SLEEP},
+const PSYCLAW_DYNAMIC_BANNER = `const bannerCandidates = [
+  ${VAR_COMPACT}, ${VAR_SLANT_CLASSIC}, ${VAR_3D_BLOCK}, ${VAR_SERIF},
 ];
-const narrowBannerVariants = [${VAR_SLANT_CLASSIC_NARROW}, ${VAR_SERIF_NARROW}];
-const BANNER_VARIANTS = (process.stdout.columns ?? 80) >= 96 ? wideBannerVariants : narrowBannerVariants;
-const chosenBanner = BANNER_VARIANTS[Math.floor(Math.random() * BANNER_VARIANTS.length)];
+const compactBanner = ${VAR_COMPACT};
+const petBanner = ${VAR_COMPACT_PET};
+const terminalColumns = process.stdout.columns ?? 80;
+const ansiPattern = /\\x1b\\[[0-9;]*m/g;
+const bannerWidth = (rows) => Math.max(...rows.map((row) => Array.from(row.replace(ansiPattern, "")).length));
+const fittingBanners = bannerCandidates.filter((rows) => bannerWidth(rows) <= terminalColumns - 4);
+const tinyBanner = [\`  ψ PsyClaw v\${process.env.PSYCLAW_VERSION ?? this.version}\`];
+const defaultPool = fittingBanners.length > 0 ? fittingBanners : [tinyBanner];
+const chosenBanner = process.env.PSYCLAW_PET === "1" && bannerWidth(petBanner) <= terminalColumns - 4
+  ? petBanner
+  : defaultPool[Math.floor(Math.random() * defaultPool.length)];
+const detailLines = terminalColumns >= 86 ? [
+  \`  ${GRAD_PIPELINE}\`,
+  \`  ${GRAD_PROTOCOL}\`,
+] : [];
+if (terminalColumns >= 76) detailLines.push(\`  ${GRAD_WORKBENCH}\`);
 const logo = [
   "",
   ...chosenBanner,
   "",
-  \`  ${GRAD_PIPELINE}\`,
-  \`  ${GRAD_PROTOCOL}\`,
-  \`  ${GRAD_WORKBENCH}\`,
+  ...detailLines,
   "",
 ].join("\\n");`;
 
@@ -230,6 +208,9 @@ const MODE_PATCHES = [
 
 async function patchPackageJson(pkgPath) {
   const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
+  if (pkg.version !== LOCKED_PI_VERSION) {
+    throw new Error(`Unsupported Pi runtime ${String(pkg.version)}; expected ${LOCKED_PI_VERSION}`);
+  }
   const existing = pkg.piConfig && typeof pkg.piConfig === "object" && !Array.isArray(pkg.piConfig)
     ? pkg.piConfig
     : {};
@@ -237,8 +218,37 @@ async function patchPackageJson(pkgPath) {
     return { applied: false };
   }
   pkg.piConfig = { ...existing, name: NAME, configDir: CONFIG_DIR };
-  await writeFile(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`, "utf8");
+  await atomicReplace(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`);
   return { applied: true };
+}
+
+async function atomicReplace(path, content, checkJavaScript = false) {
+  const suffix = `${process.pid}.${randomUUID()}`;
+  const temporary = join(dirname(path), `.${basename(path)}.${suffix}.tmp${checkJavaScript ? ".mjs" : ""}`);
+  const backup = join(dirname(path), `.${basename(path)}.${suffix}.bak`);
+  let backedUp = false;
+  await writeFile(temporary, content, { encoding: "utf8", flag: "wx" });
+  try {
+    if (checkJavaScript) {
+      await new Promise((resolve, reject) => {
+        execFile(process.execPath, ["--check", temporary], { windowsHide: true }, (error) => error ? reject(error) : resolve());
+      });
+    }
+    try { await rename(temporary, path); }
+    catch (error) {
+      if (!new Set(["EEXIST", "EPERM", "EACCES"]).has(error?.code)) throw error;
+      await rename(path, backup);
+      backedUp = true;
+      try { await rename(temporary, path); }
+      catch (replaceError) {
+        await rename(backup, path).catch(() => undefined);
+        throw replaceError;
+      }
+    }
+  } finally {
+    await rm(temporary, { force: true }).catch(() => undefined);
+    if (backedUp) await rm(backup, { force: true }).catch(() => undefined);
+  }
 }
 
 async function applyModePatches(modePath) {
@@ -247,10 +257,12 @@ async function applyModePatches(modePath) {
 
   // Replace the entire generated block. The greedy range also repairs a module
   // that a previous build appended to, instead of declaring the banner twice.
-  const dynamicBannerRegex = /(?:const (?:wideBannerVariants|BANNER_VARIANTS)[\s\S]*const logo = \[[\s\S]*?\]\.join\("\\n"\);|const logo = (?:`[\s\S]*?`|\[[\s\S]*?\]\.join\("\\n"\)|theme\.bold[\s\S]*?);)/;
-  const currentMatch = content.match(dynamicBannerRegex);
+  const dynamicBannerRegex = /(?:const (?:bannerCandidates|wideBannerVariants|BANNER_VARIANTS)[\s\S]*?const logo = \[[\s\S]*?\]\.join\("\\n"\);|const logo = (?:`[\s\S]*?`|\[[\s\S]*?\]\.join\("\\n"\)|theme\.bold[^;]*);)/g;
+  const matches = [...content.matchAll(dynamicBannerRegex)];
+  if (matches.length !== 1) throw new Error(`Expected exactly one Pi startup banner, found ${matches.length}`);
+  const currentMatch = matches[0];
   if (currentMatch && currentMatch[0] !== PSYCLAW_DYNAMIC_BANNER) {
-    content = content.replace(dynamicBannerRegex, PSYCLAW_DYNAMIC_BANNER);
+    content = `${content.slice(0, currentMatch.index)}${PSYCLAW_DYNAMIC_BANNER}${content.slice(currentMatch.index + currentMatch[0].length)}`;
     applied.push("const logo = ... [Updated Curated 4-Style psyclaw Banner Rotation Pool]");
   }
 
@@ -262,7 +274,7 @@ async function applyModePatches(modePath) {
     }
   }
   if (applied.length > 0) {
-    await writeFile(modePath, content, "utf8");
+    await atomicReplace(modePath, content, true);
   }
   return applied;
 }

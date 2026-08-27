@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text, render, useInput } from "ink";
-import { PROVIDER_PRESETS, setupProviders } from "./setup.js";
+import { PROVIDER_PRESETS, providerCredentialSource, saveProviderConfig } from "./setup.js";
 import { PSYCLAW_ACCENT, PSYCLAW_ERROR, PSYCLAW_OK, PSYCLAW_VERSION } from "./branding.js";
 
-export type WizardStep = "welcome" | "provider" | "model" | "confirm" | "done";
+export type WizardStep = "welcome" | "provider" | "model" | "credential" | "confirm" | "done";
 
 export interface WizardResult {
   completed: boolean;
@@ -59,18 +59,32 @@ interface WizardProps {
 }
 
 function Wizard({ onDone }: WizardProps): React.ReactElement {
+  const wizardProviders = PROVIDER_PRESETS.filter((preset) => preset.models.length > 0);
   const [step, setStep] = useState<WizardStep>("welcome");
   const [providerIndex, setProviderIndex] = useState(0);
   const [modelIndex, setModelIndex] = useState(0);
+  const [apiKey, setApiKey] = useState("");
+  const [credentialSource, setCredentialSource] = useState<string>("checking");
 
-  const provider = PROVIDER_PRESETS[providerIndex];
+  const provider = wizardProviders[providerIndex];
   const model = provider?.models[modelIndex];
   const apiKeyEnv = provider?.apiKeyEnv ?? "";
-  const keyConfigured = process.env[apiKeyEnv] !== undefined && process.env[apiKeyEnv] !== "";
+  const keyConfigured = credentialSource !== "missing" && credentialSource !== "checking";
+
+  useEffect(() => {
+    let active = true;
+    setCredentialSource("checking");
+    if (provider) void providerCredentialSource(provider).then((source) => { if (active) setCredentialSource(source); });
+    return () => { active = false; };
+  }, [provider]);
+
+  useEffect(() => {
+    setApiKey("");
+  }, [providerIndex]);
 
   const writeConfig = async () => {
     if (!provider) return;
-    await setupProviders({ providers: [provider.id] });
+    await saveProviderConfig({ ...provider, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
     setStep("done");
   };
 
@@ -85,7 +99,7 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
         break;
       case "provider":
         if (key.upArrow) setProviderIndex((value) => Math.max(0, value - 1));
-        if (key.downArrow) setProviderIndex((value) => Math.min(PROVIDER_PRESETS.length - 1, value + 1));
+        if (key.downArrow) setProviderIndex((value) => Math.min(wizardProviders.length - 1, value + 1));
         if (key.return) {
           setModelIndex(0);
           setStep("model");
@@ -94,7 +108,13 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
       case "model":
         if (key.upArrow) setModelIndex((value) => Math.max(0, value - 1));
         if (key.downArrow) setModelIndex((value) => Math.min((provider?.models.length ?? 1) - 1, value + 1));
-        if (key.return) setStep("confirm");
+        if (key.return) setStep("credential");
+        break;
+      case "credential":
+        if (key.escape) setStep("model");
+        else if (key.return && (keyConfigured || apiKey.trim())) setStep("confirm");
+        else if (key.backspace || key.delete) setApiKey((value) => value.slice(0, -1));
+        else if (input && !key.ctrl && !key.meta) setApiKey((value) => value + input.replace(/[\r\n]/g, ""));
         break;
       case "confirm":
         if (key.return) void writeConfig();
@@ -112,7 +132,7 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
     }
   });
 
-  const providerLines = PROVIDER_PRESETS.map((preset) => `${preset.name.padEnd(20)} (环境变量: $${preset.apiKeyEnv})`);
+  const providerLines = wizardProviders.map((preset) => `${preset.name.padEnd(20)} (环境变量: $${preset.apiKeyEnv})`);
   const modelLines = provider ? provider.models.map((entry) => `${entry.name.padEnd(26)} [${entry.id}]`) : [];
 
   return (
@@ -145,15 +165,25 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
 
       {step === "confirm" && (
         <Box flexDirection="column">
-          <Text bold color={PSYCLAW_ACCENT}>[3/3] 确认配置并写入</Text>
+          <Text bold color={PSYCLAW_ACCENT}>[4/4] 确认配置并写入</Text>
           <Box flexDirection="column" marginY={1}>
             <Text>• 提供商: <Text color={PSYCLAW_ACCENT} bold>{provider?.name}</Text></Text>
             <Text>• 模  型: <Text color={PSYCLAW_ACCENT} bold>{model?.name}</Text> <Text dimColor>({model?.id})</Text></Text>
-            <Text color={keyConfigured ? PSYCLAW_OK : PSYCLAW_ERROR} bold>
-              • API Key: {keyConfigured ? `✔ 已就绪 ($${apiKeyEnv})` : `✗ 未检测到 $${apiKeyEnv}（请先在环境设置）`}
+            <Text color={keyConfigured || apiKey.trim() ? PSYCLAW_OK : PSYCLAW_ERROR} bold>
+              • API Key: {apiKey.trim() ? "✔ 将保存到用户级凭据文件 auth.json" : `✔ 已检测到 (${credentialSource})`}
             </Text>
           </Box>
           <Hint>[Enter] 保存并启动对话  ·  [Esc] 返回上一步  ·  [Q] 退出</Hint>
+        </Box>
+      )}
+
+      {step === "credential" && (
+        <Box flexDirection="column">
+          <Text bold color={PSYCLAW_ACCENT}>[3/4] 配置 API Key</Text>
+          <Text dimColor>已检查当前进程、macOS launchctl 与用户凭据存储。</Text>
+          <Box marginY={1}><Text>Key: </Text><Text color={PSYCLAW_ACCENT}>{apiKey ? "•".repeat(Math.min(apiKey.length, 48)) : keyConfigured ? "已检测到，可直接继续" : "请输入 API Key"}</Text></Box>
+          {!keyConfigured && !apiKey.trim() && <Text color={PSYCLAW_ERROR}>未检测到 ${apiKeyEnv}</Text>}
+          <Hint>直接输入 Key（内容不回显） · [Enter] 继续 · [Esc] 返回</Hint>
         </Box>
       )}
 

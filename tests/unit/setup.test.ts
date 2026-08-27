@@ -1,8 +1,8 @@
-import { mkdtemp, readFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { hasConfiguredProvider, PROVIDER_PRESETS, setupProviders } from "../../src/setup.js";
+import { hasConfiguredProvider, providerCredentialSource, PROVIDER_PRESETS, saveProviderConfig, setupProviders } from "../../src/setup.js";
 
 describe("provider setup and first-run detection", () => {
   it("reports unconfigured before setup and configured after", async () => {
@@ -31,5 +31,47 @@ describe("provider setup and first-run detection", () => {
     const { readJson } = await import("node:fs/promises");
     const parsed = JSON.parse(await readFile(second.path, "utf8")) as { providers: Record<string, unknown> };
     expect(Object.keys(parsed.providers).sort()).toEqual(["deepseek", "openai"]);
+  });
+
+  it("includes the Google Gemini preset", () => {
+    expect(PROVIDER_PRESETS).toContainEqual(expect.objectContaining({ id: "google", apiKeyEnv: "GEMINI_API_KEY" }));
+  });
+
+  it("detects a process environment credential without exposing it", async () => {
+    const previous = process.env.GEMINI_API_KEY;
+    process.env.GEMINI_API_KEY = "test-secret-never-returned";
+    try {
+      await expect(providerCredentialSource({ id: "google", apiKeyEnv: "GEMINI_API_KEY" })).resolves.toBe("process-env");
+    } finally {
+      if (previous === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = previous;
+    }
+  });
+
+  it("fails closed instead of overwriting a corrupt provider catalog", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
+    const modelsPath = join(agentDir, "models.json");
+    await writeFile(modelsPath, "{broken", "utf8");
+    await expect(setupProviders({ agentDir, providers: ["google"] })).rejects.toThrow();
+    await expect(readFile(modelsPath, "utf8")).resolves.toBe("{broken");
+  });
+
+  it("recovers a stale provider catalog lock", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
+    const lockPath = join(agentDir, "models.json.psyclaw.lock");
+    await mkdir(lockPath);
+    const old = new Date(Date.now() - 60_000);
+    await utimes(lockPath, old, old);
+    await expect(setupProviders({ agentDir, providers: ["google"] })).resolves.toMatchObject({ providers: ["google"] });
+    await expect(access(lockPath)).rejects.toThrow();
+  });
+
+  it("stores a directly entered key only in the user auth store", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
+    const preset = PROVIDER_PRESETS.find((item) => item.id === "google")!;
+    const result = await saveProviderConfig({ ...preset, apiKey: "direct-entry-secret" }, { agentDir });
+    expect(await readFile(result.path, "utf8")).not.toContain("direct-entry-secret");
+    expect(await readFile(join(agentDir, "auth.json"), "utf8")).toContain("direct-entry-secret");
+    await expect(providerCredentialSource(preset, { agentDir })).resolves.toBe("auth-store");
   });
 });
