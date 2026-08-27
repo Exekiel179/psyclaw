@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensurePsyClawTheme, ensureQuietStartup, PSYCLAW_IDENTITY_PROMPT } from "./branding.js";
@@ -92,6 +93,13 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
   };
   if (manifest?.version !== undefined) spawnEnv.PSYCLAW_VERSION = manifest.version;
+  try {
+    const settings = JSON.parse(await readFile(join(getAgentDir(), "psyclaw-settings.json"), "utf8")) as { psyclawPet?: unknown };
+    if (settings.psyclawPet === true) spawnEnv.PSYCLAW_PET = "1";
+    else delete spawnEnv.PSYCLAW_PET;
+  } catch {
+    delete spawnEnv.PSYCLAW_PET;
+  }
 
   return new Promise<number>((resolve, reject) => {
     const child = spawn(process.execPath, [piCli, ...args], {

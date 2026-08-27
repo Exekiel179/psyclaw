@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.2 - 2026-08-27
+
+- 修复 macOS 从 Finder 或全局 npm 启动时无法识别登录 shell Provider 环境变量的问题，并在首次向导中安全迁移到用户级凭据存储。
+- 首次向导支持遮罩输入 API Key，新增 Google Gemini Provider 预设。
+- 新增 `/provider` 与 `/pet` 管理命令；宠物横幅默认关闭，仅显式启用后显示。
+- 横幅按终端实际可见宽度筛选，修复 PsyClaw 标识在窄终端被截断的问题。
+- 所有 PsyClaw 自定义斜杠命令补充简短说明。
+
 ## 0.26.1 - 2026-08-27
 
 - 修复 npm 包清单中的错误模块入口元数据；PsyClaw 继续以 `dist/src/cli.js` 作为唯一命令入口。

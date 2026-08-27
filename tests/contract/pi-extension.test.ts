@@ -72,6 +72,20 @@ describe("Pi extension contract", () => {
     expect(notifications[0]).not.toMatch(/sk-[A-Za-z0-9]/);
   });
 
+  it("registers every PsyClaw slash command with a short description", () => {
+    const commands: Array<{ name: string; description?: string }> = [];
+    const api = {
+      registerCommand(name: string, options: { description?: string }) { commands.push({ name, description: options.description }); },
+      registerTool() {},
+    } as any;
+    extension(api);
+    expect(commands).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "provider" }),
+      expect.objectContaining({ name: "pet" }),
+    ]));
+    expect(commands.every((command) => Boolean(command.description?.trim()))).toBe(true);
+  });
+
   it("fails closed before creating an agent run for an uninitialized project", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-agents-"));
     let agentsHandler: ((args: string, ctx: any) => Promise<void>) | undefined;

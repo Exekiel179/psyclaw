@@ -1,8 +1,10 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { randomUUID } from "node:crypto";
 import { DEFAULT_PRICING, PROVIDER_PRICING } from "./core/pricing.js";
 
 export interface ProviderPreset {
@@ -20,6 +22,17 @@ export interface ProviderPreset {
  * the user supplies the secret in their shell environment, never on disk.
  */
 export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
+  {
+    id: "google",
+    name: "Google Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    api: "openai-completions",
+    apiKeyEnv: "GEMINI_API_KEY",
+    models: [
+      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", reasoning: true },
+      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+    ],
+  },
   {
     id: "deepseek",
     name: "DeepSeek",
@@ -146,6 +159,120 @@ export interface ProviderConfigInput {
   apiKey?: string;
 }
 
+export type CredentialSource = "process-env" | "macos-launchctl" | "auth-store" | "missing";
+
+function execFileText(file: string, args: readonly string[]): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile(file, [...args], { encoding: "utf8", timeout: 3_000, windowsHide: true }, (error, stdout) => {
+      const value = error ? "" : stdout.trim();
+      resolve(value || undefined);
+    });
+  });
+}
+
+async function hasStoredCredential(providerId: string, agentDir: string): Promise<boolean> {
+  try {
+    const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
+    const { readStoredCredential } = await import(pathToFileURL(join(dirname(entry), "core", "auth-storage.js")).href);
+    return readStoredCredential(providerId, join(agentDir, "auth.json")) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/** Detect a provider credential without returning or logging its value. */
+export async function providerCredentialSource(
+  preset: Pick<ProviderPreset, "id" | "apiKeyEnv">,
+  options: { agentDir?: string; platform?: NodeJS.Platform } = {},
+): Promise<CredentialSource> {
+  if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(preset.apiKeyEnv)) throw new Error("Invalid API key environment name");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(preset.id)) throw new Error("Invalid provider id");
+  const processValue = process.env[preset.apiKeyEnv]?.trim();
+  if (processValue) return "process-env";
+  const platform = options.platform ?? process.platform;
+  if (platform === "darwin") {
+    const launchctlValue = await execFileText("/bin/launchctl", ["getenv", preset.apiKeyEnv]);
+    if (launchctlValue) return "macos-launchctl";
+  }
+  return await hasStoredCredential(preset.id, options.agentDir ?? getAgentDir()) ? "auth-store" : "missing";
+}
+
+const modelWriteQueues = new Map<string, Promise<unknown>>();
+const STALE_MODELS_LOCK_MS = 30_000;
+
+async function withModelsLock<T>(modelsPath: string, operation: () => Promise<T>): Promise<T> {
+  const previous = modelWriteQueues.get(modelsPath) ?? Promise.resolve();
+  const queued = previous.catch(() => undefined).then(async () => {
+    const lockPath = `${modelsPath}.psyclaw.lock`;
+    const deadline = Date.now() + 10_000;
+    while (true) {
+      try { await mkdir(lockPath); break; }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        const ageMs = await stat(lockPath).then((value) => Date.now() - value.mtimeMs).catch(() => 0);
+        if (ageMs > STALE_MODELS_LOCK_MS) {
+          const stalePath = `${lockPath}.stale.${process.pid}.${randomUUID()}`;
+          try {
+            await rename(lockPath, stalePath);
+            await rm(stalePath, { recursive: true, force: true });
+          } catch (staleError) {
+            if ((staleError as NodeJS.ErrnoException).code !== "ENOENT") throw staleError;
+          }
+          continue;
+        }
+        if (Date.now() >= deadline) throw new Error(`Provider catalog is locked: ${modelsPath}`);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+    try {
+      await writeFile(join(lockPath, "owner.json"), `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() })}\n`, { encoding: "utf8", flag: "wx" });
+      return await operation();
+    }
+    finally { await rm(lockPath, { recursive: true, force: true }); }
+  });
+  modelWriteQueues.set(modelsPath, queued);
+  try { return await queued; }
+  finally { if (modelWriteQueues.get(modelsPath) === queued) modelWriteQueues.delete(modelsPath); }
+}
+
+async function atomicJsonWrite(path: string, value: unknown): Promise<void> {
+  const suffix = `${process.pid}.${randomUUID()}`;
+  const temporary = join(dirname(path), `.${basename(path)}.${suffix}.tmp`);
+  const backup = join(dirname(path), `.${basename(path)}.${suffix}.bak`);
+  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+  let backedUp = false;
+  try {
+    try { await rename(temporary, path); }
+    catch (error) {
+      if (!(["EEXIST", "EPERM", "EACCES"] as const).includes((error as NodeJS.ErrnoException).code as "EEXIST")) throw error;
+      await rename(path, backup);
+      backedUp = true;
+      try { await rename(temporary, path); }
+      catch (replaceError) {
+        await rename(backup, path).catch(() => undefined);
+        throw replaceError;
+      }
+    }
+  } finally {
+    await rm(temporary, { force: true }).catch(() => undefined);
+    if (backedUp) await rm(backup, { force: true }).catch(() => undefined);
+  }
+}
+
+async function readProviderCatalog(modelsPath: string): Promise<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(await readFile(modelsPath, "utf8")) as { providers?: unknown };
+    if (parsed.providers === undefined) return {};
+    if (!parsed.providers || typeof parsed.providers !== "object" || Array.isArray(parsed.providers)) {
+      throw new Error(`Invalid provider catalog: ${modelsPath}`);
+    }
+    return parsed.providers as Record<string, unknown>;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw error;
+  }
+}
+
 function providerConfig(input: ProviderConfigInput): Record<string, unknown> {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(input.id)) throw new Error("Invalid provider id");
   if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(input.apiKeyEnv)) throw new Error("Invalid API key environment name");
@@ -173,15 +300,7 @@ function providerConfig(input: ProviderConfigInput): Record<string, unknown> {
 export async function saveProviderConfig(input: ProviderConfigInput, options: { agentDir?: string } = {}): Promise<SetupResult> {
   const agentDir = options.agentDir ?? getAgentDir();
   const modelsPath = join(agentDir, "models.json");
-  let existing: { providers?: Record<string, unknown> } = {};
-  try {
-    const parsed = JSON.parse(await readFile(modelsPath, "utf8")) as { providers?: unknown };
-    if (parsed.providers && typeof parsed.providers === "object" && !Array.isArray(parsed.providers)) {
-      existing.providers = parsed.providers as Record<string, unknown>;
-    }
-  } catch { /* start with a new catalog */ }
   await mkdir(agentDir, { recursive: true });
-  await writeFile(modelsPath, `${JSON.stringify({ providers: { ...existing.providers, [input.id]: providerConfig(input) } }, null, 2)}\n`, "utf8");
   if (input.apiKey?.trim()) {
     // AuthStorage is intentionally not part of Pi's public root export. Resolve
     // the locked runtime's implementation without reading or logging secrets.
@@ -190,6 +309,10 @@ export async function saveProviderConfig(input: ProviderConfigInput, options: { 
     const auth = AuthStorage.create(join(agentDir, "auth.json"));
     await auth.modify(input.id, async () => ({ type: "api_key", key: input.apiKey!.trim() }));
   }
+  await withModelsLock(modelsPath, async () => {
+    const existing = await readProviderCatalog(modelsPath);
+    await atomicJsonWrite(modelsPath, { providers: { ...existing, [input.id]: providerConfig(input) } });
+  });
   return { path: modelsPath, providers: [input.id] };
 }
 
@@ -212,22 +335,11 @@ export async function setupProviders(options: SetupOptions = {}): Promise<SetupR
     providers[id] = providerToJson(preset);
   }
 
-  let existing: { providers?: Record<string, unknown> } = {};
-  try {
-    const parsed = JSON.parse(await readFile(modelsPath, "utf8")) as unknown;
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const candidate = (parsed as { providers?: unknown }).providers;
-      if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
-        existing = { providers: candidate as Record<string, unknown> };
-      }
-    }
-  } catch {
-    // Missing or malformed file: start from the presets.
-  }
-
   await mkdir(agentDir, { recursive: true });
-  const merged = { ...existing.providers, ...providers };
-  await writeFile(modelsPath, `${JSON.stringify({ providers: merged }, null, 2)}\n`, "utf8");
+  await withModelsLock(modelsPath, async () => {
+    const existing = await readProviderCatalog(modelsPath);
+    await atomicJsonWrite(modelsPath, { providers: { ...existing, ...providers } });
+  });
   return { path: modelsPath, providers: Object.keys(providers) };
 }
 

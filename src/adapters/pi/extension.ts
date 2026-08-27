@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { asProject, bootstrapProject, projectPaths, runOfflineBrief, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, publishManuscript, recordCitationUse, writeHandoff } from "../../index.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
@@ -7,7 +7,8 @@ import { atomicWriteFile } from "../../project/jsonl.js";
 import { RunEventLog } from "../../panel/events.js";
 import { readProject } from "../../research/ledger.js";
 import { join } from "node:path";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { PROVIDER_PRESETS } from "../../setup.js";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -82,6 +83,30 @@ function modelSummary(ctx: ExtensionCommandContext): string {
   const current = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "none";
   const available = ctx.modelRegistry.getAll().map((model) => `${model.provider}/${model.id}`);
   return `current=${current}; available=${available.length > 0 ? available.slice(0, 12).join(", ") : "none"}`;
+}
+
+const petSettingsPath = () => join(getAgentDir(), "psyclaw-settings.json");
+
+async function setPetPreference(enabled: boolean): Promise<void> {
+  const path = petSettingsPath();
+  let settings: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid PsyClaw settings file");
+    settings = parsed as Record<string, unknown>;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    settings = {};
+  }
+  await mkdir(dirname(path), { recursive: true });
+  await atomicWriteFile(path, `${JSON.stringify({ ...settings, psyclawPet: enabled }, null, 2)}\n`);
+}
+
+async function petPreference(): Promise<boolean> {
+  try {
+    const value = JSON.parse(await readFile(petSettingsPath(), "utf8")) as { psyclawPet?: unknown };
+    return value.psyclawPet === true;
+  } catch { return false; }
 }
 
 function parseModelRef(args: string): { provider: string; id: string } {
@@ -367,7 +392,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
   pi.registerCommand("research", {
-    description: "Bootstrap an evidence-grounded psyclaw research project",
+    description: "创建可追溯的研究项目",
     handler: async (args, ctx) => {
       try {
         const parsed = parseResearchArgs(args);
@@ -380,7 +405,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (developerCommands || legacyTestApi) pi.registerCommand("verify", {
-    description: "Write a machine-readable psyclaw handoff checkpoint",
+    description: "写入机器可读的交接检查点",
     handler: async (_args, ctx) => {
       try {
         const paths = projectPaths(ctx.cwd);
@@ -406,7 +431,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("brief", {
-    description: "Run the offline evidence-gated research brief",
+    description: "运行离线证据门控研究简报",
     handler: async (_args, ctx) => {
       try {
         const result = await runOfflineBrief(ctx.cwd);
@@ -453,6 +478,62 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         }
         await showRecommended(kind === "skill" ? "skills" : "mcp", `install ${id}`, ctx);
       } catch (error) { await notifyError(ctx, error); }
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("provider", {
+    description: "查看或切换模型 Provider",
+    handler: async (args, ctx) => {
+      try {
+        const requested = args.trim();
+        const providers = new Map<string, ReturnType<typeof ctx.modelRegistry.getAll>>();
+        for (const model of ctx.modelRegistry.getAll()) {
+          const list = providers.get(model.provider) ?? [];
+          list.push(model);
+          providers.set(model.provider, list);
+        }
+        if (!requested) {
+          const current = ctx.model?.provider ?? "none";
+          const lines = [...providers].map(([id, models]) => `${id}${id === current ? " *" : ""} (${models.length} models)`);
+          ctx.ui.notify([`当前 Provider: ${current}`, ...lines, "", "切换：/provider <id>", "模型：/model <provider/model>", "添加或更新 Key：退出后运行 psyclaw wizard"].join("\n"), "info");
+          return;
+        }
+        if (!/^[A-Za-z0-9._:-]+$/.test(requested)) throw new Error("Usage: /provider <provider-id>");
+        const models = providers.get(requested);
+        if (!models?.[0]) {
+          const preset = PROVIDER_PRESETS.find((item) => item.id === requested);
+          throw new Error(preset ? `Provider ${requested} 尚未加载；请运行 psyclaw wizard 完成配置` : `Unknown provider: ${requested}`);
+        }
+        let selectedId = models[0]?.id;
+        if (models.length > 1) {
+          if (!ctx.hasUI) throw new Error(`Provider ${requested} has multiple models; use /model ${requested}/<model-id>`);
+          const choice = await ctx.ui.select(`选择 ${requested} 模型`, models.map((model) => model.id));
+          if (!choice) return;
+          selectedId = choice;
+        }
+        const selected = models.find((model) => model.id === selectedId);
+        if (!selected) throw new Error(`No model selected for provider: ${requested}`);
+        const changed = await pi.setModel(selected);
+        if (!changed) throw new Error(`Provider ${requested} 的凭据尚未配置；请运行 psyclaw wizard`);
+        ctx.ui.notify(`Provider selected: ${requested} (${selected.id})`, "info");
+      } catch (error) { await notifyError(ctx, error); }
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("pet", {
+    description: "开启或关闭启动横幅宠物",
+    handler: async (args, ctx) => {
+      const action = args.trim().toLowerCase() || "status";
+      if (action === "status") {
+        ctx.ui.notify(`启动横幅宠物：${await petPreference() ? "已开启" : "已关闭（默认）"}`, "info");
+        return;
+      }
+      if (action !== "on" && action !== "off") {
+        ctx.ui.notify("Usage: /pet on|off|status", "error");
+        return;
+      }
+      await setPetPreference(action === "on");
+      ctx.ui.notify(`启动横幅宠物已${action === "on" ? "开启" : "关闭"}，下次启动生效`, "info");
     },
   });
 
@@ -651,7 +732,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   }
 
   if (developerCommands || legacyTestApi) pi.registerCommand("model", {
-    description: "List or switch the active Pi model without exposing credentials",
+    description: "列出或切换当前模型",
     handler: async (args, ctx) => {
       try {
         if (!args.trim()) {
@@ -671,7 +752,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (developerCommands || legacyTestApi) pi.registerCommand("agents", {
-    description: "Run a human-approved, read-only Pi research worker",
+    description: "运行经批准的只读研究 Agent",
     handler: async (args, ctx) => {
       const objective = args.trim();
       if (!objective) {

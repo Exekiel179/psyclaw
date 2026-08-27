@@ -54,7 +54,10 @@ export async function appendJsonlIfMissing<T>(
 export async function atomicWriteFile(path: string, contents: string): Promise<void> {
   const directory = dirname(path);
   await mkdir(directory, { recursive: true });
-  const temporary = join(directory, `.${basename(path)}.${randomUUID()}.tmp`);
+  const suffix = randomUUID();
+  const temporary = join(directory, `.${basename(path)}.${suffix}.tmp`);
+  const backup = join(directory, `.${basename(path)}.${suffix}.bak`);
+  let backedUp = false;
   try {
     await writeFile(temporary, contents, { encoding: "utf8", flag: "wx" });
     try {
@@ -64,11 +67,18 @@ export async function atomicWriteFile(path: string, contents: string): Promise<v
       // only the exact destination, then complete the same-directory move.
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "EEXIST" && code !== "EPERM" && code !== "EACCES") throw error;
-      await rm(path, { force: true });
-      await rename(temporary, path);
+      await rename(path, backup);
+      backedUp = true;
+      try {
+        await rename(temporary, path);
+      } catch (replaceError) {
+        await rename(backup, path).catch(() => undefined);
+        throw replaceError;
+      }
     }
   } finally {
     await rm(temporary, { force: true }).catch(() => undefined);
+    if (backedUp) await rm(backup, { force: true }).catch(() => undefined);
   }
 }
 
