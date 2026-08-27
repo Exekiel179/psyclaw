@@ -65,7 +65,9 @@ async function packageManagerAt(root: string): Promise<"pnpm" | "npm" | undefine
       // keep looking
     }
   }
-  return undefined;
+  // A globally installed npm package is not shipped with its lockfile. npm is
+  // still able to update this package's pinned runtime dependencies in place.
+  return "npm";
 }
 
 function buildCommand(manager: "pnpm" | "npm", version: string): string {

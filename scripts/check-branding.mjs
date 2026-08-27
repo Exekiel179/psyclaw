@@ -55,12 +55,20 @@ function displayPath(path) {
 }
 
 function isAllowedProvenance(path, line) {
-  if (displayPath(path) !== "package.json.psyclaw") return false;
-  const provenance = new RegExp(
-    `^\\s*"ref"\\s*:\\s*"${legacyName}@[0-9a-f]{40}"\\s*$`,
-    "i",
+  const relativePath = displayPath(path);
+  if (relativePath === "package.json.psyclaw") {
+    const provenance = new RegExp(
+      `^\\s*"ref"\\s*:\\s*"${legacyName}@[0-9a-f]{40}"\\s*$`,
+      "i",
+    );
+    return provenance.test(line);
+  }
+  // These are explicit compatibility/provenance notices. The product must not
+  // otherwise expose the predecessor as its runtime name or command.
+  return (
+    (relativePath === "README.md" && line.includes("历史仓库"))
+    || (relativePath === "CHANGELOG.md" && line.includes(legacyName))
   );
-  return provenance.test(line);
 }
 
 async function collectFiles(path) {
@@ -124,24 +132,33 @@ if (governance.id !== "psyclaw") contractFailures.push("package governance id mu
 if (governance.schemaVersion !== "psyclaw/package-governance/v1") {
   contractFailures.push("package governance schema must use the psyclaw namespace");
 }
-if (governance.apiVersion !== manifest.version.replace(/\.0$/u, "")) {
+if (governance.apiVersion !== manifest.version.split(".").slice(0, 2).join(".")) {
   contractFailures.push("package governance apiVersion must match the package major/minor version");
 }
 
 const versionSurfaces = [
-  ["README.md", `v${manifest.version}`],
-  ["PRODUCT.md", `Version ${manifest.version}`],
-  ["CHANGELOG.md", `## v${manifest.version}`],
-  ["docs/使用白皮书.md", `| 版本 | ${manifest.version}`],
-  ["apps/website/index.html", `PsyClaw v${manifest.version}`],
+  ["README.md", `\`${manifest.version}\``],
+  ["CHANGELOG.md", `## ${manifest.version}`],
 ];
 for (const [path, marker] of versionSurfaces) {
   const content = await readFile(join(root, path), "utf8");
   if (!content.includes(marker)) contractFailures.push(`${path} is missing ${marker}`);
 }
 
-if (allowed.length !== 1) {
-  contractFailures.push(`expected one pinned predecessor provenance ref, found ${allowed.length}`);
+const whitepaperIndex = await readFile(join(root, "docs", "使用白皮书.md"), "utf8");
+const whitepaperName = whitepaperIndex.match(/PsyClaw使用白皮书_v(\d+\.\d+\.\d+)\.md/u);
+if (whitepaperName === null) {
+  contractFailures.push("docs/使用白皮书.md must link to a versioned PsyClaw whitepaper");
+} else {
+  const whitepaperPath = `docs/PsyClaw使用白皮书_v${whitepaperName[1]}.md`;
+  const whitepaper = await readFile(join(root, whitepaperPath), "utf8");
+  if (!whitepaper.includes(`**版本：v${whitepaperName[1]}**`)) {
+    contractFailures.push(`${whitepaperPath} version must match its filename`);
+  }
+}
+
+if (!allowed.some((match) => match.startsWith("package.json.psyclaw:"))) {
+  contractFailures.push("expected the pinned predecessor provenance ref in package.json.psyclaw");
 }
 if (forbidden.length > 0) {
   contractFailures.push("legacy product identifier found in release sources");

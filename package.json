@@ -1,7 +1,7 @@
 {
   "name": "psyclaw",
-  "version": "0.24.0",
-  "description": "A standalone, evidence-grounded social-science research agent that bundles Pi with PsyClaw's research contracts, evidence gates, and workflows",
+  "version": "0.26.1",
+  "description": "A standalone, evidence-grounded social-science research agent — a conversation-driven agent that bundles the Pi runtime with psyclaw's research contracts, evidence gates, and workflows",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -20,9 +20,10 @@
     "psyclaw": "dist/src/cli.js"
   },
   "files": [
-    "dist",
+    "dist/src",
+    "dist/apps/panel/index.html",
     "skills",
-    "package.json.psyclaw"
+    "scripts/rebrand-pi.mjs"
   ],
   "engines": {
     "node": ">=22.19.0"
@@ -46,12 +47,13 @@
     ]
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/copy-panel.mjs",
+    "build": "node scripts/rebrand-pi.mjs && tsc -p tsconfig.json && node scripts/copy-panel.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "eval": "tsx evals/harness.ts",
     "eval:modules": "tsx evals/modules.ts",
+    "rebrand": "node scripts/rebrand-pi.mjs",
     "check:branding": "node scripts/check-branding.mjs",
     "prepublishOnly": "pnpm check:branding && pnpm build"
   },

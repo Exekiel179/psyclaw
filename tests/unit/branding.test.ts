@@ -6,10 +6,9 @@ import { ensurePsyClawTheme, ensureQuietStartup, PSYCLAW_IDENTITY_PROMPT } from 
 import { PSYCLAW_THEME_NAME } from "../../src/psyclaw-theme.js";
 
 describe("psyclaw identity prompt", () => {
-  it("identifies as PsyClaw and accurately discloses the official Pi runtime", () => {
+  it("identifies as psyclaw and disavows the pi name", () => {
     expect(PSYCLAW_IDENTITY_PROMPT).toContain("psyclaw");
-    expect(PSYCLAW_IDENTITY_PROMPT).toContain("official Pi coding-agent harness");
-    expect(PSYCLAW_IDENTITY_PROMPT).toContain("disclose that runtime accurately");
+    expect(PSYCLAW_IDENTITY_PROMPT).toContain("never \"pi\"");
   });
 });
 

@@ -4,6 +4,13 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPanelServer } from "./server.js";
 import { PiRpcClient } from "../adapters/pi/rpc.js";
 
+const BROWSER_ASSISTANT_PROMPT = [
+  "You are the PsyClaw browser research assistant.",
+  "Work in a read-only mode. You may inspect project files with read, grep, find, and ls only.",
+  "Do not claim a statistical result, citation, or completed action without evidence.",
+  "When the user asks for a change or side effect, explain the proposed plan and state that approval is required.",
+].join("\n");
+
 function assistantEnv(provider: string | undefined): Record<string, string> {
   const envName = provider === "deepseek" ? "DEEPSEEK_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : provider === "anthropic" ? "ANTHROPIC_API_KEY" : provider === "google" ? "GEMINI_API_KEY" : undefined;
   const value = envName === undefined ? undefined : process.env[envName];
@@ -78,6 +85,7 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
                 ...(ctx.model?.id === undefined ? {} : { model: ctx.model.id }),
                 env: assistantEnv(ctx.model?.provider),
                 tools: ["read", "grep", "find", "ls"],
+                systemPrompt: BROWSER_ASSISTANT_PROMPT,
               });
               try {
                 await assistant.start();
@@ -88,13 +96,7 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
               }
             }
             const current = assistant;
-            const events = await current.promptAndWait([
-              "You are the psyclaw browser research assistant.",
-              "Work in a read-only mode. You may inspect project files with read, grep, find, and ls only.",
-              "Do not claim a statistical result, citation, or completed action without evidence.",
-              "When the user asks for a change or side effect, explain the proposed plan and state that approval is required.",
-              `User request: ${message}`,
-            ].join("\n"));
+            const events = await current.promptAndWait(message);
             return { text: assistantText(events as Array<Record<string, unknown>>) };
           }});
           const actualPort = await listen(next, 0);

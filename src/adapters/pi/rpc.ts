@@ -23,6 +23,8 @@ export interface PiRpcOptions {
   agentDir?: string;
   env?: Record<string, string>;
   tools?: readonly string[];
+  /** Extra system guidance for this isolated RPC worker, never sent as a user message. */
+  systemPrompt?: string;
   timeoutMs?: number;
   maxLineBytes?: number;
 }
@@ -77,6 +79,9 @@ export class PiRpcClient {
     if (tools.some((tool) => !SAFE_TOOL_NAMES.has(tool))) {
       throw new Error("Pi RPC workers may only use read-only tools");
     }
+    if (config.systemPrompt !== undefined && (!config.systemPrompt.trim() || config.systemPrompt.length > 16_000)) {
+      throw new Error("system prompt must be non-empty and at most 16000 characters");
+    }
     this.options = {
       timeoutMs: config.timeoutMs ?? 120_000,
       maxLineBytes: config.maxLineBytes ?? 2 * 1024 * 1024,
@@ -97,6 +102,7 @@ export class PiRpcClient {
     const args = ["--mode", "rpc"];
     if (this.config.provider !== undefined) args.push("--provider", this.config.provider);
     if (this.config.model !== undefined) args.push("--model", this.config.model);
+    if (this.config.systemPrompt !== undefined) args.push("--append-system-prompt", this.config.systemPrompt);
     args.push(
       "--no-session",
       "--no-extensions",

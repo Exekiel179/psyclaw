@@ -104,7 +104,7 @@ async function main(): Promise<void> {
   const helpRoot = await project();
   const help = cli(["--help"], helpRoot);
   await probe("M1", "安装与启动", "CLI 版本横幅", async () => ({
-      ok: help.code === 0 && /PsyClaw \[v\d+\.\d+\.\d+\]/.test(help.out) && /社会科学科研智能体/.test(help.out),
+    ok: help.code === 0 && /ψ PsyClaw \[v\d+\.\d+\.\d+\]/.test(help.out) && /社会科学科研智能体/.test(help.out),
     note: help.code === 0 ? (help.out.match(/ψ PsyClaw \[v[^\]]*\]/) ?? ["(未匹配横幅)"])[0]! : help.out.slice(0, 120),
   }));
 

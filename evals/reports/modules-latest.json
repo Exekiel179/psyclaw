@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/module-eval/v1",
   "suite": "module-by-module-usage",
-  "generatedAt": "2026-08-22T12:48:16.611Z",
+  "generatedAt": "2026-08-27T11:29:54.321Z",
   "modules": [
     {
       "module": "M1",
@@ -73,7 +73,7 @@
       "moduleLabel": "安装与启动",
       "name": "CLI 版本横幅",
       "ok": true,
-      "note": "ψ PsyClaw [v0.24.0]"
+      "note": "ψ PsyClaw [v0.26.1]"
     },
     {
       "module": "M2",
@@ -150,7 +150,7 @@
       "moduleLabel": "对话工具",
       "name": "真实运行时 /panel（Pi RPC + 扩展）",
       "ok": true,
-      "note": "notify + 真实页面伺服（端口 4001,4301,4310,5283,6505,6506,6982,9210,9222,9277,9410,10808,10812,14369,21083,49890,54996,57207）"
+      "note": "notify + 真实页面伺服（http://127.0.0.1:3147）"
     },
     {
       "module": "M4",

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, render, useInput } from "ink";
 import { PROVIDER_PRESETS, setupProviders } from "./setup.js";
-import { PSYCLAW_ACCENT, PSYCLAW_ERROR, PSYCLAW_OK } from "./branding.js";
+import { PSYCLAW_ACCENT, PSYCLAW_ERROR, PSYCLAW_OK, PSYCLAW_VERSION } from "./branding.js";
 
 export type WizardStep = "welcome" | "provider" | "model" | "confirm" | "done";
 
@@ -16,7 +16,7 @@ function Banner(): React.ReactElement {
     <Box flexDirection="column" marginBottom={1}>
       <Box gap={1} alignItems="center">
         <Text color={PSYCLAW_ACCENT} bold>ψ PsyClaw</Text>
-        <Text color="black" backgroundColor={PSYCLAW_ACCENT} bold> v0.24.0 </Text>
+        <Text color="black" backgroundColor={PSYCLAW_ACCENT} bold> v{PSYCLAW_VERSION} </Text>
         <Text dimColor>社科科研智能体 · 首次配置向导</Text>
       </Box>
       <Text dimColor>──────────────────────────────────────────────────</Text>
