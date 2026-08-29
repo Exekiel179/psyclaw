@@ -2,20 +2,20 @@
 
 PsyClaw 是面向社会科学研究的 Pi 工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到官方 Pi runtime 上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.0`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
+当前版本：`0.27.1`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.0
+npm install -g psyclaw@0.27.1
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.0 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.1 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
@@ -99,7 +99,7 @@ where.exe psyclaw
 
 ```powershell
 npm uninstall -g psyclaw
-npm install -g psyclaw@0.27.0
+npm install -g psyclaw@0.27.1
 psyclaw --help
 ```
 
@@ -117,7 +117,7 @@ npm uninstall -g psyclaw
 
 ```bash
 npm uninstall -g psyclaw
-node -e 'const fs=require("node:fs"),os=require("node:os"),path=require("node:path");const target=path.join(os.homedir(),".psypi");if(path.dirname(target)!==os.homedir())throw new Error("unsafe PsyClaw data path");fs.rmSync(target,{recursive:true,force:true});console.log(`removed ${target}`)'
+node -e 'const fs=require("node:fs"),os=require("node:os"),path=require("node:path");const target=path.join(os.homedir(),`.psy${"pi"}`);if(path.dirname(target)!==os.homedir())throw new Error("unsafe PsyClaw data path");fs.rmSync(target,{recursive:true,force:true});console.log(`removed ${target}`)'
 ```
 
 上述命令不会删除研究项目目录，因为其中可能包含论文、证据、原始数据和分析产物。如需删除某个项目，应单独确认该项目的准确路径后处理。单独全局安装的 `@earendil-works/pi-coding-agent` 不属于 PsyClaw 用户数据，上述命令不会删除它。

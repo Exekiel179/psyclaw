@@ -31,15 +31,19 @@ export { verifyDoi } from "../core/doi.js";
 import { resumePlanWithPi } from "../orchestration/pi-executor.js";
 import { RunEventLog } from "./events.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
+import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
 
 const activePanelRuns = new Set<string>();
 
-interface RecommendationState { schemaVersion: "psyclaw/recommendation-state/v1"; skills: string[]; mcp: string[]; }
+interface RecommendationState { schemaVersion: "psyclaw/recommendation-state/v1"; skills: string[]; mcp: string[]; skillScopes?: Record<string, RecommendedSkillScope>; }
 
 async function readRecommendationState(root: string): Promise<RecommendationState> {
   try {
     const value = JSON.parse(await readFile(join(root, ".psyclaw", "recommendations.json"), "utf8")) as Partial<RecommendationState>;
-    return { schemaVersion: "psyclaw/recommendation-state/v1", skills: Array.isArray(value.skills) ? value.skills.filter((id): id is string => typeof id === "string") : [], mcp: Array.isArray(value.mcp) ? value.mcp.filter((id): id is string => typeof id === "string") : [] };
+    const skillScopes = value.skillScopes && typeof value.skillScopes === "object"
+      ? Object.fromEntries(Object.entries(value.skillScopes).filter((entry): entry is [string, RecommendedSkillScope] => entry[1] === "project" || entry[1] === "user"))
+      : undefined;
+    return { schemaVersion: "psyclaw/recommendation-state/v1", skills: Array.isArray(value.skills) ? value.skills.filter((id): id is string => typeof id === "string") : [], mcp: Array.isArray(value.mcp) ? value.mcp.filter((id): id is string => typeof id === "string") : [], ...(skillScopes === undefined ? {} : { skillScopes }) };
   } catch { return { schemaVersion: "psyclaw/recommendation-state/v1", skills: [], mcp: [] }; }
 }
 
@@ -395,6 +399,25 @@ export interface PanelServerOptions {
   panelHtmlPath?: string;
   /** Optional browser assistant. The callback owns the Pi/model boundary. */
   assistant?: (message: string) => Promise<{ text: string }>;
+  /** Queue an approved installation task into the current PsyClaw model session. */
+  installSkill?: (task: string) => Promise<void>;
+}
+
+function panelSkillInstallTask(root: string, item: Record<string, unknown>, scope: RecommendedSkillScope): string {
+  const id = String(item.id ?? "");
+  const name = String(item.name ?? id);
+  const sourceRef = String(item.sourceRef ?? "");
+  const target = recommendedSkillTarget(root, id, scope);
+  return [
+    `安装推荐 Skill：${name} (${id})。`,
+    `来源网址：${sourceRef}`,
+    `安装位置：${scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）"}。`,
+    `唯一允许的最终目标目录：${target}`,
+    "请使用当前会话的工具检查来源仓库并完成安装。不要写入其他 Skill 目录，不要修改 data/raw、.git 或研究产物。",
+    "目标目录最终必须直接包含有效 SKILL.md（YAML frontmatter 至少包含 name 和 description），不得包含 .git、符号链接、凭据或二进制大文件。",
+    "如果仓库包含多个 Skill，只安装与此推荐项相符的部分；如果它不是 Skill 或无法合理适配，停止并说明原因，不要伪造 SKILL.md。",
+    "安装完成后检查目标目录结构，并提醒用户执行 /skills 启用该项，再执行 /reload。",
+  ].join("\n");
 }
 
 /** Metadata-only catalog for the optional panel. No install or credential read. */
@@ -534,8 +557,16 @@ async function recommendedSkills(): Promise<unknown> {
   ];
   for (const path of candidates) {
     try {
-      const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>> };
-      return { ...catalog, items: (catalog.items ?? []).map((item) => ({ ...item, slashCommand: `/skills enable ${String(item.id ?? "")}`, installCommand: `/install skill ${String(item.id ?? "")}` })) };
+      const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>>; externalTools?: Array<Record<string, unknown>> };
+      return {
+        ...catalog,
+        items: (catalog.items ?? []).filter((item) => item.kind === "skill").map((item) => ({
+          ...item,
+          slashCommand: `/skills enable ${String(item.id ?? "")}`,
+          installCommand: `/install skill ${String(item.id ?? "")}`,
+        })),
+        externalTools: (catalog.externalTools ?? []).filter((item) => item.kind === "external-tool"),
+      };
     } catch { /* try package layout */ }
   }
   return { schemaVersion: "psyclaw/recommended-skills/v1", documentVersion: "0.1.0", items: [] };
@@ -807,6 +838,8 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         const state = await readRecommendationState(root);
         const disabled = await readDisabledCapabilities(root);
         const [skills, mcps] = await Promise.all([recommendedSkills(), recommendedMcps()]);
+        const skillIds = new Set(((skills as { items?: Array<Record<string, unknown>> }).items ?? []).map((item) => String(item.id ?? "")));
+        const mcpIds = new Set(((mcps as { items?: Array<Record<string, unknown>> }).items ?? []).map((item) => String(item.id ?? "")));
         const nameOf = (kind: "skill" | "mcp", id: string): string => {
           const catalog = kind === "skill" ? skills : mcps;
           const item = ((catalog as { items?: Array<Record<string, unknown>> }).items ?? []).find((candidate) => candidate.id === id);
@@ -816,8 +849,8 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         response.end(JSON.stringify({
           schemaVersion: "psyclaw/enabled-capabilities/v1",
           coreSkills: CORE_SKILLS.map((skill) => ({ id: skill.id, name: skill.name, enabled: !disabled.coreSkills.includes(skill.id) })),
-          skills: state.skills.map((id) => ({ id, name: nameOf("skill", id), enabled: true })),
-          mcp: state.mcp.map((id) => ({ id, name: nameOf("mcp", id), enabled: true })),
+          skills: state.skills.filter((id) => skillIds.has(id)).map((id) => ({ id, name: nameOf("skill", id), enabled: true })),
+          mcp: state.mcp.filter((id) => mcpIds.has(id)).map((id) => ({ id, name: nameOf("mcp", id), enabled: true })),
         }));
         return;
       }
@@ -852,6 +885,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         const kind = body.kind === "skill" || body.kind === "mcp" ? body.kind : undefined;
         const id = String(body.id ?? "").trim();
         const approved = body.approved === true;
+        const scope = body.scope === "project" || body.scope === "user" ? body.scope : undefined;
         const actor = String(body.actor ?? "researcher").trim();
         if (!kind || !id || !approved || actor.length < 1) throw new Error("kind, id, approved and actor are required");
         const found = await findRecommendedItem(kind, id);
@@ -860,12 +894,36 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           response.end(JSON.stringify({ error: "unknown recommended item" }));
           return;
         }
-        const command = typeof found.prep?.command === "string" && found.prep.command.trim() ? found.prep.command.trim() : undefined;
-        if (!command) {
+        if (kind === "skill") {
+          if (!scope) throw new Error("scope must be project or user for Skill installation");
+          if (options.installSkill === undefined) {
+            response.writeHead(503, { "content-type": "application/json" });
+            response.end(JSON.stringify({ error: "Skill 安装需要当前模型通道；请在 PsyClaw 对话中执行 /panel 后再安装。", reasonCode: "panel.skill-installer-unavailable" }));
+            return;
+          }
+          await options.installSkill(panelSkillInstallTask(root, found.item, scope));
+          const state = await readRecommendationState(root);
+          state.skillScopes = { ...(state.skillScopes ?? {}), [id]: scope };
+          await writeRecommendationState(root, state);
+          response.writeHead(202, { "content-type": "application/json" });
+          response.end(JSON.stringify({
+            schemaVersion: "psyclaw/model-install-task/v1",
+            ok: true,
+            queued: true,
+            id,
+            scope,
+            reloadHint: "/reload",
+            message: "安装任务已交给当前模型；模型完成后请启用 Skill 并执行 /reload。",
+          }));
+          return;
+        }
+        const shellCommand = typeof found.prep?.command === "string" && found.prep.command.trim() ? found.prep.command.trim() : undefined;
+        if (!shellCommand) {
           response.writeHead(400, { "content-type": "application/json" });
           response.end(JSON.stringify({ error: "no install command is available for this item", blockedReason: found.prep?.blockedReason ?? null }));
           return;
         }
+        const command = shellCommand;
         const startedAt = new Date().toISOString();
         const runId = `panel_${randomUUID().replaceAll("-", "")}`;
         const idempotencyKey = `panel:install:${sha256Text(`${kind}\u0000${id}\u0000${actor}`).slice(0, 24)}`;
@@ -881,7 +939,9 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           command,
           startedAt,
         };
-        const { exitCode, output } = await runShellCommand(command, root);
+        let exitCode: number;
+        let output: string;
+        ({ exitCode, output } = await runShellCommand(command, root));
         receipt.ok = exitCode === 0;
         receipt.exitCode = exitCode;
         receipt.finishedAt = new Date().toISOString();
@@ -889,8 +949,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         await atomicWriteFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
         if (receipt.ok) {
           const state = await readRecommendationState(root);
-          const key = kind === "skill" ? "skills" : "mcp";
-          state[key] = [...new Set([...state[key], id])];
+          state.mcp = [...new Set([...state.mcp, id])];
           await writeRecommendationState(root, state);
         }
         await appendJsonlIfMissing(projectPaths(root).audit, {

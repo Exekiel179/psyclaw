@@ -13,12 +13,15 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   coreSkillNames,
+  enabledRecommendedSkillPaths,
   installRecommendedSkill,
   normalizeRecommendedSkillId,
   readRecommendationState,
   readRecommendedCatalog,
+  recommendedSkillTarget,
   saveRecommendationState,
-  validateInstalledRecommendedSkill,
+  validateModelInstalledRecommendedSkill,
+  type RecommendedSkillScope,
   type RecommendationState,
 } from "../../skills/recommended.js";
 import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../tui/skill-manager.js";
@@ -136,7 +139,7 @@ function researchTaskPlan(runId: string, objective: string) {
   };
 }
 
-async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<Record<string, unknown>>; installPrep: Array<Record<string, unknown>> }> {
+async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<Record<string, unknown>>; externalTools: Array<Record<string, unknown>>; installPrep: Array<Record<string, unknown>> }> {
   const file = kind === "skills" ? "catalog.json" : "mcp-catalog.json";
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
@@ -147,14 +150,15 @@ async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<
   ];
   for (const path of candidates) {
     try {
-      const value = JSON.parse(await readFile(path, "utf8")) as { items?: unknown; installPrep?: unknown };
+      const value = JSON.parse(await readFile(path, "utf8")) as { items?: unknown; externalTools?: unknown; installPrep?: unknown };
       return {
         items: Array.isArray(value.items) ? value.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [],
+        externalTools: Array.isArray(value.externalTools) ? value.externalTools.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [],
         installPrep: Array.isArray(value.installPrep) ? value.installPrep.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [],
       };
     } catch { /* try next candidate */ }
   }
-  return { items: [], installPrep: [] };
+  return { items: [], externalTools: [], installPrep: [] };
 }
 
 interface SkillManagerRow {
@@ -164,6 +168,7 @@ interface SkillManagerRow {
   sourceRef?: string;
   installed: boolean;
   enabled: boolean;
+  scope: RecommendedSkillScope;
   blocked: boolean;
   reason?: string;
 }
@@ -179,12 +184,17 @@ interface McpManagerRow {
   details: string[];
 }
 
+function skillScopeLabel(scope: RecommendedSkillScope): string {
+  return scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）";
+}
+
 async function skillManagerRows(root: string, state: RecommendationState): Promise<SkillManagerRow[]> {
   const catalog = await readRecommendedCatalog();
   return Promise.all(catalog.items.filter((item) => item.kind === "skill").map(async (item) => {
     const id = normalizeRecommendedSkillId(item.id);
+    const scope = state.skillScopes?.[id] ?? "project";
     try {
-      await validateInstalledRecommendedSkill(root, id);
+      await validateModelInstalledRecommendedSkill(root, id, scope);
       return {
         id,
         name: item.name,
@@ -192,13 +202,10 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         ...(item.sourceRef === undefined ? {} : { sourceRef: item.sourceRef }),
         installed: true,
         enabled: state.skills.includes(id),
+        scope,
         blocked: false,
       };
-    } catch (error) {
-      const plan = catalog.installPrep.find((candidate) => normalizeRecommendedSkillId(candidate.id) === id);
-      const installable = plan?.sourceKind === "github" && typeof plan.sourceUrl === "string" &&
-        typeof plan.skillPath === "string" && typeof plan.skillName === "string" &&
-        typeof plan.ref === "string" && !["unknown", "NOASSERTION"].includes(plan.license);
+    } catch {
       return {
         id,
         name: item.name,
@@ -206,8 +213,11 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         ...(item.sourceRef === undefined ? {} : { sourceRef: item.sourceRef }),
         installed: false,
         enabled: false,
-        blocked: !installable,
-        reason: installable ? "尚未安装" : (plan?.blockedReason ?? (error instanceof Error ? error.message : String(error))),
+        scope,
+        blocked: typeof item.sourceRef !== "string" || !/^https:\/\//.test(item.sourceRef),
+        reason: typeof item.sourceRef === "string" && /^https:\/\//.test(item.sourceRef)
+          ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
+          : "没有可交给模型检查的来源网址",
       };
     }
   }));
@@ -244,13 +254,15 @@ function skillRowLabel(row: SkillManagerRow): string {
   return `${state}  ${row.name}  [${row.id}]`;
 }
 
-async function setRecommendedSkillEnabled(root: string, requestedId: string, enabled: boolean): Promise<void> {
+async function setRecommendedSkillEnabled(root: string, requestedId: string, enabled: boolean, requestedScope?: RecommendedSkillScope): Promise<void> {
   const id = normalizeRecommendedSkillId(requestedId);
-  if (enabled) await validateInstalledRecommendedSkill(root, id);
   const state = await readRecommendationState(root);
+  const scope = requestedScope ?? state.skillScopes?.[id] ?? "project";
+  if (enabled) await validateModelInstalledRecommendedSkill(root, id, scope);
   const current = new Set(state.skills);
   if (enabled) current.add(id); else current.delete(id);
   state.skills = [...current];
+  state.skillScopes = { ...(state.skillScopes ?? {}), [id]: scope };
   await saveRecommendationState(root, state);
 }
 
@@ -269,6 +281,7 @@ function skillManagerItems(rows: SkillManagerRow[]): SkillManagerItem[] {
       description: row.description,
       status: row.blocked ? "blocked" as const : row.enabled ? "enabled" as const : row.installed ? "disabled" as const : "missing" as const,
       ...(row.sourceRef === undefined ? {} : { sourceRef: row.sourceRef }),
+      details: [`安装位置：${skillScopeLabel(row.scope)}`],
       ...(row.reason === undefined ? {} : { reason: row.reason }),
     })),
   ];
@@ -377,7 +390,46 @@ async function showMcpManager(args: string, ctx: ExtensionCommandContext): Promi
   }
 }
 
-async function showSkillManager(args: string, ctx: ExtensionCommandContext): Promise<void> {
+function modelSkillInstallTask(root: string, row: SkillManagerRow, scope: RecommendedSkillScope): string {
+  const target = recommendedSkillTarget(root, row.id, scope);
+  return [
+    `安装推荐 Skill：${row.name} (${row.id})。`,
+    `来源网址：${row.sourceRef}`,
+    `安装位置：${skillScopeLabel(scope)}。`,
+    `唯一允许的最终目标目录：${target}`,
+    "请使用当前会话的工具检查来源仓库并完成安装。不要写入其他 Skill 目录，不要修改 data/raw、.git 或研究产物。",
+    "目标目录最终必须直接包含有效 SKILL.md（YAML frontmatter 至少包含 name 和 description），不得包含 .git、符号链接、凭据或二进制大文件。",
+    "如果仓库包含多个 Skill，只安装与此推荐项相符的部分；如果它不是 Skill 或无法合理适配，停止并说明原因，不要伪造 SKILL.md。",
+    "安装完成后检查目标目录结构，并提醒用户执行 /skills 启用该项，再执行 /reload。",
+  ].join("\n");
+}
+
+async function chooseSkillScope(ctx: ExtensionCommandContext): Promise<RecommendedSkillScope | undefined> {
+  const projectLabel = skillScopeLabel("project");
+  const systemLabel = skillScopeLabel("user");
+  const selected = await ctx.ui.select("选择 Skill 安装位置", [projectLabel, systemLabel]);
+  if (selected === projectLabel) return "project";
+  if (selected === systemLabel) return "user";
+  return undefined;
+}
+
+async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandContext, row: SkillManagerRow): Promise<void> {
+  if (!row.sourceRef) throw new Error(`推荐 Skill 没有来源网址: ${row.id}`);
+  const scope = await chooseSkillScope(ctx);
+  if (!scope) return;
+  const approved = await ctx.ui.confirm(
+    "交给当前模型安装 Skill？",
+    `${row.name}\n来源：${row.sourceRef}\n安装位置：${skillScopeLabel(scope)}\n目标目录：${recommendedSkillTarget(ctx.cwd, row.id, scope)}\n模型将检查仓库并使用文件与命令工具完成安装。`,
+  );
+  if (!approved) return;
+  const state = await readRecommendationState(ctx.cwd);
+  state.skillScopes = { ...(state.skillScopes ?? {}), [row.id]: scope };
+  await saveRecommendationState(ctx.cwd, state);
+  pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型，目标为${skillScopeLabel(scope)}。安装完成后请在 /skills 中启用，再执行 /reload。`, "info");
+}
+
+async function showSkillManager(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const action = args.trim().split(/\s+/).filter(Boolean);
   const verb = action[0];
   const id = action[1];
@@ -388,13 +440,14 @@ async function showSkillManager(args: string, ctx: ExtensionCommandContext): Pro
     throw new Error(`Usage: /skills ${verb} <id>`);
   }
   if (verb === "install") {
-    const result = await installRecommendedSkill(ctx.cwd, id!);
-    ctx.ui.notify(`${result.installed ? "已安装" : "已经安装"} ${result.skillName}\n${result.path}\n安装不会自动启用，请返回 /skills 开启。`, "info");
+    const row = (await skillManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd))).find((candidate) => candidate.id === normalizeRecommendedSkillId(id!));
+    if (!row) throw new Error(`未找到推荐 Skill: ${id}`);
+    await queueModelSkillInstall(pi, ctx, row);
     return;
   }
   if (verb === "enable" || verb === "disable") {
     await setRecommendedSkillEnabled(ctx.cwd, id!, verb === "enable");
-    ctx.ui.notify(`${verb === "enable" ? "已启用" : "已停用"} ${normalizeRecommendedSkillId(id!)}，下次启动 PsyClaw 生效`, "info");
+    ctx.ui.notify(`${verb === "enable" ? "已启用" : "已停用"} ${normalizeRecommendedSkillId(id!)}。请运行 /reload 重新加载。`, "info");
     return;
   }
 
@@ -417,19 +470,12 @@ async function showSkillManager(args: string, ctx: ExtensionCommandContext): Pro
     const row = rows.find((candidate) => candidate.id === action.id);
     if (!row) continue;
     if (action.type === "install") {
-      const approved = await ctx.ui.confirm("安装推荐 Skill？", `${row.name}\n固定来源：${row.sourceRef ?? row.id}\n安装到当前项目，安装完成后仍由你决定是否启用。`);
-      if (!approved) continue;
-      try {
-        const result = await installRecommendedSkill(ctx.cwd, row.id);
-        ctx.ui.notify(`${result.installed ? "安装完成" : "已经安装"}：${result.skillName}`, "info");
-      } catch (error) {
-        await notifyError(ctx, error);
-      }
-      continue;
+      await queueModelSkillInstall(pi, ctx, row);
+      return;
     }
     if (action.type === "toggle") {
       await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
-      ctx.ui.notify(`已${action.enabled ? "启用" : "停用"} ${row.name}，重启 PsyClaw 后生效`, "info");
+      ctx.ui.notify(`已${action.enabled ? "启用" : "停用"} ${row.name}。请运行 /reload 重新加载。`, "info");
     }
   }
 }
@@ -542,6 +588,11 @@ const WORKFLOW_RUNNERS = {
 export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
+  if (!legacyTestApi) pi.on("resources_discover", async (event, ctx) => {
+    const enabled = await enabledRecommendedSkillPaths(event.cwd);
+    for (const warning of enabled.warnings) ctx.ui.notify(`PsyClaw Skill: ${warning}`, "warning");
+    return { skillPaths: enabled.paths };
+  });
   pi.registerCommand("research", {
     description: "创建可追溯的研究项目",
     handler: async (args, ctx) => {
@@ -599,7 +650,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   if (!legacyTestApi) pi.registerCommand("skills", {
     description: "打开 Skill 安装与启用管理页",
     handler: async (args, ctx) => {
-      try { await showSkillManager(args, ctx); } catch (error) { await notifyError(ctx, error); }
+      try { await showSkillManager(pi, args, ctx); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
@@ -619,16 +670,17 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           const [skills, mcps] = await Promise.all([recommendedItems("skills"), recommendedItems("mcp")]);
           const skillLines = skills.items.slice(0, 8).map((item) => `Skill: ${String(item.id)} — ${String(item.name)}`);
           const mcpLines = mcps.items.slice(0, 8).map((item) => `MCP: ${String(item.id)} — ${String(item.name)}`);
-          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...mcpLines, "", "安装：/install skill|mcp <id>", "管理：/skills 或 /mcp", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
+          const toolLines = skills.externalTools.slice(0, 8).map((item) => `外部工具: ${String(item.name)} — ${String(item.sourceRef ?? "请查看项目文档")}`);
+          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...mcpLines, "", ...toolLines, "", "安装：/install skill|mcp <id>", "管理：/skills 或 /mcp", "外部工具不通过 Skill 安装器安装", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
           return;
         }
         if (kind !== "skill" && kind !== "mcp") throw new Error("Usage: /install skill|mcp <id>");
         if (!id) {
-          if (kind === "skill") await showSkillManager("", ctx);
+          if (kind === "skill") await showSkillManager(pi, "", ctx);
           else await showMcpManager("", ctx);
           return;
         }
-        if (kind === "skill") await showSkillManager(`install ${id}`, ctx);
+        if (kind === "skill") await showSkillManager(pi, `install ${id}`, ctx);
         else await showMcpManager(`install ${id}`, ctx);
       } catch (error) { await notifyError(ctx, error); }
     },

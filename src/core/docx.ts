@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 /**
  * Word document conversion via Pandoc. Pandoc is already part of psyclaw's DOCX
  * export path; if it is unavailable, the caller should fall back to the
- * markitdown skill (read) or report the failure (write).
+ * external MarkItDown tool (read) or report the failure (write).
  */
 function runPandoc(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -15,7 +15,7 @@ function runPandoc(args: string[]): Promise<string> {
     let errorText = "";
     child.stdout?.on("data", (chunk) => { output += String(chunk); });
     child.stderr?.on("data", (chunk) => { errorText += String(chunk); });
-    child.on("error", (error) => reject(new Error(`pandoc unavailable (${error.message}); install Pandoc or use the markitdown skill`)));
+    child.on("error", (error) => reject(new Error(`pandoc unavailable (${error.message}); install Pandoc or use the external MarkItDown tool`)));
     child.on("close", (code) => {
       if (code === 0) resolve(output);
       else reject(new Error(`pandoc failed (exit ${code ?? "unknown"})${errorText ? `: ${errorText.trim().slice(0, 300)}` : ""}`));

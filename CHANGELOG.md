@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.27.1 - 2026-08-30
+
+- 推荐 Skill 安装改由当前模型根据来源网址检查并执行，不再要求推荐目录预先提供固定安装命令。
+- 安装前由用户选择项目目录或系统目录；项目目录仅供当前项目使用，系统目录可供所有 PsyClaw 项目使用。
+- `/skills` 与科研面板统一显示安装位置、安装状态及 `/reload` 提示，安装完成后可明确启用并重新加载。
+- MarkItDown 和 SmartPlot 归入外部工具，不再伪装为可安装 Skill；清理并补充能够由模型从有效来源处理的推荐 Skill。
+
+> 发布说明：本地按用户要求跳过测试，仅执行品牌检查、TypeScript 构建和 npm 打包核验。
+
+> npm 发布通过 GitHub Actions Trusted Publishing 使用短期 OIDC 凭据，不保存长期 npm Token；首次使用前需在 npm 包设置中将 `Exekiel179/psyclaw` 的 `release.yml` 配置为 Trusted Publisher。
+
 ## 0.27.0 - 2026-08-30
 
 - `psyclaw update` 改为直接更新 PsyClaw 整包及其锁定的内置 Pi，默认执行更新；`--check` 仅查看计划，旧 `--yes` 参数继续兼容。

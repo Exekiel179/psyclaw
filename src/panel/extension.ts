@@ -77,7 +77,9 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
       }
       try {
         if (server === undefined || workbenchUrl === undefined) {
-          const next = createPanelServer(ctx.cwd, { assistant: async (message) => {
+          const next = createPanelServer(ctx.cwd, { installSkill: async (task) => {
+            pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+          }, assistant: async (message) => {
             if (!assistant) {
               assistant = new PiRpcClient({
                 cwd: ctx.cwd,

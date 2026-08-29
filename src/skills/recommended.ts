@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { parse as parseYaml } from "yaml";
 import { atomicWriteFile } from "../project/jsonl.js";
 
@@ -32,8 +33,11 @@ export interface RecommendationState {
   schemaVersion: "psyclaw/recommendation-state/v1";
   skills: string[];
   mcp: string[];
+  skillScopes?: Record<string, RecommendedSkillScope>;
   skillSources?: Record<string, string>;
 }
+
+export type RecommendedSkillScope = "project" | "user";
 
 export interface RecommendedCatalogItem {
   id: string;
@@ -61,6 +65,7 @@ export interface RecommendedCatalog {
   schemaVersion: "psyclaw/recommended-skills/v1";
   documentVersion: string;
   items: RecommendedCatalogItem[];
+  externalTools?: RecommendedCatalogItem[];
   installPrep: RecommendedInstallPlan[];
 }
 
@@ -120,10 +125,14 @@ export async function readRecommendationState(root: string): Promise<Recommendat
     const skillSources = isRecord(value.skillSources)
       ? Object.fromEntries(Object.entries(value.skillSources).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
       : undefined;
+    const skillScopes = isRecord(value.skillScopes)
+      ? Object.fromEntries(Object.entries(value.skillScopes).filter((entry): entry is [string, RecommendedSkillScope] => entry[1] === "project" || entry[1] === "user"))
+      : undefined;
     return {
       schemaVersion: "psyclaw/recommendation-state/v1",
       skills: [...new Set(skills)].sort(),
       mcp: [...new Set(mcp)].sort(),
+      ...(skillScopes === undefined ? {} : { skillScopes }),
       ...(skillSources === undefined ? {} : { skillSources }),
     };
   } catch {
@@ -138,6 +147,7 @@ export async function saveRecommendationState(root: string, state: Recommendatio
     schemaVersion: "psyclaw/recommendation-state/v1",
     skills: [...new Set(state.skills.map(normalizedId))].sort(),
     mcp: [...new Set(state.mcp)].sort(),
+    ...(state.skillScopes === undefined ? {} : { skillScopes: state.skillScopes }),
     ...(state.skillSources === undefined ? {} : { skillSources: state.skillSources }),
   }, null, 2)}\n`);
 }
@@ -157,6 +167,9 @@ export async function readRecommendedCatalog(): Promise<RecommendedCatalog> {
       const value = JSON.parse(await readFile(path, "utf8")) as unknown;
       if (!isRecord(value) || value.schemaVersion !== "psyclaw/recommended-skills/v1" ||
           !Array.isArray(value.items) || !Array.isArray(value.installPrep)) continue;
+      if (value.items.some((item) => !isRecord(item) || item.kind !== "skill")) continue;
+      if (value.externalTools !== undefined && (!Array.isArray(value.externalTools) ||
+          value.externalTools.some((item) => !isRecord(item) || item.kind !== "external-tool"))) continue;
       return value as unknown as RecommendedCatalog;
     } catch { /* try the next package/source layout */ }
   }
@@ -236,6 +249,39 @@ function installPlan(catalog: RecommendedCatalog, requestedId: string): { item: 
 
 function importsRoot(root: string): string {
   return join(resolve(root), ".psyclaw", "imports", "recommended");
+}
+
+export function recommendedSkillTarget(root: string, requestedId: string, scope: RecommendedSkillScope): string {
+  const id = normalizedId(requestedId);
+  if (!safeSegment(id)) throw new Error(`Recommended Skill id is invalid: ${requestedId}`);
+  return scope === "user"
+    ? join(getAgentDir(), "skills", id)
+    : join(importsRoot(root), id);
+}
+
+async function assertNoNestedGitOrSymlink(directory: string): Promise<void> {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.name === ".git") throw new Error("Installed Skill contains nested Git metadata");
+    if (entry.isSymbolicLink()) throw new Error(`Installed Skill contains a symbolic link: ${entry.name}`);
+    if (entry.isDirectory()) await assertNoNestedGitOrSymlink(join(directory, entry.name));
+  }
+}
+
+export async function validateModelInstalledRecommendedSkill(
+  root: string,
+  requestedId: string,
+  scope: RecommendedSkillScope,
+): Promise<{ id: string; skillName: string; path: string }> {
+  const id = normalizedId(requestedId);
+  const target = recommendedSkillTarget(root, id, scope);
+  const stat = await lstat(target).catch(() => undefined);
+  if (!stat?.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error(`Recommended Skill is not installed in ${scope} scope: ${id}`);
+  }
+  await assertNoNestedGitOrSymlink(target);
+  const skillText = await readFile(join(target, "SKILL.md"), "utf8");
+  const skillName = parseSkillName(skillText);
+  return { id, skillName, path: target };
 }
 
 async function readInstallManifest(path: string): Promise<RecommendedInstallManifest> {
@@ -331,12 +377,19 @@ export async function installRecommendedSkill(root: string, requestedId: string,
 
 export async function enabledRecommendedSkillPaths(root: string): Promise<EnabledSkillPaths> {
   const state = await readRecommendationState(root);
+  const catalog = await readRecommendedCatalog();
+  const catalogIds = new Set(catalog.items.map((item) => normalizedId(item.id)));
   const paths: string[] = [];
   const warnings: string[] = [];
   const seenNames = new Set<string>();
   for (const requestedId of state.skills) {
+    if (!catalogIds.has(normalizedId(requestedId))) {
+      warnings.push(`Enabled Skill '${requestedId}' is no longer in the recommended catalog and was ignored.`);
+      continue;
+    }
     try {
-      const installed = await validateInstalledRecommendedSkill(root, requestedId);
+      const scope = state.skillScopes?.[requestedId] ?? "project";
+      const installed = await validateModelInstalledRecommendedSkill(root, requestedId, scope);
       if (CORE_SKILLS.has(installed.skillName) && state.skillSources?.[installed.skillName] !== `recommended:${installed.id}`) {
         warnings.push(`Skill '${installed.skillName}' conflicts with a PsyClaw core Skill; core remains active. Rename it or explicitly select recommended:${installed.id}.`);
         continue;

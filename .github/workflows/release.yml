@@ -12,7 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
@@ -61,9 +61,12 @@ jobs:
       - run: pnpm build
 
   release:
-    name: Pack and create GitHub release
+    name: Publish npm package and create GitHub release
     needs: platform-test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,6 +80,8 @@ jobs:
           node-version: 22.19.0
           cache: pnpm
           registry-url: https://registry.npmjs.org
+      - name: Install npm with Trusted Publishing support
+        run: npm install --global npm@11.5.1
       - name: Verify tag matches package version
         shell: bash
         run: |
@@ -97,6 +102,9 @@ jobs:
           artifact="$(npm pack --ignore-scripts --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s)[0].filename))")"
           mv "$artifact" "release/$artifact"
           (cd release && sha256sum "$artifact" > SHA256SUMS.txt)
+      - name: Publish to npm with Trusted Publishing
+        shell: bash
+        run: npm publish "release/psyclaw-${RELEASE_TAG#v}.tgz" --access public --registry=https://registry.npmjs.org/
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
