@@ -86,6 +86,40 @@ describe("Pi extension contract", () => {
     expect(commands.every((command) => Boolean(command.description?.trim()))).toBe(true);
   });
 
+  it("opens the MCP manager as a custom page and preserves status fallback", async () => {
+    let mcpHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "mcp") mcpHandler = options.handler;
+      },
+      registerTool() {},
+    } as any;
+    extension(api);
+
+    let customCalls = 0;
+    await mcpHandler?.("", {
+      cwd: await mkdtemp(join(tmpdir(), "psyclaw-extension-mcp-ui-")),
+      hasUI: true,
+      ui: {
+        custom: async () => {
+          customCalls += 1;
+          return { type: "close" };
+        },
+        notify: () => undefined,
+      },
+    });
+    expect(customCalls).toBe(1);
+
+    const notifications: string[] = [];
+    await mcpHandler?.("status", {
+      cwd: await mkdtemp(join(tmpdir(), "psyclaw-extension-mcp-status-")),
+      hasUI: false,
+      ui: { notify: (message: string) => notifications.push(message) },
+    });
+    expect(notifications[0]).toContain("paper-search-mcp");
+    expect(notifications[0]).toContain("[off]");
+  });
+
   it("fails closed before creating an agent run for an uninitialized project", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-agents-"));
     let agentsHandler: ((args: string, ctx: any) => Promise<void>) | undefined;

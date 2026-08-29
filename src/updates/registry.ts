@@ -13,6 +13,7 @@ export interface PiRelease {
 
 export interface RegistryClient {
   latestNpm(packageName: string): Promise<string | undefined>;
+  npmDependencies(packageName: string, version: string): Promise<Record<string, string> | undefined>;
   latestPypi(packageName: string): Promise<string | undefined>;
   latestPiRelease(): Promise<PiRelease | undefined>;
 }
@@ -31,6 +32,24 @@ export function createHttpRegistry(fetchFn: typeof fetch = fetch): RegistryClien
         if (!response.ok) return undefined;
         const body = await response.json() as { version?: unknown };
         return typeof body.version === "string" && body.version.trim() ? body.version.trim() : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    async npmDependencies(packageName: string, version: string): Promise<Record<string, string> | undefined> {
+      try {
+        const response = await fetchFn(
+          `https://registry.npmjs.org/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`,
+          { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+        );
+        if (!response.ok) return undefined;
+        const body = await response.json() as { dependencies?: unknown };
+        if (!body.dependencies || typeof body.dependencies !== "object" || Array.isArray(body.dependencies)) return undefined;
+        const dependencies: Record<string, string> = {};
+        for (const [name, value] of Object.entries(body.dependencies)) {
+          if (typeof value === "string" && value.trim()) dependencies[name] = value.trim();
+        }
+        return dependencies;
       } catch {
         return undefined;
       }

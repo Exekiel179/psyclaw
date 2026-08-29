@@ -71,6 +71,11 @@ export interface EnsureQuietStartupResult {
   wrote: boolean;
 }
 
+export interface AcknowledgeBundledPiChangelogResult {
+  path: string;
+  wrote: boolean;
+}
+
 /**
  * Set `quietStartup` in the psyclaw agent settings. Defaults to `false` so Pi's
  * native header ("psyclaw v<version>", keybinding hints, loaded resources) stays
@@ -97,6 +102,32 @@ export async function ensureQuietStartup(
   }
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify({ ...existing, quietStartup: quiet }, null, 2)}\n`, "utf8");
+  return { path, wrote: true };
+}
+
+/**
+ * Keep Pi's release notes available through `/changelog` without showing them
+ * automatically when PsyClaw starts after a bundled runtime update.
+ */
+export async function acknowledgeBundledPiChangelog(
+  version: string,
+  settingsPath?: string,
+): Promise<AcknowledgeBundledPiChangelogResult> {
+  const path = settingsPath ?? join(getAgentDir(), "settings.json");
+  let existing: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      existing = parsed as Record<string, unknown>;
+    }
+  } catch {
+    existing = {};
+  }
+  if (existing.lastChangelogVersion === version) {
+    return { path, wrote: false };
+  }
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${JSON.stringify({ ...existing, lastChangelogVersion: version }, null, 2)}\n`, "utf8");
   return { path, wrote: true };
 }
 

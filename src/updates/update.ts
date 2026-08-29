@@ -1,5 +1,5 @@
 import { access } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { PI_AI, PI_CODING_AGENT, resolvePsyClawManifest } from "./manifest.js";
 import { type PiRelease, type RegistryClient } from "./registry.js";
 import { compareSemver } from "./status.js";
@@ -41,9 +41,32 @@ export interface UpdateBundledPiOptions {
   packageRoot?: string;
   force?: boolean;
   now?: () => string;
-  /** When omitted, the call is a dry run and never mutates the workspace. */
+  /** When omitted, the library call is a dry run and never mutates the workspace. */
   executor?: PiUpdateExecutor;
 }
+
+export interface ProductVersionUpdate {
+  packageName: string;
+  before?: string;
+  after?: string;
+  latest?: string;
+}
+
+export interface PsyClawUpdateReceipt {
+  schemaVersion: "psyclaw/product-update/v1";
+  ok: boolean;
+  executed: boolean;
+  reasonCode: PiUpdateReason;
+  reason?: string;
+  psyclaw: ProductVersionUpdate;
+  runtime: ProductVersionUpdate;
+  commands: string[];
+  exitCode?: number;
+  startedAt: string;
+  finishedAt: string;
+}
+
+export type UpdatePsyClawOptions = UpdateBundledPiOptions;
 
 /** Reject anything that is not a plain, installable semver (guards the spawn). */
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
@@ -72,15 +95,184 @@ async function packageManagerAt(root: string): Promise<"pnpm" | "npm" | undefine
 
 function buildCommand(manager: "pnpm" | "npm", version: string): string {
   const spec = `${PI_AI}@${version} ${PI_CODING_AGENT}@${version}`;
-  return manager === "pnpm" ? `pnpm add --save-exact ${spec}` : `npm install --save-exact ${spec}`;
+  return manager === "pnpm"
+    ? `pnpm add --save-exact ${spec}`
+    : `npm install --save-exact --omit=dev --legacy-peer-deps ${spec}`;
+}
+
+function buildProductCommand(version: string): string {
+  return `npm install --global psyclaw@${version}`;
+}
+
+async function hasSourceLockfile(root: string): Promise<boolean> {
+  for (const file of ["pnpm-lock.yaml", "package-lock.json"]) {
+    try {
+      await access(join(root, file));
+      return true;
+    } catch {
+      // keep looking
+    }
+  }
+  return false;
+}
+
+/**
+ * Update the installed PsyClaw product together with the exact Pi runtime
+ * declared by that release. Updating the whole product keeps PsyClaw's code,
+ * extensions, banner and tested runtime in one user-facing operation.
+ * Source checkouts are deliberately not overwritten; developers update them
+ * through Git and rebuild explicitly.
+ */
+export async function updatePsyClaw(options: UpdatePsyClawOptions): Promise<PsyClawUpdateReceipt> {
+  const now = options.now ?? (() => new Date().toISOString());
+  const startedAt = now();
+  const finish = (
+    receipt: Omit<PsyClawUpdateReceipt, "schemaVersion" | "startedAt" | "finishedAt">,
+  ): PsyClawUpdateReceipt => ({
+    schemaVersion: "psyclaw/product-update/v1",
+    startedAt,
+    finishedAt: now(),
+    ...receipt,
+  });
+
+  const manifest = await resolvePsyClawManifest(options.packageRoot);
+  const emptyRuntime = { packageName: PI_CODING_AGENT };
+  if (manifest === undefined) {
+    return finish({
+      ok: false,
+      executed: false,
+      reasonCode: "update-skipped",
+      reason: "psyclaw package.json not found",
+      psyclaw: { packageName: "psyclaw" },
+      runtime: emptyRuntime,
+      commands: [],
+    });
+  }
+
+  const psyclaw = { packageName: "psyclaw", before: manifest.version };
+  const runtime = {
+    packageName: PI_CODING_AGENT,
+    ...(manifest.piVersion === undefined ? {} : { before: manifest.piVersion }),
+  };
+
+  if (await hasSourceLockfile(manifest.root)) {
+    return finish({
+      ok: false,
+      executed: false,
+      reasonCode: "update-skipped",
+      reason: "source checkout detected; update with Git, then run pnpm install and pnpm build",
+      psyclaw,
+      runtime,
+      commands: [],
+    });
+  }
+
+  const publishedPsyClawVersion = await options.registry.latestNpm("psyclaw");
+  const latestDependencies = publishedPsyClawVersion === undefined
+    ? undefined
+    : await options.registry.npmDependencies("psyclaw", publishedPsyClawVersion);
+  const publishedPiVersion = latestDependencies?.[PI_CODING_AGENT];
+  if (publishedPsyClawVersion === undefined || publishedPiVersion === undefined) {
+    return finish({
+      ok: false,
+      executed: false,
+      reasonCode: "update-skipped",
+      reason: publishedPsyClawVersion === undefined
+        ? "latest PsyClaw release unavailable"
+        : "latest PsyClaw dependency manifest unavailable",
+      psyclaw: { ...psyclaw, ...(publishedPsyClawVersion === undefined ? {} : { latest: publishedPsyClawVersion }) },
+      runtime: { ...runtime, ...(publishedPiVersion === undefined ? {} : { latest: publishedPiVersion }) },
+      commands: [],
+    });
+  }
+  const latestPsyClaw = publishedPsyClawVersion;
+  const latestPi = publishedPiVersion;
+  if (!isSafeVersion(latestPsyClaw) || !isSafeVersion(latestPi)) {
+    return finish({
+      ok: false,
+      executed: false,
+      reasonCode: "update-skipped",
+      reason: !isSafeVersion(latestPsyClaw)
+        ? `refusing unsafe PsyClaw version: ${latestPsyClaw}`
+        : `refusing unsafe Pi version: ${latestPi}`,
+      psyclaw: { ...psyclaw, latest: latestPsyClaw },
+      runtime: { ...runtime, latest: latestPi },
+      commands: [],
+    });
+  }
+
+  const selfComparison = compareSemver(manifest.version, latestPsyClaw);
+  const runtimeComparison = manifest.piVersion === undefined ? null : compareSemver(manifest.piVersion, latestPi);
+  const selfNeedsUpdate = options.force === true || selfComparison === null || selfComparison < 0;
+  const runtimeNeedsRepair = selfComparison === 0 && runtimeComparison !== 0;
+  const commands: string[] = [];
+  // Reinstalling the product also installs its tested, exact Pi dependency.
+  // Force can repair a locally drifted runtime without composing an untested
+  // PsyClaw/Pi version pair.
+  if (selfNeedsUpdate || runtimeNeedsRepair) {
+    commands.push(buildProductCommand(latestPsyClaw));
+  }
+
+  const versions = {
+    psyclaw: { ...psyclaw, latest: latestPsyClaw },
+    runtime: { ...runtime, latest: latestPi },
+  };
+  if (commands.length === 0) {
+    return finish({
+      ok: true,
+      executed: false,
+      reasonCode: "already-up-to-date",
+      psyclaw: { ...versions.psyclaw, after: latestPsyClaw },
+      runtime: { ...versions.runtime, after: manifest.piVersion ?? latestPi },
+      commands,
+    });
+  }
+  if (options.executor === undefined) {
+    return finish({
+      ok: true,
+      executed: false,
+      reasonCode: "update-skipped",
+      reason: "check only: no changes applied",
+      ...versions,
+      commands,
+    });
+  }
+
+  for (const command of commands) {
+    // Do not keep the updater's cwd inside the package npm is replacing. This
+    // matters on Windows, where an in-use directory cannot be removed.
+    const { exitCode } = await options.executor({ command, cwd: dirname(manifest.root) });
+    if (exitCode !== 0) {
+      return finish({
+        ok: false,
+        executed: true,
+        reasonCode: "update-failed",
+        reason: `update command failed: ${command}`,
+        psyclaw: versions.psyclaw,
+        runtime: versions.runtime,
+        commands,
+        exitCode,
+      });
+    }
+  }
+
+  return finish({
+    ok: true,
+    executed: true,
+    reasonCode: "update-applied",
+    psyclaw: { ...versions.psyclaw, after: latestPsyClaw },
+    runtime: { ...versions.runtime, after: latestPi },
+    commands,
+    exitCode: 0,
+  });
 }
 
 /**
  * Update the bundled Pi runtime by re-pinning both `@earendil-works/pi-*`
  * packages to the latest official release. This is the write-side counterpart
- * to `checkUpdates`: it is `--yes`/executor-gated, refuses non-semver versions,
- * and always returns a structured receipt. Without an executor it is a pure
- * plan (no workspace mutation).
+ * to `checkUpdates`: it is executor-gated, refuses non-semver versions, and
+ * always returns a structured receipt. Without an executor it is a pure plan
+ * (no workspace mutation).
  */
 export async function updateBundledPi(options: UpdateBundledPiOptions): Promise<PiUpdateReceipt> {
   const now = options.now ?? (() => new Date().toISOString());
@@ -160,7 +352,7 @@ export async function updateBundledPi(options: UpdateBundledPiOptions): Promise<
       ok: true,
       executed: false,
       reasonCode: "update-skipped",
-      reason: "dry run: re-run with --yes to apply",
+      reason: "dry run: no executor provided",
       command,
       after: latestVersion,
       ...withLatest,

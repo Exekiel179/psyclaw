@@ -13,6 +13,18 @@ describe("provider setup and first-run detection", () => {
     await expect(hasConfiguredProvider({ agentDir })).resolves.toBe(true);
   });
 
+  it("recognizes a built-in provider credential without models.json", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
+    const previous = process.env.OPENAI_API_KEY;
+    process.env.OPENAI_API_KEY = "test-secret-never-returned";
+    try {
+      await expect(hasConfiguredProvider({ agentDir })).resolves.toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previous;
+    }
+  });
+
   it("writes only environment-variable references, never a literal API key", async () => {
     const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
     const result = await setupProviders({ agentDir });

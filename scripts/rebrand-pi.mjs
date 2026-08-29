@@ -8,7 +8,7 @@
  * 3. 3D 侧影电路方块字 (3D Isometric Shadow Block: ██████╗)
  * 4. 学术罗马衬线体 (Academic Roman Serif: ╔══╗)
  *
- * Pets are opt-in via /pet and only render when the terminal is wide enough.
+ * Pets are opt-in via /pet and render below the primary wordmark.
  */
 import { execFile } from "node:child_process";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
@@ -17,7 +17,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NAME = "PsyClaw";
-const LOCKED_PI_VERSION = "0.84.1";
+const LOCKED_PI_VERSION = "0.84.4";
 // Retain the predecessor Pi profile so existing models, themes, packages, and
 // skills survive the product rename. PsyClaw's project data remains separate.
 const CONFIG_DIR = `.psy${"pi"}`;
@@ -106,15 +106,16 @@ function buildCustomVariant(fontLines, dogLines = []) {
   return `[\n${rows.join(",\n")}\n  ]`;
 }
 
-// Every default variant is pet-free. Pet variants are selected only when
-// PSYCLAW_PET=1 and the complete row fits the current terminal.
+// Every default variant is pet-free. The pet is appended below the wordmark
+// when enabled so it never forces PsyClaw's primary branding into a smaller
+// layout.
 const VAR_COMPACT = `[
     \`  \\x1b[1m${GRAD_2ROW_0}\\x1b[0m   \\x1b[38;2;148;163;184mv\${process.env.PSYCLAW_VERSION ?? this.version}\\x1b[0m\`,
     \`  \\x1b[1m${GRAD_2ROW_1}\\x1b[0m\`
   ]`;
-const VAR_COMPACT_PET = `[
-    \`  \\x1b[1m${GRAD_2ROW_0}\\x1b[0m   ${PUP_SCHOLAR_TOP}\`,
-    \`  \\x1b[1m${GRAD_2ROW_1}\\x1b[0m   ${PUP_SCHOLAR_BOT}\`
+const VAR_STACKED_PET = `[
+    \`  ${PUP_SCHOLAR_TOP}\`,
+    \`  ${PUP_SCHOLAR_BOT}\`
   ]`;
 const VAR_SLANT_CLASSIC = buildCustomVariant(FONT_SLANT_CLASSIC);
 const VAR_3D_BLOCK = buildCustomVariant(FONT_3D_BLOCK);
@@ -127,7 +128,6 @@ const PSYCLAW_DYNAMIC_BANNER = `const bannerCandidates = [
   ${VAR_COMPACT}, ${VAR_SLANT_CLASSIC}, ${VAR_3D_BLOCK}, ${VAR_SERIF},
 ];
 const compactBanner = ${VAR_COMPACT};
-const petBanner = ${VAR_COMPACT_PET};
 const terminalColumns = process.stdout.columns ?? 80;
 const ansiPattern = /\\x1b\\[[0-9;]*m/g;
 const cellWidth = (text) => Array.from(text.replace(ansiPattern, "")).reduce((width, char) => {
@@ -143,10 +143,13 @@ const fittingBanners = bannerCandidates.filter((rows) => bannerWidth(rows) <= te
 const tinyBanner = [terminalColumns >= 22
   ? \`  ψ PsyClaw v\${process.env.PSYCLAW_VERSION ?? this.version}\`
   : "  PsyClaw"];
-const defaultPool = fittingBanners.length > 0 ? fittingBanners : [tinyBanner];
-const chosenBanner = process.env.PSYCLAW_PET === "1" && bannerWidth(petBanner) <= terminalColumns - 4
-  ? petBanner
-  : defaultPool[Math.floor(Math.random() * defaultPool.length)];
+const chosenBanner = fittingBanners.reduce((largest, candidate) => {
+  if (!largest) return candidate;
+  if (candidate.length !== largest.length) return candidate.length > largest.length ? candidate : largest;
+  return bannerWidth(candidate) > bannerWidth(largest) ? candidate : largest;
+}, undefined) ?? tinyBanner;
+const petEnabled = process.env.PSYCLAW_PET === "1";
+const stackedPet = petEnabled ? ${VAR_STACKED_PET} : [];
 const detailLines = terminalColumns >= 86 ? [
   \`  ${GRAD_PIPELINE}\`,
   \`  ${GRAD_PROTOCOL}\`,
@@ -155,6 +158,7 @@ if (terminalColumns >= 76) detailLines.push(\`  ${GRAD_WORKBENCH}\`);
 const logo = [
   "",
   ...chosenBanner,
+  ...stackedPet,
   "",
   ...detailLines,
   "",

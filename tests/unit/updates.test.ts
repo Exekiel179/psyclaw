@@ -8,7 +8,7 @@ import { checkSkillDrift } from "../../src/updates/skills.js";
 import { PI_AI, PI_CODING_AGENT } from "../../src/updates/manifest.js";
 import { createHttpRegistry, npmPackageName, pipxPackageName, type RegistryClient } from "../../src/updates/registry.js";
 import { compareSemver, isUnpinnedRef, versionStatus } from "../../src/updates/status.js";
-import { updateBundledPi } from "../../src/updates/update.js";
+import { updateBundledPi, updatePsyClaw } from "../../src/updates/update.js";
 
 const sha = (text: string): string => createHash("sha256").update(text).digest("hex");
 
@@ -38,6 +38,16 @@ describe("registry helpers", () => {
     expect(npmPackageName("npm install --global opencode-ai@1.18.18")).toBe("opencode-ai");
     expect(pipxPackageName("pipx install aider-chat")).toBe("aider-chat");
     expect(pipxPackageName("pipx install aider-chat==0.16.0")).toBe("aider-chat");
+  });
+
+  it("reads exact dependencies from an npm package version", async () => {
+    const fakeResponse = (body: unknown): Response => ({ ok: true, json: async () => body }) as unknown as Response;
+    const registry = createHttpRegistry(async () => fakeResponse({
+      dependencies: { [PI_CODING_AGENT]: "0.84.4", ignored: 123 },
+    }));
+    await expect(registry.npmDependencies("psyclaw", "0.26.3")).resolves.toEqual({
+      [PI_CODING_AGENT]: "0.84.4",
+    });
   });
 });
 
@@ -85,6 +95,7 @@ describe("checkUpdates orchestration", () => {
         if (pkg === "@anthropic-ai/claude-code") return "2.0.0";
         return undefined;
       },
+      npmDependencies: async () => undefined,
       latestPypi: async (pkg) => (pkg === "aider-chat" ? "1.0.0" : undefined),
       latestPiRelease: async () => ({ version: "0.84.2", packageName: PI_CODING_AGENT }),
     };
@@ -96,9 +107,9 @@ describe("checkUpdates orchestration", () => {
     expect(report.self.latest).toBe("999.0.0");
 
     expect(report.runtime.packageName).toBe(PI_CODING_AGENT);
-    expect(report.runtime.current).toBe("0.84.1");
+    expect(report.runtime.current).toBe("0.84.4");
     expect(report.runtime.latest).toBe("0.84.2");
-    expect(report.runtime.status).toBe("outdated");
+    expect(report.runtime.status).toBe("up-to-date");
 
     const claude = report.agents.find((agent) => agent.id === "claude-code")!;
     expect(claude.latest).toBe("2.0.0");
@@ -153,6 +164,7 @@ describe("updateBundledPi", () => {
 
   const registry: RegistryClient = {
     latestNpm: async () => undefined,
+    npmDependencies: async () => undefined,
     latestPypi: async () => undefined,
     latestPiRelease: async () => ({ version: "0.84.2", packageName: PI_CODING_AGENT }),
   };
@@ -203,6 +215,7 @@ describe("updateBundledPi", () => {
     expect(receipt.ok).toBe(true);
     expect(receipt.executed).toBe(false);
     expect(receipt.reasonCode).toBe("update-skipped");
+    expect(receipt.reason).toBe("dry run: no executor provided");
     expect(receipt.command).toContain("0.84.2");
     expect(receipt.after).toBe("0.84.2");
   });
@@ -219,7 +232,9 @@ describe("updateBundledPi", () => {
       },
     });
     expect(receipt.ok).toBe(true);
-    expect(steps[0]!.command).toBe(`npm install --save-exact ${PI_AI}@0.84.2 ${PI_CODING_AGENT}@0.84.2`);
+    expect(steps[0]!.command).toBe(
+      `npm install --save-exact --omit=dev --legacy-peer-deps ${PI_AI}@0.84.2 ${PI_CODING_AGENT}@0.84.2`,
+    );
   });
 
   it("fails closed when the executor reports a non-zero exit", async () => {
@@ -249,5 +264,100 @@ describe("updateBundledPi", () => {
     expect(receipt.reasonCode).toBe("update-skipped");
     expect(receipt.executed).toBe(false);
     expect(ran).toBe(false);
+  });
+});
+
+describe("updatePsyClaw", () => {
+  const makeInstalledRoot = async (): Promise<string> => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-product-update-"));
+    await writeFile(join(root, "package.json"), JSON.stringify({
+      name: "psyclaw",
+      version: "0.26.0",
+      dependencies: { [PI_AI]: "0.84.1", [PI_CODING_AGENT]: "0.84.1" },
+    }), "utf8");
+    return root;
+  };
+
+  const registry: RegistryClient = {
+    latestNpm: async (name) => name === "psyclaw" ? "0.26.3" : undefined,
+    npmDependencies: async () => ({ [PI_AI]: "0.84.4", [PI_CODING_AGENT]: "0.84.4" }),
+    latestPypi: async () => undefined,
+    latestPiRelease: async () => ({ version: "0.84.4", packageName: PI_CODING_AGENT }),
+  };
+
+  it("updates PsyClaw together with its tested bundled Pi", async () => {
+    const root = await makeInstalledRoot();
+    const steps: { command: string; cwd: string }[] = [];
+    const receipt = await updatePsyClaw({
+      registry,
+      packageRoot: root,
+      executor: async (step) => {
+        steps.push(step);
+        return { exitCode: 0 };
+      },
+    });
+
+    expect(receipt).toMatchObject({
+      schemaVersion: "psyclaw/product-update/v1",
+      ok: true,
+      executed: true,
+      reasonCode: "update-applied",
+      psyclaw: { before: "0.26.0", after: "0.26.3" },
+      runtime: { before: "0.84.1", after: "0.84.4" },
+    });
+    expect(steps.map((step) => step.command)).toEqual([
+      "npm install --global psyclaw@0.26.3",
+    ]);
+    expect(steps.every((step) => step.cwd === join(root, ".."))).toBe(true);
+  });
+
+  it("returns the complete plan without executing for --check", async () => {
+    const root = await makeInstalledRoot();
+    const receipt = await updatePsyClaw({ registry, packageRoot: root });
+    expect(receipt.ok).toBe(true);
+    expect(receipt.executed).toBe(false);
+    expect(receipt.reason).toBe("check only: no changes applied");
+    expect(receipt.commands).toHaveLength(1);
+  });
+
+  it("repairs a bundled Pi version that drifted from the product manifest", async () => {
+    const root = await makeInstalledRoot();
+    await writeFile(join(root, "package.json"), JSON.stringify({
+      name: "psyclaw",
+      version: "0.26.3",
+      dependencies: { [PI_AI]: "0.84.1", [PI_CODING_AGENT]: "0.84.1" },
+    }), "utf8");
+    const receipt = await updatePsyClaw({ registry, packageRoot: root });
+    expect(receipt.reason).toBe("check only: no changes applied");
+    expect(receipt.commands).toEqual(["npm install --global psyclaw@0.26.3"]);
+  });
+
+  it("refuses to overwrite a source checkout", async () => {
+    const root = await makeInstalledRoot();
+    await writeFile(join(root, "pnpm-lock.yaml"), "", "utf8");
+    let ran = false;
+    const receipt = await updatePsyClaw({
+      registry,
+      packageRoot: root,
+      executor: async () => {
+        ran = true;
+        return { exitCode: 0 };
+      },
+    });
+    expect(receipt.ok).toBe(false);
+    expect(receipt.reason).toContain("source checkout detected");
+    expect(ran).toBe(false);
+  });
+
+  it("does not downgrade a newer local product or runtime", async () => {
+    const root = await makeInstalledRoot();
+    await writeFile(join(root, "package.json"), JSON.stringify({
+      name: "psyclaw",
+      version: "0.27.0",
+      dependencies: { [PI_AI]: "0.85.0", [PI_CODING_AGENT]: "0.85.0" },
+    }), "utf8");
+    const receipt = await updatePsyClaw({ registry, packageRoot: root });
+    expect(receipt.reasonCode).toBe("already-up-to-date");
+    expect(receipt.commands).toEqual([]);
   });
 });
