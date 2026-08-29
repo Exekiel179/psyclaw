@@ -3,6 +3,7 @@ import { readJsonl, appendJsonlIfMissing } from "../project/jsonl.js";
 import { assertSafeProjectPath } from "../project/paths.js";
 import { referenceFromVerification, upsertReference, type ReferenceRecord } from "./references.js";
 import { verifyDoi, type DoiVerification } from "./doi.js";
+import { archiveOpenAccessPdf, type ReferenceFulltextRecord } from "../literature/archive.js";
 
 /**
  * Citation-usage ledger (.psyclaw/citations.jsonl).
@@ -54,7 +55,7 @@ export async function recordCitationUse(
   root: string,
   input: RecordCitationInput,
   verify: (doi: string) => Promise<DoiVerification> = verifyDoi,
-): Promise<{ record: CitationUseRecord; reference: ReferenceRecord | null; appended: boolean }> {
+): Promise<{ record: CitationUseRecord; reference: ReferenceRecord | null; fulltext: ReferenceFulltextRecord | null; appended: boolean }> {
   const doi = input.doi.trim();
   const reason = input.reason.trim();
   const context = input.context.trim();
@@ -64,8 +65,10 @@ export async function recordCitationUse(
 
   const verification = await verify(doi);
   const reference = referenceFromVerification(verification);
+  let fulltext: ReferenceFulltextRecord | null = null;
   if (reference !== null) {
     await upsertReference(root, reference);
+    fulltext = await archiveOpenAccessPdf(root, doi).catch(() => null);
   }
 
   const surname = (reference?.authors[0]?.split(/\s+/).at(-1) ?? doi.split("/")[0] ?? doi).slice(0, 40);
@@ -84,5 +87,5 @@ export async function recordCitationUse(
     recordedAt: new Date().toISOString(),
   };
   const { appended } = await appendJsonlIfMissing(await citationsPath(root), record, (item) => item.citationId);
-  return { record, reference, appended };
+  return { record, reference: reference === null ? null : { ...reference, ...(fulltext?.sourceUrl ? { oaPdfUrl: fulltext.sourceUrl } : {}), ...(fulltext?.status === "downloaded" ? { downloadedPath: fulltext.localPath } : {}) }, fulltext, appended };
 }

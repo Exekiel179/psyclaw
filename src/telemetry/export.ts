@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { lstat, mkdir, readFile, readdir } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
@@ -47,6 +47,36 @@ export interface TraceExportResult {
   };
 }
 
+export interface PanelTraceEvent {
+  id: string;
+  name: string;
+  at: string;
+  status: "ok" | "error";
+  category?: string;
+}
+
+export interface PanelTrace {
+  id: string;
+  source: "session" | "workflow";
+  label: string;
+  startedAt: string;
+  endedAt: string;
+  status: "ok" | "error";
+  events: PanelTraceEvent[];
+}
+
+export interface PanelTraceSnapshot {
+  schemaVersion: "psyclaw/panel-traces/v1";
+  generatedAt: string;
+  traces: PanelTrace[];
+  sources: { sessions: number; workflowRuns: number };
+  privacy: {
+    contentIncluded: false;
+    originalIdsIncluded: false;
+    absolutePathsIncluded: false;
+  };
+}
+
 const attr = (key: string, value: string | number | boolean): OtlpAttribute => ({
   key,
   value: typeof value === "boolean"
@@ -58,6 +88,10 @@ const attr = (key: string, value: string | number | boolean): OtlpAttribute => (
 
 function id(bytes: number): string {
   return randomBytes(bytes).toString("hex");
+}
+
+function stableId(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 16);
 }
 
 function timestamp(value: unknown, fallback: Date): Date {
@@ -233,6 +267,101 @@ function workflowSpans(rows: JsonRecord[], fallback: Date): OtlpSpan[] {
     }));
   }
   return spans;
+}
+
+function sessionTrace(rows: JsonRecord[], root: string, sourceKey: string): PanelTrace | undefined {
+  const header = rows.find((row) => row.type === "session");
+  if (!header || typeof header.cwd !== "string" || resolve(header.cwd) !== root) return undefined;
+  const events: PanelTraceEvent[] = [];
+  for (const [index, row] of rows.entries()) {
+    if (row.type !== "message" || !isRecord(row.message)) continue;
+    const role = row.message.role;
+    const at = timestamp(row.timestamp ?? row.message.timestamp, new Date(0)).toISOString();
+    if (role === "user" || role === "assistant") {
+      events.push({
+        id: stableId(`${sourceKey}:${index}:turn`),
+        name: role === "user" ? "用户回合" : "助手回合",
+        at,
+        status: role === "assistant" && typeof row.message.errorMessage === "string" ? "error" : "ok",
+      });
+    }
+    if (role === "assistant") {
+      for (const [toolIndex, category] of toolCategories(row.message).entries()) {
+        events.push({
+          id: stableId(`${sourceKey}:${index}:tool:${toolIndex}`),
+          name: "工具调用",
+          at,
+          status: "ok",
+          category,
+        });
+      }
+    }
+  }
+  if (events.length === 0) return undefined;
+  const traceId = stableId(`session:${sourceKey}`);
+  return {
+    id: traceId,
+    source: "session",
+    label: `会话 ${traceId.slice(0, 6)}`,
+    startedAt: events[0]!.at,
+    endedAt: events.at(-1)!.at,
+    status: events.some((event) => event.status === "error") ? "error" : "ok",
+    events,
+  };
+}
+
+function workflowTrace(rows: JsonRecord[], sourceKey: string): PanelTrace | undefined {
+  const sourceEvents = rows.filter((row) => row.schemaVersion === "psyclaw/run-event/v1" && typeof row.type === "string");
+  if (sourceEvents.length === 0) return undefined;
+  const events = sourceEvents.map((row, index): PanelTraceEvent => {
+    const eventType = String(row.type);
+    return {
+      id: stableId(`${sourceKey}:${index}:${eventType}`),
+      name: `工作流 ${eventType}`,
+      at: timestamp(row.at, new Date(0)).toISOString(),
+      status: eventType === "blocked" ? "error" : "ok",
+    };
+  });
+  const traceId = stableId(`workflow:${sourceKey}`);
+  return {
+    id: traceId,
+    source: "workflow",
+    label: `工作流 ${traceId.slice(0, 6)}`,
+    startedAt: events[0]!.at,
+    endedAt: events.at(-1)!.at,
+    status: events.some((event) => event.status === "error") ? "error" : "ok",
+    events,
+  };
+}
+
+/** Build a stable, metadata-only trace view for the local Panel without writing an export file. */
+export async function projectTraceSnapshot(options: Pick<TraceExportOptions, "root" | "agentDir"> = {}): Promise<PanelTraceSnapshot> {
+  const root = resolve(options.root ?? process.cwd());
+  const sessionsRoot = resolve(options.agentDir ?? getAgentDir(), "sessions");
+  const runRoot = projectPaths(root).runs;
+  const [sessionFiles, runFiles] = await Promise.all([regularJsonlFiles(sessionsRoot), regularJsonlFiles(runRoot)]);
+  const traces: PanelTrace[] = [];
+  for (const file of sessionFiles) {
+    const sourceKey = stableId(relative(sessionsRoot, file).replaceAll("\\", "/"));
+    const trace = sessionTrace(await readJsonl(file), root, sourceKey);
+    if (trace) traces.push(trace);
+  }
+  for (const file of runFiles) {
+    const sourceKey = stableId(relative(runRoot, file).replaceAll("\\", "/"));
+    const trace = workflowTrace(await readJsonl(file), sourceKey);
+    if (trace) traces.push(trace);
+  }
+  traces.sort((left, right) => right.startedAt.localeCompare(left.startedAt));
+  return {
+    schemaVersion: "psyclaw/panel-traces/v1",
+    generatedAt: new Date().toISOString(),
+    traces,
+    sources: {
+      sessions: traces.filter((trace) => trace.source === "session").length,
+      workflowRuns: traces.filter((trace) => trace.source === "workflow").length,
+    },
+    privacy: { contentIncluded: false, originalIdsIncluded: false, absolutePathsIncluded: false },
+  };
 }
 
 function safeOutput(root: string, requested: string): string {
