@@ -14,7 +14,7 @@ describe("Pi extension contract", () => {
       },
     } as any;
     extension(api);
-    expect([...commands.keys()]).toEqual(["research", "verify", "brief", "model", "agents"]);
+    expect([...commands.keys()]).toEqual(["research", "verify", "brief", "trace", "model", "agents"]);
   });
 
   it("lets the research command bootstrap through the Pi context cwd", async () => {
