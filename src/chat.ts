@@ -11,7 +11,6 @@ import {
 } from "./branding.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
-import { enabledRecommendedSkillPaths } from "./skills/recommended.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -88,12 +87,10 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     const supplement = (await readFile(join(cwd, ".psyclaw", "system-prompt.md"), "utf8")).trim();
     if (supplement) identityPrompt = `${identityPrompt}\n\n${supplement}`;
   } catch { /* no user supplement */ }
-  const enabledSkills = await enabledRecommendedSkillPaths(cwd);
   const args = [
     "--extension", extensionPath,
     "--extension", panelExtensionPath,
     "--skill", skillsPath,
-    ...enabledSkills.paths.flatMap((path) => ["--skill", path]),
     "--tools", toolAllowlist,
     "--append-system-prompt", identityPrompt,
     ...(options.args ?? []),
@@ -130,8 +127,6 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   } catch {
     delete spawnEnv.PSYCLAW_PET;
   }
-
-  for (const warning of enabledSkills.warnings) process.stderr.write(`PsyClaw Skill: ${warning}\n`);
 
   return new Promise<number>((resolve, reject) => {
     const child = (options.spawnProcess ?? spawn)(process.execPath, [piCli, ...args], {

@@ -1610,6 +1610,11 @@
       <div id="recommended-mcps-shelf" class="capability-grid"><p class="detail-key">读取中…</p></div>
     </div>
 
+    <div style="margin-bottom:1.5rem;">
+      <h3 style="font-size:1.1rem;margin-bottom:0.8rem;">外部工具</h3>
+      <div id="external-tools-shelf" class="capability-grid"><p class="detail-key">读取中…</p></div>
+    </div>
+
     <div>
       <h3 style="font-size:1.1rem;margin-bottom:0.8rem;">⚙️ 已启用能力管理</h3>
       <div id="enabled-shelf" class="overview-grid"><p class="detail-key">读取中…</p></div>
@@ -2157,16 +2162,23 @@ document.getElementById("decision-form").addEventListener("submit", async (e) =>
 });
 
 const DEFAULT_RECOMMENDED_SKILLS = [
-  { id: "markitdown", name: "MarkItDown", stage: "统一", description: "把 PDF、Word、PPT、Excel、HTML 等转换为结构化 Markdown。", sourceRef: "https://github.com/microsoft/markitdown" },
-  { id: "markitdown-pro", name: "MarkItDown Pro", stage: "统一", description: "字幕优先、转录回退，把 B 站课程和讲座转成带来源状态的 Markdown。", sourceRef: "https://github.com/LHT666-hub/markItdown-pro" },
-  { id: "session-handoff", name: "Session Handoff", stage: "接力", description: "把长任务的目标、进度、阻塞和下一步写成可核验的交接状态。", sourceRef: "https://github.com/LHT666-hub/session-handoff" },
+  { id: "markitdown-bilibili", name: "MarkItDown + Bilibili", stage: "材料转换", description: "字幕优先、转录回退，把 B 站课程和讲座转成带来源状态的 Markdown。", sourceRef: "https://github.com/LHT666-hub/markItdown-pro" },
+  { id: "session-handoff", name: "Session Handoff", stage: "任务接力", description: "把长任务的目标、进度、阻塞和下一步写成可核验的交接状态。", sourceRef: "https://github.com/LHT666-hub/session-handoff" },
   { id: "zotero-translators", name: "Zotero Translators", stage: "题录", description: "从出版社和数据库页面提取规范题录、DOI、PDF 和补充材料。", sourceRef: "https://github.com/zotero/translators" },
-  { id: "scansci-pdf", name: "ScanSci PDF", stage: "获取", description: "按开放来源、官方接口和用户授权会话尝试获取论文全文。", sourceRef: "https://github.com/Rimagination/scansci-pdf" },
-  { id: "scholarbridge", name: "ScholarBridge", stage: "质控", description: "连接文献清单、PDF 完整性校验、哈希去重和 Zotero 交接。", sourceRef: "https://github.com/LHT666-hub/ScholarBridge" },
-  { id: "mentorforge", name: "MentorForge", stage: "蒸馏", description: "从学者主页、论文和全文信号卡中提炼可追问的科研方法论。", sourceRef: "https://github.com/qwqalice/MentorForge" },
-  { id: "supervisor-skills", name: "Supervisor-Skills", stage: "写作", description: "覆盖 idea、调研、写作、图表、评审和投稿前检查的科研规范。", sourceRef: "https://github.com/HKUSTDial/Supervisor-Skills" },
-  { id: "openkb", name: "OpenKB", stage: "知识库", description: "把异构资料编译成可链接、可检索、可持续更新的 Wiki。", sourceRef: "https://github.com/VectifyAI/OpenKB" },
-  { id: "smartplot", name: "SmartPlot", stage: "绘图", description: "科研绘图、样式统一、多面板组图和可见确认的 MCP 控制。", sourceRef: "https://smartplot.app" }
+  { id: "scansci-pdf", name: "ScanSci PDF", stage: "全文获取", description: "按开放来源、官方接口和用户授权会话尝试获取论文全文。", sourceRef: "https://github.com/Rimagination/scansci-pdf" },
+  { id: "scholarbridge", name: "ScholarBridge", stage: "文献质控", description: "连接文献清单、PDF 完整性校验、哈希去重和 Zotero 交接。", sourceRef: "https://github.com/LHT666-hub/ScholarBridge" },
+  { id: "mentorforge", name: "MentorForge", stage: "方法蒸馏", description: "从学者主页、论文和全文信号卡中提炼可追问的科研方法论。", sourceRef: "https://github.com/qwqalice/MentorForge" },
+  { id: "supervisor-skills", name: "Supervisor-Skills", stage: "研究写作", description: "覆盖研究构思、调研、写作、图表、评审和投稿前检查的科研工作流。", sourceRef: "https://github.com/HKUSTDial/Supervisor-Skills" },
+  { id: "openkb", name: "OpenKB", stage: "知识库", description: "把异构资料编译成可链接、可检索、可持续更新的知识库。", sourceRef: "https://github.com/VectifyAI/OpenKB" },
+  { id: "corpus2skill", name: "Corpus2Skill", stage: "知识库", description: "将大规模语料编译成可导航的 Skill 树和文档索引。", sourceRef: "https://github.com/dukesun99/Corpus2Skill" },
+  { id: "academic-reference-matcher", name: "Academic Reference Matcher", stage: "引用核验", description: "逐条拆分 Claim、检索来源并输出 Claim–Reference 对照表。", sourceRef: "https://github.com/keros68/academic-reference-matcher" }
+  ,{ id: "pskoett-ai-skills", name: "pskoett AI Skills", stage: "经验沉淀", description: "把失败和纠正沉淀为候选经验，经过验证后晋升为规则或回归测试。", sourceRef: "https://github.com/pskoett/pskoett-ai-skills" }
+  ,{ id: "omnidistill", name: "OmniDistill", stage: "知识蒸馏", description: "以证据账本统一知识、启发式规则、工作流、反模式和边界。", sourceRef: "https://github.com/LHT666-hub/OmniDistill" }
+];
+
+const DEFAULT_EXTERNAL_TOOLS = [
+  { id: "markitdown", name: "MarkItDown", stage: "材料转换", description: "把 PDF、Word、PPT、Excel、HTML 等转换为结构化 Markdown。它是独立 Python 工具，不作为 PsyClaw Skill 安装。", sourceRef: "https://github.com/microsoft/markitdown" },
+  { id: "smartplot", name: "SmartPlot", stage: "科研绘图", description: "科研绘图、样式统一、多面板组图和可见确认工具。它不是 PsyClaw Skill。", sourceRef: "https://smartplot.app" }
 ];
 
 const DEFAULT_RECOMMENDED_MCPS = [
@@ -2183,7 +2195,8 @@ async function loadSkillsAndEcosystem() {
       fetchJson("/api/enabled-capabilities").catch(() => ({ skills: [], mcp: [] }))
     ]);
 
-    const skillItems = (skills && skills.items && skills.items.length) ? skills.items : DEFAULT_RECOMMENDED_SKILLS;
+    const skillItems = (skills && Array.isArray(skills.items)) ? skills.items : DEFAULT_RECOMMENDED_SKILLS;
+    const externalTools = (skills && Array.isArray(skills.externalTools)) ? skills.externalTools : DEFAULT_EXTERNAL_TOOLS;
     const mcpItems = (mcps && mcps.items && mcps.items.length) ? mcps.items : DEFAULT_RECOMMENDED_MCPS;
 
     recommendCache = { skill: skillItems, mcp: mcpItems };
@@ -2191,12 +2204,33 @@ async function loadSkillsAndEcosystem() {
 
     renderCapabilityShelf("recommended-skills-shelf", "skill", recommendCache.skill);
     renderCapabilityShelf("recommended-mcps-shelf", "mcp", recommendCache.mcp);
+    renderExternalTools(externalTools);
     renderEnabledList(enabled || { skills: [], mcp: [] });
   } catch (err) {
     recommendCache = { skill: DEFAULT_RECOMMENDED_SKILLS, mcp: DEFAULT_RECOMMENDED_MCPS };
     renderCapabilityShelf("recommended-skills-shelf", "skill", recommendCache.skill);
     renderCapabilityShelf("recommended-mcps-shelf", "mcp", recommendCache.mcp);
+    renderExternalTools(DEFAULT_EXTERNAL_TOOLS);
   }
+}
+
+function renderExternalTools(items) {
+  document.getElementById("external-tools-shelf").innerHTML = items.length
+    ? items.map(item => `
+      <div class="capability-card">
+        <div>
+          <div class="capability-header">
+            <span class="capability-title">${esc(item.name)}</span>
+            <span class="pill neutral">${esc(item.stage || "外部工具")}</span>
+          </div>
+          <p class="capability-desc">${esc(item.description)}</p>
+        </div>
+        <div style="margin-top:0.8rem;border-top:1px solid var(--line);padding-top:0.6rem;">
+          <a href="${esc(item.sourceRef)}" target="_blank" rel="noreferrer" style="font-size:0.78rem;">查看工具 ↗</a>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="detail-key">没有外部工具</p>`;
 }
 
 function renderCapabilityShelf(targetId, kind, items) {
@@ -2246,19 +2280,28 @@ function handleCardKey(e, kind, id) {
 
 async function installCapability(kind, id) {
   const item = (recommendCache[kind] || []).find(c => c.id === id);
-  const prep = (item?.installPrep || [])[0];
-  const cmd = prep?.command || "";
-  if (!confirm(`将执行安装命令：\n\n${cmd}\n\n确认安装吗？`)) return;
+  if (!item) return;
+  let scope;
+  if (kind === "skill") {
+    const choice = window.prompt("选择 Skill 安装位置：\n1. 项目目录（仅当前项目）\n2. 系统目录（所有项目）", "1");
+    if (choice === null) return;
+    scope = choice.trim() === "2" ? "user" : choice.trim() === "1" ? "project" : undefined;
+    if (!scope) { alert("请输入 1 或 2"); return; }
+  }
+  const scopeLine = kind === "skill"
+    ? `\n\n安装位置：${scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）"}`
+    : "";
+  if (!confirm(`将把安装任务交给当前模型：\n\n${item.sourceRef}${scopeLine}\n\n确认吗？`)) return;
 
   try {
     const res = await fetch("/api/install/execute", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind, id, approved: true, actor: "researcher" })
+      body: JSON.stringify({ kind, id, scope, approved: true, actor: "researcher" })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "安装失败");
-    alert(data.ok ? `安装成功！在终端输入 /reload 重新加载。` : `安装退出码：${data.exitCode}\n${data.output || ""}`);
+    alert(data.queued ? `安装任务已交给当前模型。模型完成后请启用 Skill，并输入 /reload。` : data.ok ? `安装成功！在终端输入 /reload 重新加载。` : `安装退出码：${data.exitCode}\n${data.output || ""}`);
     loadSkillsAndEcosystem();
   } catch (e) { alert(e.message); }
 }
