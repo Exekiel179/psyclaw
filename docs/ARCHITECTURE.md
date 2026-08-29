@@ -153,7 +153,7 @@ Skill 晋升采用 fail-closed：必须存在带来源的 `verified` claim，并
 `psyclaw.handoff` 把目标、完成项、下一步和阻塞同时写入 Markdown 与 JSON，供下一会话先核验再继续。
 
 `psyclaw.figures.compose_figures` 只负责已有科研图的确定性多面板排版和哈希审计；统计图的数值、
-坐标轴和误差线仍由 matplotlib/R/SmartPlot 等成熟工具生成，并继续接受 `FIG.honest` 质量检查。
+坐标轴和误差线仍由 matplotlib/R 等本地成熟工具生成，并继续接受 `FIG.honest` 质量检查。
 
 ### Agent-first 工具面
 

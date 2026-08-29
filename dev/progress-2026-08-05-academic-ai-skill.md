@@ -67,7 +67,6 @@ APA7、心理学报、心理科学等 Word 导出格式也已有实现。问题�
 | OmniDistill：证据驱动的 Skill 蒸馏 | 已有记忆、教训卡和回归评测 | 可借其分层和晋升规则，但不照搬整套产品 |
 | pskoett：从失败中持续改进 | 错误自学习、教训卡和睡眠整合已落地 | 补候选、晋升、回滚的治理记录 |
 | CodePivot：桌面 Agent 工作台 | 当前仍是本地 CLI/REPL | 暂不自建桌面壳，先把 CLI 交付做稳 |
-| SmartPlot：科研绘图和 MCP | 有图片渲染和图形能力提示，不是完整绘图平台 | 通过 MCP 接入，不在本体重造绘图引擎 |
 
 一句话概括：先借协议，再借实现；先接能复用的部分，再决定是否长期维护。
 
@@ -121,7 +120,7 @@ APA7、心理学报、心理科学等 Word 导出格式也已有实现。问题�
 2. 参考 ScholarBridge 补 PDF 哈希、来源审计和 Zotero 交接。
 3. 参考 Academic Reference Matcher 和 OmniDistill，统一 Claim-Evidence 及 Skill 蒸馏记录。
 4. 参考 CodePivot 的受控桥接思路，但暂不启动桌面 UI 项目。
-5. 通过 MCP 接入 SmartPlot 或其他成熟绘图工具，不在 PsyClaw 内复制绘图引擎。
+5. 通过本地成熟绘图工具完成科研制图，不在 PsyClaw 内复制绘图引擎。
 
 金句：开源框架最有价值的地方，往往不是它的代码，而是它已经替你踩过的坑。
 
@@ -165,7 +164,7 @@ APA7、心理学报、心理科学等 Word 导出格式也已有实现。问题�
 ## 暂不做什么
 
 - 不直接复制 PDF 中的第三方项目，不把项目名堆成新的依赖清单。
-- 不在仓内重写 scipy、pingouin、statsmodels、SPSS、Mplus、Stata 或 SmartPlot 的核心算法。
+- 不在仓内重写 scipy、pingouin、statsmodels、SPSS、Mplus 或 Stata 的核心算法。
 - 不绕过机构认证、验证码、付费墙，也不保存用户账号密码。
 - 不把人物或导师蒸馏结果写成“本人真实想法”，必须区分证据、推断和未知。
 - 不把“175 个 feature 全部 done”误读成“所有真实场景都已验证”。
