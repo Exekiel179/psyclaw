@@ -2,20 +2,20 @@
 
 PsyClaw 是面向社会科学研究的 Pi 工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到官方 Pi runtime 上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.4`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
+当前版本：`0.27.5`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.4
+npm install -g psyclaw@0.27.5
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.4 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.5 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
@@ -37,7 +37,9 @@ psyclaw init "社交支持与研究生心理健康的关系" --paradigm survey-o
 psyclaw
 ```
 
-初始化会建立 `.psyclaw/`、`data/raw/`、`data/clean/`、`notes/` 和 `outputs/`。`data/raw/` 是只读保护区；把经确认可用于分析的派生数据放在 `data/clean/`。
+初始化会建立 `.psyclaw/`、`data/raw/`、`data/clean/`、`literature/pdfs/`、`notes/` 和 `outputs/`，不再生成通用 `artifacts/` 目录。`data/raw/` 是只读保护区；把经确认可用于分析的派生数据放在 `data/clean/`。
+
+在对话界面中，`/init <研究目标>` 只初始化研究项目和规格，随后使用 `/run [本轮目标]` 才启动受控研究流程。没有依次运行 `/init` 和 `/run` 时，PsyClaw 保持普通对话模式，不强制加入研究门禁或阶段式询问。
 
 登记本地材料并生成离线证据简报：
 
@@ -52,6 +54,8 @@ psyclaw brief
 | --- | --- |
 | 启动研究对话 | `psyclaw` 或 `psyclaw chat` |
 | 创建研究项目 | `psyclaw init <goal> --paradigm <profile>` |
+| 启动受控研究流程 | 对话中依次输入 `/init <goal>`、`/run [objective]` |
+| 模拟同行评审 | 论文完成后在对话中输入 `/review` |
 | 登记本地证据 | `psyclaw evidence add <path> --level user\|fulltext` |
 | 生成离线简报 | `psyclaw brief` |
 | 创建人工裁决模板 | `psyclaw hitl init` |
@@ -99,7 +103,7 @@ where.exe psyclaw
 
 ```powershell
 npm uninstall -g psyclaw
-npm install -g psyclaw@0.27.4
+npm install -g psyclaw@0.27.5
 psyclaw --help
 ```
 

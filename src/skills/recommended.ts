@@ -23,10 +23,16 @@ const execFileAsync = promisify(execFile);
 const INSTALL_MANIFEST = "psyclaw-install.json";
 const SHA256_RE = /^[a-f0-9]{40}$/i;
 const CONTENT_SHA256_RE = /^[a-f0-9]{64}$/i;
-const CORE_SKILLS = new Set(["research-intake", "evidence-capture", "citation-audit", "research-brief"]);
+const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "research-brief"]);
 
 export const RECOMMENDED_SKILL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   "markitdown-pro": "markitdown-bilibili",
+  "nature-reader": "nature-skills",
+  "nature-figure": "nature-skills",
+  "nature-writing": "nature-skills",
+  "nature-polishing": "nature-skills",
+  "nature-reviewer": "nature-skills",
+  "nature-citation": "nature-skills",
 });
 
 export interface RecommendationState {
@@ -126,7 +132,9 @@ export async function readRecommendationState(root: string): Promise<Recommendat
       ? Object.fromEntries(Object.entries(value.skillSources).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
       : undefined;
     const skillScopes = isRecord(value.skillScopes)
-      ? Object.fromEntries(Object.entries(value.skillScopes).filter((entry): entry is [string, RecommendedSkillScope] => entry[1] === "project" || entry[1] === "user"))
+      ? Object.fromEntries(Object.entries(value.skillScopes)
+        .filter((entry): entry is [string, RecommendedSkillScope] => entry[1] === "project" || entry[1] === "user")
+        .map(([id, scope]) => [normalizedId(id), scope]))
       : undefined;
     return {
       schemaVersion: "psyclaw/recommendation-state/v1",
@@ -271,7 +279,7 @@ export async function validateModelInstalledRecommendedSkill(
   root: string,
   requestedId: string,
   scope: RecommendedSkillScope,
-): Promise<{ id: string; skillName: string; path: string }> {
+): Promise<{ id: string; skillName: string; skillNames: string[]; path: string }> {
   const id = normalizedId(requestedId);
   const target = recommendedSkillTarget(root, id, scope);
   const stat = await lstat(target).catch(() => undefined);
@@ -279,9 +287,24 @@ export async function validateModelInstalledRecommendedSkill(
     throw new Error(`Recommended Skill is not installed in ${scope} scope: ${id}`);
   }
   await assertNoNestedGitOrSymlink(target);
-  const skillText = await readFile(join(target, "SKILL.md"), "utf8");
-  const skillName = parseSkillName(skillText);
-  return { id, skillName, path: target };
+  const catalog = await readRecommendedCatalog();
+  const item = catalog.items.find((candidate) => normalizedId(candidate.id) === id);
+  if (item?.skillLayout === "collection") {
+    const skillNames: string[] = [];
+    const visit = async (directory: string): Promise<void> => {
+      for (const entry of await readdir(directory, { withFileTypes: true })) {
+        if (entry.name.startsWith(".")) continue;
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) await visit(path);
+        else if (entry.isFile() && entry.name === "SKILL.md") skillNames.push(parseSkillName(await readFile(path, "utf8")));
+      }
+    };
+    await visit(target);
+    if (skillNames.length === 0) throw new Error(`Recommended Skill collection contains no SKILL.md: ${id}`);
+    return { id, skillName: id, skillNames: [...new Set(skillNames)].sort(), path: target };
+  }
+  const skillName = parseSkillName(await readFile(join(target, "SKILL.md"), "utf8"));
+  return { id, skillName, skillNames: [skillName], path: target };
 }
 
 async function readInstallManifest(path: string): Promise<RecommendedInstallManifest> {
@@ -390,15 +413,17 @@ export async function enabledRecommendedSkillPaths(root: string): Promise<Enable
     try {
       const scope = state.skillScopes?.[requestedId] ?? "project";
       const installed = await validateModelInstalledRecommendedSkill(root, requestedId, scope);
-      if (CORE_SKILLS.has(installed.skillName) && state.skillSources?.[installed.skillName] !== `recommended:${installed.id}`) {
-        warnings.push(`Skill '${installed.skillName}' conflicts with a PsyClaw core Skill; core remains active. Rename it or explicitly select recommended:${installed.id}.`);
+      const coreConflict = installed.skillNames.find((name) => CORE_SKILLS.has(name) && state.skillSources?.[name] !== `recommended:${installed.id}`);
+      if (coreConflict) {
+        warnings.push(`Skill '${coreConflict}' conflicts with a PsyClaw core Skill; core remains active. Rename it or explicitly select recommended:${installed.id}.`);
         continue;
       }
-      if (seenNames.has(installed.skillName)) {
-        warnings.push(`Skill '${installed.skillName}' has multiple enabled sources; only the first verified source is loaded.`);
+      const duplicate = installed.skillNames.find((name) => seenNames.has(name));
+      if (duplicate) {
+        warnings.push(`Skill '${duplicate}' has multiple enabled sources; only the first verified source is loaded.`);
         continue;
       }
-      seenNames.add(installed.skillName);
+      for (const name of installed.skillNames) seenNames.add(name);
       paths.push(installed.path);
     } catch (error) {
       warnings.push(error instanceof Error ? error.message : String(error));

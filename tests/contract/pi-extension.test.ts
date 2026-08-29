@@ -14,20 +14,20 @@ describe("Pi extension contract", () => {
       },
     } as any;
     extension(api);
-    expect([...commands.keys()]).toEqual(["research", "verify", "brief", "trace", "model", "agents"]);
+    expect([...commands.keys()]).toEqual(["init", "verify", "brief", "trace", "model", "agents"]);
   });
 
-  it("lets the research command bootstrap through the Pi context cwd", async () => {
+  it("lets the init command bootstrap through the Pi context cwd", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-"));
-    let researchHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    let initHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     const api = {
       registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
-        if (name === "research") researchHandler = options.handler;
+        if (name === "init") initHandler = options.handler;
       },
     } as any;
     extension(api);
     const notifications: string[] = [];
-    await researchHandler?.("--paradigm qualitative-thematic A bounded goal", {
+    await initHandler?.("--paradigm qualitative-thematic A bounded goal", {
       cwd: root,
       ui: { notify: (message: string) => notifications.push(message) },
     });
@@ -38,15 +38,15 @@ describe("Pi extension contract", () => {
 
   it("does not reinterpret malformed flags as a research goal", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-invalid-"));
-    let researchHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    let initHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     const api = {
       registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
-        if (name === "research") researchHandler = options.handler;
+        if (name === "init") initHandler = options.handler;
       },
     } as any;
     extension(api);
     const notifications: string[] = [];
-    await researchHandler?.("--paradigm survey-observational", {
+    await initHandler?.("--paradigm survey-observational", {
       cwd: root,
       ui: { notify: (message: string) => notifications.push(message) },
     });
@@ -80,10 +80,38 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     expect(commands).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "grill" }),
+      expect.objectContaining({ name: "loop" }),
       expect.objectContaining({ name: "provider" }),
       expect.objectContaining({ name: "pet" }),
     ]));
     expect(commands.every((command) => Boolean(command.description?.trim()))).toBe(true);
+  });
+
+  it("starts the academic grill with the requested subject", async () => {
+    let grillHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const messages: Array<{ text: string; options?: { deliverAs?: string } }> = [];
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "grill") grillHandler = options.handler;
+      },
+      registerTool() {},
+      sendUserMessage(text: string, options?: { deliverAs?: string }) { messages.push({ text, options }); },
+    } as any;
+    extension(api);
+
+    const notifications: string[] = [];
+    await grillHandler?.("生成式 AI 使用与大学生批判性思维", {
+      isIdle: () => false,
+      ui: { notify: (message: string) => notifications.push(message) },
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.text).toContain("psyclaw_skill");
+    expect(messages[0]?.text).toContain("academic-grill");
+    expect(messages[0]?.text).toContain("生成式 AI 使用与大学生批判性思维");
+    expect(messages[0]?.options).toEqual({ deliverAs: "followUp" });
+    expect(notifications[0]).toContain("每轮只处理一个关键决策");
   });
 
   it("opens the MCP manager as a custom page and preserves status fallback", async () => {

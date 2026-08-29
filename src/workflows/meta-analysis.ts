@@ -26,6 +26,7 @@ export interface MetaStudy {
   id: string;
   title: string;
   authors: string[];
+  abstract?: string;
   year?: number;
   venue?: string;
   doi?: string;
@@ -43,17 +44,26 @@ export async function searchOpenAlex(target: string, nStudies: number, fetchFn: 
       id?: string; title?: string; publication_year?: number;
       authorships?: Array<{ author?: { display_name?: string } }>;
       host_venue?: { display_name?: string }; doi?: string; cited_by_count?: number;
+      abstract_inverted_index?: Record<string, number[]>;
     }>;
   };
-  return (body.results ?? []).slice(0, nStudies).map((item, index) => ({
-    id: `study_${index + 1}`,
-    title: item.title ?? "untitled",
-    authors: (item.authorships ?? []).map((entry) => entry.author?.display_name ?? "?").slice(0, 10),
-    ...(item.publication_year === undefined ? {} : { year: item.publication_year }),
-    ...(item.host_venue?.display_name ? { venue: item.host_venue.display_name } : {}),
-    ...(item.doi ? { doi: item.doi } : {}),
-    ...(item.cited_by_count === undefined ? {} : { citations: item.cited_by_count }),
-  }));
+  return (body.results ?? []).slice(0, nStudies).map((item, index) => {
+    const abstract = Object.entries(item.abstract_inverted_index ?? {})
+      .flatMap(([word, positions]) => positions.map((position) => ({ word, position })))
+      .sort((left, right) => left.position - right.position)
+      .map((entry) => entry.word)
+      .join(" ");
+    return {
+      id: item.id ?? `study_${index + 1}`,
+      title: item.title ?? "untitled",
+      authors: (item.authorships ?? []).map((entry) => entry.author?.display_name ?? "?").slice(0, 10),
+      ...(abstract ? { abstract } : {}),
+      ...(item.publication_year === undefined ? {} : { year: item.publication_year }),
+      ...(item.host_venue?.display_name ? { venue: item.host_venue.display_name } : {}),
+      ...(item.doi ? { doi: item.doi } : {}),
+      ...(item.cited_by_count === undefined ? {} : { citations: item.cited_by_count }),
+    };
+  });
 }
 
 export interface EffectRow {

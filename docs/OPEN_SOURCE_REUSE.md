@@ -12,6 +12,5 @@
 | OmniDistill / OPID 思路 | 参考治理规则；不引入训练栈 | JSONL staging 可版本化 | `skill_distill.py`：候选→复现→人工晋升/拒绝 | 零 GPU/训练依赖 | 删除 staging 文件；不会自动修改 bundled Skill |
 | Corpus2Skill / OpenKB 思路 | 参考导航协议；不复制服务端 | `INDEX.md` + manifest + 分文件材料 | `psyclaw compile`：目录→可导航 staged Skill；四类验证后才可晋升 v3 | 纯 stdlib；复杂格式沿用可选 MarkItDown | 编译目录是派生产物，可删除重建；原资料不修改 |
 | Session Handoff 思路 | 参考交接协议；本地实现 | `HANDOFF.md` + JSON v1 | `psyclaw handoff`：目标/完成项/下一步/阻塞可重放 | 纯 stdlib | 删除交接产物不影响 SQLite 会话与 workflow checkpoint |
-| SmartPlot / CodePivot | 暂不作为核心依赖；随用户环境变化 | MCP 工具由 registry 声明并缓存 | 通过 MCP/受控桥接使用，不复制绘图引擎或桌面 UI | 零核心依赖 | MCP 不可用时保留脚本/人工路径 |
 
 默认原则：先借协议，再借实现；任何新依赖必须可禁用、可审计、可退出。

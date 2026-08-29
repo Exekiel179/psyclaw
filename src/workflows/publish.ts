@@ -7,6 +7,7 @@ import { atomicWriteFile, appendJsonlIfMissing, readJsonl } from "../project/jso
 import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
 import { readManuscript } from "../project/manuscript.js";
 import { allocateProjectVersion } from "../project/versions.js";
+import { auditCitationFulltexts } from "../literature/archive.js";
 
 /**
  * Generation-time manuscript publishing with versioning (convention:
@@ -96,6 +97,19 @@ export async function publishManuscript(root: string, options: PublishOptions = 
   const markdown = options.markdown ?? existing.markdown;
   if (!markdown.trim()) {
     throw new Error("没有可发布的手稿内容：请先在编辑器写入内容，或先运行工作流生成论文初稿");
+  }
+  const isManuscript = sourcePath === "notes/manuscript.md" || sourcePath?.startsWith("paper/") || sourcePath?.startsWith("docs/");
+  if (isManuscript || options.markdown !== undefined) {
+    const citationAudit = await auditCitationFulltexts(root);
+    if (!citationAudit.ok) {
+      const missing = citationAudit.missingPdfs.map((item) => `${item.doi} -> ${item.doiUrl}（下载到 ${item.expectedPath}）`);
+      throw new Error([
+        "论文发布已被引用证据门禁阻断。",
+        citationAudit.citedDois.length === 0 ? "尚未登记任何正文引用。" : "",
+        citationAudit.missingVerification.length ? `未完成双源核验：${citationAudit.missingVerification.join(", ")}` : "",
+        missing.length ? `本地缺少引用论文 PDF：${missing.join("；")}` : "",
+      ].filter(Boolean).join(" "));
+    }
   }
 
   const markdownPath = `paper/${name}.md`;
