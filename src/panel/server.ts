@@ -13,7 +13,6 @@ import { KNOWN_AGENTS } from "../agents/catalog.js";
 import { planAgentInstall } from "../install/installer.js";
 import { deepSeekProviderSpec, PiModelGateway, type ModelDescriptor } from "../adapters/pi/model.js";
 import { PROVIDER_PRESETS, saveProviderConfig } from "../setup.js";
-import { readHitlWorkspace } from "../project/hitl.js";
 import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
 import { readManuscript } from "../project/manuscript.js";
 import { appendJsonlIfMissing, atomicWriteFile, readJsonl } from "../project/jsonl.js";
@@ -32,6 +31,7 @@ import { resumePlanWithPi } from "../orchestration/pi-executor.js";
 import { RunEventLog } from "./events.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
 import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
+import { projectTraceSnapshot } from "../telemetry/export.js";
 
 const activePanelRuns = new Set<string>();
 
@@ -53,6 +53,7 @@ async function writeRecommendationState(root: string, state: RecommendationState
 
 /** The bundled core skills, always listed so the user can disable (not uninstall) them. */
 const CORE_SKILLS = [
+  { id: "academic-grill", name: "学术追问" },
   { id: "research-intake", name: "研究入口" },
   { id: "evidence-capture", name: "证据登记" },
   { id: "citation-audit", name: "引用审计" },
@@ -159,7 +160,7 @@ async function appendLedgerEvidence(root: string, body: Record<string, unknown>)
  * Any root-level document (questionnaire exports etc.) is listed as well.
  */
 const DOCUMENT_EXTENSIONS = new Set(["md", "markdown", "docx", "doc", "pdf", "xlsx", "xls", "csv", "txt"]);
-const DOCUMENT_SKIP_DIRS = [".psyclaw", ".git", "node_modules", "analysis/scripts", "analysis/results", "analysis/configs", "artifacts", "logs", "paper/archive"];
+const DOCUMENT_SKIP_DIRS = [".psyclaw", ".git", "node_modules", "analysis/scripts", "analysis/results", "analysis/configs", "logs", "paper/archive", "literature/pdfs"];
 
 export interface ProjectDocument {
   path: string;
@@ -385,6 +386,35 @@ async function panelStats(root: string): Promise<unknown> {
   const countLines = async (path: string): Promise<number> => { try { return (await readFile(path, "utf8")).split(/\r?\n/).filter(Boolean).length; } catch { return 0; } };
   const files = await listProjectFiles(root);
   return { schemaVersion: "psyclaw/panel-stats/v1", runs: (await listRuns(root)).length, evidence: await countLines(paths.evidence), claims: await countLines(paths.claims), auditEvents: await countLines(paths.audit), trackedFiles: files.length, outputs: files.filter((path) => path.startsWith("outputs/")).length, generatedAt: new Date().toISOString() };
+}
+
+const PANEL_FILE_ROOTS = ["notes/", "paper/", "docs/", "outputs/", "logs/"] as const;
+const PANEL_FILE_EXTENSIONS = /\.(md|markdown|txt|json|csv)$/i;
+
+function panelFileAllowed(relative: string): boolean {
+  const normalized = relative.replaceAll("\\", "/");
+  return PANEL_FILE_ROOTS.some((prefix) => normalized.startsWith(prefix))
+    && PANEL_FILE_EXTENSIONS.test(normalized)
+    && !/credential|secret|auth\.json|\.env/i.test(normalized);
+}
+
+async function panelProjectFiles(root: string): Promise<string[]> {
+  return (await listProjectFiles(root)).filter(panelFileAllowed);
+}
+
+async function readPanelProjectFile(root: string, relative: string): Promise<{ path: string; content: string; format: string }> {
+  const normalized = relative.replaceAll("\\", "/").trim();
+  if (!panelFileAllowed(normalized) || normalized.split("/").some((part) => part === "" || part === "..")) {
+    throw new Error("project file is outside the Panel read-only allowlist");
+  }
+  const target = await assertSafeProjectPath(root, normalized);
+  const stat = await lstat(target);
+  if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("project file must be a regular file");
+  if (stat.size > 2 * 1024 * 1024) throw new Error("project file is too large for Panel preview");
+  const format = normalized.toLowerCase().endsWith(".json") ? "json"
+    : normalized.toLowerCase().endsWith(".csv") ? "csv"
+      : /\.(md|markdown)$/i.test(normalized) ? "markdown" : "text";
+  return { path: normalized, content: await readFile(target, "utf8"), format };
 }
 
 function publicInstallPlan(plan: ReturnType<typeof planAgentInstall>): Record<string, unknown> {
@@ -730,7 +760,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
     const url = new URL(request.url ?? "/", "http://localhost");
     // Read-only surface: any write method is rejected before routing.
     const runAction = /^\/api\/runs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/(pause|resume)$/.test(url.pathname);
-    if (request.method !== "GET" && request.method !== "HEAD" && !(request.method === "POST" && (["/api/provider-config", "/api/hitl/decision", "/api/assistant", "/api/system-prompt", "/api/hooks", "/api/recommendation-state", "/api/install/execute", "/api/active-provider", "/api/artifact/save", "/api/manuscript", "/api/claim", "/api/evidence", "/api/doi/verify", "/api/documents/import", "/api/publish", "/api/references/verify", "/api/references/check", "/api/references/download", "/api/citations"].includes(url.pathname) || runAction))) {
+    if (request.method !== "GET" && request.method !== "HEAD" && !(request.method === "POST" && (["/api/provider-config", "/api/assistant", "/api/system-prompt", "/api/hooks", "/api/recommendation-state", "/api/install/execute", "/api/active-provider", "/api/artifact/save", "/api/manuscript", "/api/claim", "/api/evidence", "/api/doi/verify", "/api/documents/import", "/api/publish", "/api/references/verify", "/api/references/check", "/api/references/download", "/api/citations"].includes(url.pathname) || runAction))) {
       response.writeHead(405, { "content-type": "application/json", allow: "GET, HEAD" });
       response.end(JSON.stringify({ error: "method not allowed" }));
       return;
@@ -808,6 +838,22 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       if (url.pathname === "/api/files") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-files/v1", files: await listProjectFiles(root) }));
+        return;
+      }
+      if (url.pathname === "/api/project-files") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-project-files/v1", files: await panelProjectFiles(root) }));
+        return;
+      }
+      if (url.pathname === "/api/project-file") {
+        const relative = url.searchParams.get("path") ?? "";
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-project-file/v1", ...(await readPanelProjectFile(root, relative)) }));
+        return;
+      }
+      if (url.pathname === "/api/traces") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify(await projectTraceSnapshot({ root })));
         return;
       }
       if (url.pathname === "/api/config") {
@@ -1096,11 +1142,6 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         } finally {
           activePanelRuns.delete(runId);
         }
-        return;
-      }
-      if (url.pathname === "/api/hitl") {
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify(await readHitlWorkspace(root, url.searchParams.get("contents") === "1")));
         return;
       }
       if (url.pathname === "/api/artifacts") {
@@ -1537,63 +1578,6 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         });
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ schemaVersion: "psyclaw/provider-config-receipt/v1", ok: true, provider: id, modelCount: models.length, apiKeyStored: Boolean(apiKey?.trim()) }));
-        return;
-      }
-      if (url.pathname === "/api/hitl/decision") {
-        if (request.method !== "POST") {
-          response.writeHead(405, { "content-type": "application/json", allow: "POST" });
-          response.end(JSON.stringify({ error: "method not allowed" }));
-          return;
-        }
-        const body = await readJsonBody(request);
-        const decision = String(body.decision ?? "").trim();
-        const rationale = String(body.rationale ?? "").trim();
-        const actor = String(body.actor ?? "researcher").trim();
-        if (!["approved", "denied", "needs-changes"].includes(decision) || rationale.length < 3 || actor.length < 1) {
-          response.writeHead(400, { "content-type": "application/json" });
-          response.end(JSON.stringify({ error: "decision, rationale (3+ chars), and actor are required" }));
-          return;
-        }
-        const recordedAt = new Date().toISOString();
-        const idempotencyKey = `panel:hitl:${sha256Text(`${decision}\u0000${rationale}\u0000${actor}`).slice(0, 24)}`;
-        const decisionDocument = [
-          "---",
-          "schemaVersion: psyclaw/hitl-decision-request/v1",
-          "documentVersion: 1.0.0",
-          `recordedAt: ${recordedAt}`,
-          `actor: ${actor.replaceAll("\n", " ")}`,
-          `decision: ${decision}`,
-          `idempotencyKey: ${idempotencyKey}`,
-          "---",
-          "",
-          "# Decision Request",
-          "",
-          `Decision: ${decision}`,
-          "",
-          "## Rationale",
-          "",
-          rationale,
-          "",
-        ].join("\n");
-        const decisionPath = await assertSafeProjectPath(root, "notes/decision_request.md");
-        await atomicWriteFile(decisionPath, decisionDocument);
-        const receipt = {
-          schemaVersion: "psyclaw/tool-receipt/v1",
-          runId: `panel_${randomUUID().replaceAll("-", "")}`,
-          taskId: "hitl-decision",
-          tool: "panel.hitl.decision",
-          effect: "write",
-          approval: "approved",
-          idempotencyKey,
-          ok: true,
-          resultHash: sha256Text(decisionDocument),
-          startedAt: recordedAt,
-          finishedAt: new Date().toISOString(),
-        };
-        const receiptPath = await assertSafeProjectPath(root, `.psyclaw/manifests/${receipt.runId}.receipt.json`);
-        await atomicWriteFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ schemaVersion: "psyclaw/hitl-decision-receipt/v1", ok: true, decision, decisionPath, receiptPath, idempotencyKey }));
         return;
       }
       if (url.pathname === "/" || url.pathname === "/index.html") {

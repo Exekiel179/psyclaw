@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type PiRpcCommand =
   | { type: "prompt"; message: string }
@@ -111,9 +112,11 @@ export class PiRpcClient {
       "--tools",
       (this.config.tools ?? [...SAFE_TOOL_NAMES]).join(","),
     );
-    const defaultCommand = process.platform === "win32" ? "pi.cmd" : "pi";
-    const rawCommand = this.config.cliPath === undefined ? (this.config.command ?? defaultCommand) : process.execPath;
-    const rawArgs = this.config.cliPath === undefined ? args : [this.config.cliPath, ...args];
+    const bundledCli = join(dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))), "cli.js");
+    const rawCommand = this.config.command ?? process.execPath;
+    const rawArgs = this.config.command === undefined
+      ? [this.config.cliPath ?? bundledCli, ...args]
+      : args;
     const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : rawCommand;
     const commandArgs = process.platform === "win32" ? ["/d", "/c", rawCommand, ...rawArgs] : rawArgs;
     const childEnv = this.buildEnvironment();

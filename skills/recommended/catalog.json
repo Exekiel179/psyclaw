@@ -1,10 +1,65 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.5.0",
+  "documentVersion": "0.6.0",
   "syncedAt": "2026-08-30",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
+    {
+      "id": "academic-research-suite",
+      "name": "ARS Academic Research Suite",
+      "kind": "skill",
+      "stage": "研究全流程",
+      "description": "面向文献研究、论文写作、同行评审与修订的端到端 Academic Research Skills 套件。",
+      "sourceRef": "https://github.com/Imbad0202/academic-research-skills-codex",
+      "installHint": "安装仓库中的 skills/academic-research-suite 完整目录，目标目录根部必须是该目录的 SKILL.md。"
+    },
+    {
+      "id": "nature-skills",
+      "name": "Nature Skills Suite",
+      "kind": "skill",
+      "skillLayout": "collection",
+      "stage": "研究全流程",
+      "description": "完整安装 Nature Skills 套件，覆盖检索、精读、数据、统计、实验记录、写作、绘图、引用核验、评审回复与演示文稿等研究任务。",
+      "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
+      "installHint": "这是多 Skill 套件。将仓库 skills 目录中的全部 nature-* Skill（包括 nature-shared）原样安装到目标目录，保留每个子目录的 SKILL.md、references、scripts、assets、tests 和相对路径；不要只挑选单个 Skill，也不要在套件根目录伪造 SKILL.md。"
+    },
+    {
+      "id": "scientific-visualization",
+      "name": "Scientific Visualization",
+      "kind": "skill",
+      "stage": "科研绘图",
+      "description": "创建并审计真实、可访问、可投稿的 Matplotlib、Seaborn 或 Plotly 科研图表。",
+      "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
+      "installHint": "只安装仓库中的 skills/scientific-visualization 完整目录，包含其 scripts、assets 与 references。"
+    },
+    {
+      "id": "academic-figure-skill",
+      "name": "Academic Figure Skill",
+      "kind": "skill",
+      "stage": "科研绘图",
+      "description": "围绕 Nature、Cell、Science 图稿规范和常用图型生成出版级矢量图，并进行多轮视觉质检。",
+      "sourceRef": "https://github.com/TingxiYu/academic-figure-skill",
+      "installHint": "安装仓库根目录的完整 Skill 包，保留 SKILL.md、references、assets 和脚本。"
+    },
+    {
+      "id": "figure-generation",
+      "name": "Scientific Figure Generation",
+      "kind": "skill",
+      "stage": "科研绘图",
+      "description": "通过查询扩展、可执行绘图代码和视觉反馈生成论文常见的柱状图、热图、消融图、训练曲线等。",
+      "sourceRef": "https://github.com/lingzhi227/agent-research-skills",
+      "installHint": "只安装仓库中的 skills/figure-generation 完整目录，包含 scripts 和 references。"
+    },
+    {
+      "id": "beautify-chart",
+      "name": "Science Plot Formatter",
+      "kind": "skill",
+      "stage": "图表美化",
+      "description": "审查并改造已有 Matplotlib 脚本，使其达到论文投稿所需的排版、配色、字体和导出质量。",
+      "sourceRef": "https://github.com/preordinary/science-plot-formatter",
+      "installHint": "安装仓库中的 .codex/skills/beautify-chart 完整目录；若该路径不存在，再采用 .claude/skills/beautify-chart。"
+    },
     {
       "id": "markitdown-bilibili",
       "name": "MarkItDown + Bilibili",
@@ -110,14 +165,6 @@
       "stage": "材料转换",
       "description": "把 PDF、Word、PPT、Excel、HTML 等转换为结构化 Markdown。它是独立 Python 工具，不作为 PsyClaw Skill 安装。",
       "sourceRef": "https://github.com/microsoft/markitdown"
-    },
-    {
-      "id": "smartplot",
-      "name": "SmartPlot",
-      "kind": "external-tool",
-      "stage": "科研绘图",
-      "description": "科研绘图、样式统一、多面板组图和可见确认工具。它不是 PsyClaw Skill。",
-      "sourceRef": "https://smartplot.app"
     }
   ],
   "installPrep": [

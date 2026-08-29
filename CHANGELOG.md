@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.27.5 - 2026-08-30
+
+- Added `/run` as the explicit controlled research workflow entry after `/init`; ordinary conversations remain unintrusive.
+- Staged academic delivery from analysis report through optional literature research, manuscript writing, `/review`, and final DOCX export.
+- Added lawful open-access PDF archiving under `literature/pdfs/`, DOI fallback links for paywalled sources, and a final citation full-text gate.
+- Removed automatic `artifacts/` project scaffolding and SmartPlot integration; simplified Panel to project files/Trace, Skill/MCP, and Provider/cost views.
+
 ## 0.27.4 - 2026-08-30
 
 - 修正 GitHub Actions 中 npm tarball 的相对路径，避免 npm 将发布产物误解析为 Git 仓库地址。
@@ -21,7 +28,7 @@
 - 推荐 Skill 安装改由当前模型根据来源网址检查并执行，不再要求推荐目录预先提供固定安装命令。
 - 安装前由用户选择项目目录或系统目录；项目目录仅供当前项目使用，系统目录可供所有 PsyClaw 项目使用。
 - `/skills` 与科研面板统一显示安装位置、安装状态及 `/reload` 提示，安装完成后可明确启用并重新加载。
-- MarkItDown 和 SmartPlot 归入外部工具，不再伪装为可安装 Skill；清理并补充能够由模型从有效来源处理的推荐 Skill。
+- MarkItDown 归入外部工具，不再伪装为可安装 Skill；清理并补充能够由模型从有效来源处理的推荐 Skill。
 
 > 发布说明：该标签的三平台流水线因既有测试失败而停止，未发布到 npm；修正内容随 0.27.2 发布。
 
