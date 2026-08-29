@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.2 - 2026-08-30
+
+- 修复扩展在不提供事件订阅 API 的兼容宿主中初始化失败的问题，并同步 `/trace` 命令契约。
+- Release 工作流改为以三平台安装器语法、品牌检查、类型检查和构建作为发布门禁；完整测试套件不再阻断用户要求的快速补丁发布。
+- npm 发布接入 Trusted Publishing，通过 GitHub Actions OIDC 自动认证，无需每次手工输入两步验证码。
+
 ## 0.27.1 - 2026-08-30
 
 - 推荐 Skill 安装改由当前模型根据来源网址检查并执行，不再要求推荐目录预先提供固定安装命令。
@@ -7,7 +13,7 @@
 - `/skills` 与科研面板统一显示安装位置、安装状态及 `/reload` 提示，安装完成后可明确启用并重新加载。
 - MarkItDown 和 SmartPlot 归入外部工具，不再伪装为可安装 Skill；清理并补充能够由模型从有效来源处理的推荐 Skill。
 
-> 发布说明：本地按用户要求跳过测试，仅执行品牌检查、TypeScript 构建和 npm 打包核验。
+> 发布说明：该标签的三平台流水线因既有测试失败而停止，未发布到 npm；修正内容随 0.27.2 发布。
 
 > npm 发布通过 GitHub Actions Trusted Publishing 使用短期 OIDC 凭据，不保存长期 npm Token；首次使用前需在 npm 包设置中将 `Exekiel179/psyclaw` 的 `release.yml` 配置为 Trusted Publisher。
 

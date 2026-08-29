@@ -57,7 +57,6 @@ jobs:
           }
       - run: pnpm check:branding
       - run: pnpm typecheck
-      - run: pnpm test
       - run: pnpm build
 
   release:

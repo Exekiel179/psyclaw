@@ -588,7 +588,7 @@ const WORKFLOW_RUNNERS = {
 export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
-  if (!legacyTestApi) pi.on("resources_discover", async (event, ctx) => {
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event, ctx) => {
     const enabled = await enabledRecommendedSkillPaths(event.cwd);
     for (const warning of enabled.warnings) ctx.ui.notify(`PsyClaw Skill: ${warning}`, "warning");
     return { skillPaths: enabled.paths };
