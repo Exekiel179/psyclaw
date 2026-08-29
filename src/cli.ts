@@ -76,7 +76,7 @@ function spawnCommand(command: string, inherit: boolean): Promise<{ exitCode: nu
  * Run a package-manager command in a fixed directory. Unlike `spawnCommand`,
  * this one sets `cwd` and — on Windows only — uses a shell so `pnpm`/`npm`
  * resolve through their `.cmd` shims. The command string is built by
- * `updateBundledPi` from a strictly-validated semver and hardcoded package
+ * the update module from strictly validated semvers and hardcoded package
  * names, so shell interpretation is safe.
  */
 function runPackageManager(command: string, cwd: string): Promise<{ exitCode: number }> {
@@ -303,24 +303,35 @@ async function main(): Promise<void> {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return;
   }
+  if (command === "traces") {
+    const action = args.shift();
+    if (action !== "export") throw new Error("Usage: psyclaw traces export [--output <relative-path>] [--format otlp-json]");
+    assertKnownOptions(args, ["--output", "--format"]);
+    const format = option(args, "--format", "otlp-json");
+    if (format !== "otlp-json") throw new Error(`Unsupported trace format: ${format}`);
+    const { exportTraces } = await import("./telemetry/export.js");
+    const output = option(args, "--output");
+    const result = await exportTraces({ root, ...(output === undefined ? {} : { output }) });
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return;
+  }
   if (command === "update") {
     for (const arg of args) {
-      if (arg.startsWith("--") && arg !== "--yes" && arg !== "--force") {
+      if (arg.startsWith("--") && arg !== "--check" && arg !== "--yes" && arg !== "--force") {
         throw new Error(`Unknown option: ${arg}`);
       }
     }
-    const { updateBundledPi } = await import("./updates/update.js");
+    const { updatePsyClaw } = await import("./updates/update.js");
     const { createHttpRegistry } = await import("./updates/registry.js");
-    const receipt = await updateBundledPi({
+    const checkOnly = args.includes("--check");
+    const receipt = await updatePsyClaw({
       registry: createHttpRegistry(),
       force: args.includes("--force"),
-      ...(args.includes("--yes") ? { executor: (step) => runPackageManager(step.command, step.cwd) } : {}),
+      ...(checkOnly ? {} : { executor: (step) => runPackageManager(step.command, step.cwd) }),
     });
     process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
     if (!receipt.ok) {
       process.exitCode = 1;
-    } else if (receipt.reasonCode === "update-skipped" && receipt.command !== undefined) {
-      process.stdout.write(c.yellow("\n➜ 请附加 --yes 参数确认并应用更新。\n"));
     }
     return;
   }

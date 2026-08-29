@@ -3,9 +3,15 @@ import { readFile } from "node:fs/promises";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ensurePsyClawTheme, ensureQuietStartup, PSYCLAW_IDENTITY_PROMPT } from "./branding.js";
+import {
+  acknowledgeBundledPiChangelog,
+  ensurePsyClawTheme,
+  ensureQuietStartup,
+  PSYCLAW_IDENTITY_PROMPT,
+} from "./branding.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
+import { enabledRecommendedSkillPaths } from "./skills/recommended.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -51,6 +57,8 @@ export interface ChatLaunchOptions {
   extensionPath?: string;
   /** Override the psyclaw skill directory (defaults to the bundled skills). */
   skillsPath?: string;
+  /** Test/development hook for launching the bundled runtime. */
+  spawnProcess?: typeof spawn;
 }
 
 /**
@@ -65,6 +73,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   const extensionPath = options.extensionPath ?? join(root, "dist", "src", "extension.js");
   const panelExtensionPath = join(root, "dist", "src", "panel", "extension.js");
   const skillsPath = options.skillsPath ?? join(root, "skills", "core");
+  const cwd = options.cwd ?? process.cwd();
   // Branding is applied on first launch, not during npm installation, so the
   // package install itself never mutates dependency files.
   await applyRuntimeBranding(root);
@@ -76,19 +85,31 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   // (managed from the panel), never rewrite the base.
   let identityPrompt = PSYCLAW_IDENTITY_PROMPT;
   try {
-    const supplement = (await readFile(join(options.cwd ?? process.cwd(), ".psyclaw", "system-prompt.md"), "utf8")).trim();
+    const supplement = (await readFile(join(cwd, ".psyclaw", "system-prompt.md"), "utf8")).trim();
     if (supplement) identityPrompt = `${identityPrompt}\n\n${supplement}`;
   } catch { /* no user supplement */ }
-  const args = ["--extension", extensionPath, "--extension", panelExtensionPath, "--skill", skillsPath, "--tools", toolAllowlist, "--append-system-prompt", identityPrompt, ...(options.args ?? [])];
+  const enabledSkills = await enabledRecommendedSkillPaths(cwd);
+  const args = [
+    "--extension", extensionPath,
+    "--extension", panelExtensionPath,
+    "--skill", skillsPath,
+    ...enabledSkills.paths.flatMap((path) => ["--skill", path]),
+    "--tools", toolAllowlist,
+    "--append-system-prompt", identityPrompt,
+    ...(options.args ?? []),
+  ];
 
   // Brand the startup: psyclaw theme + native "ψ psyclaw v<psyclaw version>" header
   // (opt into a quiet screen with PSYCLAW_QUIET_STARTUP=1), and keep the model's
   // identity as psyclaw rather than "pi".
+  const manifest = await resolvePsyClawManifest();
   await ensureQuietStartup();
   await ensurePsyClawTheme();
+  if (manifest?.piVersion !== undefined) {
+    await acknowledgeBundledPiChangelog(manifest.piVersion);
+  }
 
   // The header banner renders psyclaw's own version (not the bundled pi 0.84.x).
-  const manifest = await resolvePsyClawManifest();
   const spawnEnv: NodeJS.ProcessEnv = {
     ...process.env,
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
@@ -110,9 +131,11 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     delete spawnEnv.PSYCLAW_PET;
   }
 
+  for (const warning of enabledSkills.warnings) process.stderr.write(`PsyClaw Skill: ${warning}\n`);
+
   return new Promise<number>((resolve, reject) => {
-    const child = spawn(process.execPath, [piCli, ...args], {
-      cwd: options.cwd ?? process.cwd(),
+    const child = (options.spawnProcess ?? spawn)(process.execPath, [piCli, ...args], {
+      cwd,
       stdio: "inherit",
       shell: false,
       // psyclaw owns the update surface (`psyclaw check-updates` / `psyclaw update`),

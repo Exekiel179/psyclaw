@@ -1,6 +1,6 @@
 {
   "name": "psyclaw",
-  "version": "0.26.3",
+  "version": "0.27.0",
   "description": "A standalone, evidence-grounded social-science research agent — a conversation-driven agent that bundles the Pi runtime with psyclaw's research contracts, evidence gates, and workflows",
   "type": "module",
   "license": "MIT",
@@ -58,8 +58,9 @@
     "prepublishOnly": "pnpm check:branding && pnpm build"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.84.1",
-    "@earendil-works/pi-coding-agent": "0.84.1",
+    "@earendil-works/pi-ai": "0.84.4",
+    "@earendil-works/pi-coding-agent": "0.84.4",
+    "@earendil-works/pi-tui": "0.84.4",
     "ink": "^7.1.1",
     "react": "^19.2.8",
     "typebox": "1.3.7",

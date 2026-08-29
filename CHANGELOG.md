@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.27.0 - 2026-08-30
+
+- `psyclaw update` 改为直接更新 PsyClaw 整包及其锁定的内置 Pi，默认执行更新；`--check` 仅查看计划，旧 `--yes` 参数继续兼容。
+- 内置 Pi 升级至 0.84.4，隐藏启动时重复的 Pi 更新说明，同时保留显式 Changelog 查询能力。
+- 新增 `/trace`，将脱敏后的研究使用路径导出为 OTLP/HTTP JSON，供 Langfuse、LangSmith 或 OpenTelemetry Collector 分析；不会自动上传内容。
+- 推荐 Skill 启用状态现在会在下一次聊天启动时真正接入 Pi；同名核心 Skill 禁止静默覆盖，并要求显式选择来源。
+- `/skills` 与 `/mcp` 改为单页键盘交互管理界面，集中显示启用状态、来源、版本、许可证、依赖、风险和阻断原因。
+- 修复推荐 Skill 安装目录、许可证证据和嵌套 Git 元数据处理，并统一 `markitdown-bilibili` 的目录 ID 与 Skill 名称。
+- 启动横幅优先显示完整 PsyClaw 字标；启用 `/pet` 后宠物改为独立显示，不再挤压主标识。
+
+> 发布说明：本地按用户要求跳过测试；推送版本标签后由 GitHub Actions 执行 Node 22 跨平台检查、构建和离线评测，全部通过后才创建 GitHub prerelease。
+
 ## 0.26.3 - 2026-08-27
 
 - 修复 macOS GUI/全局 npm 启动时的 Provider Key 识别：`launchctl` Key 仅注入当前进程；login shell Key 仅在用户明确选择导入后保存。

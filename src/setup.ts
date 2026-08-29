@@ -375,7 +375,7 @@ export async function setupProviders(options: SetupOptions = {}): Promise<SetupR
   return { path: modelsPath, providers: Object.keys(providers) };
 }
 
-/** Whether any provider has been written to `models.json` yet. */
+/** Whether a custom or built-in provider is ready for an interactive launch. */
 export async function hasConfiguredProvider(options: { agentDir?: string } = {}): Promise<boolean> {
   const agentDir = options.agentDir ?? getAgentDir();
   const modelsPath = join(agentDir, "models.json");
@@ -383,11 +383,16 @@ export async function hasConfiguredProvider(options: { agentDir?: string } = {})
     const parsed = JSON.parse(await readFile(modelsPath, "utf8")) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
     const providers = (parsed as { providers?: unknown }).providers;
-    return providers !== undefined &&
+    if (providers !== undefined &&
       typeof providers === "object" &&
       !Array.isArray(providers) &&
-      Object.keys(providers as object).length > 0;
+      Object.keys(providers as object).length > 0) return true;
   } catch {
-    return false;
+    // Built-in providers do not require models.json.
   }
+  for (const preset of PROVIDER_PRESETS) {
+    if (preset.id === "custom" || preset.id === "ollama") continue;
+    if (await providerCredentialSource(preset, { agentDir }) !== "missing") return true;
+  }
+  return false;
 }

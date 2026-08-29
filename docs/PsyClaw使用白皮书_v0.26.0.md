@@ -230,16 +230,16 @@ psyclaw check-updates
 
 该命令只检查版本和生态状态，不修改本地环境。
 
-### 8.2 更新捆绑 Pi runtime
+### 8.2 更新 PsyClaw 和内置 Pi
 
 ```powershell
 psyclaw update
-psyclaw update --yes
+psyclaw update --check
 ```
 
-不带 `--yes` 时只给出计划；带 `--yes` 后才更新锁定的 Pi 依赖并写出回执。源码仓库优先使用 pnpm lockfile；全局 npm 安装没有 lockfile 时会回退到 npm。它不会更新 PsyClaw 本身，也不应使用 Git pull 覆盖本地开发源码。
+`psyclaw update` 默认升级 PsyClaw 整包，同时安装该版本锁定、验证过的内置 Pi，并在同一回执中报告两者的更新结果。只想查看更新计划时使用 `--check`。它不会影响系统中单独安装的 Pi，也不会自行组合未经 PsyClaw 版本验证的 Pi。源码仓库中会拒绝自覆盖，开发者应通过 Git 同步后重新构建。旧的 `--yes` 参数仍兼容，但不再需要。
 
-### 8.3 升级 PsyClaw
+### 8.3 手动升级 PsyClaw
 
 ```powershell
 npm install -g psyclaw@latest
@@ -295,7 +295,7 @@ psyclaw --help
 
 ### 是否应运行 `psyclaw update`
 
-全局安装用户升级 PsyClaw 用 `npm install -g psyclaw@latest`。`psyclaw update` 仅管理 Pi runtime；本地开发者直接改源码并运行构建。
+全局安装用户直接运行 `psyclaw update` 即可升级 PsyClaw 和内置 Pi；`npm install -g psyclaw@latest` 仅作为手动备选方式。本地开发者通过 Git 同步源码并重新构建。
 
 ## 10. 可信使用清单
 

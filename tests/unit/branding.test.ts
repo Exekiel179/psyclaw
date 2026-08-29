@@ -2,7 +2,12 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ensurePsyClawTheme, ensureQuietStartup, PSYCLAW_IDENTITY_PROMPT } from "../../src/branding.js";
+import {
+  acknowledgeBundledPiChangelog,
+  ensurePsyClawTheme,
+  ensureQuietStartup,
+  PSYCLAW_IDENTITY_PROMPT,
+} from "../../src/branding.js";
 import { PSYCLAW_THEME_NAME } from "../../src/psyclaw-theme.js";
 
 describe("psyclaw identity prompt", () => {
@@ -46,6 +51,27 @@ describe("ensureQuietStartup", () => {
       const result = await ensureQuietStartup(path);
       expect(result.wrote).toBe(true);
       expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ quietStartup: false });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("acknowledgeBundledPiChangelog", () => {
+  it("records the bundled Pi version without overwriting other settings", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "psyclaw-branding-"));
+    const path = join(dir, "settings.json");
+    try {
+      await writeFile(path, JSON.stringify({ theme: "psyclaw" }), "utf8");
+      const first = await acknowledgeBundledPiChangelog("0.84.4", path);
+      expect(first.wrote).toBe(true);
+      expect(JSON.parse(await readFile(path, "utf8"))).toEqual({
+        theme: "psyclaw",
+        lastChangelogVersion: "0.84.4",
+      });
+
+      const second = await acknowledgeBundledPiChangelog("0.84.4", path);
+      expect(second.wrote).toBe(false);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

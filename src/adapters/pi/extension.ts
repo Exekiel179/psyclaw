@@ -1,6 +1,6 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { asProject, bootstrapProject, projectPaths, runOfflineBrief, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, publishManuscript, recordCitationUse, writeHandoff } from "../../index.js";
+import { asProject, bootstrapProject, exportTraces, projectPaths, runOfflineBrief, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, publishManuscript, recordCitationUse, writeHandoff } from "../../index.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
 import { atomicWriteFile } from "../../project/jsonl.js";
@@ -11,6 +11,17 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { PROVIDER_PRESETS } from "../../setup.js";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  coreSkillNames,
+  installRecommendedSkill,
+  normalizeRecommendedSkillId,
+  readRecommendationState,
+  readRecommendedCatalog,
+  saveRecommendationState,
+  validateInstalledRecommendedSkill,
+  type RecommendationState,
+} from "../../skills/recommended.js";
+import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../tui/skill-manager.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -47,20 +58,6 @@ async function notifyError(ctx: ExtensionCommandContext, error: unknown): Promis
 
 const activeAgentRuns = new Set<string>();
 const CORE_SKILLS = new Set(["research-intake", "evidence-capture", "citation-audit", "research-brief"]);
-type RecommendationKind = "skill" | "mcp";
-interface RecommendationState { schemaVersion: "psyclaw/recommendation-state/v1"; skills: string[]; mcp: string[]; }
-
-async function recommendationState(root: string): Promise<RecommendationState> {
-  try {
-    const value = JSON.parse(await readFile(join(root, ".psyclaw", "recommendations.json"), "utf8")) as Partial<RecommendationState>;
-    return { schemaVersion: "psyclaw/recommendation-state/v1", skills: Array.isArray(value.skills) ? value.skills.filter((id): id is string => typeof id === "string") : [], mcp: Array.isArray(value.mcp) ? value.mcp.filter((id): id is string => typeof id === "string") : [] };
-  } catch { return { schemaVersion: "psyclaw/recommendation-state/v1", skills: [], mcp: [] }; }
-}
-
-async function saveRecommendationState(root: string, state: RecommendationState): Promise<void> {
-  await mkdir(join(root, ".psyclaw"), { recursive: true });
-  await atomicWriteFile(join(root, ".psyclaw", "recommendations.json"), `${JSON.stringify({ ...state, skills: [...new Set(state.skills)].sort(), mcp: [...new Set(state.mcp)].sort() }, null, 2)}\n`);
-}
 
 function coreSkillPath(name: string): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "skills", "core", name, "SKILL.md");
@@ -160,127 +157,281 @@ async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<
   return { items: [], installPrep: [] };
 }
 
-async function showRecommended(kind: "skills" | "mcp", args: string, ctx: ExtensionCommandContext): Promise<void> {
-  const { items, installPrep } = await recommendedItems(kind);
-  const state = await recommendationState(ctx.cwd);
-  const stateKey: RecommendationKind = kind === "skills" ? "skill" : "mcp";
-  const stateField: "skills" | "mcp" = kind === "skills" ? "skills" : "mcp";
+interface SkillManagerRow {
+  id: string;
+  name: string;
+  description: string;
+  sourceRef?: string;
+  installed: boolean;
+  enabled: boolean;
+  blocked: boolean;
+  reason?: string;
+}
+
+interface McpManagerRow {
+  id: string;
+  name: string;
+  description: string;
+  sourceRef?: string;
+  enabled: boolean;
+  blocked: boolean;
+  reason?: string;
+  details: string[];
+}
+
+async function skillManagerRows(root: string, state: RecommendationState): Promise<SkillManagerRow[]> {
+  const catalog = await readRecommendedCatalog();
+  return Promise.all(catalog.items.filter((item) => item.kind === "skill").map(async (item) => {
+    const id = normalizeRecommendedSkillId(item.id);
+    try {
+      await validateInstalledRecommendedSkill(root, id);
+      return {
+        id,
+        name: item.name,
+        description: String(item.description ?? ""),
+        ...(item.sourceRef === undefined ? {} : { sourceRef: item.sourceRef }),
+        installed: true,
+        enabled: state.skills.includes(id),
+        blocked: false,
+      };
+    } catch (error) {
+      const plan = catalog.installPrep.find((candidate) => normalizeRecommendedSkillId(candidate.id) === id);
+      const installable = plan?.sourceKind === "github" && typeof plan.sourceUrl === "string" &&
+        typeof plan.skillPath === "string" && typeof plan.skillName === "string" &&
+        typeof plan.ref === "string" && !["unknown", "NOASSERTION"].includes(plan.license);
+      return {
+        id,
+        name: item.name,
+        description: String(item.description ?? ""),
+        ...(item.sourceRef === undefined ? {} : { sourceRef: item.sourceRef }),
+        installed: false,
+        enabled: false,
+        blocked: !installable,
+        reason: installable ? "尚未安装" : (plan?.blockedReason ?? (error instanceof Error ? error.message : String(error))),
+      };
+    }
+  }));
+}
+
+async function mcpManagerRows(state: RecommendationState): Promise<McpManagerRow[]> {
+  const { items, installPrep } = await recommendedItems("mcp");
+  return items.map((item) => {
+    const id = String(item.id ?? "");
+    const plan = installPrep.find((candidate) => candidate.id === id);
+    const blocked = plan?.status === "blocked";
+    const dependencies = Array.isArray(plan?.dependencies)
+      ? plan.dependencies.filter((value): value is string => typeof value === "string")
+      : [];
+    return {
+      id,
+      name: String(item.name ?? id),
+      description: String(item.description ?? ""),
+      ...(typeof item.sourceRef === "string" ? { sourceRef: item.sourceRef } : {}),
+      enabled: state.mcp.includes(id),
+      blocked,
+      ...(typeof plan?.blockedReason === "string" ? { reason: plan.blockedReason } : {}),
+      details: [
+        `传输：${String(item.transport ?? "未声明")} · 风险：${String(item.risk ?? "未声明")}`,
+        `版本：${String(plan?.ref ?? "未固定")} · 许可证：${String(plan?.license ?? "未核验")}`,
+        `依赖：${dependencies.length > 0 ? dependencies.join(", ") : "无已声明依赖"}`,
+      ],
+    };
+  });
+}
+
+function skillRowLabel(row: SkillManagerRow): string {
+  const state = row.blocked ? "× 阻断" : row.enabled ? "● 已启用" : row.installed ? "○ 未启用" : "↓ 未安装";
+  return `${state}  ${row.name}  [${row.id}]`;
+}
+
+async function setRecommendedSkillEnabled(root: string, requestedId: string, enabled: boolean): Promise<void> {
+  const id = normalizeRecommendedSkillId(requestedId);
+  if (enabled) await validateInstalledRecommendedSkill(root, id);
+  const state = await readRecommendationState(root);
+  const current = new Set(state.skills);
+  if (enabled) current.add(id); else current.delete(id);
+  state.skills = [...current];
+  await saveRecommendationState(root, state);
+}
+
+function skillManagerItems(rows: SkillManagerRow[]): SkillManagerItem[] {
+  return [
+    ...coreSkillNames().map((name) => ({
+      id: `core:${name}`,
+      name,
+      description: "PsyClaw 核心研究流程 Skill。",
+      status: "core" as const,
+      sourceRef: "PsyClaw core",
+    })),
+    ...rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      status: row.blocked ? "blocked" as const : row.enabled ? "enabled" as const : row.installed ? "disabled" as const : "missing" as const,
+      ...(row.sourceRef === undefined ? {} : { sourceRef: row.sourceRef }),
+      ...(row.reason === undefined ? {} : { reason: row.reason }),
+    })),
+  ];
+}
+
+async function openSkillManager(ctx: ExtensionCommandContext, rows: SkillManagerRow[]): Promise<SkillManagerAction> {
+  return ctx.ui.custom((tui, theme, keybindings, done) => (
+    new SkillManagerComponent(skillManagerItems(rows), tui, theme, keybindings, done)
+  ));
+}
+
+function mcpManagerItems(rows: McpManagerRow[]): SkillManagerItem[] {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    status: row.blocked ? "blocked" as const : row.enabled ? "enabled" as const : "disabled" as const,
+    configuredEnabled: row.enabled,
+    ...(row.sourceRef === undefined ? {} : { sourceRef: row.sourceRef }),
+    ...(row.reason === undefined ? {} : { reason: row.reason }),
+    details: row.details,
+  }));
+}
+
+async function openMcpManager(ctx: ExtensionCommandContext, rows: McpManagerRow[]): Promise<SkillManagerAction> {
+  return ctx.ui.custom((tui, theme, keybindings, done) => (
+    new SkillManagerComponent(mcpManagerItems(rows), tui, theme, keybindings, done, {
+      title: "MCP 管理",
+      itemLabel: "MCP",
+      footer: "↑/↓ 移动 · Space 开启/关闭项目配置 · Enter 查看预检 · Esc 关闭",
+      enterAction: "install",
+      enabledText: "项目配置已开启；运行时仍需通过安装、信任和工具策略检查",
+      disabledText: "项目配置已关闭",
+      blockedText: "预检阻断；若配置曾开启，可按 Space 关闭",
+    })
+  ));
+}
+
+async function setRecommendedMcpEnabled(root: string, id: string, enabled: boolean): Promise<void> {
+  const state = await readRecommendationState(root);
+  const rows = await mcpManagerRows(state);
+  const row = rows.find((candidate) => candidate.id === id);
+  if (!row) throw new Error(`未找到推荐 MCP: ${id}`);
+  if (enabled && row.blocked) throw new Error(row.reason ?? `MCP 预检未通过: ${id}`);
+  const current = new Set(state.mcp);
+  if (enabled) current.add(id); else current.delete(id);
+  state.mcp = [...current];
+  await saveRecommendationState(root, state);
+}
+
+function mcpInstallPlan(id: string, items: Array<Record<string, unknown>>, installPrep: Array<Record<string, unknown>>): Record<string, unknown> {
+  const item = items.find((candidate) => candidate.id === id);
+  if (!item) throw new Error(`未找到推荐 MCP: ${id}`);
+  const plan = installPrep.find((candidate) => candidate.id === id);
+  return {
+    schemaVersion: "psyclaw/recommendation-install/v1",
+    kind: "mcp",
+    id,
+    name: item.name,
+    sourceRef: item.sourceRef,
+    plan: plan ?? null,
+    status: plan?.status ?? "review-required",
+    next: "这里只展示固定来源、版本、许可证和依赖预检；完成受信任安装与注册后，MCP 才能在运行时调用。",
+  };
+}
+
+async function showMcpManager(args: string, ctx: ExtensionCommandContext): Promise<void> {
+  const [verb, id] = args.trim().split(/\s+/).filter(Boolean);
+  if (verb && !["status", "enable", "disable", "install"].includes(verb)) {
+    throw new Error("Usage: /mcp [status|enable <id>|disable <id>|install <id>]");
+  }
+  if ((verb === "enable" || verb === "disable" || verb === "install") && !id) {
+    throw new Error(`Usage: /mcp ${verb} <id>`);
+  }
+  const catalog = await recommendedItems("mcp");
+  if (verb === "install") {
+    ctx.ui.notify(JSON.stringify(mcpInstallPlan(id!, catalog.items, catalog.installPrep), null, 2), "info");
+    return;
+  }
+  if (verb === "enable" || verb === "disable") {
+    await setRecommendedMcpEnabled(ctx.cwd, id!, verb === "enable");
+    ctx.ui.notify(`MCP ${id} 的项目配置已${verb === "enable" ? "开启" : "关闭"}；重启后重新检查安装、信任和工具策略`, "info");
+    return;
+  }
+
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function" || verb === "status") {
+    const rows = await mcpManagerRows(await readRecommendationState(ctx.cwd));
+    ctx.ui.notify(rows.map((row) => `${row.blocked ? "[!]" : row.enabled ? "[on]" : "[off]"} ${row.id} — ${row.name}${row.reason ? ` — ${row.reason}` : ""}`).join("\n"), "info");
+    return;
+  }
+
+  while (true) {
+    const rows = await mcpManagerRows(await readRecommendationState(ctx.cwd));
+    const action = await openMcpManager(ctx, rows);
+    if (action.type === "close") return;
+    const row = rows.find((candidate) => candidate.id === action.id);
+    if (!row) continue;
+    if (action.type === "install") {
+      ctx.ui.notify(JSON.stringify(mcpInstallPlan(row.id, catalog.items, catalog.installPrep), null, 2), "info");
+      continue;
+    }
+    if (action.type === "toggle") {
+      await setRecommendedMcpEnabled(ctx.cwd, row.id, action.enabled);
+      ctx.ui.notify(`${row.name} 的项目配置已${action.enabled ? "开启" : "关闭"}；重启后重新检查运行时可用性`, "info");
+    }
+  }
+}
+
+async function showSkillManager(args: string, ctx: ExtensionCommandContext): Promise<void> {
   const action = args.trim().split(/\s+/).filter(Boolean);
   const verb = action[0];
   const id = action[1];
-
-  if (verb && !["status", "enable", "disable", "install", "select"].includes(verb)) {
-    throw new Error(`Usage: /${kind} [status|enable <id>|disable <id>|install <id>]`);
+  if (verb && !["status", "enable", "disable", "install"].includes(verb)) {
+    throw new Error("Usage: /skills [status|enable <id>|disable <id>|install <id>]");
   }
-
-  // 1. 无参数或显式 select 时，如果处于交互 TUI 模式，则启动键盘上下键选择器
-  if ((!verb || verb === "select") && ctx.hasUI && typeof ctx.ui.select === "function") {
-    if (!items.length) {
-      ctx.ui.notify(`暂无推荐${kind === "skills" ? " Skill" : " MCP"}`, "info");
-      return;
-    }
-
-    const enabled = new Set(state[stateField]);
-    const optionLabels = items.map((item) => {
-      const isEnabled = enabled.has(String(item.id));
-      const mark = isEnabled ? "● [已启用]" : "○ [未启用]";
-      const stage = item.stage ? ` [${String(item.stage)}]` : "";
-      const desc = item.description ? ` — ${String(item.description)}` : "";
-      return `${mark} ${String(item.name)}${stage}${desc}`;
-    });
-
-    const CANCEL_LABEL = "↩️ 取消 / 返回";
-    const selected = await ctx.ui.select(
-      `选择推荐 ${kind === "skills" ? "Skill" : "MCP"}（使用键盘 ↑/↓ 移动光标，Enter 确认）:`,
-      [...optionLabels, CANCEL_LABEL],
-    );
-
-    if (!selected || selected === CANCEL_LABEL) return;
-
-    const selectedIndex = optionLabels.indexOf(selected);
-    if (selectedIndex < 0 || selectedIndex >= items.length) return;
-
-    const selectedItem = items[selectedIndex];
-    if (!selectedItem) return;
-    const targetId = String(selectedItem.id);
-    const isCurrentlyEnabled = enabled.has(targetId);
-
-    const actionChoice = await ctx.ui.select(
-      `管理推荐 ${kind === "skills" ? "Skill" : "MCP"}: ${String(selectedItem.name)} (${targetId})`,
-      [
-        isCurrentlyEnabled ? `🔴 禁用 (Disable ${String(selectedItem.name)})` : `🟢 启用 (Enable ${String(selectedItem.name)})`,
-        `📦 查看安装预检与依赖计划 (Install Plan)`,
-        `🌐 查看来源仓库 (${String(selectedItem.sourceRef ?? "无")})`,
-        `↩️ 取消`,
-      ],
-    );
-
-    if (!actionChoice || actionChoice === "↩️ 取消") return;
-
-    if (actionChoice.startsWith("🔴") || actionChoice.startsWith("🟢")) {
-      const nextAction = isCurrentlyEnabled ? "disable" : "enable";
-      if (await ctx.ui.confirm(`${nextAction === "enable" ? "启用" : "禁用"}推荐${stateKey === "skill" ? " Skill" : " MCP"}`, `${String(selectedItem.name)} 的状态将写入当前项目配置。`)) {
-        const current = new Set(state[stateField]);
-        if (nextAction === "enable") current.add(targetId); else current.delete(targetId);
-        state[stateField] = [...current];
-        await saveRecommendationState(ctx.cwd, state);
-        ctx.ui.notify(`${nextAction === "enable" ? "已启用" : "已禁用"} ${String(selectedItem.name)}（/reload 后生效；打开 /panel 可可视化管理）`, "info");
-      }
-      return;
-    }
-
-    if (actionChoice.startsWith("📦")) {
-      const plan = installPrep.find((candidate) => candidate.id === targetId);
-      ctx.ui.notify(JSON.stringify({
-        schemaVersion: "psyclaw/recommendation-install/v1",
-        kind: stateKey,
-        id: targetId,
-        name: selectedItem.name,
-        sourceRef: selectedItem.sourceRef,
-        plan: plan ?? null,
-        status: plan?.status ?? "review-required",
-        next: "安装预检与启用是两个步骤；打开 /panel 查看完整计划，安装完成后再执行启用。",
-      }, null, 2), "info");
-      return;
-    }
-
-    if (actionChoice.startsWith("🌐")) {
-      ctx.ui.notify(`来源仓库: ${String(selectedItem.sourceRef ?? "无")}`, "info");
-      return;
-    }
-    return;
-  }
-
-  // 2. 命令行显式参数调用
   if ((verb === "enable" || verb === "disable" || verb === "install") && !id) {
-    throw new Error(`Usage: /${kind} ${verb} <id>`);
+    throw new Error(`Usage: /skills ${verb} <id>`);
   }
-
-  if (verb === "enable" || verb === "disable") {
-    const item = items.find((candidate) => candidate.id === id);
-    if (!item) throw new Error(`未找到推荐${stateKey === "skill" ? " Skill" : " MCP"}: ${id}`);
-    if (!ctx.hasUI || !(await ctx.ui.confirm(`${verb === "enable" ? "启用" : "禁用"}推荐${stateKey === "skill" ? " Skill" : " MCP"}`, `${String(item.name)} 的状态将写入当前项目配置。`))) return;
-    const current = new Set(state[stateField]);
-    if (verb === "enable") current.add(id!); else current.delete(id!);
-    state[stateField] = [...current];
-    await saveRecommendationState(ctx.cwd, state);
-    ctx.ui.notify(`${verb === "enable" ? "已启用" : "已禁用"} ${String(item.name)}（/reload 后生效；打开 /panel 可可视化管理）`, "info");
-    return;
-  }
-
   if (verb === "install") {
-    const item = items.find((candidate) => candidate.id === id);
-    const plan = installPrep.find((candidate) => candidate.id === id);
-    if (!item) throw new Error(`未找到推荐${kind === "skills" ? " Skill" : " MCP"}: ${id}`);
-    ctx.ui.notify(JSON.stringify({ schemaVersion: "psyclaw/recommendation-install/v1", kind: stateKey, id, name: item.name, sourceRef: item.sourceRef, plan: plan ?? null, status: plan?.status ?? "review-required", next: "安装预检与启用是两个步骤；打开 /panel 查看完整计划，安装完成后再执行启用。" }, null, 2), "info");
+    const result = await installRecommendedSkill(ctx.cwd, id!);
+    ctx.ui.notify(`${result.installed ? "已安装" : "已经安装"} ${result.skillName}\n${result.path}\n安装不会自动启用，请返回 /skills 开启。`, "info");
+    return;
+  }
+  if (verb === "enable" || verb === "disable") {
+    await setRecommendedSkillEnabled(ctx.cwd, id!, verb === "enable");
+    ctx.ui.notify(`${verb === "enable" ? "已启用" : "已停用"} ${normalizeRecommendedSkillId(id!)}，下次启动 PsyClaw 生效`, "info");
     return;
   }
 
-  // 3. 非交互模式或 status 命令回退输出
-  const enabled = new Set(state[stateField]);
-  const lines = items.map((item) => `${enabled.has(String(item.id)) ? "[on]" : "[off]"} ${String(item.id)} — ${String(item.name)}  (/${kind} enable|disable ${String(item.id)})`);
-  lines.push("", "可视化管理：打开 /panel（推荐 + 现有 Skill/MCP 的启用/停用）");
-  ctx.ui.notify(lines.length ? lines.join("\n") : `暂无推荐${kind === "skills" ? " Skill" : " MCP"}`, "info");
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function" || verb === "status") {
+    const state = await readRecommendationState(ctx.cwd);
+    const rows = await skillManagerRows(ctx.cwd, state);
+    const lines = [
+      ...coreSkillNames().map((name) => `● 内置  ${name}`),
+      ...rows.map((row) => `${skillRowLabel(row)}${row.reason ? ` — ${row.reason}` : ""}`),
+    ];
+    ctx.ui.notify(lines.join("\n"), "info");
+    return;
+  }
+
+  while (true) {
+    const state = await readRecommendationState(ctx.cwd);
+    const rows = await skillManagerRows(ctx.cwd, state);
+    const action = await openSkillManager(ctx, rows);
+    if (action.type === "close") return;
+    const row = rows.find((candidate) => candidate.id === action.id);
+    if (!row) continue;
+    if (action.type === "install") {
+      const approved = await ctx.ui.confirm("安装推荐 Skill？", `${row.name}\n固定来源：${row.sourceRef ?? row.id}\n安装到当前项目，安装完成后仍由你决定是否启用。`);
+      if (!approved) continue;
+      try {
+        const result = await installRecommendedSkill(ctx.cwd, row.id);
+        ctx.ui.notify(`${result.installed ? "安装完成" : "已经安装"}：${result.skillName}`, "info");
+      } catch (error) {
+        await notifyError(ctx, error);
+      }
+      continue;
+    }
+    if (action.type === "toggle") {
+      await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
+      ctx.ui.notify(`已${action.enabled ? "启用" : "停用"} ${row.name}，重启 PsyClaw 后生效`, "info");
+    }
+  }
 }
 
 type WorkflowResultLike = Awaited<ReturnType<typeof runMetaAnalysis>>;
@@ -446,16 +597,16 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("skills", {
-    description: "查看并启用/禁用推荐 Skill",
+    description: "打开 Skill 安装与启用管理页",
     handler: async (args, ctx) => {
-      try { await showRecommended("skills", args, ctx); } catch (error) { await notifyError(ctx, error); }
+      try { await showSkillManager(args, ctx); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
   if (!legacyTestApi) pi.registerCommand("mcp", {
-    description: "查看并启用/禁用推荐 MCP",
+    description: "打开 MCP 配置与预检管理页",
     handler: async (args, ctx) => {
-      try { await showRecommended("mcp", args, ctx); } catch (error) { await notifyError(ctx, error); }
+      try { await showMcpManager(args, ctx); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
@@ -473,10 +624,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         }
         if (kind !== "skill" && kind !== "mcp") throw new Error("Usage: /install skill|mcp <id>");
         if (!id) {
-          await showRecommended(kind === "skill" ? "skills" : "mcp", "", ctx);
+          if (kind === "skill") await showSkillManager("", ctx);
+          else await showMcpManager("", ctx);
           return;
         }
-        await showRecommended(kind === "skill" ? "skills" : "mcp", `install ${id}`, ctx);
+        if (kind === "skill") await showSkillManager(`install ${id}`, ctx);
+        else await showMcpManager(`install ${id}`, ctx);
       } catch (error) { await notifyError(ctx, error); }
     },
   });
@@ -536,6 +689,26 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       ctx.ui.notify(`启动横幅宠物已${action === "on" ? "开启" : "关闭"}，下次启动生效`, "info");
     },
   });
+
+  const traceCommand = {
+    description: "导出脱敏使用路径，供 Langfuse 或 LangSmith 分析",
+    handler: async (args: string, ctx: ExtensionCommandContext) => {
+      try {
+        if (args.trim()) throw new Error("Usage: /trace");
+        const result = await exportTraces({ root: ctx.cwd });
+        ctx.ui.notify([
+          "使用路径已导出（未上传）",
+          `文件：${result.output}`,
+          `轨迹：${result.traces}`,
+          `步骤：${result.spans}`,
+          "隐私：不含对话正文、工具参数、原始 ID 或绝对路径",
+        ].join("\n"), "info");
+      } catch (error) {
+        await notifyError(ctx, error);
+      }
+    },
+  };
+  pi.registerCommand("trace", traceCommand);
 
   if (typeof pi.registerTool === "function") {
   pi.registerTool({
