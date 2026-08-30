@@ -78,8 +78,8 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   await applyRuntimeBranding(root);
   const developerMode = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const toolAllowlist = developerMode
-    ? "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench"
-    : "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench";
+    ? "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp"
+    : "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp";
   // The base identity is fixed; the user may only append a project supplement
   // (managed from the panel), never rewrite the base.
   let identityPrompt = PSYCLAW_IDENTITY_PROMPT;

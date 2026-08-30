@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.6 - 2026-08-30
+
+- Added a live stdio MCP bridge so enabled project/user MCP configurations are discoverable and callable by the active model; existing MNE MCP configurations no longer stop at installation state.
+- Added `/skill <name> [task]` and loaded local Claude, Codex, and shared Agents Skill directories alongside PsyClaw Skills; Pi's native `/skill:<name>` remains available.
+- Kept Skill and MCP discovery reloadable through `/reload` without copying or forking Pi's resource runtime.
+
 ## 0.27.5 - 2026-08-30
 
 - Added `/run` as the explicit controlled research workflow entry after `/init`; ordinary conversations remain unintrusive.

@@ -2,20 +2,20 @@
 
 PsyClaw 是面向社会科学研究的 Pi 工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到官方 Pi runtime 上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.5`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
+当前版本：`0.27.6`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.5
+npm install -g psyclaw@0.27.6
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.5 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.6 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
@@ -67,6 +67,8 @@ psyclaw brief
 | 打开科研面板 | 在对话中输入 `/panel` |
 | 查看或切换 Provider | 在对话中输入 `/provider` 或 `/provider <id>` |
 | 管理启动横幅宠物 | `/pet status`、`/pet on`、`/pet off`（默认关闭） |
+| 调用本机 Skill | `/skill <name> [任务]` 或 Pi 原生 `/skill:<name>` |
+| 调用已配置 MCP | 模型通过 `psyclaw_mcp` 自动发现并调用 `.psyclaw/mcp/*.json` 中启用的服务器 |
 
 `psyclaw update` 会更新 PsyClaw 整包，并同时安装该版本锁定、验证过的内置 Pi；它不会更新或删除系统中单独安装的 `pi` 命令。在源码仓库中运行时，命令会停止并提示通过 Git 更新，不会覆盖本地修改。
 仅查看更新计划而不执行时，使用 `psyclaw update --check`。旧的 `--yes` 参数仍兼容，但不再需要。
