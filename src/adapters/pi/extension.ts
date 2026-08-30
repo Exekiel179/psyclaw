@@ -8,6 +8,7 @@ import { RunEventLog } from "../../panel/events.js";
 import { readProject } from "../../research/ledger.js";
 import { join } from "node:path";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { PROVIDER_PRESETS, saveProviderConfig } from "../../setup.js";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +26,7 @@ import {
   type RecommendationState,
 } from "../../skills/recommended.js";
 import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../tui/skill-manager.js";
+import { RuntimeMcpRegistry } from "../../integrations/mcp-runtime.js";
 import {
   ProviderPickerComponent,
   SecretInputComponent,
@@ -700,11 +702,23 @@ const WORKFLOW_RUNNERS = {
 export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
+  const runtimeMcps = new RuntimeMcpRegistry();
   if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event, ctx) => {
     const enabled = await enabledRecommendedSkillPaths(event.cwd);
     for (const warning of enabled.warnings) ctx.ui.notify(`PsyClaw Skill: ${warning}`, "warning");
-    return { skillPaths: enabled.paths };
+    const localSkillPaths = [
+      join(homedir(), ".claude", "skills"),
+      join(homedir(), ".claude", "commands"),
+      join(homedir(), ".codex", "skills"),
+      join(homedir(), ".agents", "skills"),
+      join(event.cwd, ".claude", "skills"),
+      join(event.cwd, ".claude", "commands"),
+      join(event.cwd, ".codex", "skills"),
+      join(event.cwd, ".agents", "skills"),
+    ];
+    return { skillPaths: [...enabled.paths, ...localSkillPaths] };
   });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => runtimeMcps.close());
   pi.registerCommand("init", {
     description: "初始化可追溯的研究项目",
     handler: async (args, ctx) => {
@@ -879,6 +893,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
+  if (!legacyTestApi) pi.registerCommand("skill", {
+    description: "调用任意已加载 Skill（/skill <name> [任务]）",
+    handler: async (args, ctx) => {
+      const [name, ...rest] = args.trim().split(/\s+/).filter(Boolean);
+      if (!name || !/^[a-z0-9-]+$/.test(name)) {
+        ctx.ui.notify("Usage: /skill <name> [task]；也可直接使用 /skill:<name>", "info");
+        return;
+      }
+      pi.sendUserMessage(`/skill:${name}${rest.length ? ` ${rest.join(" ")}` : ""}`, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+    },
+  });
+
   if (!legacyTestApi) pi.registerCommand("mcp", {
     description: "打开 MCP 安装与配置管理页",
     handler: async (args, ctx) => {
@@ -1019,6 +1045,37 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   pi.registerCommand("trace", traceCommand);
 
   if (typeof pi.registerTool === "function") {
+  pi.registerTool({
+    name: "psyclaw_mcp",
+    label: "MCP tools",
+    description: "List and call tools from MCP servers enabled in .psyclaw/mcp/*.json. Use action=list first, then action=call with the exact server and tool names.",
+    promptSnippet: "Discover and call enabled MCP servers such as MNE through PsyClaw.",
+    parameters: Type.Object({
+      action: Type.Union([Type.Literal("list"), Type.Literal("call")]),
+      server: Type.Optional(Type.String({ description: "Configured MCP server id, for example mne-mcp" })),
+      tool: Type.Optional(Type.String({ description: "Exact MCP tool name returned by action=list" })),
+      input: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+    }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      try {
+        if (params.action === "list") {
+          const servers = await runtimeMcps.list(ctx.cwd, params.server);
+          return { content: [{ type: "text", text: JSON.stringify({ servers }, null, 2) }], details: { action: "list", servers: servers.length } };
+        }
+        if (!params.server || !params.tool) throw new Error("server and tool are required for action=call");
+        const result = await runtimeMcps.call(ctx.cwd, params.server, params.tool, params.input ?? {});
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: { action: "call", server: params.server, tool: params.tool } };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `MCP call failed: ${error instanceof Error ? error.message : String(error)}` }],
+          details: { action: params.action, status: "failed" },
+          isError: true,
+        };
+      }
+    },
+  });
+
   pi.registerTool({
     name: "psyclaw_skill",
     label: "Research skill",
