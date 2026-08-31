@@ -1785,7 +1785,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
-  if (developerCommands || legacyTestApi) pi.registerCommand("agents", {
+  // Read-only multi-agent research is a user-facing capability.  Keep the
+  // destructive/developer commands gated, but do not hide the bounded agent
+  // runner behind PSYCLAW_DEVELOPER_COMMANDS in published builds.
+  if (!legacyTestApi) pi.registerCommand("agents", {
     description: "运行经批准的只读研究 Agent",
     handler: async (args, ctx) => {
       const objective = args.trim();

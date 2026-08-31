@@ -670,7 +670,7 @@ function runShellCommand(command: string, cwd: string): Promise<{ exitCode: numb
 }
 
 const USER_HOOK_ID = /^u-[a-z0-9][a-z0-9._-]{0,40}$/i;
-const HOOK_EVENTS = new Set(["before-analysis", "before-write", "after-analysis"]);
+const HOOK_EVENTS = new Set(["before-plan", "before-analysis", "before-delegation", "before-write", "after-analysis", "before-report", "after-report"]);
 
 function sanitizeUserHooks(body: Record<string, unknown>): Record<string, unknown> {
   const raw = Array.isArray(body.hooks) ? body.hooks : [];
@@ -679,7 +679,7 @@ function sanitizeUserHooks(body: Record<string, unknown>): Record<string, unknow
   for (const hook of hooks) {
     const id = String(hook.id ?? "");
     if (!USER_HOOK_ID.test(id)) throw new Error(`hook id must be user-managed (u- prefix): ${id || "(empty)"}`);
-    if (!HOOK_EVENTS.has(String(hook.event ?? ""))) throw new Error("hook event must be before-analysis, before-write or after-analysis");
+    if (!HOOK_EVENTS.has(String(hook.event ?? ""))) throw new Error("hook event must be before-plan, before-analysis, before-delegation, before-write, after-analysis, before-report or after-report");
     if (hook.severity !== "block" && hook.severity !== "warn") throw new Error("hook severity must be block or warn");
     if (typeof hook.message !== "string" || hook.message.trim().length < 1) throw new Error("hook message is required");
     if (hook.pattern !== undefined && (typeof hook.pattern !== "string" || hook.pattern.length > 500)) throw new Error("hook pattern must be a short string");
@@ -764,8 +764,14 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
   return createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://localhost");
     // Read-only surface: any write method is rejected before routing.
-    const runAction = /^\/api\/runs\/[A-Za-z0-9][A-Za-z0-9._-]{0,127}\/(pause|resume)$/.test(url.pathname);
-    if (request.method !== "GET" && request.method !== "HEAD" && !(request.method === "POST" && (["/api/provider-config", "/api/assistant", "/api/system-prompt", "/api/hooks", "/api/recommendation-state", "/api/install/execute", "/api/active-provider", "/api/artifact/save", "/api/manuscript", "/api/claim", "/api/evidence", "/api/doi/verify", "/api/documents/import", "/api/publish", "/api/references/verify", "/api/references/check", "/api/references/download", "/api/citations"].includes(url.pathname) || runAction))) {
+    // The panel is intentionally limited to ecosystem management and Provider
+    // configuration. Project files, runs, evidence and manuscripts are read
+    // only projections; legacy mutation routes remain unavailable over HTTP.
+    const panelWriteRoutes = ["/api/provider-config", "/api/recommendation-state", "/api/install/execute", "/api/active-provider"];
+    // Kept false for source compatibility with the legacy handler below; the
+    // method gate above makes pause/resume unreachable from the panel API.
+    const runAction = false;
+    if (request.method !== "GET" && request.method !== "HEAD" && !(request.method === "POST" && panelWriteRoutes.includes(url.pathname))) {
       response.writeHead(405, { "content-type": "application/json", allow: "GET, HEAD" });
       response.end(JSON.stringify({ error: "method not allowed" }));
       return;

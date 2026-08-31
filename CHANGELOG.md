@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.27.9 - 2026-09-01
+
+- Expanded analysis hooks across planning, input validation, delegation, writes, results, reporting, and citation completion.
+- Exposed the read-only `/agents` command to regular users while keeping destructive developer commands gated.
+- Narrowed Panel mutation routes to Provider and Skill/MCP ecosystem management; project files, evidence, manuscripts, artifacts, and run facts remain read-only.
+- Synchronized project, architecture, hook, and whitepaper documentation with the current implementation status.
+
 ## 0.27.8 - 2026-08-31
 
 - Renamed the `/skills` manager to `/skill` and removed the old `/skill <name>` forwarding behavior; loaded Skills remain callable through `/skill:<name>`.
