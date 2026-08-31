@@ -2,20 +2,20 @@
 
 PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到内置运行时上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.11`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.27.12`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.11
+npm install -g psyclaw@0.27.12
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.11 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.12 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
