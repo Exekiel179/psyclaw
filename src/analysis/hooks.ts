@@ -18,7 +18,15 @@ export interface AnalysisHookResult {
   findings: AnalysisHookFinding[];
 }
 
-export type AnalysisHookEvent = "before-analysis" | "before-write" | "after-analysis";
+/** Lifecycle points spanning planning, execution, result checking and reporting. */
+export type AnalysisHookEvent =
+  | "before-plan"
+  | "before-analysis"
+  | "before-delegation"
+  | "before-write"
+  | "after-analysis"
+  | "before-report"
+  | "after-report";
 
 /** Project-local, declarative extension. It can add blocks/warnings, never remove built-in gates. */
 export interface UserAnalysisHook {
@@ -85,12 +93,12 @@ export async function loadUserAnalysisHooks(root: string): Promise<UserAnalysisH
     if (parsed.schemaVersion !== "psyclaw/user-analysis-hooks/v1" || !Array.isArray(parsed.hooks)) return [];
     return parsed.hooks.filter((hook): hook is UserAnalysisHook =>
       typeof hook?.id === "string" && /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(hook.id) &&
-      (hook.event === "before-analysis" || hook.event === "before-write" || hook.event === "after-analysis") &&
+      (hook.event === "before-plan" || hook.event === "before-analysis" || hook.event === "before-delegation" || hook.event === "before-write" || hook.event === "after-analysis" || hook.event === "before-report" || hook.event === "after-report") &&
       (hook.severity === "block" || hook.severity === "warn") && typeof hook.message === "string" && hook.message.trim().length > 0,
     );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
-    return [{ id: "config-invalid", event: "before-analysis", severity: "block", message: "user analysis hook configuration is invalid" }];
+    return [{ id: "config-invalid", event: "before-plan", severity: "block", message: "user analysis hook configuration is invalid" }];
   }
 }
 
@@ -155,15 +163,38 @@ export function beforeWrite(root: string, targetPath: string, originalDataPaths:
   return result([...findings, ...applyUserHooks("before-write", userHooks, [targetPath, ...originalDataPaths])]);
 }
 
+/** Plan gate: ensure the analysis boundary is explicit before any delegation. */
+export function beforePlan(plan: AnalysisPlanContract, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
+  const findings: AnalysisHookFinding[] = [];
+  if (plan.confirmatory && (plan.exploratoryAnalyses?.length ?? 0) > 0 && !plan.primaryAnalysis?.trim()) {
+    findings.push({ rule: "confirmatory-plan-missing-primary", severity: "block", message: "confirmatory and exploratory analyses must have a declared primary analysis" });
+  }
+  if (!plan.confirmatory && !plan.exploratoryAnalyses?.length) {
+    findings.push({ rule: "analysis-status-unclear", severity: "warn", message: "declare whether analyses are exploratory or list the exploratory analyses" });
+  }
+  const values = [plan.primaryOutcome ?? "", plan.primaryAnalysis ?? "", ...(plan.exploratoryAnalyses ?? [])];
+  return result([...findings, ...applyUserHooks("before-plan", userHooks, values)]);
+}
+
 /** Plan gate: force pre-specification and make undisclosed researcher degrees of freedom visible. */
-export function validateAnalysisPlan(plan: AnalysisPlanContract): AnalysisHookResult {
+export function validateAnalysisPlan(plan: AnalysisPlanContract, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
   const findings: AnalysisHookFinding[] = [];
   if (!plan.primaryOutcome?.trim()) findings.push({ rule: "missing-primary-outcome", severity: "block", message: "declare a primary outcome before confirmatory analysis" });
   if (!plan.primaryAnalysis?.trim()) findings.push({ rule: "missing-primary-analysis", severity: "block", message: "declare the primary analysis method" });
   if (!plan.missingDataPlan?.trim()) findings.push({ rule: "missing-missing-data-plan", severity: "block", message: "declare missing-data handling" });
   if (!plan.multiplicityPlan?.trim()) findings.push({ rule: "missing-multiplicity-plan", severity: plan.confirmatory ? "block" : "warn", message: "declare multiplicity or explain why it is not applicable" });
   if (!plan.exclusionCriteria?.trim()) findings.push({ rule: "missing-exclusion-criteria", severity: "warn", message: "record exclusion criteria to prevent outcome-dependent filtering" });
-  return result(findings);
+  return result([...findings, ...applyUserHooks("before-plan", userHooks, [plan.primaryOutcome ?? "", plan.primaryAnalysis ?? "", ...(plan.exploratoryAnalyses ?? [])])]);
+}
+
+/** Delegation gate: require an explicit external tool and reproducibility contract. */
+export function beforeDelegation(contract: { tool?: string; scriptPath?: string; environment?: Record<string, string>; inputHashes?: Record<string, string> }, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
+  const findings: AnalysisHookFinding[] = [];
+  if (!contract.tool?.trim()) findings.push({ rule: "delegation-tool-missing", severity: "block", message: "delegated analysis must identify the statistical tool or backend" });
+  if (!contract.scriptPath?.trim()) findings.push({ rule: "delegation-script-missing", severity: "block", message: "delegated analysis must provide a reproducible script path" });
+  if (!contract.environment || Object.keys(contract.environment).length === 0) findings.push({ rule: "delegation-environment-missing", severity: "block", message: "delegated analysis must record its execution environment" });
+  if (!contract.inputHashes || Object.keys(contract.inputHashes).length === 0) findings.push({ rule: "delegation-input-hash-missing", severity: "block", message: "delegated analysis must bind its inputs to hashes" });
+  return result([...findings, ...applyUserHooks("before-delegation", userHooks, [contract.tool ?? "", contract.scriptPath ?? ""])]);
 }
 
 /** Result gate: reject p-value-only and causal overclaims; require reproducibility metadata. */
@@ -174,11 +205,26 @@ export function afterAnalysis(report: AnalysisResultContract, userHooks: readonl
   if (!report.scriptPath?.trim() || Object.keys(report.environment ?? {}).length === 0) findings.push({ rule: "reproducibility-metadata-missing", severity: "block", message: "record script path and execution environment" });
   if (!report.missingData?.handled || !report.missingData.method?.trim()) findings.push({ rule: "missing-data-undisclosed", severity: "block", message: "missing-data handling must be explicit" });
   if ((report.pValues?.length ?? 0) > 0 && (report.effectSizes?.length ?? 0) === 0) findings.push({ rule: "p-value-only-reporting", severity: "block", message: "p-values cannot be reported without effect sizes" });
+  if ((report.effectSizes?.length ?? 0) > 0 && report.effectSizes.some((effect) => effect.interval === undefined)) findings.push({ rule: "effect-size-interval-missing", severity: "warn", message: "report an uncertainty interval for each effect size when the method supports it" });
   for (const claim of report.claims ?? []) if (BLOCKED_RESULT_PHRASES.some((pattern) => pattern.test(claim))) findings.push({ rule: "overclaim-language", severity: "block", message: "claim uses significance as proof of causality; rewrite with design-appropriate uncertainty" });
   for (const [path, hash] of Object.entries(report.inputHashes ?? {})) if (!/^[a-f0-9]{64}$/i.test(hash)) findings.push({ rule: "result-input-hash-invalid", severity: "block", message: `invalid result input hash: ${path}` });
   return result([...findings, ...applyUserHooks("after-analysis", userHooks, report.claims ?? [])]);
 }
 
+/** Reporting gate: apply the same claim-language checks immediately before prose generation. */
+export function beforeReport(claims: readonly string[], userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
+  const findings = claims.filter((claim) => BLOCKED_RESULT_PHRASES.some((pattern) => pattern.test(claim)))
+    .map(() => ({ rule: "report-overclaim-language", severity: "block" as const, message: "report language exceeds the study design; separate association, uncertainty and causality" }));
+  return result([...findings, ...applyUserHooks("before-report", userHooks, claims)]);
+}
+
+export function afterReport(report: { claims?: string[]; referencesVerified?: boolean; missingCitations?: number }, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
+  const findings: AnalysisHookFinding[] = [];
+  if (report.referencesVerified === false) findings.push({ rule: "references-unverified", severity: "block", message: "all factual references must be verified before the report is finalized" });
+  if (typeof report.missingCitations === "number" && report.missingCitations > 0) findings.push({ rule: "missing-citations", severity: "block", message: "report contains claims without verified citations" });
+  return result([...findings, ...applyUserHooks("after-report", userHooks, report.claims ?? [])]);
+}
+
 export function analysisHookDigest(): string {
-  return sha256Text(JSON.stringify({ version: ANALYSIS_HOOKS_VERSION, rules: ["raw-data-write", "original-data-overwrite", "p-value-only-reporting", "overclaim-language", "reproducibility-metadata-missing"] }));
+  return sha256Text(JSON.stringify({ version: ANALYSIS_HOOKS_VERSION, events: ["before-plan", "before-analysis", "before-delegation", "before-write", "after-analysis", "before-report", "after-report"], rules: ["raw-data-write", "original-data-overwrite", "p-value-only-reporting", "effect-size-interval-missing", "overclaim-language", "reproducibility-metadata-missing", "references-unverified", "missing-citations"] }));
 }
