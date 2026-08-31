@@ -1,4 +1,5 @@
 import { lstat, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -32,6 +33,9 @@ describe("project bootstrap", () => {
       generatedAt: "2026-01-01T00:00:00.000Z",
     });
     const paths = projectPaths(root);
+    expect(paths.raw).toBe(join(root, ".psyclaw", "data", "raw"));
+    expect(existsSync(paths.raw)).toBe(true);
+    expect(existsSync(join(root, "data", "raw"))).toBe(false);
     expect(JSON.parse(await readFile(paths.project, "utf8")).id).toBe(project.id);
     expect(JSON.parse(await readFile(paths.handoffJson, "utf8")).schemaVersion).toBe("psyclaw/handoff/v1");
     expect(await readFile(paths.handoffMarkdown, "utf8")).toContain("`pnpm test`");
@@ -61,6 +65,7 @@ describe("project bootstrap", () => {
     await expect(assertSafeProjectPath(root, "C:\\outside.txt")).rejects.toThrow("escapes");
     await expect(assertSafeProjectPath(root, "\\\\server\\share\\outside.txt")).rejects.toThrow("escapes");
     await expect(assertSafeProjectPath(root, "data/raw/new.csv")).rejects.toThrow("Protected");
+    await expect(assertSafeProjectPath(root, ".psyclaw/data/raw/new.csv")).rejects.toThrow("Protected");
     const target = join(root, "notes");
     const outside = await tempProject();
     await symlink(outside, target, "junction");

@@ -7,10 +7,19 @@ import { hasConfiguredProvider, providerCredentialSource, PROVIDER_PRESETS, save
 describe("provider setup and first-run detection", () => {
   it("reports unconfigured before setup and configured after", async () => {
     const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
-    await expect(hasConfiguredProvider({ agentDir })).resolves.toBe(false);
-    const result = await setupProviders({ agentDir, providers: ["deepseek"] });
-    expect(result.providers).toEqual(["deepseek"]);
-    await expect(hasConfiguredProvider({ agentDir })).resolves.toBe(true);
+    const envNames = PROVIDER_PRESETS.map((preset) => preset.apiKeyEnv);
+    const previous = new Map(envNames.map((name) => [name, process.env[name]]));
+    for (const name of envNames) delete process.env[name];
+    try {
+      await expect(hasConfiguredProvider({ agentDir })).resolves.toBe(false);
+      const result = await setupProviders({ agentDir, providers: ["deepseek"] });
+      expect(result.providers).toEqual(["deepseek"]);
+      await expect(hasConfiguredProvider({ agentDir })).resolves.toBe(true);
+    } finally {
+      for (const [name, value] of previous) {
+        if (value === undefined) delete process.env[name]; else process.env[name] = value;
+      }
+    }
   });
 
   it("recognizes a built-in provider credential without models.json", async () => {

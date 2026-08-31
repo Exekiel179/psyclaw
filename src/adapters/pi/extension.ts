@@ -1,17 +1,16 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { asProject, bootstrapProject, exportTraces, projectPaths, runOfflineBrief, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview, writeHandoff } from "../../index.js";
+import { appendApproval, approvalInputDigest, approvePrimaryDocument, asProject, bootstrapProject, DEFAULT_RUN_APPROVAL_NODES, exportTraces, PRIMARY_PLAN_DOCUMENTS, primaryPlanApprovalStatus, projectPaths, runOfflineBrief, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview, writeHandoff } from "../../index.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
 import { atomicWriteFile } from "../../project/jsonl.js";
 import { RunEventLog } from "../../panel/events.js";
 import { readProject } from "../../research/ledger.js";
 import { join } from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { PROVIDER_PRESETS, saveProviderConfig } from "../../setup.js";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
+import { PROVIDER_PRESETS, providerCredentialSource, saveProviderConfig } from "../../setup.js";
 import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   coreSkillNames,
   enabledRecommendedSkillPaths,
@@ -26,12 +25,25 @@ import {
   type RecommendationState,
 } from "../../skills/recommended.js";
 import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../tui/skill-manager.js";
-import { RuntimeMcpRegistry } from "../../integrations/mcp-runtime.js";
 import {
-  ProviderPickerComponent,
+  enabledLocalSkillPaths,
+  enabledLocalPromptPaths,
+  readUserSkillState,
+  scanLocalSkills,
+  setLocalSkillEnabled,
+  setLocalSkillsEnabled,
+  skillNamesInPaths,
+  installLocalSkill,
+  userSkillId,
+} from "../../skills/user-skills.js";
+import {
+  RuntimeMcpRegistry,
+  setUserMcpConfigEnabled,
+  type UserMcpConfigEntry,
+} from "../../integrations/mcp-runtime.js";
+import {
   SecretInputComponent,
   type ProviderPickerItem,
-  type ProviderPickerResult,
   type SecretInputResult,
 } from "../../tui/provider-picker.js";
 
@@ -68,7 +80,19 @@ async function notifyError(ctx: ExtensionCommandContext, error: unknown): Promis
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 }
 
+async function runPluginCommand(args: string[]): Promise<void> {
+  const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
+  const modulePath = join(dirname(entry), "package-manager-cli.js");
+  const { handlePackageCommand } = await import(pathToFileURL(modulePath).href) as {
+    handlePackageCommand(commandArgs: string[]): Promise<boolean>;
+  };
+  const handled = await handlePackageCommand(args);
+  if (!handled) throw new Error(`不支持的 Plugin 操作：${args[0] ?? ""}`);
+}
+
 const activeAgentRuns = new Set<string>();
+const pendingInitApprovals = new Set<string>();
+const activeApprovalDialogs = new Set<string>();
 const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "research-brief"]);
 
 function coreSkillPath(name: string): string {
@@ -134,9 +158,10 @@ async function pickProviderItem(
   title: string,
   items: ProviderPickerItem[],
 ): Promise<string | undefined> {
-  const result = await ctx.ui.custom<ProviderPickerResult>((tui, theme, keybindings, done) =>
-    new ProviderPickerComponent(title, items, tui, theme, keybindings, done));
-  return result.type === "select" ? result.id : undefined;
+  const labels = items.map((item) => `${item.current ? "* " : ""}${item.label} (${item.id})`);
+  const selected = await ctx.ui.select(title, labels, { timeout: 60_000 });
+  const index = selected === undefined ? -1 : labels.indexOf(selected);
+  return index < 0 ? undefined : items[index]!.id;
 }
 
 async function promptProviderKey(
@@ -188,15 +213,18 @@ function academicGrillRequest(subject: string, mode: "init" | "review"): string 
     "从最上游、影响最大的未决问题开始。每一轮只问一个问题，同时给出你的推荐答案或推荐决策及主要取舍。",
     "明确区分探索性与确证性研究，不把规划内容当作已有证据。直到关键分支已经解决或明确交由研究者决定后，再整理研究规格。",
     mode === "init"
-      ? "持久化模式：init。追问完成后直接更新 academic-grill Skill 规定的全部项目文档，不再询问是否更新；写入后列出实际更新的文件。"
+      ? "持久化模式：init。追问完成后直接更新 academic-grill Skill 规定的全部项目文档，不再询问是否更新；写入后列出实际更新的文件，并把 notes/research-spec.md 与 notes/plan.md 的 Status 统一写为 awaiting-human-approval。"
       : "持久化模式：review。追问完成后先展示拟更新摘要和受影响文件，并询问我是否写回；得到明确确认前不得修改项目文档。",
   ].join("\n");
 }
 
 interface ControlledRunState {
   schemaVersion: "psyclaw/controlled-run/v1";
+  runId: string;
   projectId: string;
   objective: string;
+  selectedSkills: string[];
+  mode: "human" | "auto";
   activatedAt: string;
   status: "active";
 }
@@ -209,18 +237,21 @@ async function readControlledRun(root: string): Promise<ControlledRunState | nul
   try {
     const value = JSON.parse(await readFile(await controlledRunPath(root), "utf8")) as Partial<ControlledRunState>;
     return value.schemaVersion === "psyclaw/controlled-run/v1" && value.status === "active" && typeof value.projectId === "string" && typeof value.objective === "string" && typeof value.activatedAt === "string"
-      ? value as ControlledRunState
+      ? { ...value, runId: typeof value.runId === "string" ? value.runId : `legacy_${value.projectId}`, mode: value.mode === "auto" ? "auto" : "human", selectedSkills: Array.isArray(value.selectedSkills) ? value.selectedSkills.filter((item): item is string => typeof item === "string") : [] } as ControlledRunState
       : null;
   } catch {
     return null;
   }
 }
 
-async function activateControlledRun(root: string, projectId: string, objective: string): Promise<ControlledRunState> {
+async function activateControlledRun(root: string, runId: string, projectId: string, objective: string, selectedSkills: string[], mode: "human" | "auto"): Promise<ControlledRunState> {
   const state: ControlledRunState = {
     schemaVersion: "psyclaw/controlled-run/v1",
+    runId,
     projectId,
     objective,
+    selectedSkills: [...new Set(selectedSkills)],
+    mode,
     activatedAt: new Date().toISOString(),
     status: "active",
   };
@@ -228,10 +259,16 @@ async function activateControlledRun(root: string, projectId: string, objective:
   return state;
 }
 
-function controlledRunRequest(objective: string): string {
+function controlledRunRequest(objective: string, selectedSkills: string[], mode: "human" | "auto"): string {
   return [
-    "PsyClaw 受控研究流程已由用户通过 /run 明确启动。先读取 .psyclaw/project.json、.psyclaw/controlled-run.json、notes/research-spec.md 和 notes/plan.md。",
+    `PsyClaw ${mode === "auto" ? "自动" : "人在环路"}研究流程已由用户通过 /run 明确启动。先读取 .psyclaw/project.json、.psyclaw/controlled-run.json、.psyclaw/approvals.jsonl、notes/research-spec.md 和 notes/plan.md。`,
     `本次目标：${objective}`,
+    selectedSkills.length > 0
+      ? `本次运行由用户选择的优化 Skill：${selectedSkills.join(", ")}。在相关任务中优先加载并遵循这些 Skill；同名 Skill 只加载一次。`
+      : "本次运行未指定额外 Skill，使用 PsyClaw 默认研究流程。不要删除、停用或改写已安装的其他 Skill。",
+    mode === "auto"
+      ? "自动模式：计划内普通步骤连续推进，不再逐项询问；运行时会自动记录审批。原始数据、凭据、破坏性命令、伦理决定、未经核验的事实与外部发布仍必须停止并请求用户决定。"
+      : "人在环路模式：每个有副作用或关键方法决策的步骤都必须通过交互审批；拒绝或超时立即停止，不得绕过审批。",
     "实际推进当前尚未完成的研究任务；先形成或更新符合学术规范的 Markdown 分析报告，不能只描述计划。分析报告必须清楚区分数据来源、统计结果、文献证据、限制与尚未核验内容。",
     "分析报告完成后，下一步不是直接询问是否导出 DOCX，而是询问用户是否据此撰写论文。",
     "若用户选择撰写论文，再单独询问是否先进行文献调研，并说明该阶段可能花费较长时间；提示用户可以指定已启用的 Skill，或者选择 PsyClaw 默认的文献调研方式。不要在获得答复前自动开始长时调研。",
@@ -240,6 +277,134 @@ function controlledRunRequest(objective: string): string {
     "开放获取 PDF 自动保存到 literature/pdfs/。不得绕过付费墙；没有合法开放全文时给出 https://doi.org/<DOI> 可点击链接，提示用户通过自己的权限下载到系统给出的目标路径。论文中的每篇引用都必须完成 DOI 核验并有本地 PDF，否则列出缺失项并保持正文或发布状态为 blocked。",
     "如果用户在未完成文献调研、全文写作或评审前要求导出 DOCX，允许导出当前分析报告，但必须明确标为遵循学术规范的分析报告，不得称为论文。",
   ].join("\n");
+}
+
+interface RunArguments {
+  objective: string;
+  requestedSkills?: string[];
+  mode: "human" | "auto";
+}
+
+function parseRunArgs(args: string): RunArguments {
+  const value = args.trim();
+  const auto = value === "auto" || value.startsWith("auto ");
+  const rest = auto ? value.slice(4).trim() : value;
+  if (!rest.startsWith("--skills")) return { objective: rest, mode: auto ? "auto" : "human" };
+  const match = rest.match(/^--skills(?:=|\s+)([^\s]+)(?:\s+([\s\S]*))?$/);
+  if (!match) throw new Error("Usage: /run [auto] [--skills skill-a,skill-b] [objective]");
+  return {
+    objective: (match[2] ?? "").trim(),
+    requestedSkills: [...new Set(match[1]!.split(",").map((item) => item.trim()).filter(Boolean))],
+    mode: auto ? "auto" : "human",
+  };
+}
+
+async function planDocumentsReady(root: string): Promise<boolean> {
+  try {
+    const [spec, plan] = await Promise.all([
+      readFile(join(root, "notes", "research-spec.md"), "utf8"),
+      readFile(join(root, "notes", "plan.md"), "utf8"),
+    ]);
+    return /Status:\s*awaiting-human-approval/i.test(spec) && /Status:\s*awaiting-human-approval/i.test(plan);
+  } catch { return false; }
+}
+
+async function reviewPrimaryDocuments(ctx: Pick<ExtensionCommandContext, "hasUI" | "cwd" | "ui">): Promise<boolean> {
+  if (!ctx.hasUI || activeApprovalDialogs.has(ctx.cwd)) return false;
+  if (!(await planDocumentsReady(ctx.cwd))) {
+    ctx.ui.notify("主要计划文档尚未生成完成；请先完成 /init 的学术追问。", "warning");
+    return false;
+  }
+  activeApprovalDialogs.add(ctx.cwd);
+  try {
+    for (const document of PRIMARY_PLAN_DOCUMENTS) {
+      const choice = await ctx.ui.select(
+        `审批${document.title}：${document.path}`,
+        ["批准当前版本", "拒绝并返回修改"],
+        { timeout: 120_000 },
+      );
+      const approved = choice === "批准当前版本";
+      await approvePrimaryDocument(ctx.cwd, document, approved ? "approved" : "rejected");
+      if (!approved) {
+        ctx.ui.notify(`${document.title}未批准；修改后运行 /approve 重新审批。`, "warning");
+        return false;
+      }
+    }
+    ctx.ui.notify("主要计划文档已批准。文档内容变化后审批会自动失效。", "info");
+    return true;
+  } finally {
+    activeApprovalDialogs.delete(ctx.cwd);
+  }
+}
+
+async function approveRunNodes(ctx: ExtensionCommandContext, runId: string, mode: "human" | "auto"): Promise<boolean> {
+  for (const node of DEFAULT_RUN_APPROVAL_NODES) {
+    if (mode === "auto") {
+      await appendApproval(ctx.cwd, { kind: "step", nodeId: node.id, decision: "auto-approved", actor: "auto", runId, summary: node.summary });
+      continue;
+    }
+    const options = node.required ? ["批准", "拒绝并停止"] : ["批准", "本次跳过", "拒绝并停止"];
+    const choice = await ctx.ui.select(`${node.title}\n${node.summary}`, options, { timeout: 120_000 });
+    const decision = choice === "批准" ? "approved" : choice === "本次跳过" ? "skipped" : "rejected";
+    await appendApproval(ctx.cwd, { kind: "step", nodeId: node.id, decision, actor: "human", runId, summary: node.summary });
+    if (decision === "rejected" || (node.required && decision !== "approved")) return false;
+  }
+  return true;
+}
+
+function toolApprovalSummary(toolName: string, input: unknown): string {
+  const record = input && typeof input === "object" && !Array.isArray(input) ? input as Record<string, unknown> : {};
+  const target = [record.path, record.file_path, record.command, record.action, record.server, record.tool]
+    .find((value) => typeof value === "string") as string | undefined;
+  return `${toolName}${target ? `: ${target.slice(0, 240)}` : ""}`;
+}
+
+function toolNeedsApproval(toolName: string, input: unknown): boolean {
+  if (["write", "edit", "bash", "powershell", "psyclaw_workbench", "psyclaw_mcp"].includes(toolName)) return true;
+  const action = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>).action : undefined;
+  return typeof action === "string" && /write|save|publish|install|download|execute|call/i.test(action);
+}
+
+function autoApprovalBlocked(toolName: string, input: unknown): string | undefined {
+  const text = JSON.stringify(input ?? {}).toLocaleLowerCase();
+  if (/data[\\/]raw|credential|secret|auth\.json|api[_ -]?key/.test(text)) return "自动模式不能批准原始数据或凭据路径操作";
+  if (["bash", "powershell"].includes(toolName) && /\b(rm|rmdir|del|remove-item|format|shutdown|reboot|git\s+reset\s+--hard)\b/i.test(text)) {
+    return "自动模式不能批准破坏性命令";
+  }
+  return undefined;
+}
+
+async function selectableRunSkills(root: string): Promise<Array<{ id: string; name: string }>> {
+  const state = await readRecommendationState(root);
+  const rows = await skillManagerRows(root, state);
+  const available = [
+    ...coreSkillNames().map((name) => ({ id: name, name })),
+    ...rows.filter((row) => row.installed && row.enabled && !row.blocked).map((row) => ({ id: row.id, name: row.name })),
+  ];
+  const seen = new Set<string>();
+  return available.filter((skill) => {
+    const key = skill.name.trim().toLocaleLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function resolveRunSkills(requested: string[], available: Array<{ id: string; name: string }>): string[] {
+  const lookup = new Map<string, string>();
+  for (const skill of available) {
+    lookup.set(skill.id.toLocaleLowerCase(), skill.name);
+    lookup.set(skill.name.toLocaleLowerCase(), skill.name);
+  }
+  const selected: string[] = [];
+  const unknown: string[] = [];
+  for (const value of requested) {
+    const name = lookup.get(value.toLocaleLowerCase());
+    if (!name) unknown.push(value);
+    else if (!selected.some((item) => item.toLocaleLowerCase() === name.toLocaleLowerCase())) selected.push(name);
+  }
+  if (unknown.length > 0) throw new Error(`本次运行不可用的 Skill：${unknown.join(", ")}。请先通过 /skill 安装或启用。`);
+  return selected;
 }
 
 async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<Record<string, unknown>>; externalTools: Array<Record<string, unknown>>; installPrep: Array<Record<string, unknown>> }> {
@@ -273,9 +438,12 @@ interface SkillManagerRow {
   collection: boolean;
   installed: boolean;
   enabled: boolean;
-  scope: RecommendedSkillScope;
+  scope: RecommendedSkillScope | "local";
   blocked: boolean;
   reason?: string;
+  /** `recommended` rows come from the catalog; `local` rows are user-installed skills. */
+  source: "recommended" | "local";
+  duplicatePaths?: string[];
 }
 
 interface McpManagerRow {
@@ -285,15 +453,19 @@ interface McpManagerRow {
   sourceRef?: string;
   enabled: boolean;
   details: string[];
+  source: "recommended" | "user";
+  /** Present for user-configured rows so the toggle can rewrite the config file. */
+  userEntry?: UserMcpConfigEntry;
 }
 
-function skillScopeLabel(scope: RecommendedSkillScope): string {
+function skillScopeLabel(scope: RecommendedSkillScope | "local"): string {
+  if (scope === "local") return "用户本地目录（所有项目可发现）";
   return scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）";
 }
 
 async function skillManagerRows(root: string, state: RecommendationState): Promise<SkillManagerRow[]> {
   const catalog = await readRecommendedCatalog();
-  return Promise.all(catalog.items.filter((item) => item.kind === "skill").map(async (item) => {
+  const recommendedRows = await Promise.all(catalog.items.filter((item) => item.kind === "skill").map(async (item) => {
     const id = normalizeRecommendedSkillId(item.id);
     const scope = state.skillScopes?.[id] ?? "project";
     try {
@@ -309,8 +481,19 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         enabled: state.skills.includes(id),
         scope,
         blocked: false,
+        source: "recommended" as const,
       };
-    } catch {
+    } catch (validationError) {
+      // A managed target that exists on disk but fails validation (e.g. a URL
+      // install whose manifest/hash does not match the pinned catalog) is still
+      // shown as installed so the user sees it; enabling it only takes effect
+      // once the install is repaired through /install.
+      let onDisk = false;
+      try {
+        const target = recommendedSkillTarget(root, id, scope);
+        const stat = await lstat(target);
+        onDisk = stat.isDirectory();
+      } catch { /* target missing */ }
       return {
         id,
         name: item.name,
@@ -318,21 +501,53 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         ...(item.sourceRef === undefined ? {} : { sourceRef: item.sourceRef }),
         ...(typeof item.installHint === "string" ? { installHint: item.installHint } : {}),
         collection: item.skillLayout === "collection",
-        installed: false,
-        enabled: false,
+        installed: onDisk,
+        enabled: onDisk && state.skills.includes(id),
         scope,
         blocked: typeof item.sourceRef !== "string" || !/^https:\/\//.test(item.sourceRef),
-        reason: typeof item.sourceRef === "string" && /^https:\/\//.test(item.sourceRef)
-          ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
-          : "没有可交给模型检查的来源网址",
+        reason: onDisk
+          ? `已检测到目录但未通过来源/许可/哈希校验${state.skills.includes(id) ? "（当前配置为启用，但校验失败不会加载）" : ""}；可按 Enter 重新安装修复`
+          : typeof item.sourceRef === "string" && /^https:\/\//.test(item.sourceRef)
+            ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
+            : "没有可交给模型检查的来源网址",
+        source: "recommended" as const,
       };
     }
   }));
+  // Merge user-installed local skills from the expanded discovery roots so the
+  // management page shows them and lets the user toggle each one.  Managed
+  // recommended installs are excluded here — they are shown through their
+  // recommended rows above (including on-disk-but-unvalidated installs).
+  const userState = await readUserSkillState(root);
+  const disabled = new Set(userState.disabled);
+  const localSkills = await scanLocalSkills(root, { includeManaged: false });
+  const localRows: SkillManagerRow[] = localSkills.map((skill) => ({
+    id: userSkillId(skill.name),
+    name: skill.name,
+    description: skill.description,
+    sourceRef: skill.path,
+    collection: false,
+    installed: true,
+    enabled: !disabled.has(skill.name),
+    scope: "local",
+    blocked: false,
+    source: "local",
+    duplicatePaths: skill.duplicatePaths,
+  }));
+  // A catalog skill that is actually installed is shown once through its
+  // recommended row (which carries source/trust info); purely local skills —
+  // including a local copy of a catalog skill that failed managed validation —
+  // are appended so they stay visible and toggleable.
+  const installedRecommendedNames = new Set(
+    recommendedRows.filter((row) => row.installed).map((row) => row.name.toLocaleLowerCase()),
+  );
+  const uniqueLocalRows = localRows.filter((row) => !installedRecommendedNames.has(row.name.toLocaleLowerCase()));
+  return [...recommendedRows, ...uniqueLocalRows];
 }
 
-async function mcpManagerRows(state: RecommendationState): Promise<McpManagerRow[]> {
+async function mcpManagerRows(root: string, state: RecommendationState, runtime: RuntimeMcpRegistry): Promise<McpManagerRow[]> {
   const { items, installPrep } = await recommendedItems("mcp");
-  return items.map((item) => {
+  const recommendedRows: McpManagerRow[] = items.map((item) => {
     const id = String(item.id ?? "");
     const plan = installPrep.find((candidate) => candidate.id === id);
     const dependencies = Array.isArray(plan?.dependencies)
@@ -344,12 +559,35 @@ async function mcpManagerRows(state: RecommendationState): Promise<McpManagerRow
       description: String(item.description ?? ""),
       ...(typeof item.sourceRef === "string" ? { sourceRef: item.sourceRef } : {}),
       enabled: state.mcp.includes(id),
+      source: "recommended" as const,
       details: [
         `传输：${String(item.transport ?? "未声明")} · 风险：${String(item.risk ?? "未声明")}`,
         `参考版本：${String(plan?.ref ?? "由模型读取来源确定")} · 许可证：${String(plan?.license ?? "由模型读取来源确定")}`,
         `可能需要：${dependencies.length > 0 ? dependencies.join(", ") : "由模型读取来源确定"}`,
       ],
     };
+  });
+  // Merge user-configured MCP servers (`.psyclaw/mcp/*.json` and
+  // `~/.psyclaw/mcp/*.json`) so the management page shows them too, even when
+  // disabled.  User rows win over a same-id recommended row.
+  const userRows: McpManagerRow[] = (await runtime.listUserConfigs(root)).map((entry) => ({
+    id: entry.id,
+    name: entry.name,
+    description: `用户配置：${entry.command}`,
+    enabled: entry.enabled,
+    source: "user" as const,
+    userEntry: entry,
+    details: [
+      `传输：stdio · 范围：${entry.scope === "user" ? "用户级" : "项目级"}`,
+      `配置：${entry.path}`,
+    ],
+  }));
+  const merged = new Map(recommendedRows.map((row) => [row.id, row]));
+  for (const row of userRows) merged.set(row.id, row);
+  return [...merged.values()].sort((left, right) => {
+    if (left.source === "user" && right.source !== "user") return -1;
+    if (right.source === "user" && left.source !== "user") return 1;
+    return left.id.localeCompare(right.id);
   });
 }
 
@@ -385,7 +623,12 @@ function skillManagerItems(rows: SkillManagerRow[]): SkillManagerItem[] {
       description: row.description,
       status: row.blocked ? "blocked" as const : row.enabled ? "enabled" as const : row.installed ? "disabled" as const : "missing" as const,
       ...(row.sourceRef === undefined ? {} : { sourceRef: row.sourceRef }),
-      details: [`安装位置：${skillScopeLabel(row.scope)}`],
+      details: [
+        `安装位置：${skillScopeLabel(row.scope)}`,
+        ...(row.duplicatePaths && row.duplicatePaths.length > 0
+          ? [`已忽略 ${row.duplicatePaths.length} 个同名来源`]
+          : []),
+      ],
       ...(row.reason === undefined ? {} : { reason: row.reason }),
     })),
   ];
@@ -414,23 +657,24 @@ async function openMcpManager(ctx: ExtensionCommandContext, rows: McpManagerRow[
     new SkillManagerComponent(mcpManagerItems(rows), tui, theme, keybindings, done, {
       title: "MCP 管理",
       itemLabel: "MCP",
-      footer: "↑/↓ 移动 · Space 开启/关闭项目配置 · Enter 交给模型安装并配置 · Esc 关闭",
+      footer: "↑/↓ 移动 · Space 开启/关闭 · a 全部开启 · d 全部关闭 · Enter 交给模型安装并配置 · Esc 关闭",
       enterAction: "install",
-      enabledText: "项目配置已开启；Enter 可让当前模型重新安装或修复配置",
-      disabledText: "项目配置已关闭",
+      enabledText: "已开启；Enter 可让当前模型重新安装或修复推荐配置",
+      disabledText: "已关闭",
     })
   ));
 }
 
 async function setRecommendedMcpEnabled(root: string, id: string, enabled: boolean): Promise<void> {
   const state = await readRecommendationState(root);
-  const rows = await mcpManagerRows(state);
-  const row = rows.find((candidate) => candidate.id === id);
-  if (!row) throw new Error(`未找到推荐 MCP: ${id}`);
   const current = new Set(state.mcp);
   if (enabled) current.add(id); else current.delete(id);
   state.mcp = [...current];
   await saveRecommendationState(root, state);
+}
+
+async function setUserMcpEnabled(entry: UserMcpConfigEntry, enabled: boolean): Promise<void> {
+  await setUserMcpConfigEnabled(entry, enabled);
 }
 
 function modelMcpInstallTask(root: string, row: McpManagerRow, plan?: Record<string, unknown>): string {
@@ -456,47 +700,75 @@ async function queueModelMcpInstall(pi: ExtensionAPI, ctx: ExtensionCommandConte
   ctx.ui.notify(`已将 ${row.name} 的下载、安装和配置任务交给当前模型。模型完成并确认可启动后，请执行 /reload。`, "info");
 }
 
-async function showMcpManager(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
+async function showMcpManager(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext, runtime: RuntimeMcpRegistry): Promise<void> {
   const [verb, id] = args.trim().split(/\s+/).filter(Boolean);
-  if (verb && !["status", "enable", "disable", "install"].includes(verb)) {
-    throw new Error("Usage: /mcp [status|enable <id>|disable <id>|install <id>]");
+  if (verb && !["status", "enable", "disable", "enable-all", "disable-all", "install"].includes(verb)) {
+    throw new Error("Usage: /mcp [status|enable <id>|disable <id>|enable-all|disable-all|install <id>]");
   }
   if ((verb === "enable" || verb === "disable" || verb === "install") && !id) {
     throw new Error(`Usage: /mcp ${verb} <id>`);
   }
   const catalog = await recommendedItems("mcp");
   if (verb === "install") {
-    const rows = await mcpManagerRows(await readRecommendationState(ctx.cwd));
+    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
     const row = rows.find((candidate) => candidate.id === id);
     if (!row) throw new Error(`未找到推荐 MCP: ${id}`);
+    if (row.source !== "recommended") throw new Error(`MCP ${id} 已是用户配置，无需再次安装`);
     await queueModelMcpInstall(pi, ctx, row, catalog.installPrep.find((candidate) => candidate.id === row.id));
     return;
   }
+  if (verb === "enable-all" || verb === "disable-all") {
+    const enabled = verb === "enable-all";
+    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
+    for (const row of rows) {
+      if (row.source === "user" && row.userEntry) await setUserMcpEnabled(row.userEntry, enabled);
+      else await setRecommendedMcpEnabled(ctx.cwd, row.id, enabled);
+    }
+    ctx.ui.notify(`已批量${enabled ? "开启" : "关闭"}全部 MCP 配置；重启后重新检查运行时可用性`, "info");
+    return;
+  }
   if (verb === "enable" || verb === "disable") {
-    await setRecommendedMcpEnabled(ctx.cwd, id!, verb === "enable");
-    ctx.ui.notify(`MCP ${id} 的项目配置已${verb === "enable" ? "开启" : "关闭"}；重启后重新检查安装、信任和工具策略`, "info");
+    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
+    const row = rows.find((candidate) => candidate.id === id);
+    if (!row) throw new Error(`未找到 MCP: ${id}`);
+    if (row.source === "user" && row.userEntry) await setUserMcpEnabled(row.userEntry, verb === "enable");
+    else await setRecommendedMcpEnabled(ctx.cwd, row.id, verb === "enable");
+    ctx.ui.notify(`MCP ${id} 已${verb === "enable" ? "开启" : "关闭"}；重启后重新检查安装、信任和工具策略`, "info");
     return;
   }
 
   if (!ctx.hasUI || typeof ctx.ui.custom !== "function" || verb === "status") {
-    const rows = await mcpManagerRows(await readRecommendationState(ctx.cwd));
-    ctx.ui.notify(rows.map((row) => `${row.enabled ? "[on]" : "[off]"} ${row.id} — ${row.name}`).join("\n"), "info");
+    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
+    ctx.ui.notify(rows.map((row) => `${row.enabled ? "[on]" : "[off]"} ${row.id} — ${row.name}${row.source === "user" ? "（用户配置）" : ""}`).join("\n"), "info");
     return;
   }
 
   while (true) {
-    const rows = await mcpManagerRows(await readRecommendationState(ctx.cwd));
+    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
     const action = await openMcpManager(ctx, rows);
     if (action.type === "close") return;
+    if (action.type === "toggle-all") {
+      for (const row of rows) {
+        if (row.source === "user" && row.userEntry) await setUserMcpEnabled(row.userEntry, action.enabled);
+        else await setRecommendedMcpEnabled(ctx.cwd, row.id, action.enabled);
+      }
+      ctx.ui.notify(`已批量${action.enabled ? "开启" : "关闭"}全部 MCP 配置；重启后重新检查运行时可用性`, "info");
+      continue;
+    }
     const row = rows.find((candidate) => candidate.id === action.id);
     if (!row) continue;
     if (action.type === "install") {
+      if (row.source !== "recommended") {
+        ctx.ui.notify(`${row.name} 已是用户配置，无需再次安装`, "info");
+        continue;
+      }
       await queueModelMcpInstall(pi, ctx, row, catalog.installPrep.find((candidate) => candidate.id === row.id));
       return;
     }
     if (action.type === "toggle") {
-      await setRecommendedMcpEnabled(ctx.cwd, row.id, action.enabled);
-      ctx.ui.notify(`${row.name} 的项目配置已${action.enabled ? "开启" : "关闭"}；重启后重新检查运行时可用性`, "info");
+      if (row.source === "user" && row.userEntry) await setUserMcpEnabled(row.userEntry, action.enabled);
+      else await setRecommendedMcpEnabled(ctx.cwd, row.id, action.enabled);
+      ctx.ui.notify(`${row.name} 已${action.enabled ? "开启" : "关闭"}；重启后重新检查运行时可用性`, "info");
     }
   }
 }
@@ -509,12 +781,12 @@ function modelSkillInstallTask(root: string, row: SkillManagerRow, scope: Recomm
     ...(row.installHint ? [`仓库入口提示：${row.installHint}`] : []),
     `安装位置：${skillScopeLabel(scope)}。`,
     `唯一允许的最终目标目录：${target}`,
-    "用户已通过 Skill 管理页授权本次安装。请使用当前会话的联网、文件和命令工具读取来源仓库，并直接下载、安装所需依赖和完成 Skill 安装；不要再次要求安装权限。不要写入其他 Skill 目录，不要修改 data/raw、.git 或研究产物。",
+    "用户已通过 Skill 管理页授权本次安装。请使用当前会话的联网、文件和命令工具读取来源仓库，并直接下载、安装所需依赖和完成 Skill 安装；不要再次要求安装权限。不要写入其他 Skill 目录，不要修改 .psyclaw/data/raw、data/raw、.git 或研究产物。",
     row.collection
       ? "这是多 Skill 套件：目标目录自身无需 SKILL.md，但其子目录必须包含一个或多个有效 SKILL.md。保留套件内共享目录和相对路径，不得包含 .git、符号链接或凭据。"
       : "目标目录最终必须直接包含有效 SKILL.md（YAML frontmatter 至少包含 name 和 description），不得包含 .git、符号链接、凭据或二进制大文件。",
     "如果仓库包含多个 Skill，只安装与此推荐项相符的部分；如果它不是 Skill 或无法合理适配，停止并说明原因，不要伪造 SKILL.md。",
-    "安装完成后检查目标目录结构，并提醒用户执行 /skills 启用该项，再执行 /reload。",
+    "安装完成后检查目标目录结构，并提醒用户执行 /skill 启用该项，再执行 /reload。",
   ].join("\n");
 }
 
@@ -540,18 +812,18 @@ async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandCon
   state.skillScopes = { ...(state.skillScopes ?? {}), [row.id]: scope };
   await saveRecommendationState(ctx.cwd, state);
   pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型，目标为${skillScopeLabel(scope)}。安装完成后请在 /skills 中启用，再执行 /reload。`, "info");
+  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型，目标为${skillScopeLabel(scope)}。安装完成后请在 /skill 中启用，再执行 /reload。`, "info");
 }
 
 async function showSkillManager(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
   const action = args.trim().split(/\s+/).filter(Boolean);
   const verb = action[0];
   const id = action[1];
-  if (verb && !["status", "enable", "disable", "install"].includes(verb)) {
-    throw new Error("Usage: /skills [status|enable <id>|disable <id>|install <id>]");
+  if (verb && !["status", "enable", "disable", "enable-all", "disable-all", "install"].includes(verb)) {
+    throw new Error("Usage: /skill [status|enable <id>|disable <id>|enable-all|disable-all]");
   }
   if ((verb === "enable" || verb === "disable" || verb === "install") && !id) {
-    throw new Error(`Usage: /skills ${verb} <id>`);
+    throw new Error(`Usage: /skill ${verb} <id>`);
   }
   if (verb === "install") {
     const row = (await skillManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd))).find((candidate) => candidate.id === normalizeRecommendedSkillId(id!));
@@ -559,9 +831,40 @@ async function showSkillManager(pi: ExtensionAPI, args: string, ctx: ExtensionCo
     await queueModelSkillInstall(pi, ctx, row);
     return;
   }
+  if (verb === "enable-all" || verb === "disable-all") {
+    const enabled = verb === "enable-all";
+    const state = await readRecommendationState(ctx.cwd);
+    const rows = await skillManagerRows(ctx.cwd, state);
+    const managed = rows.filter((row) => row.source === "recommended" && row.installed && !row.blocked);
+    const locals = rows.filter((row) => row.source === "local");
+    const failed: string[] = [];
+    for (const row of managed) {
+      try { await setRecommendedSkillEnabled(ctx.cwd, row.id, enabled); }
+      catch { if (enabled) failed.push(row.name); }
+    }
+    if (locals.length > 0) {
+      await setLocalSkillsEnabled(ctx.cwd, locals.map((row) => row.name), enabled);
+    }
+    ctx.ui.notify(
+      enabled && failed.length > 0
+        ? `已批量启用（${failed.join("、")} 启用失败）。请运行 /reload 重新加载。`
+        : `已批量${enabled ? "启用" : "停用"}可管理的 Skill。请运行 /reload 重新加载。`,
+      enabled && failed.length > 0 ? "warning" : "info",
+    );
+    return;
+  }
   if (verb === "enable" || verb === "disable") {
-    await setRecommendedSkillEnabled(ctx.cwd, id!, verb === "enable");
-    ctx.ui.notify(`${verb === "enable" ? "已启用" : "已停用"} ${normalizeRecommendedSkillId(id!)}。请运行 /reload 重新加载。`, "info");
+    const requested = normalizeRecommendedSkillId(id!);
+    const state = await readRecommendationState(ctx.cwd);
+    const rows = await skillManagerRows(ctx.cwd, state);
+    const row = rows.find((candidate) => candidate.id === requested || candidate.name === requested || candidate.id === userSkillId(requested));
+    if (!row) throw new Error(`未找到 Skill: ${id}`);
+    if (row.source === "local") {
+      await setLocalSkillEnabled(ctx.cwd, row.name, verb === "enable");
+    } else {
+      await setRecommendedSkillEnabled(ctx.cwd, row.id, verb === "enable");
+    }
+    ctx.ui.notify(`${verb === "enable" ? "已启用" : "已停用"} ${row.name}。请运行 /reload 重新加载。`, "info");
     return;
   }
 
@@ -581,6 +884,38 @@ async function showSkillManager(pi: ExtensionAPI, args: string, ctx: ExtensionCo
     const rows = await skillManagerRows(ctx.cwd, state);
     const action = await openSkillManager(ctx, rows);
     if (action.type === "close") return;
+    if (action.type === "toggle-all") {
+      const managed = rows.filter((row) => row.source === "recommended" && row.installed && !row.blocked);
+      const locals = rows.filter((row) => row.source === "local");
+      if (action.enabled) {
+        const failed: string[] = [];
+        for (const row of managed) {
+          try { await setRecommendedSkillEnabled(ctx.cwd, row.id, true); }
+          catch { failed.push(row.name); }
+        }
+        if (locals.length > 0) {
+          const ids = locals.map((row) => row.name);
+          await setLocalSkillsEnabled(ctx.cwd, ids, true);
+        }
+        ctx.ui.notify(
+          failed.length > 0
+            ? `已启用全部可管理的 Skill（${failed.join("、")} 启用失败：可能未通过来源、许可或依赖预检）。请运行 /reload 重新加载。`
+            : `已启用全部可管理的 Skill。请运行 /reload 重新加载。`,
+          failed.length > 0 ? "warning" : "info",
+        );
+      } else {
+        for (const row of managed) {
+          try { await setRecommendedSkillEnabled(ctx.cwd, row.id, false); }
+          catch { /* already disabled */ }
+        }
+        if (locals.length > 0) {
+          const ids = locals.map((row) => row.name);
+          await setLocalSkillsEnabled(ctx.cwd, ids, false);
+        }
+        ctx.ui.notify("已停用全部可管理的 Skill。请运行 /reload 重新加载。", "info");
+      }
+      continue;
+    }
     const row = rows.find((candidate) => candidate.id === action.id);
     if (!row) continue;
     if (action.type === "install") {
@@ -588,8 +923,13 @@ async function showSkillManager(pi: ExtensionAPI, args: string, ctx: ExtensionCo
       return;
     }
     if (action.type === "toggle") {
-      await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
-      ctx.ui.notify(`已${action.enabled ? "启用" : "停用"} ${row.name}。请运行 /reload 重新加载。`, "info");
+      if (row.source === "local") {
+        await setLocalSkillEnabled(ctx.cwd, row.name, action.enabled);
+        ctx.ui.notify(`已${action.enabled ? "启用" : "停用"}本地 Skill ${row.name}。请运行 /reload 重新加载。`, "info");
+      } else {
+        await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
+        ctx.ui.notify(`已${action.enabled ? "启用" : "停用"} ${row.name}。请运行 /reload 重新加载。`, "info");
+      }
     }
   }
 }
@@ -703,22 +1043,56 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
   const runtimeMcps = new RuntimeMcpRegistry();
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event, ctx) => {
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event) => {
     const enabled = await enabledRecommendedSkillPaths(event.cwd);
-    for (const warning of enabled.warnings) ctx.ui.notify(`PsyClaw Skill: ${warning}`, "warning");
-    const localSkillPaths = [
-      join(homedir(), ".claude", "skills"),
-      join(homedir(), ".claude", "commands"),
-      join(homedir(), ".codex", "skills"),
-      join(homedir(), ".agents", "skills"),
-      join(event.cwd, ".claude", "skills"),
-      join(event.cwd, ".claude", "commands"),
-      join(event.cwd, ".codex", "skills"),
-      join(event.cwd, ".agents", "skills"),
-    ];
-    return { skillPaths: [...enabled.paths, ...localSkillPaths] };
+    const local = await enabledLocalSkillPaths(event.cwd, {
+      excludedNames: [...coreSkillNames(), ...await skillNamesInPaths(enabled.paths)],
+    });
+    // Return only existing Skill directories. Same-name local/core candidates
+    // are resolved before Pi sees them. Discovery warnings belong in /skill;
+    // they should not interrupt every startup.
+    return {
+      skillPaths: [...enabled.paths, ...local.paths],
+      promptPaths: await enabledLocalPromptPaths(event.cwd),
+    };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => runtimeMcps.close());
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
+    const run = await readControlledRun(ctx.cwd);
+    if (!run || !toolNeedsApproval(event.toolName, event.input)) return;
+    const summary = toolApprovalSummary(event.toolName, event.input);
+    if (run.mode === "auto") {
+      const blockedReason = autoApprovalBlocked(event.toolName, event.input);
+      await appendApproval(ctx.cwd, {
+        kind: "tool",
+        nodeId: event.toolCallId,
+        decision: blockedReason ? "rejected" : "auto-approved",
+        actor: "auto",
+        runId: run.runId,
+        sha256: approvalInputDigest({ toolName: event.toolName, input: event.input }),
+        summary: blockedReason ?? summary,
+      });
+      return blockedReason ? { block: true, terminate: true, reason: blockedReason } : undefined;
+    }
+    if (!ctx.hasUI) return { block: true, terminate: true, reason: "该步骤需要人在环路审批，但当前没有交互界面" };
+    const choice = await ctx.ui.select(`审批执行步骤\n${summary}`, ["批准本次执行", "拒绝并停止"], { timeout: 120_000 });
+    const approved = choice === "批准本次执行";
+    await appendApproval(ctx.cwd, {
+      kind: "tool",
+      nodeId: event.toolCallId,
+      decision: approved ? "approved" : "rejected",
+      actor: "human",
+      runId: run.runId,
+      sha256: approvalInputDigest({ toolName: event.toolName, input: event.input }),
+      summary,
+    });
+    return approved ? undefined : { block: true, terminate: true, reason: "用户拒绝该执行步骤或审批超时" };
+  });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("agent_end", async (_event, ctx) => {
+    if (!pendingInitApprovals.has(ctx.cwd) || !(await planDocumentsReady(ctx.cwd))) return;
+    pendingInitApprovals.delete(ctx.cwd);
+    await reviewPrimaryDocuments(ctx);
+  });
   pi.registerCommand("init", {
     description: "初始化可追溯的研究项目",
     handler: async (args, ctx) => {
@@ -726,8 +1100,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         const parsed = parseInitArgs(args);
         const project = await bootstrapProject({ root: ctx.cwd, ...parsed });
         if (typeof pi.sendUserMessage === "function") {
+          pendingInitApprovals.add(ctx.cwd);
           pi.sendUserMessage(academicGrillRequest(project.goal, "init"), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。现在开始学术追问；准备好后使用 /run 启动受控研究流程。`, "info");
+          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。学术追问完成并生成主要计划文档后会进入审批；全部批准后才能 /run。`, "info");
         } else {
           ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。使用 /run 启动受控研究流程。`, "info");
         }
@@ -737,18 +1112,76 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
+  if (!legacyTestApi) pi.registerCommand("approve", {
+    description: "审批 /init 生成的主要研究计划文档",
+    handler: async (_args, ctx) => {
+      try { await reviewPrimaryDocuments(ctx); } catch (error) { await notifyError(ctx, error); }
+    },
+  });
+
   if (!legacyTestApi) pi.registerCommand("run", {
-    description: "在 /init 后启动受控研究流程",
+    description: "启动受控研究流程，可用 --skills a,b 选择本次优化 Skill",
     handler: async (args, ctx) => {
       try {
-        const project = await readProject(ctx.cwd);
-        const objective = args.trim() || project.goal;
-        await activateControlledRun(ctx.cwd, project.id, objective);
-        pi.appendEntry("psyclaw:controlled-run", { projectId: project.id, objective, activatedAt: new Date().toISOString() });
-        pi.sendUserMessage(controlledRunRequest(objective), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-        ctx.ui.notify("受控研究流程已启动。分析完成后会先询问是否撰写论文；不会直接进入 DOCX 导出。", "info");
-      } catch {
-        ctx.ui.notify("请先使用 /init 初始化研究项目；未运行 /init 和 /run 时保持普通对话模式。", "warning");
+        const parsed = parseRunArgs(args);
+        let project;
+        try {
+          project = await readProject(ctx.cwd);
+        } catch (error) {
+          // No `.psyclaw/project.json` (or it is corrupt): fall back to the
+          // compliant analysis documents when present, so a project prepared
+          // outside the /init flow can be analyzed directly.
+          const { bootstrapProjectFromAnalysisDocs } = await import("../../project/bootstrap.js");
+          try {
+            project = await bootstrapProjectFromAnalysisDocs(ctx.cwd);
+          } catch (bootstrapError) {
+            ctx.ui.notify(bootstrapError instanceof Error ? bootstrapError.message : String(bootstrapError), "warning");
+            return;
+          }
+          ctx.ui.notify("检测到合规的分析文档，已自动补齐研究项目记录并启动受控流程。", "info");
+        }
+        const planApproval = await primaryPlanApprovalStatus(ctx.cwd);
+        if (!planApproval.ok) {
+          const missing = planApproval.documents.filter((item) => !item.approved).map((item) => item.path);
+          ctx.ui.notify(`主要计划尚未批准或批准后已修改：${missing.join("、")}。请运行 /approve。`, "warning");
+          return;
+        }
+        const available = await selectableRunSkills(ctx.cwd);
+        let requestedSkills = parsed.requestedSkills;
+        if (parsed.mode === "auto" && requestedSkills === undefined) requestedSkills = [];
+        if (requestedSkills === undefined && ctx.hasUI && typeof ctx.ui.input === "function") {
+          const answer = await ctx.ui.input(
+            "选择本次 Run 使用的 Skill（逗号分隔，可留空）",
+            available.map((skill) => skill.name).join(", "),
+          );
+          if (answer === undefined) {
+            ctx.ui.notify("已取消启动受控研究流程", "info");
+            return;
+          }
+          requestedSkills = answer.split(",").map((item) => item.trim()).filter(Boolean);
+        }
+        const selectedSkills = resolveRunSkills(requestedSkills ?? [], available);
+        const objective = parsed.objective || project.goal;
+        const runId = `run_${Date.now()}`;
+        await appendApproval(ctx.cwd, {
+          kind: "run-mode",
+          nodeId: "run-mode",
+          decision: parsed.mode === "auto" ? "auto-approved" : "approved",
+          actor: parsed.mode === "auto" ? "auto" : "human",
+          runId,
+          sha256: approvalInputDigest({ projectId: project.id, objective, selectedSkills, mode: parsed.mode }),
+          summary: parsed.mode === "auto" ? "用户选择自动运行模式" : "用户选择人在环路模式",
+        });
+        if (!(await approveRunNodes(ctx, runId, parsed.mode))) {
+          ctx.ui.notify("运行审批被拒绝或超时，未启动。", "warning");
+          return;
+        }
+        await activateControlledRun(ctx.cwd, runId, project.id, objective, selectedSkills, parsed.mode);
+        pi.appendEntry("psyclaw:controlled-run", { runId, projectId: project.id, objective, selectedSkills, mode: parsed.mode, activatedAt: new Date().toISOString() });
+        pi.sendUserMessage(controlledRunRequest(objective, selectedSkills, parsed.mode), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+        ctx.ui.notify(`${parsed.mode === "auto" ? "自动" : "人在环路"}研究流程已启动${selectedSkills.length > 0 ? `；本次使用 Skill：${selectedSkills.join(", ")}` : "；使用默认 Skill"}。`, "info");
+      } catch (error) {
+        await notifyError(ctx, error);
       }
     },
   });
@@ -886,29 +1319,66 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
-  if (!legacyTestApi) pi.registerCommand("skills", {
-    description: "打开 Skill 安装与启用管理页",
+  if (!legacyTestApi) pi.registerCommand("skill", {
+    description: "管理和安装 Skill",
     handler: async (args, ctx) => {
-      try { await showSkillManager(pi, args, ctx); } catch (error) { await notifyError(ctx, error); }
+      const [name, ...rest] = args.trim().split(/\s+/).filter(Boolean);
+      if (!name) {
+        try { await showSkillManager(pi, "", ctx); } catch (error) { await notifyError(ctx, error); }
+        return;
+      }
+      if (name === "install") {
+        const source = rest.join(" ").trim();
+        if (!source) {
+          ctx.ui.notify("Usage: /skill install <local-directory>", "info");
+          return;
+        }
+        try {
+          const installed = await installLocalSkill(source, ctx.cwd);
+          ctx.ui.notify(`已安装本地 Skill ${installed.name}：${installed.target}。请执行 /reload。`, "info");
+        } catch (error) {
+          await notifyError(ctx, error);
+        }
+        return;
+      }
+      if (["status", "enable", "disable", "enable-all", "disable-all"].includes(name)) {
+        try { await showSkillManager(pi, args, ctx); } catch (error) { await notifyError(ctx, error); }
+        return;
+      }
+      ctx.ui.notify("Usage: /skill [status|enable <id>|disable <id>|enable-all|disable-all|install <local-directory>]", "info");
     },
   });
 
-  if (!legacyTestApi) pi.registerCommand("skill", {
-    description: "调用任意已加载 Skill（/skill <name> [任务]）",
+  if (!legacyTestApi) pi.registerCommand("plugin", {
+    description: "管理 Plugin / Extension",
     handler: async (args, ctx) => {
-      const [name, ...rest] = args.trim().split(/\s+/).filter(Boolean);
-      if (!name || !/^[a-z0-9-]+$/.test(name)) {
-        ctx.ui.notify("Usage: /skill <name> [task]；也可直接使用 /skill:<name>", "info");
-        return;
-      }
-      pi.sendUserMessage(`/skill:${name}${rest.length ? ` ${rest.join(" ")}` : ""}`, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+      try {
+        const [action, ...rest] = args.trim().split(/\s+/).filter(Boolean);
+        if (!action) {
+          ctx.ui.notify("Usage: /plugin list | install <source> [-l] | remove <source> [-l]", "info");
+          return;
+        }
+        if (!["list", "install", "remove"].includes(action)) {
+          throw new Error("Usage: /plugin list | install <source> [-l] | remove <source> [-l]");
+        }
+        if (action !== "list" && rest.length === 0) throw new Error(`Usage: /plugin ${action} <source> [-l]`);
+        if (action !== "list") {
+          const approved = await ctx.ui.confirm(
+            `${action === "install" ? "安装" : "移除"} Plugin？`,
+            `${rest.join(" ")}\nPlugin 与宿主进程同权限，操作完成后需要重启 PsyClaw。`,
+          );
+          if (!approved) return;
+        }
+        await runPluginCommand([action, ...rest]);
+        if (action !== "list") ctx.ui.notify("Plugin 配置已更新，请重启 PsyClaw。", "info");
+      } catch (error) { await notifyError(ctx, error); }
     },
   });
 
   if (!legacyTestApi) pi.registerCommand("mcp", {
     description: "打开 MCP 安装与配置管理页",
     handler: async (args, ctx) => {
-      try { await showMcpManager(pi, args, ctx); } catch (error) { await notifyError(ctx, error); }
+      try { await showMcpManager(pi, args, ctx, runtimeMcps); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
@@ -922,17 +1392,17 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           const skillLines = skills.items.slice(0, 8).map((item) => `Skill: ${String(item.id)} — ${String(item.name)}`);
           const mcpLines = mcps.items.slice(0, 8).map((item) => `MCP: ${String(item.id)} — ${String(item.name)}`);
           const toolLines = skills.externalTools.slice(0, 8).map((item) => `外部工具: ${String(item.name)} — ${String(item.sourceRef ?? "请查看项目文档")}`);
-          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...mcpLines, "", ...toolLines, "", "安装：/install skill|mcp <id>", "管理：/skills 或 /mcp", "外部工具不通过 Skill 安装器安装", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
+          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...mcpLines, "", ...toolLines, "", "安装：/install skill|mcp <id>", "管理：/skill 或 /mcp", "外部工具不通过 Skill 安装器安装", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
           return;
         }
         if (kind !== "skill" && kind !== "mcp") throw new Error("Usage: /install skill|mcp <id>");
         if (!id) {
           if (kind === "skill") await showSkillManager(pi, "", ctx);
-          else await showMcpManager(pi, "", ctx);
+          else await showMcpManager(pi, "", ctx, runtimeMcps);
           return;
         }
         if (kind === "skill") await showSkillManager(pi, `install ${id}`, ctx);
-        else await showMcpManager(pi, `install ${id}`, ctx);
+        else await showMcpManager(pi, `install ${id}`, ctx, runtimeMcps);
       } catch (error) { await notifyError(ctx, error); }
     },
   });
@@ -991,10 +1461,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           selectedId = choice;
         }
         if (preset && ctx.hasUI && typeof ctx.ui.custom === "function") {
-          const key = await promptProviderKey(ctx, preset.name, preset.apiKeyEnv);
+          const credential = await providerCredentialSource(preset);
+          const key = credential === "missing" ? await promptProviderKey(ctx, preset.name, preset.apiKeyEnv) : "";
           if (key === undefined) return;
           await saveProviderConfig({ ...preset, ...(key ? { apiKey: key } : {}) });
-          await ctx.modelRegistry.refresh();
+          const refreshed = await Promise.race([
+            ctx.modelRegistry.refresh().then(() => true),
+            new Promise<false>((resolve) => setTimeout(() => resolve(false), 5_000)),
+          ]);
+          if (!refreshed) {
+            ctx.ui.notify("Provider 配置已保存；模型目录刷新超时，请重新启动 PsyClaw 后使用。", "warning");
+            return;
+          }
           models = ctx.modelRegistry.getAll().filter((model) => model.provider === requested);
         }
         const selected = models.find((model) => model.id === selectedId);
@@ -1025,24 +1503,24 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   const traceCommand = {
-    description: "导出脱敏使用路径，供 Langfuse 或 LangSmith 分析",
+    description: "导出包含正文与工具参数的完整使用路径，供 Langfuse 或 LangSmith 分析",
     handler: async (args: string, ctx: ExtensionCommandContext) => {
       try {
-        if (args.trim()) throw new Error("Usage: /trace");
+        if (args.trim()) throw new Error("Usage: /export");
         const result = await exportTraces({ root: ctx.cwd });
         ctx.ui.notify([
           "使用路径已导出（未上传）",
           `文件：${result.output}`,
           `轨迹：${result.traces}`,
           `步骤：${result.spans}`,
-          "隐私：不含对话正文、工具参数、原始 ID 或绝对路径",
+          "包含对话正文、工具参数、原始 ID 与绝对路径，便于排查各环节问题；请勿将导出文件提交到公开仓库。",
         ].join("\n"), "info");
       } catch (error) {
         await notifyError(ctx, error);
       }
     },
   };
-  pi.registerCommand("trace", traceCommand);
+  pi.registerCommand("export", traceCommand);
 
   if (typeof pi.registerTool === "function") {
   pi.registerTool({
@@ -1334,7 +1812,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       }
       const approved = await ctx.ui.confirm(
         "Run read-only research worker?",
-        "The worker runs in a separate Pi process with extensions, skills, context files, and mutating tools disabled.",
+        "The worker runs in a separate PsyClaw process with extensions, skills, context files, and mutating tools disabled.",
       );
       if (!approved) {
         ctx.ui.notify("Agent run canceled", "info");

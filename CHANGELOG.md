@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.27.8 - 2026-08-31
+
+- Renamed the `/skills` manager to `/skill` and removed the old `/skill <name>` forwarding behavior; loaded Skills remain callable through `/skill:<name>`.
+- Connected `/plugin list|install|remove` to Pi's package/extension manager with confirmation before changes.
+- Moved new projects' immutable original-data location to `.psyclaw/data/raw`; legacy `data/raw` remains protected for compatibility.
+
+## 0.27.7 - 2026-08-31
+
+- Fixed Windows, `~`, relative, and environment-provided Skill path resolution; nonexistent paths are no longer passed to the Pi resource loader.
+- Added deterministic same-name Skill selection across project and user Agent directories, with duplicate counts available in `/skill` instead of harmless startup conflicts.
+- Loaded Claude command Markdown as individual prompt commands rather than one conflicting `commands` Skill.
+- Hid automatically resolved Skill collisions and stale missing paths at startup; remaining long Skill diagnostics are collapsed and can be expanded with `Ctrl+O`.
+- Expanded `/skill` and `/mcp` management, per-run Skill selection, Export output, and local MCP discovery included in this release line.
+
 ## 0.27.6 - 2026-08-30
 
 - Added a live stdio MCP bridge so enabled project/user MCP configurations are discoverable and callable by the active model; existing MNE MCP configurations no longer stop at installation state.

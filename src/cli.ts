@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   asProject,
   assertEvidenceImportable,
@@ -161,6 +162,10 @@ async function main(): Promise<void> {
     process.stdout.write(`${usage()}\n`);
     return;
   }
+  if (command === "--version" || command === "-V") {
+    process.stdout.write(`${PSYCLAW_VERSION}\n`);
+    return;
+  }
   // Bare `psyclaw` is the primary entrypoint: guide the user through first-run
   // setup when no provider is configured, then launch the conversation.
   if (!command) {
@@ -296,6 +301,20 @@ async function main(): Promise<void> {
     runTui(root);
     return;
   }
+  if (command === "plugin") {
+    const action = args.shift();
+    if (!action || !["install", "remove", "uninstall", "list"].includes(action)) {
+      throw new Error("Usage: psyclaw plugin install|remove|list [source] [-l]");
+    }
+    const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
+    const modulePath = join(dirname(entry), "package-manager-cli.js");
+    const { handlePackageCommand } = await import(pathToFileURL(modulePath).href) as {
+      handlePackageCommand(args: string[]): Promise<boolean>;
+    };
+    const handled = await handlePackageCommand([action, ...args]);
+    if (!handled) throw new Error(`Unsupported Plugin action: ${action}`);
+    return;
+  }
   if (command === "check-updates") {
     const { checkUpdates } = await import("./updates/check.js");
     const { createHttpRegistry } = await import("./updates/registry.js");
@@ -303,9 +322,7 @@ async function main(): Promise<void> {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return;
   }
-  if (command === "traces") {
-    const action = args.shift();
-    if (action !== "export") throw new Error("Usage: psyclaw traces export [--output <relative-path>] [--format otlp-json]");
+  if (command === "export") {
     assertKnownOptions(args, ["--output", "--format"]);
     const format = option(args, "--format", "otlp-json");
     if (format !== "otlp-json") throw new Error(`Unsupported trace format: ${format}`);

@@ -326,6 +326,8 @@ async function recordLedger(ledger: InstallLedger | undefined, key: string): Pro
 
 function protectedPath(path: string): boolean {
   const pieces = path.replaceAll("\\", "/").split("/").filter(Boolean).map((part) => part.toLowerCase());
+  const normalized = pieces.join("/");
+  if (normalized === ".psyclaw/data/raw" || normalized.startsWith(".psyclaw/data/raw/")) return true;
   for (let index = 0; index < pieces.length; index += 1) {
     const piece = pieces[index]!;
     const joined = pieces.slice(Math.max(0, index - 1), index + 1).join("/");

@@ -1,12 +1,12 @@
 import type { RunEvent } from "../orchestration/contracts.js";
-import { redactSecrets } from "../core/redact.js";
 import { lstat } from "node:fs/promises";
 import { appendJsonl, readJsonl } from "../project/jsonl.js";
 import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
 
 /**
  * Append-only projection of a run's facts. The panel may replay this log, but
- * it never becomes an alternative state store.
+ * it never becomes an alternative state store. Event messages and receipts are
+ * stored verbatim so traces keep the inputs needed to diagnose each step.
  */
 export class RunEventLog {
   private readonly path: string;
@@ -23,9 +23,6 @@ export class RunEventLog {
       schemaVersion: "psyclaw/run-event/v1",
       runId: this.runId,
       ...event,
-      // Free-form text in the log is scrubbed so a model or untrusted tool
-      // cannot exfiltrate a credential through a projection surface.
-      ...(event.message !== undefined ? { message: redactSecrets(event.message) } : {}),
     };
     if (!full.at.trim()) throw new Error("Run event timestamp cannot be empty");
     const path = await assertSafeRunEventPath(this.root, this.runId);

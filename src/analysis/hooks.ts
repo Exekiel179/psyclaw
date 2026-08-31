@@ -150,7 +150,7 @@ export function beforeWrite(root: string, targetPath: string, originalDataPaths:
   const target = projectPath(root, targetPath);
   const findings: AnalysisHookFinding[] = [];
   const rel = relative(resolve(root), target).replaceAll("\\", "/").toLowerCase();
-  if (rel === "data/raw" || rel.startsWith("data/raw/")) findings.push({ rule: "raw-data-write", severity: "block", message: "data/raw is immutable; write a derived copy under data/clean or outputs" });
+  if ([".psyclaw/data/raw", "data/raw"].some((raw) => rel === raw || rel.startsWith(`${raw}/`))) findings.push({ rule: "raw-data-write", severity: "block", message: ".psyclaw/data/raw is immutable; write a derived copy under data/clean or outputs" });
   if (originalDataPaths.some((path) => projectPath(root, path) === target)) findings.push({ rule: "original-data-overwrite", severity: "block", message: "original input is immutable and cannot be overwritten" });
   return result([...findings, ...applyUserHooks("before-write", userHooks, [targetPath, ...originalDataPaths])]);
 }

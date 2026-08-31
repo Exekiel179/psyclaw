@@ -16,6 +16,7 @@ const MAX_VISIBLE = 9;
 export class ProviderPickerComponent {
   focused = false;
   private selectedIndex: number;
+  private completed = false;
 
   constructor(
     private readonly title: string,
@@ -54,7 +55,9 @@ export class ProviderPickerComponent {
   }
 
   handleInput(data: string): void {
+    if (this.completed) return;
     if (this.keybindings.matches(data, "tui.select.cancel")) {
+      this.completed = true;
       this.done({ type: "close" });
       return;
     }
@@ -70,6 +73,7 @@ export class ProviderPickerComponent {
       return;
     }
     if (this.keybindings.matches(data, "tui.select.confirm")) {
+      this.completed = true;
       this.done({ type: "select", id: this.items[this.selectedIndex]!.id });
     }
   }
@@ -80,6 +84,7 @@ export type SecretInputResult = { type: "submit"; value: string } | { type: "clo
 export class SecretInputComponent {
   focused = false;
   private value = "";
+  private completed = false;
 
   constructor(
     private readonly title: string,
@@ -106,11 +111,14 @@ export class SecretInputComponent {
   }
 
   handleInput(data: string): void {
+    if (this.completed) return;
     if (this.keybindings.matches(data, "tui.select.cancel")) {
+      this.completed = true;
       this.done({ type: "close" });
       return;
     }
     if (this.keybindings.matches(data, "tui.input.submit") || data === "\n" || data === "\r") {
+      this.completed = true;
       this.done({ type: "submit", value: this.value });
       return;
     }

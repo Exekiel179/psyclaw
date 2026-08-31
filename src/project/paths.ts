@@ -18,7 +18,7 @@ export function projectPaths(root: string) {
     plans: resolve(base, PSYCLAW_DIR, "plans"),
     memory: resolve(base, PSYCLAW_DIR, "memory"),
     manifests: resolve(base, PSYCLAW_DIR, "manifests"),
-    raw: resolve(base, "data", "raw"),
+    raw: resolve(base, PSYCLAW_DIR, "data", "raw"),
     clean: resolve(base, "data", "clean"),
     analysis: resolve(base, "analysis"),
     analysisScripts: resolve(base, "analysis", "scripts"),
@@ -44,8 +44,9 @@ export async function ensureProjectDirectories(root: string): Promise<void> {
     `${PSYCLAW_DIR}/plans`,
     `${PSYCLAW_DIR}/memory`,
     `${PSYCLAW_DIR}/manifests`,
+    `${PSYCLAW_DIR}/data`,
+    `${PSYCLAW_DIR}/data/raw`,
     "data",
-    "data/raw",
     "data/clean",
     "analysis",
     "analysis/scripts",
@@ -107,6 +108,8 @@ export async function assertSafeProjectPath(root: string, target: string): Promi
     protectedRel.startsWith(".git/") ||
     protectedRel === "data/raw" ||
     protectedRel.startsWith("data/raw/") ||
+    protectedRel === ".psyclaw/data/raw" ||
+    protectedRel.startsWith(".psyclaw/data/raw/") ||
     protectedRel.includes("credential") ||
     protectedRel.includes("secret")
   ) {

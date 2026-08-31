@@ -88,9 +88,7 @@ async function packageManagerAt(root: string): Promise<"pnpm" | "npm" | undefine
       // keep looking
     }
   }
-  // A globally installed npm package is not shipped with its lockfile. npm is
-  // still able to update this package's pinned runtime dependencies in place.
-  return "npm";
+  return undefined;
 }
 
 function buildCommand(manager: "pnpm" | "npm", version: string): string {
@@ -194,7 +192,7 @@ export async function updatePsyClaw(options: UpdatePsyClawOptions): Promise<PsyC
       reasonCode: "update-skipped",
       reason: !isSafeVersion(latestPsyClaw)
         ? `refusing unsafe PsyClaw version: ${latestPsyClaw}`
-        : `refusing unsafe Pi version: ${latestPi}`,
+        : `refusing unsafe bundled runtime version: ${latestPi}`,
       psyclaw: { ...psyclaw, latest: latestPsyClaw },
       runtime: { ...runtime, latest: latestPi },
       commands: [],
@@ -309,14 +307,14 @@ export async function updateBundledPi(options: UpdateBundledPiOptions): Promise<
     ...(before === undefined ? {} : { before }),
   };
   if (latest === undefined) {
-    return finish({ ok: false, executed: false, reasonCode: "update-skipped", reason: "latest Pi release unavailable", ...base });
+    return finish({ ok: false, executed: false, reasonCode: "update-skipped", reason: "latest bundled runtime release unavailable", ...base });
   }
   if (!isSafeVersion(latest.version)) {
     return finish({
       ok: false,
       executed: false,
       reasonCode: "update-skipped",
-      reason: `refusing unsafe Pi version: ${latest.version}`,
+      reason: `refusing unsafe bundled runtime version: ${latest.version}`,
       latest: latest.version,
       ...base,
     });
@@ -336,16 +334,11 @@ export async function updateBundledPi(options: UpdateBundledPiOptions): Promise<
   }
 
   const manager = await packageManagerAt(manifest.root);
-  if (manager === undefined) {
-    return finish({
-      ok: false,
-      executed: false,
-      reasonCode: "update-skipped",
-      reason: "no pnpm-lock.yaml or package-lock.json found in the psyclaw package root",
-      ...withLatest,
-    });
-  }
-  const command = buildCommand(manager, latestVersion);
+  // npm packages intentionally omit lockfiles. Updating Pi in place can leave
+  // old PsyClaw code paired with a new runtime, so repair the whole product.
+  const command = manager === undefined
+    ? "npm install --global psyclaw@latest"
+    : buildCommand(manager, latestVersion);
 
   if (options.executor === undefined) {
     return finish({
@@ -359,7 +352,7 @@ export async function updateBundledPi(options: UpdateBundledPiOptions): Promise<
     });
   }
 
-  const { exitCode } = await options.executor({ command, cwd: manifest.root });
+  const { exitCode } = await options.executor({ command, cwd: manager === undefined ? dirname(manifest.root) : manifest.root });
   const ok = Number.isInteger(exitCode) && exitCode === 0;
   return finish({
     ok,

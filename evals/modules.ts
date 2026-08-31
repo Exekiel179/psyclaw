@@ -25,6 +25,7 @@ import { publishManuscript } from "../src/workflows/publish.js";
 import { createPanelServer, downloadReferencePdf } from "../src/panel/server.js";
 import { checkCitations } from "../src/core/references.js";
 import { recordCitationUse } from "../src/core/citations.js";
+import { referencePdfPath } from "../src/literature/archive.js";
 import { runWorkflowTool } from "../src/adapters/pi/extension.js";
 import type { Evidence, ResearchParadigm } from "../src/core/contracts.js";
 
@@ -265,6 +266,12 @@ async function main(): Promise<void> {
   });
 
   // ---------- M5 发布与版本 ----------
+  const publishDoi = "10.1000/kessler2005";
+  await writeFile(join(root, ".psyclaw", "citations.jsonl"), `${JSON.stringify({ doi: publishDoi })}\n`, "utf8");
+  await writeFile(join(root, ".psyclaw", "references.jsonl"), `${JSON.stringify({ doi: publishDoi, verified: true })}\n`, "utf8");
+  const publishPdf = referencePdfPath(publishDoi);
+  await mkdir(join(root, "literature", "pdfs"), { recursive: true });
+  await writeFile(join(root, ...publishPdf.split("/")), "%PDF-1.4\nfixture\n%%EOF", "utf8");
   await probe("M5", "发布与版本", "发布 v1→v2 并归档", async () => {
     const v1 = await publishManuscript(root, { name: "论文初稿", markdown: "# 第一版", exportDocx: false });
     const v2 = await publishManuscript(root, { name: "论文初稿", markdown: "# 第二版", exportDocx: false });

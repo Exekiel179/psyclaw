@@ -5,6 +5,16 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { bootstrapProject } from "../../src/project/bootstrap.js";
 import { publishManuscript } from "../../src/workflows/publish.js";
+import { referencePdfPath } from "../../src/literature/archive.js";
+
+async function preparePublishEvidence(root: string): Promise<void> {
+  const doi = "10.1000/publish-fixture";
+  await writeFile(join(root, ".psyclaw", "citations.jsonl"), `${JSON.stringify({ doi })}\n`, "utf8");
+  await writeFile(join(root, ".psyclaw", "references.jsonl"), `${JSON.stringify({ doi, verified: true })}\n`, "utf8");
+  const pdf = referencePdfPath(doi);
+  await mkdir(join(root, "literature", "pdfs"), { recursive: true });
+  await writeFile(join(root, ...pdf.split("/")), "%PDF-1.4\nfixture\n%%EOF", "utf8");
+}
 
 const pandocOk = await new Promise<boolean>((resolve) => {
   const child = spawn("pandoc", ["--version"], { stdio: "ignore", shell: process.platform === "win32" });
@@ -16,6 +26,7 @@ describe("publishManuscript (generation-time convention)", () => {
   it("writes paper/<name>.md and registers evidence + publish record", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-publish-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await preparePublishEvidence(root);
     const result = await publishManuscript(root, { name: "论文初稿", markdown: "# 标题\n\n正文", exportDocx: false });
 
     expect(result.markdownPath).toBe("paper/论文初稿.md");
@@ -40,6 +51,7 @@ describe("publishManuscript (generation-time convention)", () => {
   it("publishes the discovered manuscript when no markdown is given", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-publish-src-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await preparePublishEvidence(root);
     await mkdir(join(root, "paper"), { recursive: true });
     await writeFile(join(root, "paper", "论文初稿.md"), "来源内容", "utf8");
 
@@ -52,6 +64,7 @@ describe("publishManuscript (generation-time convention)", () => {
   it("throws honestly when there is nothing to publish", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-publish-empty-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await preparePublishEvidence(root);
     await expect(publishManuscript(root, { exportDocx: false })).rejects.toThrow(/没有可发布/);
   });
 });
@@ -60,6 +73,7 @@ describe("publishManuscript versioning", () => {
   it("bumps versions, archives the previous files, and no-ops on identical content", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-publish-v-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await preparePublishEvidence(root);
 
     const v1 = await publishManuscript(root, { name: "论文初稿", markdown: "# 第一版\n\n内容一", exportDocx: false });
     expect(v1.version).toBe(1);
@@ -91,6 +105,7 @@ describe("publishManuscript docx export", () => {
   it.runIf(pandocOk)("exports paper/<name>_APA7.docx via pandoc", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-publish-docx-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await preparePublishEvidence(root);
     const result = await publishManuscript(root, { name: "论文初稿", markdown: "# 标题\n\n正文内容\n" });
 
     expect(result.docxPath).toBe("paper/论文初稿_APA7.docx");

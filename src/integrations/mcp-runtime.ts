@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { McpClient, StdioMcpTransport, type McpServerConfig, type McpTool } from "./mcp.js";
+import { atomicWriteFile } from "../project/jsonl.js";
 
 interface RuntimeMcpConfig extends McpServerConfig {
   name?: string;
@@ -65,6 +66,53 @@ async function configsIn(directory: string): Promise<RuntimeMcpConfig[]> {
   return configs;
 }
 
+export interface UserMcpConfigEntry {
+  id: string;
+  name: string;
+  command: string;
+  /** Raw `enabled` flag from the config file; disabled servers stay visible for management. */
+  enabled: boolean;
+  path: string;
+  scope: "user" | "project";
+}
+
+/**
+ * Read every MCP config JSON in the user and project directories without the
+ * enabled/trusted filter, so the management page can show and toggle disabled
+ * servers too.  Malformed entries are skipped but still reported by id.
+ */
+async function rawConfigsIn(directory: string, scope: "user" | "project"): Promise<UserMcpConfigEntry[]> {
+  let names: string[];
+  try {
+    names = (await readdir(directory)).filter((name) => name.endsWith(".json")).sort();
+  } catch {
+    return [];
+  }
+  const entries: UserMcpConfigEntry[] = [];
+  for (const name of names) {
+    try {
+      const value = JSON.parse(await readFile(join(directory, name), "utf8")) as Record<string, unknown>;
+      if (typeof value.id !== "string" || typeof value.command !== "string") continue;
+      entries.push({
+        id: value.id,
+        name: typeof value.name === "string" ? value.name : value.id,
+        command: value.command,
+        enabled: value.enabled !== false,
+        path: join(directory, name),
+        scope,
+      });
+    } catch { /* Ignore malformed entries. */ }
+  }
+  return entries;
+}
+
+/** Rewrite a user MCP config file, preserving every other field. */
+export async function setUserMcpConfigEnabled(entry: UserMcpConfigEntry, enabled: boolean): Promise<void> {
+  const value = JSON.parse(await readFile(entry.path, "utf8")) as Record<string, unknown>;
+  value.enabled = enabled;
+  await atomicWriteFile(entry.path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
 export class RuntimeMcpRegistry {
   private readonly connections = new Map<string, RuntimeConnection>();
 
@@ -91,6 +139,15 @@ export class RuntimeMcpRegistry {
   public close(): void {
     for (const connection of this.connections.values()) connection.client.close();
     this.connections.clear();
+  }
+
+  /** All user/project MCP config files (enabled and disabled) for management. */
+  public async listUserConfigs(root: string): Promise<UserMcpConfigEntry[]> {
+    const user = await rawConfigsIn(join(homedir(), ".psyclaw", "mcp"), "user");
+    const project = await rawConfigsIn(join(root, ".psyclaw", "mcp"), "project");
+    const merged = new Map(user.map((entry) => [entry.path, entry]));
+    for (const entry of project) merged.set(entry.path, entry);
+    return [...merged.values()].sort((left, right) => left.id.localeCompare(right.id));
   }
 
   private async configs(root: string): Promise<RuntimeMcpConfig[]> {

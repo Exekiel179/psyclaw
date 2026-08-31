@@ -221,7 +221,8 @@ async function assertProjectTarget(root: string, target: string): Promise<string
   const parts = rel.split("/").filter(Boolean);
   const lowerRel = parts.join("/").toLowerCase();
   if (parts.length === 0 || parts.some((part) => part === "." || part === ".." || isSensitiveSegment(part)) ||
-      lowerRel === "data/raw" || lowerRel.startsWith("data/raw/")) {
+      lowerRel === "data/raw" || lowerRel.startsWith("data/raw/") ||
+      lowerRel === ".psyclaw/data/raw" || lowerRel.startsWith(".psyclaw/data/raw/")) {
     fail("import.target-protected");
   }
   if (parts.some((part) => isProtectedSegment(part))) {

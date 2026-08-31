@@ -1120,6 +1120,7 @@ function isProtectedPath(path: string): boolean {
   const normalized = normalizePath(path).toLowerCase();
   return normalized === ".git" || normalized.startsWith(".git/") ||
     normalized === "data/raw" || normalized.startsWith("data/raw/") ||
+    normalized === ".psyclaw/data/raw" || normalized.startsWith(".psyclaw/data/raw/") ||
     normalized.split("/").some((part) => part === "credentials" || part === "credential" || part === "secrets" || part === "secret");
 }
 

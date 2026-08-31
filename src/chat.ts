@@ -27,7 +27,7 @@ function resolvePiCli(): string {
     return join(dirname(fileURLToPath(entryUrl)), "cli.js");
   } catch {
     throw new Error(
-      "Cannot locate the bundled Pi CLI (@earendil-works/pi-coding-agent). Run `pnpm install` or `npm install` first.",
+      "Cannot locate the bundled PsyClaw runtime. Run `pnpm install` or `npm install` first.",
     );
   }
 }
@@ -44,7 +44,7 @@ async function applyRuntimeBranding(root: string): Promise<void> {
     child.on("close", (code) => resolve(code ?? 1));
   });
   if (exitCode !== 0) {
-    throw new Error("Unable to prepare the bundled Pi runtime for PsyClaw. Reinstall psyclaw or run `psyclaw rebrand` from its package directory.");
+    throw new Error("Unable to prepare the bundled PsyClaw runtime. Reinstall psyclaw or run `psyclaw rebrand` from its package directory.");
   }
 }
 
@@ -88,6 +88,9 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     if (supplement) identityPrompt = `${identityPrompt}\n\n${supplement}`;
   } catch { /* no user supplement */ }
   const args = [
+    // Disable Pi's ambient Skill scan. PsyClaw's resources_discover handler
+    // adds only existing, deduplicated Skill paths after core Skills.
+    "--no-skills",
     "--extension", extensionPath,
     "--extension", panelExtensionPath,
     "--skill", skillsPath,

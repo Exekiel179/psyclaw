@@ -66,6 +66,7 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
   const [apiKey, setApiKey] = useState("");
   const [credentialSource, setCredentialSource] = useState<string>("checking");
   const [credentialError, setCredentialError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const provider = wizardProviders[providerIndex];
   const model = provider?.models[modelIndex];
@@ -75,7 +76,9 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
   useEffect(() => {
     let active = true;
     setCredentialSource("checking");
-    if (provider) void providerCredentialSource(provider).then((source) => { if (active) setCredentialSource(source); });
+    if (provider) void providerCredentialSource(provider)
+      .then((source) => { if (active) setCredentialSource(source); })
+      .catch(() => { if (active) setCredentialSource("missing"); });
     return () => { active = false; };
   }, [provider]);
 
@@ -84,9 +87,17 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
   }, [providerIndex]);
 
   const writeConfig = async () => {
-    if (!provider) return;
-    await saveProviderConfig({ ...provider, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
-    setStep("done");
+    if (!provider || saving) return;
+    setSaving(true);
+    setCredentialError("");
+    try {
+      await saveProviderConfig({ ...provider, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) });
+      setStep("done");
+    } catch (error) {
+      setCredentialError(error instanceof Error ? error.message : "Provider 配置保存失败");
+    } finally {
+      setSaving(false);
+    }
   };
 
   useInput((input, key) => {
@@ -124,8 +135,8 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
         else if (input && !key.ctrl && !key.meta) setApiKey((value) => value + input.replace(/[\r\n]/g, ""));
         break;
       case "confirm":
-        if (key.return) void writeConfig();
-        if (key.escape) setStep("provider");
+        if (key.return && !saving) void writeConfig();
+        if (key.escape && !saving) setStep("provider");
         break;
       case "done":
         if (key.return || input === "q") {
@@ -180,7 +191,8 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
               • API Key: {apiKey.trim() ? "✔ 将保存到用户级凭据文件 auth.json" : `✔ 已检测到 (${credentialSource})`}
             </Text>
           </Box>
-          <Hint>[Enter] 保存并启动对话  ·  [Esc] 返回上一步  ·  [Q] 退出</Hint>
+          {credentialError && <Text color={PSYCLAW_ERROR}>{credentialError}</Text>}
+          <Hint>{saving ? "正在保存配置…" : "[Enter] 保存并启动对话  ·  [Esc] 返回上一步  ·  [Q] 退出"}</Hint>
         </Box>
       )}
 

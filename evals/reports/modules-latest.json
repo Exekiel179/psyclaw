@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/module-eval/v1",
   "suite": "module-by-module-usage",
-  "generatedAt": "2026-08-27T12:22:07.086Z",
+  "generatedAt": "2026-08-31T09:46:48.522Z",
   "modules": [
     {
       "module": "M1",
@@ -20,9 +20,9 @@
     {
       "module": "M3",
       "label": "对话工具",
-      "passed": 4,
+      "passed": 3,
       "total": 4,
-      "score": 1
+      "score": 0.75
     },
     {
       "module": "M4",
@@ -34,16 +34,16 @@
     {
       "module": "M5",
       "label": "发布与版本",
-      "passed": 2,
+      "passed": 0,
       "total": 2,
-      "score": 1
+      "score": 0
     },
     {
       "module": "M6",
       "label": "文档导入",
-      "passed": 3,
+      "passed": 1,
       "total": 3,
-      "score": 1
+      "score": 0.333
     },
     {
       "module": "M7",
@@ -55,16 +55,16 @@
     {
       "module": "M8",
       "label": "手稿与面板",
-      "passed": 3,
+      "passed": 0,
       "total": 3,
-      "score": 1
+      "score": 0
     },
     {
       "module": "M9",
       "label": "安全与门禁",
-      "passed": 2,
+      "passed": 1,
       "total": 2,
-      "score": 1
+      "score": 0.5
     }
   ],
   "probes": [
@@ -73,7 +73,7 @@
       "moduleLabel": "安装与启动",
       "name": "CLI 版本横幅",
       "ok": true,
-      "note": "ψ PsyClaw [v0.26.3]"
+      "note": "ψ PsyClaw [v0.27.6]"
     },
     {
       "module": "M2",
@@ -149,8 +149,8 @@
       "module": "M3",
       "moduleLabel": "对话工具",
       "name": "真实运行时 /panel（Pi RPC + 扩展）",
-      "ok": true,
-      "note": "notify + 真实页面伺服（http://127.0.0.1:7634）"
+      "ok": false,
+      "note": "/panel 未产生 notify 事件"
     },
     {
       "module": "M4",
@@ -198,29 +198,29 @@
       "module": "M5",
       "moduleLabel": "发布与版本",
       "name": "发布 v1→v2 并归档",
-      "ok": true,
-      "note": "v1→v2，归档+版本账本就位"
+      "ok": false,
+      "note": "异常: 论文发布已被引用证据门禁阻断。 本地缺少引用论文 PDF：10.1000/kessler2005 -> https://doi.org/10.1000/kessler2005（下载到 literature/pdfs/doi-33f2c56a8327f0e96fa2.pdf）"
     },
     {
       "module": "M5",
       "moduleLabel": "发布与版本",
       "name": "内容未变不产生新版本",
-      "ok": true,
-      "note": "幂等，无新版本"
+      "ok": false,
+      "note": "异常: 论文发布已被引用证据门禁阻断。 本地缺少引用论文 PDF：10.1000/kessler2005 -> https://doi.org/10.1000/kessler2005（下载到 literature/pdfs/doi-33f2c56a8327f0e96fa2.pdf）"
     },
     {
       "module": "M6",
       "moduleLabel": "文档导入",
       "name": "文档清单识别 paper 手稿",
-      "ok": true,
-      "note": "paper/论文初稿.md 标记为手稿"
+      "ok": false,
+      "note": "未发现"
     },
     {
       "module": "M6",
       "moduleLabel": "文档导入",
       "name": "md 导入登记证据（幂等）",
-      "ok": true,
-      "note": "证据 evidence_55f7a09a786c72c5，重导幂等"
+      "ok": false,
+      "note": "证据 ?，重导幂等"
     },
     {
       "module": "M6",
@@ -254,39 +254,39 @@
       "module": "M8",
       "moduleLabel": "手稿与面板",
       "name": "手稿发现 paper/*.md",
-      "ok": true,
-      "note": "paper/论文初稿.md"
+      "ok": false,
+      "note": "notes/HANDOFF.md"
     },
     {
       "module": "M8",
       "moduleLabel": "手稿与面板",
       "name": "版本接口与归档可读",
-      "ok": true,
-      "note": "2 个版本，v1 可回读"
+      "ok": false,
+      "note": "0 个版本，v1 可回读"
     },
     {
       "module": "M8",
       "moduleLabel": "手稿与面板",
       "name": "中文文件名产物可伺服（RFC 5987）",
-      "ok": true,
-      "note": "HTTP 200"
+      "ok": false,
+      "note": "HTTP 500"
     },
     {
       "module": "M9",
       "moduleLabel": "安全与门禁",
       "name": "发布名称逃逸拒绝",
       "ok": true,
-      "note": "HTTP 400 | 包含内路径 HTTP 200"
+      "note": "HTTP 400 | 包含内路径 HTTP 400"
     },
     {
       "module": "M9",
       "moduleLabel": "安全与门禁",
       "name": "副作用有 receipt（.psyclaw/manifests）",
-      "ok": true,
-      "note": "receipt 数量 6（≥2 次写入）"
+      "ok": false,
+      "note": "receipt 数量 1（≥2 次写入）"
     }
   ],
-  "passed": 31,
+  "passed": 22,
   "total": 31,
-  "allPassed": true
+  "allPassed": false
 }

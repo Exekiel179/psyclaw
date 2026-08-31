@@ -18,9 +18,10 @@ import { fileURLToPath } from "node:url";
 
 const NAME = "PsyClaw";
 const LOCKED_PI_VERSION = "0.84.4";
-// Retain the predecessor Pi profile so existing models, themes, packages, and
-// skills survive the product rename. PsyClaw's project data remains separate.
-const CONFIG_DIR = `.psy${"pi"}`;
+// PsyClaw's own user config directory. Retained as the sole Pi config dir so
+// models, themes, packages, and skills live under `~/.psyclaw` consistently
+// with the project data directory name.
+const CONFIG_DIR = `.psyclaw`;
 
 function hexToRgb(hex) {
   const num = parseInt(hex.replace("#", ""), 16);
@@ -180,6 +181,22 @@ const PSYCLAW_SKILLS_FORMATTER = `const skills = skillsResult.skills;
                 addLoadedSection("Skills", skillCompactList, skillList);
             }`;
 
+const PSYCLAW_SKILL_DIAGNOSTICS = `const skillDiagnostics = skillsResult.diagnostics.filter((diagnostic) =>
+                diagnostic.type === "error" &&
+                !/skill path does not exist/i.test(diagnostic.message));
+            if (skillDiagnostics.length > 0) {
+                const warningLines = this.formatDiagnostics(skillDiagnostics, sourceInfos);
+                const expanded = \`${'${theme.fg("warning", "[Skill issues]")}'}\\n${'${warningLines}'}\`;
+                if (warningLines.split("\\n").length > 6) {
+                    const collapsed = \`${'${theme.fg("warning", "[Skill issues]")}'}\\n${'${theme.fg("dim", `  ${skillDiagnostics.length} issue(s) · Ctrl+O to expand`)}'}\`;
+                    this.loadedResourcesContainer.addChild(new ExpandableText(() => collapsed, () => expanded, false, 0, 0));
+                }
+                else {
+                    this.loadedResourcesContainer.addChild(new Text(expanded, 0, 0));
+                }
+                this.loadedResourcesContainer.addChild(new Spacer(1));
+            }`;
+
 const MODE_PATCHES = [
   {
     old: 'Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.',
@@ -207,8 +224,41 @@ const MODE_PATCHES = [
     next: PSYCLAW_SKILLS_FORMATTER,
   },
   {
+    old: `const skillDiagnostics = skillsResult.diagnostics;
+            if (skillDiagnostics.length > 0) {
+                const warningLines = this.formatDiagnostics(skillDiagnostics, sourceInfos);
+                this.loadedResourcesContainer.addChild(new Text(\`${'${theme.fg("warning", "[Skill conflicts]")}'}\\n${'${warningLines}'}\`, 0, 0));
+                this.loadedResourcesContainer.addChild(new Spacer(1));
+            }`,
+    next: PSYCLAW_SKILL_DIAGNOSTICS,
+  },
+  {
     old: 'this.getStartupExpansionState(), 1, 0);',
     next: 'this.getStartupExpansionState(), 0, 0);',
+  },
+  {
+    old: `const [fdPath] = await Promise.all([
+            ensureTool("fd", (status) => this.showManagedToolStatus(status)),
+            ensureTool("rg", (status) => this.showManagedToolStatus(status)),
+        ]);
+        this.fdPath = fdPath;
+        // Enable the remaining input handlers only after managed-tool setup completes.
+        this.setupKeyHandlers();
+        this.setupEditorSubmitHandler();`,
+    next: `// Input must remain usable while optional search binaries are installed.
+        this.setupKeyHandlers();
+        this.setupEditorSubmitHandler();
+        const reportToolFailure = (status) => {
+            if (status.type === "warning") this.showManagedToolStatus(status);
+        };
+        void Promise.all([
+            ensureTool("fd", reportToolFailure),
+            ensureTool("rg", reportToolFailure),
+        ]).then(([fdPath]) => {
+            this.fdPath = fdPath;
+        }).catch((error) => {
+            this.showManagedToolStatus({ type: "warning", message: \`Search tools unavailable: \${error instanceof Error ? error.message : String(error)}\` });
+        });`,
   },
   {
     old: 'this.ui.terminal.setTitle(`${APP_TITLE} - ${sessionName} - ${cwdBasename}`);',
@@ -217,6 +267,10 @@ const MODE_PATCHES = [
   {
     old: 'this.ui.terminal.setTitle(`${APP_TITLE} - ${cwdBasename}`);',
     next: 'this.ui.terminal.setTitle(`ψ ${APP_TITLE} - ${cwdBasename}`);',
+  },
+  {
+    old: 'then restart pi.',
+    next: 'then restart PsyClaw.',
   },
 ];
 
@@ -293,20 +347,56 @@ async function applyModePatches(modePath) {
   return applied;
 }
 
+/**
+ * Collapse the model's thinking/reasoning blocks by default.  Pi renders them
+ * expanded unless `hideThinkingBlock` is set; PsyClaw flips the default so a
+ * long thinking trace does not dominate the terminal.  Users can still expand
+ * a block with the `app.thinking.toggle` key binding, and an explicit
+ * `hideThinkingBlock` value in settings.json always wins.
+ */
+const SETTINGS_PATCHES = [
+  {
+    old: "return this.settings.hideThinkingBlock ?? false;",
+    next: "return this.settings.hideThinkingBlock ?? true;",
+  },
+];
+
+async function applySettingsPatches(settingsManagerPath) {
+  let content = await readFile(settingsManagerPath, "utf8");
+  const applied = [];
+  for (const { old, next } of SETTINGS_PATCHES) {
+    if (content.includes(old)) {
+      content = content.replace(old, next);
+      applied.push(old.slice(0, 48));
+    }
+  }
+  if (applied.length > 0) {
+    await atomicReplace(settingsManagerPath, content, true);
+  }
+  return applied;
+}
+
 async function main() {
   const entry = import.meta.resolve("@earendil-works/pi-coding-agent");
   const pkgDir = dirname(dirname(fileURLToPath(entry)));
   const pkgPath = join(pkgDir, "package.json");
   const modePath = join(pkgDir, "dist", "modes", "interactive", "interactive-mode.js");
+  const settingsManagerPath = join(pkgDir, "dist", "core", "settings-manager.js");
 
   const pkgResult = await patchPackageJson(pkgPath);
   const applied = await applyModePatches(modePath);
+  const settingsApplied = await applySettingsPatches(settingsManagerPath);
 
   process.stdout.write(
-    `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} (${pkgDir})\n`,
+    `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} (${pkgDir})\n`,
   );
   if (applied.length > 0) {
     for (const label of applied) {
+      process.stdout.write(`  - ${label}…\n`);
+    }
+  }
+  if (settingsApplied.length > 0) {
+    for (const label of settingsApplied) {
       process.stdout.write(`  - ${label}…\n`);
     }
   }

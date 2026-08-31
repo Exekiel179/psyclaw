@@ -1,21 +1,21 @@
 # PsyClaw
 
-PsyClaw 是面向社会科学研究的 Pi 工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到官方 Pi runtime 上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
+PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到内置运行时上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.6`。本仓库以 `psypi v0.4.1` 的完整工作台为功能基线完成改名；`psypi` 仓库保留为历史仓库，正式命令和后续发布均使用 `psyclaw`。
+当前版本：`0.27.8`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.6
+npm install -g psyclaw@0.27.8
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.6 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.8 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
@@ -24,7 +24,7 @@ npm install -g psyclaw@0.27.6 --registry=https://registry.npmmirror.com
 psyclaw --help
 ```
 
-直接运行 `psyclaw` 会启动交互研究工作台；首次没有模型配置时会进入配置向导。向导会检查当前进程、macOS `launchctl` 和已有用户凭据，也允许直接遮罩输入 Key。`launchctl` Key 只注入当前运行进程、不落盘；登录 shell 仅在用户明确按 `Ctrl+I` 后读取。直接输入或明确导入的 Key 只保存到 Pi 用户级 `auth.json`，不会写入项目或 `models.json`。也可显式运行 `psyclaw wizard`，或使用 `psyclaw setup --provider deepseek` 写入仅引用环境变量的预设。不要把 API key 写进命令参数、项目、README 或 Git 仓库。
+直接运行 `psyclaw` 会启动交互研究工作台；首次没有模型配置时会进入配置向导。向导会检查当前进程、macOS `launchctl` 和已有用户凭据，也允许直接遮罩输入 Key。`launchctl` Key 只注入当前运行进程、不落盘；登录 shell 仅在用户明确按 `Ctrl+I` 后读取。直接输入或明确导入的 Key 只保存到 PsyClaw 用户级 `auth.json`，不会写入项目或 `models.json`。也可显式运行 `psyclaw wizard`，或使用 `psyclaw setup --provider deepseek` 写入仅引用环境变量的预设。不要把 API key 写进命令参数、项目、README 或 Git 仓库。
 
 ## 五分钟开始
 
@@ -37,7 +37,7 @@ psyclaw init "社交支持与研究生心理健康的关系" --paradigm survey-o
 psyclaw
 ```
 
-初始化会建立 `.psyclaw/`、`data/raw/`、`data/clean/`、`literature/pdfs/`、`notes/` 和 `outputs/`，不再生成通用 `artifacts/` 目录。`data/raw/` 是只读保护区；把经确认可用于分析的派生数据放在 `data/clean/`。
+初始化会建立 `.psyclaw/data/raw/`、`data/clean/`、`literature/pdfs/`、`notes/` 和 `outputs/`，不再把原始数据目录暴露在项目根目录。`.psyclaw/data/raw/` 是只读保护区；旧项目的 `data/raw/` 仍保持只读兼容，把经确认可用于分析的派生数据放在 `data/clean/`。
 
 在对话界面中，`/init <研究目标>` 只初始化研究项目和规格，随后使用 `/run [本轮目标]` 才启动受控研究流程。没有依次运行 `/init` 和 `/run` 时，PsyClaw 保持普通对话模式，不强制加入研究门禁或阶段式询问。
 
@@ -54,32 +54,35 @@ psyclaw brief
 | --- | --- |
 | 启动研究对话 | `psyclaw` 或 `psyclaw chat` |
 | 创建研究项目 | `psyclaw init <goal> --paradigm <profile>` |
-| 启动受控研究流程 | 对话中依次输入 `/init <goal>`、`/run [objective]` |
+| 启动受控研究流程 | 对话中依次输入 `/init <goal>`、`/run [--skills a,b] [objective]` |
 | 模拟同行评审 | 论文完成后在对话中输入 `/review` |
 | 登记本地证据 | `psyclaw evidence add <path> --level user\|fulltext` |
 | 生成离线简报 | `psyclaw brief` |
 | 创建人工裁决模板 | `psyclaw hitl init` |
 | 写研究移交记录 | `psyclaw handoff` |
 | 扫描本机其他 Agent | `psyclaw agents` |
-| 查看 PsyClaw 和内置 Pi 更新 | `psyclaw check-updates` |
-| 更新 PsyClaw 和内置 Pi | `psyclaw update` |
-| 导出脱敏使用路径 | 在对话中输入 `/trace` |
+| 查看 PsyClaw 和内置运行时更新 | `psyclaw check-updates` |
+| 更新 PsyClaw 和内置运行时 | `psyclaw update` |
+| 导出完整使用路径 | 在对话中输入 `/export` |
 | 打开科研面板 | 在对话中输入 `/panel` |
 | 查看或切换 Provider | 在对话中输入 `/provider` 或 `/provider <id>` |
 | 管理启动横幅宠物 | `/pet status`、`/pet on`、`/pet off`（默认关闭） |
-| 调用本机 Skill | `/skill <name> [任务]` 或 Pi 原生 `/skill:<name>` |
+| 安装本地 Skill | `/skill install <本地目录>` |
+| 管理或安装 Skill | `/skill` 或 `/skill install <本地目录>` |
+| 调用已加载 Skill | `/skill:<name>` |
+| 管理 Plugin | `/plugin`；终端使用 `psyclaw plugin install|remove|list` |
 | 调用已配置 MCP | 模型通过 `psyclaw_mcp` 自动发现并调用 `.psyclaw/mcp/*.json` 中启用的服务器 |
 
-`psyclaw update` 会更新 PsyClaw 整包，并同时安装该版本锁定、验证过的内置 Pi；它不会更新或删除系统中单独安装的 `pi` 命令。在源码仓库中运行时，命令会停止并提示通过 Git 更新，不会覆盖本地修改。
+`psyclaw update` 会更新 PsyClaw 整包，并同时安装该版本锁定的内置运行时。在源码仓库中运行时，命令会停止并提示通过 Git 更新，不会覆盖本地修改。
 仅查看更新计划而不执行时，使用 `psyclaw update --check`。旧的 `--yes` 参数仍兼容，但不再需要。
 
 ### 导出使用路径
 
 ```bash
-/trace
+/export
 ```
 
-该斜杠命令直接在 PsyClaw 对话界面中使用，从当前项目的工作流日志和对应 Pi 会话中生成 OTLP/HTTP JSON，用于通过 OpenTelemetry Collector 导入 Langfuse 或 LangSmith。导出器只保留步骤类型、父子关系、时间、结果状态和版本；不包含对话正文、工具参数/输出、研究内容、原始 ID 或绝对路径。命令只写本地文件，不会自动上传。终端兼容入口仍为 `psyclaw traces export`。
+该斜杠命令直接在 PsyClaw 对话界面中使用，从当前项目的工作流日志和对应会话中生成 `outputs/psyclaw-export.otlp.json`，用于通过 OpenTelemetry Collector 导入 Langfuse 或 LangSmith。导出文件包含对话正文、工具参数、研究内容、原始 ID 与绝对路径，只写入本地，不会自动上传；不要将其提交到公开仓库。终端入口为 `psyclaw export`。Panel 不再读取实时 Trace，只展示 `outputs/` 下已经显式生成的 Export 文件。
 
 ## 开发者本地安装
 

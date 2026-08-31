@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,6 +10,8 @@ describe("read-only panel server", () => {
   it("serves the run listing and a snapshot over narrow JSON endpoints", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await mkdir(join(root, "outputs"), { recursive: true });
+    await writeFile(join(root, "outputs", "research-export.json"), JSON.stringify({ result: "exported" }), "utf8");
     const log = new RunEventLog(root, "run-server");
     await log.append({ type: "planned", at: "2026-01-01T00:00:00.000Z" });
     await log.append({ type: "started", at: "2026-01-01T00:00:01.000Z" });
@@ -34,6 +36,14 @@ describe("read-only panel server", () => {
       const snapshot = (await snapshotRes.json()) as { runId: string; phase: string };
       expect(snapshot.runId).toBe("run-server");
       expect(snapshot.phase).toBe("executing");
+
+      const filesRes = await fetch(`${base}/api/project-files`);
+      const files = (await filesRes.json()) as { files: string[] };
+      expect(files.files).toContain("outputs/research-export.json");
+      const exportRes = await fetch(`${base}/api/project-file?path=outputs%2Fresearch-export.json`);
+      expect(exportRes.status).toBe(200);
+      expect(await exportRes.json()).toMatchObject({ format: "json", content: expect.stringContaining("exported") });
+      expect((await fetch(`${base}/api/traces`)).status).toBe(404);
 
       const previousKey = process.env.DEEPSEEK_API_KEY;
       process.env.DEEPSEEK_API_KEY = "panel-secret-must-not-leak";
