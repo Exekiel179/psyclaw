@@ -11,7 +11,7 @@ export interface ProviderPickerItem {
 
 export type ProviderPickerResult = { type: "select"; id: string } | { type: "close" };
 
-const MAX_VISIBLE = 9;
+const MAX_VISIBLE = 7;
 
 export class ProviderPickerComponent {
   focused = false;
@@ -45,7 +45,8 @@ export class ProviderPickerComponent {
       const current = item.current ? this.theme.fg("success", " [当前]") : "";
       const label = `${marker} ${item.label}${current}`;
       lines.push(selected ? this.theme.bold(truncateToWidth(label, contentWidth)) : truncateToWidth(label, contentWidth));
-      if (selected && item.description) lines.push(this.theme.fg("dim", truncateToWidth(`  ${item.description}`, contentWidth)));
+      // Keep one row per item so the focused row remains visible in short
+      // terminals; details are presented after selection.
     }
     if (this.items.length > MAX_VISIBLE) {
       lines.push(this.theme.fg("dim", `  ${this.selectedIndex + 1}/${this.items.length}`));

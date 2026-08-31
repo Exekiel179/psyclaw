@@ -94,12 +94,12 @@ async function packageManagerAt(root: string): Promise<"pnpm" | "npm" | undefine
 function buildCommand(manager: "pnpm" | "npm", version: string): string {
   const spec = `${PI_AI}@${version} ${PI_CODING_AGENT}@${version}`;
   return manager === "pnpm"
-    ? `pnpm add --save-exact ${spec}`
-    : `npm install --save-exact --omit=dev --legacy-peer-deps ${spec}`;
+    ? `pnpm add --save-exact ${spec} --registry=https://registry.npmjs.org/`
+    : `npm install --save-exact --omit=dev --legacy-peer-deps ${spec} --registry=https://registry.npmjs.org/`;
 }
 
 function buildProductCommand(version: string): string {
-  return `npm install --global psyclaw@${version}`;
+  return `npm install --global psyclaw@${version} --registry=https://registry.npmjs.org/`;
 }
 
 async function hasSourceLockfile(root: string): Promise<boolean> {

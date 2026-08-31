@@ -162,7 +162,7 @@ async function main(): Promise<void> {
     process.stdout.write(`${usage()}\n`);
     return;
   }
-  if (command === "--version" || command === "-V") {
+  if (command === "--version" || command === "-v" || command === "-V") {
     process.stdout.write(`${PSYCLAW_VERSION}\n`);
     return;
   }
@@ -320,16 +320,6 @@ async function main(): Promise<void> {
     const { createHttpRegistry } = await import("./updates/registry.js");
     const report = await checkUpdates({ registry: createHttpRegistry(), cwd: root });
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-    return;
-  }
-  if (command === "export") {
-    assertKnownOptions(args, ["--output", "--format"]);
-    const format = option(args, "--format", "otlp-json");
-    if (format !== "otlp-json") throw new Error(`Unsupported trace format: ${format}`);
-    const { exportTraces } = await import("./telemetry/export.js");
-    const output = option(args, "--output");
-    const result = await exportTraces({ root, ...(output === undefined ? {} : { output }) });
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
   if (command === "update") {

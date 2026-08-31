@@ -56,6 +56,18 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     ],
   },
   {
+    id: "opencode-go",
+    name: "OpenCode Go 订阅",
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    api: "openai-completions",
+    apiKeyEnv: "OPENCODE_API_KEY",
+    models: [
+      { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", reasoning: true },
+      { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", reasoning: true },
+      { id: "glm-5.1", name: "GLM-5.1", reasoning: true },
+    ],
+  },
+  {
     id: "anthropic",
     name: "Anthropic",
     baseUrl: "https://api.anthropic.com",
@@ -160,6 +172,12 @@ export interface ProviderConfigInput {
 }
 
 export type CredentialSource = "process-env" | "macos-launchctl" | "auth-store" | "missing";
+
+// These providers are implemented by Pi itself. PsyClaw only exposes their
+// credentials and selection; writing a simplified models.json entry would
+// discard Pi's native model/API metadata (some providers expose more than one
+// API protocol).
+const PI_NATIVE_PROVIDERS = new Set(["opencode-go"]);
 
 function execFileText(file: string, args: readonly string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
@@ -341,10 +359,12 @@ export async function saveProviderConfig(input: ProviderConfigInput, options: { 
     const auth = AuthStorage.create(join(agentDir, "auth.json"));
     await auth.modify(input.id, async () => ({ type: "api_key", key: apiKey }));
   }
-  await withModelsLock(modelsPath, async () => {
-    const existing = await readProviderCatalog(modelsPath);
-    await atomicJsonWrite(modelsPath, { providers: { ...existing, [input.id]: providerConfig(input) } });
-  });
+  if (!PI_NATIVE_PROVIDERS.has(input.id)) {
+    await withModelsLock(modelsPath, async () => {
+      const existing = await readProviderCatalog(modelsPath);
+      await atomicJsonWrite(modelsPath, { providers: { ...existing, [input.id]: providerConfig(input) } });
+    });
+  }
   return { path: modelsPath, providers: [input.id] };
 }
 
@@ -364,15 +384,17 @@ export async function setupProviders(options: SetupOptions = {}): Promise<SetupR
   for (const id of selected) {
     const preset = PROVIDER_PRESETS.find((candidate) => candidate.id === id);
     if (!preset) throw new Error(`Unknown provider: ${id}`);
-    providers[id] = providerToJson(preset);
+    if (!PI_NATIVE_PROVIDERS.has(id)) providers[id] = providerToJson(preset);
   }
 
   await mkdir(agentDir, { recursive: true });
-  await withModelsLock(modelsPath, async () => {
-    const existing = await readProviderCatalog(modelsPath);
-    await atomicJsonWrite(modelsPath, { providers: { ...existing, ...providers } });
-  });
-  return { path: modelsPath, providers: Object.keys(providers) };
+  if (Object.keys(providers).length > 0) {
+    await withModelsLock(modelsPath, async () => {
+      const existing = await readProviderCatalog(modelsPath);
+      await atomicJsonWrite(modelsPath, { providers: { ...existing, ...providers } });
+    });
+  }
+  return { path: modelsPath, providers: [...selected] };
 }
 
 /** Whether a custom or built-in provider is ready for an interactive launch. */

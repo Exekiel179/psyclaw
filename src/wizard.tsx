@@ -33,9 +33,16 @@ function Hint({ children }: { children: React.ReactNode }): React.ReactElement {
 }
 
 function Selectable({ lines, selected }: { lines: readonly string[]; selected: number }): React.ReactElement {
+  const maxVisible = 8;
+  const start = Math.min(
+    Math.max(0, selected - Math.floor(maxVisible / 2)),
+    Math.max(0, lines.length - maxVisible),
+  );
+  const visible = lines.slice(start, start + maxVisible);
   return (
     <Box flexDirection="column" marginY={1}>
-      {lines.map((line, index) => {
+      {visible.map((line, offset) => {
+        const index = start + offset;
         const isSelected = index === selected;
         return (
           <Box key={line} gap={1}>
@@ -50,6 +57,7 @@ function Selectable({ lines, selected }: { lines: readonly string[]; selected: n
           </Box>
         );
       })}
+      {lines.length > maxVisible && <Text dimColor>第 {selected + 1}/{lines.length} 项</Text>}
     </Box>
   );
 }

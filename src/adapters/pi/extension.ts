@@ -1,6 +1,6 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { appendApproval, approvalInputDigest, approvePrimaryDocument, asProject, bootstrapProject, DEFAULT_RUN_APPROVAL_NODES, exportTraces, PRIMARY_PLAN_DOCUMENTS, primaryPlanApprovalStatus, projectPaths, runOfflineBrief, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview, writeHandoff } from "../../index.js";
+import { appendApproval, approvalInputDigest, approvePrimaryDocument, asProject, bootstrapProject, DEFAULT_RUN_APPROVAL_NODES, PRIMARY_PLAN_DOCUMENTS, primaryPlanApprovalStatus, projectPaths, runOfflineBrief, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview, writeHandoff } from "../../index.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
 import { atomicWriteFile } from "../../project/jsonl.js";
@@ -43,7 +43,9 @@ import {
 } from "../../integrations/mcp-runtime.js";
 import {
   SecretInputComponent,
+  ProviderPickerComponent,
   type ProviderPickerItem,
+  type ProviderPickerResult,
   type SecretInputResult,
 } from "../../tui/provider-picker.js";
 
@@ -158,10 +160,15 @@ async function pickProviderItem(
   title: string,
   items: ProviderPickerItem[],
 ): Promise<string | undefined> {
-  const labels = items.map((item) => `${item.current ? "* " : ""}${item.label} (${item.id})`);
-  const selected = await ctx.ui.select(title, labels, { timeout: 60_000 });
-  const index = selected === undefined ? -1 : labels.indexOf(selected);
-  return index < 0 ? undefined : items[index]!.id;
+  if (typeof ctx.ui.custom !== "function") {
+    const labels = items.map((item) => `${item.current ? "* " : ""}${item.label} (${item.id})`);
+    const selected = await ctx.ui.select(title, labels, { timeout: 60_000 });
+    const index = selected === undefined ? -1 : labels.indexOf(selected);
+    return index < 0 ? undefined : items[index]!.id;
+  }
+  const selected = await ctx.ui.custom<ProviderPickerResult>((tui, theme, keybindings, done) =>
+    new ProviderPickerComponent(title, items, tui, theme, keybindings, done));
+  return selected.type === "select" ? selected.id : undefined;
 }
 
 async function promptProviderKey(
@@ -1462,8 +1469,15 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         }
         if (preset && ctx.hasUI && typeof ctx.ui.custom === "function") {
           const credential = await providerCredentialSource(preset);
-          const key = credential === "missing" ? await promptProviderKey(ctx, preset.name, preset.apiKeyEnv) : "";
+          // Always show the credential step when switching a built-in
+          // provider. An empty submission deliberately keeps an existing
+          // environment/auth-store credential; this makes the flow explicit
+          // and avoids silently skipping the key screen on another machine.
+          const key = await promptProviderKey(ctx, preset.name, preset.apiKeyEnv);
           if (key === undefined) return;
+          if (!key && credential === "missing") {
+            throw new Error(`未找到 ${preset.apiKeyEnv}；请输入 API Key 后再继续`);
+          }
           await saveProviderConfig({ ...preset, ...(key ? { apiKey: key } : {}) });
           const refreshed = await Promise.race([
             ctx.modelRegistry.refresh().then(() => true),
@@ -1501,26 +1515,6 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       ctx.ui.notify(`启动横幅宠物已${action === "on" ? "开启" : "关闭"}，下次启动生效`, "info");
     },
   });
-
-  const traceCommand = {
-    description: "导出包含正文与工具参数的完整使用路径，供 Langfuse 或 LangSmith 分析",
-    handler: async (args: string, ctx: ExtensionCommandContext) => {
-      try {
-        if (args.trim()) throw new Error("Usage: /export");
-        const result = await exportTraces({ root: ctx.cwd });
-        ctx.ui.notify([
-          "使用路径已导出（未上传）",
-          `文件：${result.output}`,
-          `轨迹：${result.traces}`,
-          `步骤：${result.spans}`,
-          "包含对话正文、工具参数、原始 ID 与绝对路径，便于排查各环节问题；请勿将导出文件提交到公开仓库。",
-        ].join("\n"), "info");
-      } catch (error) {
-        await notifyError(ctx, error);
-      }
-    },
-  };
-  pi.registerCommand("export", traceCommand);
 
   if (typeof pi.registerTool === "function") {
   pi.registerTool({
