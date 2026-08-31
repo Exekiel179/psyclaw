@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.13 - 2026-09-01
+
+- Added the native OpenCode Go subscription provider and its bundled model choices.
+- Provider switching now always presents the credential screen; blank input reuses an existing credential and missing credentials are reported explicitly.
+
 ## 0.27.12 - 2026-09-01
 
 - Expanded analysis hooks across planning, input validation, delegation, writes, results, reporting, and citation completion.

@@ -68,7 +68,6 @@ export * from "./updates/skills.js";
 export * from "./updates/manifest.js";
 export * from "./updates/check.js";
 export * from "./updates/update.js";
-export * from "./telemetry/export.js";
 export * from "./adapters/pi/model.js";
 export * from "./branding.js";
 export * from "./adapters/pi/resources.js";

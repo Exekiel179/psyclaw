@@ -2,20 +2,26 @@
 
 PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到内置运行时上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.12`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.27.13`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.12
+npm install -g psyclaw@0.27.13
+```
+
+如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
+
+```bash
+npm install -g psyclaw@0.27.13 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.12 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.13 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
@@ -63,7 +69,7 @@ psyclaw brief
 | 扫描本机其他 Agent | `psyclaw agents` |
 | 查看 PsyClaw 和内置运行时更新 | `psyclaw check-updates` |
 | 更新 PsyClaw 和内置运行时 | `psyclaw update` |
-| 导出完整使用路径 | 在对话中输入 `/export` |
+| 导出会话 | 使用 Pi 内置的 `/export` |
 | 打开科研面板 | 在对话中输入 `/panel` |
 | 查看或切换 Provider | 在对话中输入 `/provider` 或 `/provider <id>` |
 | 管理启动横幅宠物 | `/pet status`、`/pet on`、`/pet off`（默认关闭） |
@@ -82,7 +88,7 @@ psyclaw brief
 /export
 ```
 
-该斜杠命令直接在 PsyClaw 对话界面中使用，从当前项目的工作流日志和对应会话中生成 `outputs/psyclaw-export.otlp.json`，用于通过 OpenTelemetry Collector 导入 Langfuse 或 LangSmith。导出文件包含对话正文、工具参数、研究内容、原始 ID 与绝对路径，只写入本地，不会自动上传；不要将其提交到公开仓库。终端入口为 `psyclaw export`。Panel 不再读取实时 Trace，只展示 `outputs/` 下已经显式生成的 Export 文件。
+`/export` 由 Pi 内置命令提供。PsyClaw 不重复实现会话导出或 Trace 运行时。
 
 ## 开发者本地安装
 
