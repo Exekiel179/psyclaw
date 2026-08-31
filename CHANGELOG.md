@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.27.9 - 2026-09-01
+## 0.27.10 - 2026-09-01
 
 - Expanded analysis hooks across planning, input validation, delegation, writes, results, reporting, and citation completion.
 - Exposed the read-only `/agents` command to regular users while keeping destructive developer commands gated.
