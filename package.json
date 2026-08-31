@@ -1,6 +1,6 @@
 {
   "name": "psyclaw",
-  "version": "0.27.11",
+  "version": "0.27.12",
   "description": "A standalone, evidence-grounded social-science research agent with research contracts, evidence gates, and recoverable workflows",
   "type": "module",
   "license": "MIT",
