@@ -9,8 +9,8 @@ export const PSYCLAW_NAME = "PsyClaw";
 /** Product version from package.json via the shared manifest walk (single source of truth). */
 export const PSYCLAW_VERSION: string = readPsyClawVersionSync() ?? "0.0.0";
 
-/** Predecessor Pi profile retained across the product rename. */
-export const PSYCLAW_CONFIG_DIR = `.psy${"pi"}`;
+/** Single user configuration root used by PsyClaw and its bundled runtime. */
+export const PSYCLAW_CONFIG_DIR = ".psyclaw";
 
 /** Accent colors for psyclaw's own ink interfaces (wizard / shell TUI). */
 export const PSYCLAW_ACCENT = "#2ec4b6";

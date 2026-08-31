@@ -7,6 +7,16 @@ import { bootstrapProject } from "../../src/project/bootstrap.js";
 import { downloadReferencePdf, enrichAssistantMessage } from "../../src/panel/server.js";
 import { appendClaim, appendEvidence } from "../../src/research/ledger.js";
 import { postJson, withServer } from "../helpers.js";
+import { referencePdfPath } from "../../src/literature/archive.js";
+
+async function preparePublishEvidence(root: string): Promise<void> {
+  const doi = "10.1000/panel-publish-fixture";
+  await writeFile(join(root, ".psyclaw", "citations.jsonl"), `${JSON.stringify({ doi })}\n`, "utf8");
+  await writeFile(join(root, ".psyclaw", "references.jsonl"), `${JSON.stringify({ doi, verified: true })}\n`, "utf8");
+  const pdf = referencePdfPath(doi);
+  await mkdir(join(root, "literature", "pdfs"), { recursive: true });
+  await writeFile(join(root, ...pdf.split("/")), "%PDF-1.4\nfixture\n%%EOF", "utf8");
+}
 
 // Detect pandoc at module load so `it.runIf` below is decided before tests run.
 const pandocOk = await new Promise<boolean>((resolve) => {
@@ -70,6 +80,7 @@ describe("generation-time publish (/api/publish)", () => {
   it("writes the manuscript to paper/ and the panel recognizes it immediately", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-publish-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await preparePublishEvidence(root);
     await withServer(root, async (base) => {
       const res = await postJson(base, "/api/publish", { content: "# 发布稿\n\n发布内容", name: "论文初稿", exportDocx: false });
       expect(res.status).toBe(200);
@@ -97,6 +108,7 @@ describe("versions and reference archive endpoints", () => {
   it("lists manuscript versions and serves archived version files", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-versions-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await preparePublishEvidence(root);
     await withServer(root, async (base) => {
       await postJson(base, "/api/publish", { content: "# v1 内容", name: "论文初稿", exportDocx: false });
       await postJson(base, "/api/publish", { content: "# v2 内容", name: "论文初稿", exportDocx: false });

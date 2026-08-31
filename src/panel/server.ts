@@ -31,7 +31,12 @@ import { resumePlanWithPi } from "../orchestration/pi-executor.js";
 import { RunEventLog } from "./events.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
 import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
-import { projectTraceSnapshot } from "../telemetry/export.js";
+import {
+  readUserSkillState,
+  scanLocalSkills,
+  setLocalSkillEnabled,
+  userSkillId,
+} from "../skills/user-skills.js";
 
 const activePanelRuns = new Set<string>();
 
@@ -342,7 +347,7 @@ async function listProjectFiles(root: string): Promise<string[]> {
     for (const entry of entries) {
       const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
       const normalized = relative.replaceAll("\\", "/");
-      if ([".git", "node_modules", "data/raw"].some((blocked) => normalized === blocked || normalized.startsWith(`${blocked}/`))) continue;
+      if ([".git", "node_modules", "data/raw", ".psyclaw/data/raw"].some((blocked) => normalized === blocked || normalized.startsWith(`${blocked}/`))) continue;
       if (/credential|secret|auth\.json|\.env/i.test(entry.name)) continue;
       const absolute = join(directory, entry.name);
       if (entry.isDirectory()) await walk(absolute, normalized); else if (entry.isFile()) result.push(normalized);
@@ -443,10 +448,10 @@ function panelSkillInstallTask(root: string, item: Record<string, unknown>, scop
     `来源网址：${sourceRef}`,
     `安装位置：${scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）"}。`,
     `唯一允许的最终目标目录：${target}`,
-    "请使用当前会话的工具检查来源仓库并完成安装。不要写入其他 Skill 目录，不要修改 data/raw、.git 或研究产物。",
+    "请使用当前会话的工具检查来源仓库并完成安装。不要写入其他 Skill 目录，不要修改 .psyclaw/data/raw、data/raw、.git 或研究产物。",
     "目标目录最终必须直接包含有效 SKILL.md（YAML frontmatter 至少包含 name 和 description），不得包含 .git、符号链接、凭据或二进制大文件。",
     "如果仓库包含多个 Skill，只安装与此推荐项相符的部分；如果它不是 Skill 或无法合理适配，停止并说明原因，不要伪造 SKILL.md。",
-    "安装完成后检查目标目录结构，并提醒用户执行 /skills 启用该项，再执行 /reload。",
+    "安装完成后检查目标目录结构，并提醒用户执行 /skill 启用该项，再执行 /reload。",
   ].join("\n");
 }
 
@@ -558,7 +563,7 @@ async function panelCatalog(root: string): Promise<unknown> {
       risk: "network",
       configured: configured(model.provider),
       endpoint: model.baseUrl,
-      apiKeyEnv: apiKeyEnv ?? "Pi auth/config",
+      apiKeyEnv: apiKeyEnv ?? "PsyClaw auth/config",
       configSource: "environment-presence" as const,
     };
   });
@@ -592,7 +597,7 @@ async function recommendedSkills(): Promise<unknown> {
         ...catalog,
         items: (catalog.items ?? []).filter((item) => item.kind === "skill").map((item) => ({
           ...item,
-          slashCommand: `/skills enable ${String(item.id ?? "")}`,
+          slashCommand: `/skill enable ${String(item.id ?? "")}`,
           installCommand: `/install skill ${String(item.id ?? "")}`,
         })),
         externalTools: (catalog.externalTools ?? []).filter((item) => item.kind === "external-tool"),
@@ -851,11 +856,6 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-project-file/v1", ...(await readPanelProjectFile(root, relative)) }));
         return;
       }
-      if (url.pathname === "/api/traces") {
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify(await projectTraceSnapshot({ root })));
-        return;
-      }
       if (url.pathname === "/api/config") {
         const promptPath = await assertSafeProjectPath(root, ".psyclaw/system-prompt.md");
         let supplement = "";
@@ -891,12 +891,24 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           const item = ((catalog as { items?: Array<Record<string, unknown>> }).items ?? []).find((candidate) => candidate.id === id);
           return typeof item?.name === "string" ? item.name : id;
         };
+        // User-installed (non-catalog) skills from the expanded discovery
+        // roots, with their individual enable state.
+        const userSkillState = await readUserSkillState(root);
+        const disabledUserSkills = new Set(userSkillState.disabled);
+        const localSkills = (await scanLocalSkills(root, { includeManaged: false })).map((skill) => ({
+          id: userSkillId(skill.name),
+          name: skill.name,
+          description: skill.description,
+          path: skill.path,
+          enabled: !disabledUserSkills.has(skill.name),
+        }));
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({
           schemaVersion: "psyclaw/enabled-capabilities/v1",
           coreSkills: CORE_SKILLS.map((skill) => ({ id: skill.id, name: skill.name, enabled: !disabled.coreSkills.includes(skill.id) })),
           skills: state.skills.filter((id) => skillIds.has(id)).map((id) => ({ id, name: nameOf("skill", id), enabled: true })),
           mcp: state.mcp.filter((id) => mcpIds.has(id)).map((id) => ({ id, name: nameOf("mcp", id), enabled: true })),
+          localSkills,
         }));
         return;
       }
@@ -918,7 +930,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         if (!/^[a-z0-9][a-z0-9._:/()-]{0,127}$/i.test(model)) throw new Error("model is required and may contain letters, digits, . _ : / ( ) -");
         await writeAgentSettings({ defaultProvider: provider, defaultModel: model });
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ schemaVersion: "psyclaw/active-provider-receipt/v1", ok: true, provider, model, note: "重启 Pi 会话后生效" }));
+        response.end(JSON.stringify({ schemaVersion: "psyclaw/active-provider-receipt/v1", ok: true, provider, model, note: "重启 PsyClaw 会话后生效" }));
         return;
       }
       if (url.pathname === "/api/install/execute") {
@@ -1027,9 +1039,12 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           return;
         }
         const body = await readJsonBody(request);
-        const kind = body.kind === "skill" || body.kind === "skills" ? "skills" : body.kind === "mcp" ? "mcp" : body.kind === "core-skill" ? "core-skill" : undefined;
+        const kind = body.kind === "skill" || body.kind === "skills" ? "skills" : body.kind === "mcp" ? "mcp" : body.kind === "core-skill" ? "core-skill" : body.kind === "local-skill" ? "local-skill" : undefined;
         const id = String(body.id ?? "").trim();
-        if (!kind || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(id) || typeof body.enabled !== "boolean") throw new Error("kind, id and enabled are required");
+        const idValid = kind === "local-skill"
+          ? /^local:[^\r\n/\\]{1,64}$/i.test(id)
+          : /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(id);
+        if (!kind || !idValid || typeof body.enabled !== "boolean") throw new Error("kind, id and enabled are required");
         if (kind === "core-skill") {
           if (!CORE_SKILLS.some((skill) => skill.id === id)) throw new Error(`unknown core skill: ${id}`);
           const disabled = await readDisabledCapabilities(root);
@@ -1039,6 +1054,16 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           await writeDisabledCapabilities(root, disabled);
           response.writeHead(200, { "content-type": "application/json" });
           response.end(JSON.stringify({ schemaVersion: "psyclaw/capability-state-receipt/v1", ok: true, coreSkills: disabled.coreSkills }));
+          return;
+        }
+        if (kind === "local-skill") {
+          // id here is the `local:<name>` management key; strip the prefix to
+          // write the user-skill enable state.
+          const name = id.startsWith("local:") ? id.slice("local:".length) : id;
+          await setLocalSkillEnabled(root, name, body.enabled);
+          const state = await readUserSkillState(root);
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/local-skill-state-receipt/v1", ok: true, id, enabled: body.enabled, disabled: state.disabled }));
           return;
         }
         const state = await readRecommendationState(root);

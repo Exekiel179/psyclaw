@@ -41,9 +41,9 @@ export interface TraceExportResult {
   spans: number;
   sources: { sessions: number; workflowRuns: number };
   privacy: {
-    contentIncluded: false;
-    originalIdsIncluded: false;
-    absolutePathsIncluded: false;
+    contentIncluded: true;
+    originalIdsIncluded: true;
+    absolutePathsIncluded: true;
   };
 }
 
@@ -53,6 +53,8 @@ export interface PanelTraceEvent {
   at: string;
   status: "ok" | "error";
   category?: string;
+  /** Full tool input / message text for debugging (not redacted). */
+  detail?: string;
 }
 
 export interface PanelTrace {
@@ -71,9 +73,9 @@ export interface PanelTraceSnapshot {
   traces: PanelTrace[];
   sources: { sessions: number; workflowRuns: number };
   privacy: {
-    contentIncluded: false;
-    originalIdsIncluded: false;
-    absolutePathsIncluded: false;
+    contentIncluded: true;
+    originalIdsIncluded: true;
+    absolutePathsIncluded: true;
   };
 }
 
@@ -160,17 +162,46 @@ function safeToolCategory(name: unknown): string {
   return "other";
 }
 
-function toolCategories(message: JsonRecord): string[] {
+const MAX_TRACE_TEXT = 12_000;
+
+function truncateTraceText(value: string): string {
+  return value.length > MAX_TRACE_TEXT ? `${value.slice(0, MAX_TRACE_TEXT)}\n…[truncated]` : value;
+}
+
+interface ToolCallInfo {
+  name: string;
+  input: string;
+}
+
+function toolCalls(message: JsonRecord): ToolCallInfo[] {
   const content = message.content;
   if (!Array.isArray(content)) return [];
-  const categories: string[] = [];
+  const calls: ToolCallInfo[] = [];
   for (const part of content) {
     if (!isRecord(part)) continue;
     const type = part.type;
     if (type !== "toolCall" && type !== "tool_call" && type !== "tool_use") continue;
-    categories.push(safeToolCategory(part.name ?? part.toolName));
+    const name = String(part.name ?? part.toolName ?? "");
+    const rawInput = part.input ?? part.arguments ?? part.params;
+    let input = "";
+    if (typeof rawInput === "string") input = rawInput;
+    else if (rawInput !== undefined) input = JSON.stringify(rawInput);
+    calls.push({ name, input: truncateTraceText(input) });
   }
-  return categories;
+  return calls;
+}
+
+function textContent(message: JsonRecord): string {
+  const content = message.content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const part of content) {
+    if (!isRecord(part)) continue;
+    if (part.type === "text" && typeof part.text === "string" && part.text.trim()) {
+      parts.push(part.text.trim());
+    }
+  }
+  return truncateTraceText(parts.join("\n"));
 }
 
 function makeSpan(options: {
@@ -207,30 +238,47 @@ function sessionSpans(rows: JsonRecord[], root: string, fallback: Date): OtlpSpa
     name: "psyclaw.session",
     start,
     end,
-    attributes: [attr("psyclaw.source", "pi-session"), attr("psyclaw.version", PSYCLAW_VERSION)],
+    attributes: [
+      attr("psyclaw.source", "pi-session"),
+      attr("psyclaw.version", PSYCLAW_VERSION),
+      attr("psyclaw.session.id", typeof header.id === "string" ? header.id : "unknown"),
+      attr("psyclaw.session.cwd", root),
+    ],
   });
   const spans = [rootSpan];
   for (const { row, at } of dated) {
     if (row.type !== "message" || !isRecord(row.message)) continue;
     const role = row.message.role;
+    const text = textContent(row.message);
+    const originalId = typeof row.id === "string" ? row.id : undefined;
     if (role === "user" || role === "assistant") {
       spans.push(makeSpan({
         traceId,
         parentSpanId: rootSpan.spanId,
         name: role === "user" ? "conversation.user_turn" : "conversation.assistant_turn",
         start: at,
-        attributes: [attr("psyclaw.content_included", false)],
+        attributes: [
+          attr("psyclaw.content_included", true),
+          attr("psyclaw.content", text || "(no text content)"),
+          ...(originalId === undefined ? [] : [attr("psyclaw.original_id", originalId)]),
+        ],
         status: role === "assistant" && typeof row.message.errorMessage === "string" ? "error" : "ok",
       }));
     }
     if (role === "assistant") {
-      for (const category of toolCategories(row.message)) {
+      for (const call of toolCalls(row.message)) {
         spans.push(makeSpan({
           traceId,
           parentSpanId: rootSpan.spanId,
-          name: `tool.${category}`,
+          name: `tool.${safeToolCategory(call.name)}`,
           start: at,
-          attributes: [attr("langsmith.span.kind", "tool"), attr("psyclaw.tool.category", category)],
+          attributes: [
+            attr("langsmith.span.kind", "tool"),
+            attr("psyclaw.tool.category", safeToolCategory(call.name)),
+            attr("psyclaw.tool.name", call.name || "unknown"),
+            attr("psyclaw.tool.input", call.input || "(no input)"),
+            ...(originalId === undefined ? [] : [attr("psyclaw.original_id", originalId)]),
+          ],
         }));
       }
     }
@@ -252,18 +300,32 @@ function workflowSpans(rows: JsonRecord[], fallback: Date): OtlpSpan[] {
     start,
     end,
     status: blocked ? "error" : "ok",
-    attributes: [attr("psyclaw.source", "workflow-run"), attr("psyclaw.version", PSYCLAW_VERSION)],
+    attributes: [
+      attr("psyclaw.source", "workflow-run"),
+      attr("psyclaw.version", PSYCLAW_VERSION),
+      attr("psyclaw.run.id", typeof rows[0]?.runId === "string" ? rows[0].runId : "unknown"),
+    ],
   });
   const spans = [rootSpan];
   for (const { row, at } of dated) {
     const eventType = String(row.type);
+    const message = typeof row.message === "string" ? truncateTraceText(row.message) : undefined;
+    const receipt = isRecord(row.receipt) ? row.receipt : undefined;
+    const receiptText = receipt !== undefined
+      ? truncateTraceText(JSON.stringify(receipt))
+      : undefined;
     spans.push(makeSpan({
       traceId,
       parentSpanId: rootSpan.spanId,
       name: `workflow.${eventType}`,
       start: at,
       status: eventType === "blocked" ? "error" : "ok",
-      attributes: [attr("psyclaw.event.type", eventType)],
+      attributes: [
+        attr("psyclaw.event.type", eventType),
+        ...(message === undefined ? [] : [attr("psyclaw.event.message", message)]),
+        ...(receiptText === undefined ? [] : [attr("psyclaw.event.receipt", receiptText)]),
+        ...(typeof row.taskId === "string" ? [attr("psyclaw.task.id", row.taskId)] : []),
+      ],
     }));
   }
   return spans;
@@ -278,21 +340,24 @@ function sessionTrace(rows: JsonRecord[], root: string, sourceKey: string): Pane
     const role = row.message.role;
     const at = timestamp(row.timestamp ?? row.message.timestamp, new Date(0)).toISOString();
     if (role === "user" || role === "assistant") {
+      const text = textContent(row.message);
       events.push({
         id: stableId(`${sourceKey}:${index}:turn`),
         name: role === "user" ? "用户回合" : "助手回合",
         at,
         status: role === "assistant" && typeof row.message.errorMessage === "string" ? "error" : "ok",
+        ...(text ? { detail: text } : {}),
       });
     }
     if (role === "assistant") {
-      for (const [toolIndex, category] of toolCategories(row.message).entries()) {
+      for (const [toolIndex, call] of toolCalls(row.message).entries()) {
         events.push({
           id: stableId(`${sourceKey}:${index}:tool:${toolIndex}`),
-          name: "工具调用",
+          name: `工具调用：${call.name || "unknown"}`,
           at,
           status: "ok",
-          category,
+          category: safeToolCategory(call.name),
+          ...(call.input ? { detail: call.input } : {}),
         });
       }
     }
@@ -315,11 +380,15 @@ function workflowTrace(rows: JsonRecord[], sourceKey: string): PanelTrace | unde
   if (sourceEvents.length === 0) return undefined;
   const events = sourceEvents.map((row, index): PanelTraceEvent => {
     const eventType = String(row.type);
+    const message = typeof row.message === "string" ? truncateTraceText(row.message) : undefined;
+    const receipt = isRecord(row.receipt) ? truncateTraceText(JSON.stringify(row.receipt)) : undefined;
+    const detail = [message, receipt].filter((part): part is string => part !== undefined && part.length > 0).join("\n");
     return {
       id: stableId(`${sourceKey}:${index}:${eventType}`),
       name: `工作流 ${eventType}`,
       at: timestamp(row.at, new Date(0)).toISOString(),
       status: eventType === "blocked" ? "error" : "ok",
+      ...(detail ? { detail } : {}),
     };
   });
   const traceId = stableId(`workflow:${sourceKey}`);
@@ -360,7 +429,7 @@ export async function projectTraceSnapshot(options: Pick<TraceExportOptions, "ro
       sessions: traces.filter((trace) => trace.source === "session").length,
       workflowRuns: traces.filter((trace) => trace.source === "workflow").length,
     },
-    privacy: { contentIncluded: false, originalIdsIncluded: false, absolutePathsIncluded: false },
+    privacy: { contentIncluded: true, originalIdsIncluded: true, absolutePathsIncluded: true },
   };
 }
 
@@ -376,7 +445,7 @@ function safeOutput(root: string, requested: string): string {
 /** Export metadata-only interaction paths as an OTLP/HTTP JSON payload. */
 export async function exportTraces(options: TraceExportOptions = {}): Promise<TraceExportResult> {
   const root = resolve(options.root ?? process.cwd());
-  const output = safeOutput(root, options.output ?? "psyclaw-traces.otlp.json");
+  const output = safeOutput(root, options.output ?? "outputs/psyclaw-export.otlp.json");
   const fallback = options.now?.() ?? new Date();
   const sessionsRoot = resolve(options.agentDir ?? getAgentDir(), "sessions");
   const runRoot = projectPaths(root).runs;
@@ -412,7 +481,7 @@ export async function exportTraces(options: TraceExportOptions = {}): Promise<Tr
           attr("service.name", "psyclaw"),
           attr("service.version", PSYCLAW_VERSION),
           ...(manifest?.piVersion ? [attr("psyclaw.pi.version", manifest.piVersion)] : []),
-          attr("psyclaw.export.content_included", false),
+          attr("psyclaw.export.content_included", true),
         ],
       },
       scopeSpans: [{
@@ -430,6 +499,6 @@ export async function exportTraces(options: TraceExportOptions = {}): Promise<Tr
     traces: traces.length,
     spans: allSpans.length,
     sources: { sessions: includedSessions, workflowRuns: includedRuns },
-    privacy: { contentIncluded: false, originalIdsIncluded: false, absolutePathsIncluded: false },
+    privacy: { contentIncluded: true, originalIdsIncluded: true, absolutePathsIncluded: true },
   };
 }

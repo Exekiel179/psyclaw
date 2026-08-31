@@ -40,9 +40,9 @@ export async function runAnalysisDelegation(root: string): Promise<WorkflowResul
       hooks: ANALYSIS_HOOKS_VERSION,
       hookDigest: analysisHookDigest(),
       userHooks: userHooks.map((hook) => ({ id: hook.id, event: hook.event, severity: hook.severity })),
-      immutableInputs: ["data/raw", "declared input paths"],
+      immutableInputs: [".psyclaw/data/raw", "declared input paths"],
       requiredChecks: ["beforeAnalysis", "validateAnalysisPlan", "beforeWrite", "afterAnalysis"],
-      policy: ["never overwrite or recode data/raw", "never report p-values without effect sizes and uncertainty intervals", "never turn correlation or significance into causality", "record script, environment, input hashes, missing-data and multiplicity handling"],
+      policy: ["never overwrite or recode .psyclaw/data/raw", "never report p-values without effect sizes and uncertainty intervals", "never turn correlation or significance into causality", "record script, environment, input hashes, missing-data and multiplicity handling"],
     },
     tasks: resultClaims.map((claim) => ({
       claimId: claim.id,

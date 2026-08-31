@@ -1,7 +1,7 @@
 {
   "name": "psyclaw",
-  "version": "0.27.6",
-  "description": "A standalone, evidence-grounded social-science research agent — a conversation-driven agent that bundles the Pi runtime with psyclaw's research contracts, evidence gates, and workflows",
+  "version": "0.27.8",
+  "description": "A standalone, evidence-grounded social-science research agent with research contracts, evidence gates, and recoverable workflows",
   "type": "module",
   "license": "MIT",
   "repository": {

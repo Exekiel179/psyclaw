@@ -30,6 +30,7 @@ export interface SkillManagerOptions {
 export type SkillManagerAction =
   | { type: "close" }
   | { type: "toggle"; id: string; enabled: boolean }
+  | { type: "toggle-all"; enabled: boolean }
   | { type: "install"; id: string };
 
 const MAX_VISIBLE = 10;
@@ -107,7 +108,7 @@ export class SkillManagerComponent {
       if (selected.reason) lines.push(this.theme.fg("warning", truncateToWidth(`原因：${selected.reason}`, contentWidth)));
     }
     if (this.notice) lines.push("", this.theme.fg("warning", truncateToWidth(this.notice, contentWidth)));
-    lines.push("", this.theme.fg("dim", this.options.footer ?? "↑/↓ 移动 · Space 启用/停用 · Enter 查看/安装 · Esc 关闭"));
+    lines.push("", this.theme.fg("dim", this.options.footer ?? "↑/↓ 移动 · Space 启用/停用 · a 全部启用 · d 全部停用 · Enter 查看/安装 · Esc 关闭"));
     return lines;
   }
 
@@ -130,6 +131,17 @@ export class SkillManagerComponent {
       this.selectedIndex = (this.selectedIndex + 1) % this.items.length;
       this.notice = "";
       this.tui.requestRender();
+      return;
+    }
+
+    // Batch operations: `a` enables every manageable item, `d` disables every
+    // manageable item. Core and blocked items are skipped by the handler.
+    if (matchesKey(data, "a")) {
+      this.done({ type: "toggle-all", enabled: true });
+      return;
+    }
+    if (matchesKey(data, "d")) {
+      this.done({ type: "toggle-all", enabled: false });
       return;
     }
 

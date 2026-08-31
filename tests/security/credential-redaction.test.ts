@@ -32,7 +32,7 @@ describe("secret redaction", () => {
     expect(kinds).toContain("credential-assignment");
   });
 
-  it("scrubs credentials from the run event log before persistence", async () => {
+  it("keeps run event messages verbatim so traces keep diagnostic inputs", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-redact-"));
     const log = new RunEventLog(root, "run-redact");
     await log.append({
@@ -41,7 +41,7 @@ describe("secret redaction", () => {
       message: "agent returned key=sk-abcdefghijklmnopqrstuvwx",
     });
     const [event] = await log.snapshot();
-    expect(event?.message).toBe("agent returned key=[REDACTED:openai-api-key]");
-    expect(JSON.stringify(await log.snapshot())).not.toContain("sk-abcdefghijklmnopqrstuvwx");
+    // User request: traces must keep the original text to diagnose each step.
+    expect(event?.message).toBe("agent returned key=sk-abcdefghijklmnopqrstuvwx");
   });
 });

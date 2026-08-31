@@ -112,6 +112,18 @@ describe("SkillManagerComponent", () => {
     expect(actions).toEqual([{ type: "close" }]);
   });
 
+  it("emits enable-all with the a key", () => {
+    const { component, actions } = createComponent();
+    component.handleInput("a");
+    expect(actions).toEqual([{ type: "toggle-all", enabled: true }]);
+  });
+
+  it("emits disable-all with the d key", () => {
+    const { component, actions } = createComponent();
+    component.handleInput("d");
+    expect(actions).toEqual([{ type: "toggle-all", enabled: false }]);
+  });
+
   it("supports an MCP management page with runtime-aware status and preflight", () => {
     const { component, actions } = createMcpComponent();
     const text = component.render(100).join("\n");
