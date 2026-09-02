@@ -16,6 +16,6 @@
   },
   "source": {
     "kind": "workspace",
-    "ref": "psyclaw@workspace"
+    "ref": "psypi@e3786ab753b3c4fee0997f12e781d3186c9c668d"
   }
 }
