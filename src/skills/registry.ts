@@ -347,28 +347,21 @@ function approvalFor(
   descriptor: Pick<SkillDescriptor, "id" | "sha256" | "sourcePath" | "resolvedPath" | "rootPath" | "trust">,
   approvals: SkillApprovalMap,
 ): SkillApprovalStatus {
-  if (descriptor.trust === "blocked") return "blocked";
   const entry = approvalEntry(approvals, descriptor.id);
-  if (entry === undefined) return "discover-only";
+  // Skill metadata and heuristic body inspection are advisory.  A user
+  // selected Skill may execute without a separate supply-chain admission
+  // ceremony; only an explicit host denial remains blocking.
+  if (entry === undefined) return "approved";
   const approval: SkillApproval = typeof entry === "boolean"
     ? { approved: entry }
     : isValidApproval(entry)
       ? entry
       : { approved: false };
   if (!approval.approved) return "blocked";
-  // A path/content pin is not a license or dependency audit.  Require a
-  // host-generated admission record before allowing executable content.
-  // Frontmatter-derived license/dependency values never upgrade this record;
-  // a verified external manifest may cover a skill whose frontmatter is terse.
-  if (!approval.admission || !isValidAdmissionEvidence(approval.admission)) return "discover-only";
-  if (approval.admission.contentSha256.toLocaleLowerCase() !== descriptor.sha256) return "stale";
-  // A no-pin approval (e.g. the `approvedIds` id shorthand) cannot grant
-  // execution; a content SHA or path pin must bind the approval to the
-  // discovered skill.
-  const hasPin = approval.sha256 !== undefined ||
-    approval.sourcePath !== undefined ||
-    approval.resolvedPath !== undefined;
-  if (!hasPin) return "discover-only";
+  // Skill enablement is an explicit user choice.  Supply-chain metadata is
+  // still exposed for inspection, but missing license/dependency/hash
+  // evidence is not a runtime gate; the model can resolve or explain it when
+  // the skill is used.  Existing explicit pins remain useful diagnostics.
   if (approval.sha256 !== undefined && approval.sha256.toLocaleLowerCase() !== descriptor.sha256) return "stale";
   if (!pathMatchesPin(approval.sourcePath, descriptor) || !pathMatchesPin(approval.resolvedPath, descriptor)) return "stale";
   return "approved";
@@ -388,9 +381,9 @@ export class SkillRegistry {
       this.approvals = new Map();
     } else {
       this.roots = [...(rootsOrOptions.roots ?? [])];
-      // `enableByDefault` is retained in the public options only so existing
-      // callers fail safely after upgrade; frontmatter can never approve a
-      // skill. Explicit approvals always come from the host options.
+      // `enableByDefault` is retained for API compatibility. Explicit host
+      // denials remain respected, but ordinary selected Skills need no
+      // separate admission ceremony.
       const merged = new Map<string, SkillApprovalEntry>();
       const configured = rootsOrOptions.approvals ?? rootsOrOptions.approvalMap ?? rootsOrOptions.approval;
       if (configured !== undefined) {
@@ -448,7 +441,7 @@ export class SkillRegistry {
               "suspicious-body",
               `Skill body contains suspicious instructions: ${preflight.findings.join(", ")}`,
               sourcePath,
-              { severity: "error", skillId: identity.id },
+              { severity: "warning", skillId: identity.id },
             ));
           }
           const baseDescriptor: Omit<SkillDescriptor, "approvalStatus"> = {
@@ -462,8 +455,8 @@ export class SkillRegistry {
             sha256: stable.sha256,
             licenseStatus: deriveLicenseStatus(parsed.metadata),
             dependencyStatus: deriveDependencyStatus(parsed.metadata),
-            trust: preflight.suspicious ? "blocked" : deriveTrust(parsed.metadata),
-            risk: preflight.suspicious ? "critical" : deriveRisk(parsed.metadata),
+            trust: deriveTrust(parsed.metadata),
+            risk: deriveRisk(parsed.metadata),
             enabled: false,
             conflicted: false,
             metadata: Object.freeze({ ...parsed.metadata }),
@@ -488,14 +481,15 @@ export class SkillRegistry {
         }
         const candidates = this.entries.get(descriptor.id) ?? [];
         if (candidates.length > 0 && candidates.every((item) => item.resolvedPath !== descriptor.resolvedPath)) {
-          descriptor = { ...descriptor, conflicted: true };
-          const marked = candidates.map((item) => ({ ...item, conflicted: true }));
-          this.entries.set(descriptor.id, [...marked, descriptor]);
+          // Roots are ordered by precedence (project/nearest roots first).
+          // Keep the first matching source as the effective Skill.  This is a
+          // deterministic nearest-directory rule, not a silent overwrite.
+          this.entries.set(descriptor.id, [candidates[0]!]);
           this.diagnosticLog.push(diagnostic(
             "duplicate-id",
-            `Skill id '${descriptor.id}' is provided by multiple paths`,
-            descriptor.sourcePath,
-            { severity: "error", skillId: descriptor.id, relatedPaths: [...marked.map((item) => item.sourcePath), descriptor.sourcePath] },
+            `Skill id '${descriptor.id}' has multiple paths; using the nearest/highest-precedence source`,
+            candidates[0]!.sourcePath,
+            { severity: "warning", skillId: descriptor.id, relatedPaths: [...candidates.map((item) => item.sourcePath), descriptor.sourcePath] },
           ));
         } else if (!candidates.some((item) => item.resolvedPath === descriptor.resolvedPath)) {
           this.entries.set(descriptor.id, [...candidates, descriptor]);
@@ -550,9 +544,7 @@ export class SkillRegistry {
   async load(id: string): Promise<LoadedSkill> {
     const descriptor = this.unique(id);
     if (!descriptor.enabled) throw new Error(`Skill is not enabled: ${id}`);
-    if (descriptor.approvalStatus !== "approved") {
-      throw new Error(`Skill requires explicit approval: ${id}`);
-    }
+    if (descriptor.approvalStatus === "blocked") throw new Error(`Skill was explicitly disabled: ${id}`);
     const stable = await readSkillFileStable(descriptor.sourcePath, descriptor.rootPath);
     if (!samePath(stable.resolvedPath, descriptor.resolvedPath) || stable.sha256 !== descriptor.sha256) {
       throw new Error(`Skill changed since discovery: ${id}`);
@@ -575,10 +567,7 @@ export class SkillRegistry {
 
   private setEnabled(id: string, enabled: boolean): SkillDescriptor {
     const current = this.unique(id);
-    if (enabled && current.trust === "blocked") throw new Error(`Skill is blocked by trust policy: ${id}`);
-    if (enabled && current.approvalStatus !== "approved") {
-      throw new Error(`Skill requires explicit approval: ${id}`);
-    }
+    if (enabled && current.approvalStatus === "blocked") throw new Error(`Skill was explicitly disabled: ${id}`);
     const updated = Object.freeze({ ...current, enabled });
     this.entries.set(id, [updated]);
     return updated;

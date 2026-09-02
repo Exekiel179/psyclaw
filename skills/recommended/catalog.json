@@ -155,6 +155,44 @@
       "stage": "知识蒸馏",
       "description": "以证据账本统一知识、启发式规则、工作流、反模式和边界。",
       "sourceRef": "https://github.com/LHT666-hub/OmniDistill"
+    },
+    {
+      "id": "journal-frontier-radar",
+      "name": "Journal Frontier Radar（王飞）",
+      "kind": "skill",
+      "stage": "文献前沿",
+      "description": "基于期刊文章清单开展可追溯的前沿追踪、主题映射、关键词分析和未解决问题发现。",
+      "sourceRef": "https://github.com/kingfly51/journal-frontier-radar",
+      "installHint": "安装仓库中的 skills/journal-frontier-radar 完整目录，包含 SKILL.md 及其脚本；该 Skill 要求使用 Kimi WebBridge 进行期刊检索。"
+    },
+    {
+      "id": "manuscript-statistical-forensics",
+      "name": "Manuscript Statistical Forensics（王飞）",
+      "kind": "skill",
+      "stage": "统计审查",
+      "description": "对论文 PDF 进行数值一致性、统计方法和研究完整性审查，不将单一异常直接判定为学术不端。",
+      "sourceRef": "https://github.com/kingfly51/manuscript-statistical-forensics",
+      "installHint": "安装仓库根目录的 SKILL.md 及配套文件；使用时必须提供可读取的论文 PDF。"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "pingouin",
+      "name": "Pingouin Statistics Plugin",
+      "kind": "plugin",
+      "stage": "统计分析",
+      "description": "基于 Pingouin 的心理学统计分析插件，提供常用检验、效应量、相关和可视化辅助能力。",
+      "sourceRef": "https://github.com/Exekiel179/psyclaw/tree/feat/lingzhi-lobster/psyclaw/skills/pingouin",
+      "installHint": "这是 PsyClaw 仓库中的 Pingouin 统计插件说明，位于 psyclaw/skills/pingouin；作为 Plugin/统计后端接入，不要把它重新归类为推荐 Skill。"
+    },
+    {
+      "id": "psych-network-css",
+      "name": "Psych Network CSS（王飞）",
+      "kind": "plugin",
+      "stage": "网络分析",
+      "description": "王飞仓库中的心理网络分析插件，包含 analyze 和 analyze-cross-sectional-network 等 Skill，用于横断面症状网络建模、中心性、桥接、可预测性及稳定性分析。",
+      "sourceRef": "https://github.com/kingfly51/psych-network-css",
+      "installHint": "这是 Plugin 仓库，不是单一 Skill；安装时保留 plugins/ 下的插件结构及其 skills 子目录。"
     }
   ],
   "externalTools": [
@@ -165,6 +203,15 @@
       "stage": "材料转换",
       "description": "把 PDF、Word、PPT、Excel、HTML 等转换为结构化 Markdown。它是独立 Python 工具，不作为 PsyClaw Skill 安装。",
       "sourceRef": "https://github.com/microsoft/markitdown"
+    },
+    {
+      "id": "nirapost",
+      "name": "NIRApost / NodeIdentifyR",
+      "kind": "external-tool",
+      "stage": "网络分析",
+      "description": "用于横断面心理网络模拟干预、置换检验和稳定性分析的 R 工具及复现材料；不是 PsyClaw Skill。",
+      "sourceRef": "https://github.com/kingfly51/NIRA_post",
+      "installHint": "请按仓库说明安装 NIRApost，并同时安装依赖 https://github.com/JasperNaberman/nodeIdentifyR。该条目仅作为外部 R 工具推荐，不代表 kingfly51 发布了 PsyClaw Skill。"
     }
   ],
   "installPrep": [

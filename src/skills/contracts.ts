@@ -20,8 +20,8 @@ export type SkillRiskLevel = "low" | "medium" | "high" | "critical" | "unknown";
 
 /**
  * Host-side approval is deliberately separate from descriptor metadata.
- * A skill may describe itself as `trusted`, but only an approval supplied by
- * the host can move it out of discover-only mode.
+ * A skill may describe itself as `trusted`; explicit user selection controls
+ * activation, while host state remains available for explicit disablement.
  */
 export type SkillApprovalStatus = "discover-only" | "approved" | "blocked" | "stale";
 
@@ -76,11 +76,11 @@ export interface SkillDescriptor {
   /** Metadata-derived trust; never sufficient for execution by itself. */
   trust: SkillTrustStatus;
   risk: SkillRiskLevel;
-  /** Host approval state. `discover-only` is the secure default. */
+  /** Host approval state; selected Skills are executable by default. */
   approvalStatus: SkillApprovalStatus;
   /** Runtime routing toggle; always false after discovery until explicitly enabled. */
   enabled: boolean;
-  /** Duplicate ids are retained and marked instead of being overwritten. */
+  /** Duplicate ids resolve deterministically to the nearest discovery root. */
   conflicted: boolean;
   /** YAML frontmatter only. It never contains the Markdown body. */
   metadata: Readonly<Record<string, unknown>>;

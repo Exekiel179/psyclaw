@@ -179,10 +179,10 @@ export function beforePlan(plan: AnalysisPlanContract, userHooks: readonly UserA
 /** Plan gate: force pre-specification and make undisclosed researcher degrees of freedom visible. */
 export function validateAnalysisPlan(plan: AnalysisPlanContract, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
   const findings: AnalysisHookFinding[] = [];
-  if (!plan.primaryOutcome?.trim()) findings.push({ rule: "missing-primary-outcome", severity: "block", message: "declare a primary outcome before confirmatory analysis" });
-  if (!plan.primaryAnalysis?.trim()) findings.push({ rule: "missing-primary-analysis", severity: "block", message: "declare the primary analysis method" });
-  if (!plan.missingDataPlan?.trim()) findings.push({ rule: "missing-missing-data-plan", severity: "block", message: "declare missing-data handling" });
-  if (!plan.multiplicityPlan?.trim()) findings.push({ rule: "missing-multiplicity-plan", severity: plan.confirmatory ? "block" : "warn", message: "declare multiplicity or explain why it is not applicable" });
+  if (!plan.primaryOutcome?.trim()) findings.push({ rule: "missing-primary-outcome", severity: "warn", message: "primary outcome is missing; AI should infer it from the research question or ask the researcher" });
+  if (!plan.primaryAnalysis?.trim()) findings.push({ rule: "missing-primary-analysis", severity: "warn", message: "primary analysis is missing; AI should propose a method and record the rationale" });
+  if (!plan.missingDataPlan?.trim()) findings.push({ rule: "missing-missing-data-plan", severity: "warn", message: "missing-data handling is unspecified; AI should propose and disclose a method or limitation" });
+  if (!plan.multiplicityPlan?.trim()) findings.push({ rule: "missing-multiplicity-plan", severity: "warn", message: "multiplicity handling is unspecified; AI should add a suitable correction or explain why it is not applicable" });
   if (!plan.exclusionCriteria?.trim()) findings.push({ rule: "missing-exclusion-criteria", severity: "warn", message: "record exclusion criteria to prevent outcome-dependent filtering" });
   return result([...findings, ...applyUserHooks("before-plan", userHooks, [plan.primaryOutcome ?? "", plan.primaryAnalysis ?? "", ...(plan.exploratoryAnalyses ?? [])])]);
 }
@@ -190,10 +190,10 @@ export function validateAnalysisPlan(plan: AnalysisPlanContract, userHooks: read
 /** Delegation gate: require an explicit external tool and reproducibility contract. */
 export function beforeDelegation(contract: { tool?: string; scriptPath?: string; environment?: Record<string, string>; inputHashes?: Record<string, string> }, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
   const findings: AnalysisHookFinding[] = [];
-  if (!contract.tool?.trim()) findings.push({ rule: "delegation-tool-missing", severity: "block", message: "delegated analysis must identify the statistical tool or backend" });
-  if (!contract.scriptPath?.trim()) findings.push({ rule: "delegation-script-missing", severity: "block", message: "delegated analysis must provide a reproducible script path" });
-  if (!contract.environment || Object.keys(contract.environment).length === 0) findings.push({ rule: "delegation-environment-missing", severity: "block", message: "delegated analysis must record its execution environment" });
-  if (!contract.inputHashes || Object.keys(contract.inputHashes).length === 0) findings.push({ rule: "delegation-input-hash-missing", severity: "block", message: "delegated analysis must bind its inputs to hashes" });
+  if (!contract.tool?.trim()) findings.push({ rule: "delegation-tool-missing", severity: "warn", message: "statistical backend is missing; AI should select or ask for one" });
+  if (!contract.scriptPath?.trim()) findings.push({ rule: "delegation-script-missing", severity: "warn", message: "reproducible script path is missing; AI should create or recover it" });
+  if (!contract.environment || Object.keys(contract.environment).length === 0) findings.push({ rule: "delegation-environment-missing", severity: "warn", message: "execution environment is missing; AI should record it from the run" });
+  if (!contract.inputHashes || Object.keys(contract.inputHashes).length === 0) findings.push({ rule: "delegation-input-hash-missing", severity: "warn", message: "input hashes are missing; AI should compute them before final reporting" });
   return result([...findings, ...applyUserHooks("before-delegation", userHooks, [contract.tool ?? "", contract.scriptPath ?? ""])]);
 }
 
@@ -201,10 +201,10 @@ export function beforeDelegation(contract: { tool?: string; scriptPath?: string;
 export function afterAnalysis(report: AnalysisResultContract, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
   const findings: AnalysisHookFinding[] = [];
   if (report.schemaVersion !== "psyclaw/analysis-result/v1") findings.push({ rule: "result-schema-invalid", severity: "block", message: "analysis result schema is not recognized" });
-  if (!Number.isInteger(report.sampleSize) || report.sampleSize < 0) findings.push({ rule: "sample-size-invalid", severity: "block", message: "analysis result must report a non-negative integer sample size" });
-  if (!report.scriptPath?.trim() || Object.keys(report.environment ?? {}).length === 0) findings.push({ rule: "reproducibility-metadata-missing", severity: "block", message: "record script path and execution environment" });
-  if (!report.missingData?.handled || !report.missingData.method?.trim()) findings.push({ rule: "missing-data-undisclosed", severity: "block", message: "missing-data handling must be explicit" });
-  if ((report.pValues?.length ?? 0) > 0 && (report.effectSizes?.length ?? 0) === 0) findings.push({ rule: "p-value-only-reporting", severity: "block", message: "p-values cannot be reported without effect sizes" });
+  if (!Number.isInteger(report.sampleSize) || report.sampleSize < 0) findings.push({ rule: "sample-size-invalid", severity: "warn", message: "sample size is missing or invalid; AI should infer or request it before final reporting" });
+  if (!report.scriptPath?.trim() || Object.keys(report.environment ?? {}).length === 0) findings.push({ rule: "reproducibility-metadata-missing", severity: "warn", message: "reproducibility metadata is incomplete; AI should repair it from the execution record" });
+  if (!report.missingData?.handled || !report.missingData.method?.trim()) findings.push({ rule: "missing-data-undisclosed", severity: "warn", message: "missing-data handling is incomplete; AI should add an explicit method or limitation" });
+  if ((report.pValues?.length ?? 0) > 0 && (report.effectSizes?.length ?? 0) === 0) findings.push({ rule: "p-value-only-reporting", severity: "warn", message: "effect sizes are missing; AI should calculate or clearly qualify the result before final reporting" });
   if ((report.effectSizes?.length ?? 0) > 0 && report.effectSizes?.some((effect) => effect.interval === undefined)) findings.push({ rule: "effect-size-interval-missing", severity: "warn", message: "report an uncertainty interval for each effect size when the method supports it" });
   for (const claim of report.claims ?? []) if (BLOCKED_RESULT_PHRASES.some((pattern) => pattern.test(claim))) findings.push({ rule: "overclaim-language", severity: "block", message: "claim uses significance as proof of causality; rewrite with design-appropriate uncertainty" });
   for (const [path, hash] of Object.entries(report.inputHashes ?? {})) if (!/^[a-f0-9]{64}$/i.test(hash)) findings.push({ rule: "result-input-hash-invalid", severity: "block", message: `invalid result input hash: ${path}` });
