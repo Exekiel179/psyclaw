@@ -436,6 +436,8 @@ export interface PanelServerOptions {
   assistant?: (message: string) => Promise<{ text: string }>;
   /** Queue an approved installation task into the current PsyClaw model session. */
   installSkill?: (task: string) => Promise<void>;
+  /** Install a Plugin through Pi's native package manager. */
+  installPlugin?: (source: string) => Promise<void>;
 }
 
 function panelSkillInstallTask(root: string, item: Record<string, unknown>, scope: RecommendedSkillScope): string {
@@ -950,13 +952,19 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           return;
         }
         const body = await readJsonBody(request);
-        const kind = body.kind === "skill" || body.kind === "mcp" ? body.kind : undefined;
+        const kind = body.kind === "skill" || body.kind === "mcp" || body.kind === "plugin" ? body.kind : undefined;
         const id = String(body.id ?? "").trim();
         const approved = body.approved === true;
         const scope = body.scope === "project" || body.scope === "user" ? body.scope : undefined;
         const actor = String(body.actor ?? "researcher").trim();
         if (!kind || !id || !approved || actor.length < 1) throw new Error("kind, id, approved and actor are required");
-        const found = await findRecommendedItem(kind, id);
+        const found: { item: Record<string, unknown>; prep?: Record<string, unknown> } | undefined = kind === "plugin"
+          ? await (async (): Promise<{ item: Record<string, unknown>; prep?: Record<string, unknown> } | undefined> => {
+              const catalog = await recommendedSkills() as { plugins?: Array<Record<string, unknown>> };
+              const item = (catalog.plugins ?? []).find((candidate) => candidate.id === id);
+              return item ? { item } : undefined;
+            })()
+          : await findRecommendedItem(kind, id);
         if (!found) {
           response.writeHead(404, { "content-type": "application/json" });
           response.end(JSON.stringify({ error: "unknown recommended item" }));
@@ -983,6 +991,19 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
             reloadHint: "/reload",
             message: "安装任务已交给当前模型；模型完成后请启用 Skill 并执行 /reload。",
           }));
+          return;
+        }
+        if (kind === "plugin") {
+          if (options.installPlugin === undefined) {
+            response.writeHead(503, { "content-type": "application/json" });
+            response.end(JSON.stringify({ error: "Plugin 安装器不可用，请在 PsyClaw 对话中执行 /panel 后重试。" }));
+            return;
+          }
+          const source = String(found.item.sourceRef ?? "").trim();
+          if (!source) throw new Error("Plugin source is missing");
+          await options.installPlugin(source);
+          response.writeHead(202, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/plugin-install-receipt/v1", ok: true, id, source, reloadHint: "/reload", message: "Plugin 已交给 Pi 原生安装器处理；请重启或执行 /reload。" }));
           return;
         }
         const shellCommand = typeof found.prep?.command === "string" && found.prep.command.trim() ? found.prep.command.trim() : undefined;

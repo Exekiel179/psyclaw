@@ -158,7 +158,7 @@
     },
     {
       "id": "journal-frontier-radar",
-      "name": "Journal Frontier Radar（王飞）",
+      "name": "Journal Frontier Radar",
       "kind": "skill",
       "stage": "文献前沿",
       "description": "基于期刊文章清单开展可追溯的前沿追踪、主题映射、关键词分析和未解决问题发现。",
@@ -167,7 +167,7 @@
     },
     {
       "id": "manuscript-statistical-forensics",
-      "name": "Manuscript Statistical Forensics（王飞）",
+      "name": "Manuscript Statistical Forensics",
       "kind": "skill",
       "stage": "统计审查",
       "description": "对论文 PDF 进行数值一致性、统计方法和研究完整性审查，不将单一异常直接判定为学术不端。",
@@ -176,6 +176,24 @@
     }
   ],
   "plugins": [
+    {
+      "id": "academic-research-suite-plugin",
+      "name": "ARS Academic Research Suite",
+      "kind": "plugin",
+      "stage": "研究全流程",
+      "description": "以 Plugin 方式提供 Academic Research Suite 的文献研究、写作、评审与修订能力。",
+      "sourceRef": "https://github.com/Imbad0202/academic-research-skills-codex",
+      "installHint": "使用 Pi 原生 Plugin 管理器安装；仓库同时包含 Skill，安装后按其插件说明启用。"
+    },
+    {
+      "id": "nature-skills-plugin",
+      "name": "Nature Skills Suite",
+      "kind": "plugin",
+      "stage": "研究全流程",
+      "description": "以 Plugin 方式提供 Nature Skills 套件，覆盖检索、精读、统计、绘图、写作和评审任务。",
+      "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
+      "installHint": "使用 Pi 原生 Plugin 管理器安装完整仓库；套件内的 Skill 保持原目录结构。"
+    },
     {
       "id": "pingouin",
       "name": "Pingouin Statistics Plugin",
@@ -187,7 +205,7 @@
     },
     {
       "id": "psych-network-css",
-      "name": "Psych Network CSS（王飞）",
+      "name": "Psych Network CSS",
       "kind": "plugin",
       "stage": "网络分析",
       "description": "王飞仓库中的心理网络分析插件，包含 analyze 和 analyze-cross-sectional-network 等 Skill，用于横断面症状网络建模、中心性、桥接、可预测性及稳定性分析。",
