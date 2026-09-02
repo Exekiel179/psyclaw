@@ -55,6 +55,7 @@
     "eval:modules": "tsx evals/modules.ts",
     "rebrand": "node scripts/rebrand-pi.mjs",
     "check:branding": "node scripts/check-branding.mjs",
+    "release:push": "node scripts/release-push.mjs",
     "prepublishOnly": "pnpm check:branding && pnpm build"
   },
   "dependencies": {

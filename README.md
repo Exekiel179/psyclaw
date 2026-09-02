@@ -4,6 +4,16 @@ PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、
 
 当前版本：`0.27.14`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
+## 发布流程
+
+发布只提交已跟踪文件，并自动递增 patch 版本、创建版本标签，推送当前分支和标签；`.DS_Store`、论文附件、图形和其他未跟踪生成物不会被加入。GitHub Actions 随标签推送执行 Node 22 检查并发布 npm：
+
+```bash
+RELEASE_MESSAGE="release: describe the change" pnpm release:push
+```
+
+运行前请确认当前分支、工作区变更和 GitHub 权限。NPM 发布由 GitHub Actions 的 Trusted Publishing 完成，本机不需要 `npm login`。
+
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
