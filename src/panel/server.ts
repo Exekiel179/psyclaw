@@ -592,13 +592,17 @@ async function recommendedSkills(): Promise<unknown> {
   ];
   for (const path of candidates) {
     try {
-      const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>>; externalTools?: Array<Record<string, unknown>> };
+      const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>>; plugins?: Array<Record<string, unknown>>; externalTools?: Array<Record<string, unknown>> };
       return {
         ...catalog,
         items: (catalog.items ?? []).filter((item) => item.kind === "skill").map((item) => ({
           ...item,
           slashCommand: `/skill enable ${String(item.id ?? "")}`,
           installCommand: `/install skill ${String(item.id ?? "")}`,
+        })),
+        plugins: (catalog.plugins ?? []).filter((item) => item.kind === "plugin").map((item) => ({
+          ...item,
+          installCommand: `/plugin install ${String(item.sourceRef ?? item.id ?? "")}`,
         })),
         externalTools: (catalog.externalTools ?? []).filter((item) => item.kind === "external-tool"),
       };

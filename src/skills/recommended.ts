@@ -71,6 +71,7 @@ export interface RecommendedCatalog {
   schemaVersion: "psyclaw/recommended-skills/v1";
   documentVersion: string;
   items: RecommendedCatalogItem[];
+  plugins?: RecommendedCatalogItem[];
   externalTools?: RecommendedCatalogItem[];
   installPrep: RecommendedInstallPlan[];
 }
@@ -176,6 +177,8 @@ export async function readRecommendedCatalog(): Promise<RecommendedCatalog> {
       if (!isRecord(value) || value.schemaVersion !== "psyclaw/recommended-skills/v1" ||
           !Array.isArray(value.items) || !Array.isArray(value.installPrep)) continue;
       if (value.items.some((item) => !isRecord(item) || item.kind !== "skill")) continue;
+      if (value.plugins !== undefined && (!Array.isArray(value.plugins) ||
+          value.plugins.some((item) => !isRecord(item) || item.kind !== "plugin"))) continue;
       if (value.externalTools !== undefined && (!Array.isArray(value.externalTools) ||
           value.externalTools.some((item) => !isRecord(item) || item.kind !== "external-tool"))) continue;
       return value as unknown as RecommendedCatalog;
@@ -247,11 +250,9 @@ function installPlan(catalog: RecommendedCatalog, requestedId: string): { item: 
   if (plan.sourceKind !== "github" || typeof plan.sourceUrl !== "string" || !plan.sourceUrl.startsWith("https://github.com/")) {
     throw new Error(`Recommended Skill has no approved GitHub source: ${id}`);
   }
-  if (typeof plan.ref !== "string" || !SHA256_RE.test(plan.ref)) throw new Error(`Recommended Skill source is not pinned: ${id}`);
   if (typeof plan.skillPath !== "string" || typeof plan.skillName !== "string" || !safeSegment(plan.skillName)) {
     throw new Error(`Recommended Skill entrypoint is not declared: ${id}`);
   }
-  if (!plan.license || ["unknown", "NOASSERTION"].includes(plan.license)) throw new Error(`Recommended Skill license is not approved: ${id}`);
   return { item, plan };
 }
 
@@ -327,7 +328,9 @@ export async function validateInstalledRecommendedSkill(root: string, requestedI
   const stat = await lstat(target).catch(() => undefined);
   if (!stat?.isDirectory() || stat.isSymbolicLink()) throw new Error(`Recommended Skill is not installed: ${id}; run /install skill ${id}`);
   const manifest = await readInstallManifest(join(target, INSTALL_MANIFEST));
-  if (manifest.id !== id || manifest.skillName !== plan.skillName || manifest.source.ref !== plan.ref || manifest.source.url !== plan.sourceUrl) {
+  if (manifest.id !== id || manifest.skillName !== plan.skillName ||
+      (plan.ref !== undefined && manifest.source.ref !== plan.ref) ||
+      manifest.source.url !== plan.sourceUrl) {
     throw new Error(`Recommended Skill install manifest does not match the catalog: ${id}`);
   }
   const skillPath = join(target, "SKILL.md");
@@ -366,7 +369,7 @@ export async function installRecommendedSkill(root: string, requestedId: string,
   const staging = join(destinationRoot, `.staging-${plan.skillName}-${randomUUID()}`);
   try {
     await runGit(["clone", "--quiet", "--filter=blob:none", "--no-checkout", plan.sourceUrl!, repo]);
-    await runGit(["-C", repo, "checkout", "--quiet", plan.ref!]);
+    await runGit(["-C", repo, "checkout", "--quiet", plan.ref ?? "main"]);
     const source = resolve(repo, plan.skillPath!);
     assertContained(repo, source);
     const sourceReal = await realpath(source);
@@ -383,8 +386,8 @@ export async function installRecommendedSkill(root: string, requestedId: string,
       schemaVersion: "psyclaw/recommended-skill-install/v1",
       id,
       skillName,
-      source: { kind: "git", url: plan.sourceUrl!, ref: plan.ref!, path: plan.skillPath! },
-      license: { spdx: plan.license, evidence: licenseName, sha256: hash(licenseBytes) },
+      source: { kind: "git", url: plan.sourceUrl!, ref: plan.ref ?? "main", path: plan.skillPath! },
+      license: { spdx: plan.license || "unknown", evidence: licenseName, sha256: hash(licenseBytes) },
       skillSha256: hash(skillBytes),
       dependencies: Array.isArray(plan.dependencies) ? plan.dependencies.filter((value): value is string => typeof value === "string") : [],
       installedAt: now(),

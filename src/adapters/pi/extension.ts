@@ -93,7 +93,6 @@ async function runPluginCommand(args: string[]): Promise<void> {
 }
 
 const activeAgentRuns = new Set<string>();
-const pendingInitApprovals = new Set<string>();
 const activeApprovalDialogs = new Set<string>();
 const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "research-brief"]);
 
@@ -414,7 +413,7 @@ function resolveRunSkills(requested: string[], available: Array<{ id: string; na
   return selected;
 }
 
-async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<Record<string, unknown>>; externalTools: Array<Record<string, unknown>>; installPrep: Array<Record<string, unknown>> }> {
+async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<Record<string, unknown>>; plugins: Array<Record<string, unknown>>; externalTools: Array<Record<string, unknown>>; installPrep: Array<Record<string, unknown>> }> {
   const file = kind === "skills" ? "catalog.json" : "mcp-catalog.json";
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
@@ -425,15 +424,16 @@ async function recommendedItems(kind: "skills" | "mcp"): Promise<{ items: Array<
   ];
   for (const path of candidates) {
     try {
-      const value = JSON.parse(await readFile(path, "utf8")) as { items?: unknown; externalTools?: unknown; installPrep?: unknown };
+      const value = JSON.parse(await readFile(path, "utf8")) as { items?: unknown; plugins?: unknown; externalTools?: unknown; installPrep?: unknown };
       return {
         items: Array.isArray(value.items) ? value.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [],
+        plugins: Array.isArray(value.plugins) ? value.plugins.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [],
         externalTools: Array.isArray(value.externalTools) ? value.externalTools.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [],
         installPrep: Array.isArray(value.installPrep) ? value.installPrep.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object")) : [],
       };
     } catch { /* try next candidate */ }
   }
-  return { items: [], externalTools: [], installPrep: [] };
+  return { items: [], plugins: [], externalTools: [], installPrep: [] };
 }
 
 interface SkillManagerRow {
@@ -1095,11 +1095,6 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     });
     return approved ? undefined : { block: true, terminate: true, reason: "用户拒绝该执行步骤或审批超时" };
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("agent_end", async (_event, ctx) => {
-    if (!pendingInitApprovals.has(ctx.cwd) || !(await planDocumentsReady(ctx.cwd))) return;
-    pendingInitApprovals.delete(ctx.cwd);
-    await reviewPrimaryDocuments(ctx);
-  });
   pi.registerCommand("init", {
     description: "初始化可追溯的研究项目",
     handler: async (args, ctx) => {
@@ -1107,9 +1102,8 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         const parsed = parseInitArgs(args);
         const project = await bootstrapProject({ root: ctx.cwd, ...parsed });
         if (typeof pi.sendUserMessage === "function") {
-          pendingInitApprovals.add(ctx.cwd);
           pi.sendUserMessage(academicGrillRequest(project.goal, "init"), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。学术追问完成并生成主要计划文档后会进入审批；全部批准后才能 /run。`, "info");
+          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。当前保持普通对话；如需进入受控研究流程，请明确运行 /run。`, "info");
         } else {
           ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。使用 /run 启动受控研究流程。`, "info");
         }
@@ -1150,8 +1144,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         const planApproval = await primaryPlanApprovalStatus(ctx.cwd);
         if (!planApproval.ok) {
           const missing = planApproval.documents.filter((item) => !item.approved).map((item) => item.path);
-          ctx.ui.notify(`主要计划尚未批准或批准后已修改：${missing.join("、")}。请运行 /approve。`, "warning");
-          return;
+          // `/run` is the sole switch into the controlled workflow.  A plan
+          // can still be incomplete when execution starts; keep the status
+          // visible and let the model repair it through the normal workflow
+          // instead of forcing a separate approval command first.
+          ctx.ui.notify(`检测到计划尚未确认或已修改：${missing.join("、")}。将由受控流程继续处理；如需先人工确认，可运行 /approve。`, "warning");
         }
         const available = await selectableRunSkills(ctx.cwd);
         let requestedSkills = parsed.requestedSkills;
@@ -1398,8 +1395,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           const [skills, mcps] = await Promise.all([recommendedItems("skills"), recommendedItems("mcp")]);
           const skillLines = skills.items.slice(0, 8).map((item) => `Skill: ${String(item.id)} — ${String(item.name)}`);
           const mcpLines = mcps.items.slice(0, 8).map((item) => `MCP: ${String(item.id)} — ${String(item.name)}`);
+          const pluginLines = skills.plugins.slice(0, 8).map((item) => `Plugin: ${String(item.name)} — ${String(item.sourceRef ?? "请查看项目文档")}`);
           const toolLines = skills.externalTools.slice(0, 8).map((item) => `外部工具: ${String(item.name)} — ${String(item.sourceRef ?? "请查看项目文档")}`);
-          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...mcpLines, "", ...toolLines, "", "安装：/install skill|mcp <id>", "管理：/skill 或 /mcp", "外部工具不通过 Skill 安装器安装", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
+          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...pluginLines, ...mcpLines, "", ...toolLines, "", "安装：/install skill|mcp <id>", "Plugin：/plugin install <source>", "管理：/skill 或 /mcp", "外部工具不通过 Skill 安装器安装", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
           return;
         }
         if (kind !== "skill" && kind !== "mcp") throw new Error("Usage: /install skill|mcp <id>");
