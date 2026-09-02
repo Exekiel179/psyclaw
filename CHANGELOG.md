@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.14 - 2026-09-02
+
+- Added verified recommendations for Wang Fei's journal frontier, statistical forensics, and psychological network analysis projects.
+
 ## 0.27.13 - 2026-09-01
 
 - Added the native OpenCode Go subscription provider and its bundled model choices.
