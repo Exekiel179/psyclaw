@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.15 - 2026-09-02
+
+- Added Plugin recommendations for ARS Academic Research Suite, Nature Skills, Psych Network CSS, and Pingouin.
+- Added a repeatable GitHub-based release push workflow.
+
 ## 0.27.14 - 2026-09-02
 
 - Added verified recommendations for Wang Fei's journal frontier, statistical forensics, and psychological network analysis projects.
