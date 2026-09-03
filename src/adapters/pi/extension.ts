@@ -1714,7 +1714,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         .filter((event) => event.type === "decision-resolved" && event.researchDecisionResolution)
         .map((event) => event.researchDecisionResolution!.decisionId));
       const pending = findLastMatching(events, (event) =>
-        event.type === "awaiting-human" && event.researchDecision && !resolvedIds.has(event.researchDecision.id));
+        event.type === "awaiting-human" && Boolean(event.researchDecision && !resolvedIds.has(event.researchDecision.id)));
       if (pending?.researchDecision) {
         return {
           content: [{ type: "text", text: `当前已有一项待研究者取舍的问题：${pending.researchDecision.question}。请先处理该问题，不能同时创建第二项。` }],

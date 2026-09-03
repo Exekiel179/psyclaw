@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.18 - 2026-09-03
+
+- Fix the remaining Node 22 type compatibility issue in research-decision lookup.
+- Include all runtime isolation, workflow, ecosystem, Panel, and interaction updates from the preceding unpublished candidates.
+
 ## 0.27.17 - 2026-09-03
 
 - Fix Node 22 compatibility in controlled-run authorization and research-decision event lookup.
