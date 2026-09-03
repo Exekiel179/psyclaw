@@ -1,9 +1,20 @@
 {
   "schemaVersion": "psyclaw/recommended-mcp/v1",
-  "documentVersion": "0.2.0",
+  "documentVersion": "0.3.0",
   "sourceDocument": "学术AI_Skill分享资料.pdf + curated research MCP review",
   "sourceRef": "user-curated",
   "items": [
+    {
+      "id": "markitdown-mcp",
+      "name": "Microsoft MarkItDown MCP",
+      "stage": "材料转换",
+      "description": "微软官方 MarkItDown MCP，通过本机 stdio 提供 convert_to_markdown 工具，把文件或 URI 转换为 Markdown。",
+      "sourceRef": "https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp",
+      "transport": "stdio",
+      "risk": "local-file-and-network-read",
+      "writeEffects": false,
+      "status": "discover-only"
+    },
     {
       "id": "paper-search-mcp",
       "name": "Paper Search MCP",
@@ -105,6 +116,7 @@
     }
   ],
   "installPrep": [
+    {"id":"markitdown-mcp","sourceKind":"pypi","ref":"latest-stable","license":"MIT","command":"python -m pip install markitdown-mcp","target":".psyclaw/mcp/markitdown-mcp.json","dependencies":["Python >=3.10","pip","markitdown-mcp"],"status":"installable","requiresApproval":true},
     {"id":"paper-search-mcp","sourceKind":"github","ref":"c8b642183bb725f0a7faec89e58b558df09079d1","license":"MIT","command":"git clone https://github.com/openags/paper-search-mcp .psyclaw/mcp-src/paper-search-mcp && git -C .psyclaw/mcp-src/paper-search-mcp checkout c8b642183bb725f0a7faec89e58b558df09079d1","target":".psyclaw/mcp/paper-search-mcp.json","dependencies":["Git","Python/uv per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify package entrypoint and lockfile before registering a stdio server."},
     {"id":"scientific-papers-mcp","sourceKind":"github","ref":"646da8d8af653f6b833f3725bae4cafc38a9428e","license":"unknown","command":"git clone https://github.com/benedict2310/Scientific-Papers-MCP .psyclaw/mcp-src/scientific-papers-mcp && git -C .psyclaw/mcp-src/scientific-papers-mcp checkout 646da8d8af653f6b833f3725bae4cafc38a9428e","target":".psyclaw/mcp/scientific-papers-mcp.json","dependencies":["Git","repository runtime requirements"],"status":"blocked","requiresApproval":true,"blockedReason":"License metadata is not verified."},
     {"id":"pubmed-search-mcp","sourceKind":"github","ref":"master","license":"NOASSERTION","command":"git clone https://github.com/u9401066/pubmed-search-mcp .psyclaw/mcp-src/pubmed-search-mcp && git -C .psyclaw/mcp-src/pubmed-search-mcp checkout master","target":".psyclaw/mcp/pubmed-search-mcp.json","dependencies":["Git","PubMed/NCBI access configuration"],"status":"blocked","requiresApproval":true,"blockedReason":"License and immutable commit were not verified."},

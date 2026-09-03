@@ -46,10 +46,9 @@ psyclaw --help
 psyclaw
 ```
 
-首次没有模型配置时会进入向导。也可以主动运行：
+首次没有模型配置时会自动进入配置界面。模型、凭据、会话和宿主资源统一保存在 `~/.psyclaw/agent`，不使用 `~/.pi`。如需非交互写入 Provider 预设，可以运行：
 
 ```powershell
-psyclaw wizard
 psyclaw setup --provider deepseek
 ```
 

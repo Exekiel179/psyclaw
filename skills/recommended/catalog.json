@@ -1,29 +1,10 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.6.0",
-  "syncedAt": "2026-08-30",
+  "documentVersion": "0.7.0",
+  "syncedAt": "2026-09-03",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
-    {
-      "id": "academic-research-suite",
-      "name": "ARS Academic Research Suite",
-      "kind": "skill",
-      "stage": "研究全流程",
-      "description": "面向文献研究、论文写作、同行评审与修订的端到端 Academic Research Skills 套件。",
-      "sourceRef": "https://github.com/Imbad0202/academic-research-skills-codex",
-      "installHint": "安装仓库中的 skills/academic-research-suite 完整目录，目标目录根部必须是该目录的 SKILL.md。"
-    },
-    {
-      "id": "nature-skills",
-      "name": "Nature Skills Suite",
-      "kind": "skill",
-      "skillLayout": "collection",
-      "stage": "研究全流程",
-      "description": "完整安装 Nature Skills 套件，覆盖检索、精读、数据、统计、实验记录、写作、绘图、引用核验、评审回复与演示文稿等研究任务。",
-      "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
-      "installHint": "这是多 Skill 套件。将仓库 skills 目录中的全部 nature-* Skill（包括 nature-shared）原样安装到目标目录，保留每个子目录的 SKILL.md、references、scripts、assets、tests 和相对路径；不要只挑选单个 Skill，也不要在套件根目录伪造 SKILL.md。"
-    },
     {
       "id": "scientific-visualization",
       "name": "Scientific Visualization",
@@ -199,16 +180,16 @@
       "name": "Pingouin Statistics Plugin",
       "kind": "plugin",
       "stage": "统计分析",
-      "description": "基于 Pingouin 的心理学统计分析插件，提供常用检验、效应量、相关和可视化辅助能力。",
-      "sourceRef": "https://github.com/Exekiel179/psyclaw/tree/feat/lingzhi-lobster/psyclaw/skills/pingouin",
-      "installHint": "这是 PsyClaw 仓库中的 Pingouin 统计插件说明，位于 psyclaw/skills/pingouin；作为 Plugin/统计后端接入，不要把它重新归类为推荐 Skill。"
+      "description": "面向心理学统计的 Pingouin Skill Plugin，包含 16 个 Skill，覆盖分析路由、数据检查、均值检验、方差分析、相关、回归与中介、非参数、分类资料、贝叶斯、多变量、信度、功效分析和 APA 风格报告。",
+      "sourceRef": "https://github.com/Exekiel179/pingouin-psych-stats",
+      "installHint": "安装完整仓库并保留 .codex-plugin、.claude-plugin、skills、references 与 scripts；安装后执行 /reload。"
     },
     {
       "id": "psych-network-css",
       "name": "Psych Network CSS",
       "kind": "plugin",
       "stage": "网络分析",
-      "description": "王飞仓库中的心理网络分析插件，包含 analyze 和 analyze-cross-sectional-network 等 Skill，用于横断面症状网络建模、中心性、桥接、可预测性及稳定性分析。",
+      "description": "心理网络分析插件，包含 analyze 和 analyze-cross-sectional-network 等 Skill，用于横断面症状网络建模、中心性、桥接、可预测性及稳定性分析。",
       "sourceRef": "https://github.com/kingfly51/psych-network-css",
       "installHint": "这是 Plugin 仓库，不是单一 Skill；安装时保留 plugins/ 下的插件结构及其 skills 子目录。"
     }
@@ -216,11 +197,13 @@
   "externalTools": [
     {
       "id": "markitdown",
-      "name": "MarkItDown",
+      "name": "Microsoft MarkItDown",
       "kind": "external-tool",
+      "installable": true,
       "stage": "材料转换",
-      "description": "把 PDF、Word、PPT、Excel、HTML 等转换为结构化 Markdown。它是独立 Python 工具，不作为 PsyClaw Skill 安装。",
-      "sourceRef": "https://github.com/microsoft/markitdown"
+      "description": "微软开源的文档转 Markdown 工具，可处理 PDF、Word、PPT、Excel、HTML 等材料，并供文档读取类 Skill 调用。",
+      "sourceRef": "https://github.com/microsoft/markitdown",
+      "installHint": "由当前模型按微软仓库的官方说明安装 MarkItDown，并验证 markitdown 命令可用。微软仓库本身不含 SKILL.md；PsyClaw 将它作为 Skill 可调用的外部工具推荐，不冒充微软官方 Skill。"
     },
     {
       "id": "nirapost",
