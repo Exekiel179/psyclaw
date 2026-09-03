@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.16 - 2026-09-03
+
+- Isolate bundled runtime configuration under ~/.psyclaw and streamline first-launch provider setup.
+- Limit researcher decision prompts to substantive methodological trade-offs while improving guided research initialization and review.
+- Add Plugin, MarkItDown, and MCP ecosystem integration plus Panel and command interaction fixes.
+
 ## 0.27.15 - 2026-09-02
 
 - Added Plugin recommendations for ARS Academic Research Suite, Nature Skills, Psych Network CSS, and Pingouin.

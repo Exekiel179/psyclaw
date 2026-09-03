@@ -192,7 +192,7 @@ export async function finalizeWorkflow(
       ? ["outputs", "output index", "manifest", "verdict"]
       : ["manifest", "verdict"],
     blocked: blocked.map((gate) => gate.reason),
-    nextSteps: blocked.length === 0 ? ["human review before external use"] : ["resolve blocked workflow gates"],
+    nextSteps: blocked.length === 0 ? ["review before external use"] : ["repair the reported workflow or evidence gaps and rerun verification"],
     verificationCommands: ["pnpm typecheck", "pnpm test"],
     generatedAt: new Date().toISOString(),
   });

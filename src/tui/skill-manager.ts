@@ -25,6 +25,7 @@ export interface SkillManagerOptions {
   enabledText?: string;
   disabledText?: string;
   blockedText?: string;
+  toggleEnabled?: boolean;
 }
 
 export type SkillManagerAction =
@@ -48,7 +49,7 @@ function statusText(status: SkillManagerStatus, options: SkillManagerOptions): s
   if (status === "enabled") return options.enabledText ?? "已启用，重启后按此配置加载";
   if (status === "disabled") return options.disabledText ?? "已安装，当前未启用";
   if (status === "missing") return "尚未安装";
-  return options.blockedText ?? "预检阻断";
+  return options.blockedText ?? "暂不可用";
 }
 
 export class SkillManagerComponent {
@@ -147,6 +148,11 @@ export class SkillManagerComponent {
 
     const item = this.items[this.selectedIndex]!;
     if (matchesKey(data, Key.space)) {
+      if (this.options.toggleEnabled === false) {
+        this.notice = `此处只管理推荐安装；${this.options.itemLabel ?? "项目"}的启停与移除由其原生管理器处理。`;
+        this.tui.requestRender();
+        return;
+      }
       if (item.status === "core") this.notice = this.options.lockedMessage ?? "核心 Skill 始终启用，不能在这里停用。";
       else if (item.status === "blocked" && item.configuredEnabled === true) this.done({ type: "toggle", id: item.id, enabled: false });
       else if (item.status === "blocked") this.notice = item.reason ?? `该 ${this.options.itemLabel ?? "Skill"} 未通过来源、许可或依赖预检。`;

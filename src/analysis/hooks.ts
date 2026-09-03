@@ -179,7 +179,7 @@ export function beforePlan(plan: AnalysisPlanContract, userHooks: readonly UserA
 /** Plan gate: force pre-specification and make undisclosed researcher degrees of freedom visible. */
 export function validateAnalysisPlan(plan: AnalysisPlanContract, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
   const findings: AnalysisHookFinding[] = [];
-  if (!plan.primaryOutcome?.trim()) findings.push({ rule: "missing-primary-outcome", severity: "warn", message: "primary outcome is missing; AI should infer it from the research question or ask the researcher" });
+  if (!plan.primaryOutcome?.trim()) findings.push({ rule: "missing-primary-outcome", severity: "warn", message: "primary outcome is missing; AI should first infer it from the confirmed research question, and report the unresolved limitation without creating a human-decision state unless competing substantive outcomes remain" });
   if (!plan.primaryAnalysis?.trim()) findings.push({ rule: "missing-primary-analysis", severity: "warn", message: "primary analysis is missing; AI should propose a method and record the rationale" });
   if (!plan.missingDataPlan?.trim()) findings.push({ rule: "missing-missing-data-plan", severity: "warn", message: "missing-data handling is unspecified; AI should propose and disclose a method or limitation" });
   if (!plan.multiplicityPlan?.trim()) findings.push({ rule: "missing-multiplicity-plan", severity: "warn", message: "multiplicity handling is unspecified; AI should add a suitable correction or explain why it is not applicable" });
@@ -190,7 +190,7 @@ export function validateAnalysisPlan(plan: AnalysisPlanContract, userHooks: read
 /** Delegation gate: require an explicit external tool and reproducibility contract. */
 export function beforeDelegation(contract: { tool?: string; scriptPath?: string; environment?: Record<string, string>; inputHashes?: Record<string, string> }, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
   const findings: AnalysisHookFinding[] = [];
-  if (!contract.tool?.trim()) findings.push({ rule: "delegation-tool-missing", severity: "warn", message: "statistical backend is missing; AI should select or ask for one" });
+  if (!contract.tool?.trim()) findings.push({ rule: "delegation-tool-missing", severity: "warn", message: "statistical backend is missing; AI should select a suitable available backend or report the technical limitation without creating a human-decision state" });
   if (!contract.scriptPath?.trim()) findings.push({ rule: "delegation-script-missing", severity: "warn", message: "reproducible script path is missing; AI should create or recover it" });
   if (!contract.environment || Object.keys(contract.environment).length === 0) findings.push({ rule: "delegation-environment-missing", severity: "warn", message: "execution environment is missing; AI should record it from the run" });
   if (!contract.inputHashes || Object.keys(contract.inputHashes).length === 0) findings.push({ rule: "delegation-input-hash-missing", severity: "warn", message: "input hashes are missing; AI should compute them before final reporting" });
@@ -201,7 +201,7 @@ export function beforeDelegation(contract: { tool?: string; scriptPath?: string;
 export function afterAnalysis(report: AnalysisResultContract, userHooks: readonly UserAnalysisHook[] = []): AnalysisHookResult {
   const findings: AnalysisHookFinding[] = [];
   if (report.schemaVersion !== "psyclaw/analysis-result/v1") findings.push({ rule: "result-schema-invalid", severity: "block", message: "analysis result schema is not recognized" });
-  if (!Number.isInteger(report.sampleSize) || report.sampleSize < 0) findings.push({ rule: "sample-size-invalid", severity: "warn", message: "sample size is missing or invalid; AI should infer or request it before final reporting" });
+  if (!Number.isInteger(report.sampleSize) || report.sampleSize < 0) findings.push({ rule: "sample-size-invalid", severity: "warn", message: "sample size is missing or invalid; AI should recover it from validated inputs or execution records, otherwise disclose the limitation without creating a human-decision state" });
   if (!report.scriptPath?.trim() || Object.keys(report.environment ?? {}).length === 0) findings.push({ rule: "reproducibility-metadata-missing", severity: "warn", message: "reproducibility metadata is incomplete; AI should repair it from the execution record" });
   if (!report.missingData?.handled || !report.missingData.method?.trim()) findings.push({ rule: "missing-data-undisclosed", severity: "warn", message: "missing-data handling is incomplete; AI should add an explicit method or limitation" });
   if ((report.pValues?.length ?? 0) > 0 && (report.effectSizes?.length ?? 0) === 0) findings.push({ rule: "p-value-only-reporting", severity: "warn", message: "effect sizes are missing; AI should calculate or clearly qualify the result before final reporting" });

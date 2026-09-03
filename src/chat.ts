@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -110,9 +111,17 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   }
 
   // The header banner renders psyclaw's own version (not the bundled pi 0.84.x).
+  const agentDir = process.env.PSYCLAW_CODING_AGENT_DIR || join(homedir(), ".psyclaw", "agent");
+  const sessionDir = process.env.PSYCLAW_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
   const spawnEnv: NodeJS.ProcessEnv = {
     ...process.env,
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
+    PSYCLAW_CODING_AGENT_DIR: agentDir,
+    PSYCLAW_CODING_AGENT_SESSION_DIR: sessionDir,
+    // Compatibility for any locked Pi module that was bundled before the
+    // PsyClaw application name was applied.
+    PI_CODING_AGENT_DIR: agentDir,
+    PI_CODING_AGENT_SESSION_DIR: sessionDir,
   };
   if (process.platform === "darwin") {
     const missing = PROVIDER_PRESETS.filter((preset) => !spawnEnv[preset.apiKeyEnv]);

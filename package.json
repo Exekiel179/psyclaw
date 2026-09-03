@@ -1,6 +1,6 @@
 {
   "name": "psyclaw",
-  "version": "0.27.15",
+  "version": "0.27.16",
   "description": "A standalone, evidence-grounded social-science research agent with research contracts, evidence gates, and recoverable workflows",
   "type": "module",
   "license": "MIT",
@@ -17,12 +17,13 @@
     "registry": "https://registry.npmjs.org/"
   },
   "bin": {
-    "psyclaw": "dist/src/cli.js"
+    "psyclaw": "scripts/psyclaw.mjs"
   },
   "files": [
     "dist/src",
     "dist/apps/panel/index.html",
     "skills",
+    "scripts/psyclaw.mjs",
     "scripts/rebrand-pi.mjs"
   ],
   "engines": {

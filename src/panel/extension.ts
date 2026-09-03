@@ -1,9 +1,7 @@
 import type { Server } from "node:http";
 import { spawn } from "node:child_process";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createPanelServer } from "./server.js";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 
 async function listen(server: Server, port: number): Promise<number> {
   await new Promise<void>((resolve, reject) => {
@@ -49,14 +47,23 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
       }
       try {
         if (server === undefined || workbenchUrl === undefined) {
+          const packageManager = (): DefaultPackageManager => new DefaultPackageManager({
+            cwd: ctx.cwd,
+            agentDir: getAgentDir(),
+            settingsManager: SettingsManager.create(ctx.cwd, getAgentDir(), { projectTrusted: ctx.isProjectTrusted() }),
+          });
           const next = createPanelServer(ctx.cwd, { installSkill: async (task) => {
             pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          }, installPlugin: async (source) => {
-            const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-            const modulePath = join(dirname(entry), "package-manager-cli.js");
-            const { handlePackageCommand } = await import(pathToFileURL(modulePath).href) as { handlePackageCommand(args: string[]): Promise<boolean> };
-            if (!await handlePackageCommand(["install", source])) throw new Error("Pi Plugin 安装器未处理该来源");
-          }});
+          }, installExternalTool: async (task) => {
+            pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+          }, installPlugin: async (source, scope) => {
+            await packageManager().installAndPersist(source, { local: scope === "project" });
+          }, listPlugins: () => packageManager().listConfiguredPackages().map(({ source, scope, filtered, installedPath }) => ({
+            source,
+            scope,
+            filtered,
+            installed: installedPath !== undefined,
+          })) });
           const actualPort = await listen(next, 0);
           server = next;
           workbenchUrl = `http://127.0.0.1:${actualPort}`;

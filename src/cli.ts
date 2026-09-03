@@ -20,7 +20,6 @@ import {
   setupProviders,
   sha256File,
   writeHandoff,
-  initializeHitlWorkspace,
   PSYCLAW_VERSION,
 } from "./index.js";
 import { appendJsonlIfMissing } from "./project/jsonl.js";
@@ -176,11 +175,6 @@ async function main(): Promise<void> {
     await ensureConfiguredThenChat(args);
     return;
   }
-  if (command === "wizard") {
-    const { runWizard } = await import("./wizard.js");
-    await runWizard();
-    return;
-  }
   if (command === "setup") {
     assertKnownOptions(args, ["--provider"]);
     const provider = option(args, "--provider");
@@ -231,17 +225,6 @@ async function main(): Promise<void> {
     process.stdout.write(renderSuccessCard("已生成 HANDOFF 研究移交备忘录", {
       "Markdown 产物": "notes/HANDOFF.md",
       "JSON 结构化快照": "notes/handoff.json",
-    }));
-    return;
-  }
-  if (command === "hitl") {
-    const action = args.shift();
-    if (action !== "init" || args.length > 0) throw new Error("Usage: psyclaw hitl init");
-    const project = asProject(JSON.parse(await readFile(projectPaths(root).project, "utf8")));
-    await initializeHitlWorkspace(root, project.goal);
-    process.stdout.write(renderSuccessCard("已初始化人类裁决 (HITL) 工作区模板", {
-      "位置": "notes/ 与 logs/",
-      "状态": "待研究者确认节点已就绪",
     }));
     return;
   }

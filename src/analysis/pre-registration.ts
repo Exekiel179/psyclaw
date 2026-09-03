@@ -4,10 +4,11 @@ import type { GateResult, ResearchParadigm } from "../core/contracts.js";
 import { validateAnalysisPlan, type AnalysisPlanContract } from "./hooks.js";
 
 /**
- * Confirmatory analysis must be pre-registered before any delegation runs.
- * The plan records the primary outcome, primary analysis, missing-data and
- * multiplicity handling, exclusion criteria, and whether the analysis is
- * confirmatory or exploratory. A missing or incomplete plan is a hard block.
+ * A recorded analysis plan preserves the exploratory/confirmatory boundary.
+ * Exploratory work may proceed without a preregistration record. For an
+ * explicitly confirmatory study, missing pre-specification is disclosed as a
+ * limitation and repaired prospectively where possible; a public registry URL
+ * is not required by PsyClaw.
  */
 export interface PreRegistration extends AnalysisPlanContract {
   schemaVersion: "psyclaw/pre-registration/v1";
@@ -77,9 +78,9 @@ export function checkPreRegistration(plan: PreRegistration | undefined, paradigm
   if (plan === undefined) {
     return [{
       gateId: "analysis:pre-registration",
-      ok: false,
-      severity: "block",
-      reason: "确证性分析前必须先登记分析计划（主要结局、主要分析、缺失值处理、多重比较处理、排除标准）；写 .psyclaw/pre-registration.json 后再继续",
+      ok: true,
+      severity: "warn",
+      reason: "尚无事前分析方案记录。若本次工作是在查看数据后形成问题，请按探索性分析继续并如实说明；只有明确的确证性研究才需核对事先确定的主要指标、分析方法、缺失值处理、多重比较和排除标准，无需提供公开链接。",
     }];
   }
   const result = validateAnalysisPlan(plan);

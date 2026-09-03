@@ -28,9 +28,9 @@ describe("claim literature map", () => {
 });
 
 describe("pre-registration gate", () => {
-  it("blocks confirmatory analysis without a plan and passes with a complete one", () => {
-    const blocked = checkPreRegistration(undefined, "survey-observational");
-    expect(blocked.some((gate) => gate.gateId === "analysis:pre-registration" && gate.severity === "block")).toBe(true);
+  it("advises when no prior plan is recorded and passes with a complete one", () => {
+    const advisory = checkPreRegistration(undefined, "survey-observational");
+    expect(advisory.some((gate) => gate.gateId === "analysis:pre-registration" && gate.severity === "warn" && gate.ok)).toBe(true);
 
     const ok = checkPreRegistration({
       schemaVersion: "psyclaw/pre-registration/v1",

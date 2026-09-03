@@ -1,4 +1,5 @@
 import type { Effect, ToolReceipt } from "../core/contracts.js";
+import type { ResearchDecisionRequest, ResearchDecisionResolution } from "../research/decision.js";
 
 export type AgentRole = "planner" | "researcher" | "analyst" | "critic" | "writer" | "verifier";
 
@@ -53,9 +54,11 @@ export interface WorkerReport {
 export interface RunEvent {
   schemaVersion: "psyclaw/run-event/v1";
   runId: string;
-  type: "planned" | "started" | "receipt" | "gate" | "checkpoint" | "completed" | "blocked";
+  type: "planned" | "started" | "receipt" | "gate" | "checkpoint" | "awaiting-human" | "decision-resolved" | "completed" | "blocked";
   at: string;
   taskId?: string;
   receipt?: ToolReceipt;
+  researchDecision?: ResearchDecisionRequest;
+  researchDecisionResolution?: ResearchDecisionResolution;
   message?: string;
 }

@@ -23,6 +23,7 @@ export * from "./integrations/contracts.js";
 export * from "./orchestration/contracts.js";
 export * from "./research/ledger.js";
 export * from "./research/brief.js";
+export * from "./research/decision.js";
 export * from "./memory/store.js";
 export * from "./orchestration/scheduler.js";
 export * from "./orchestration/runner.js";

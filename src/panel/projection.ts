@@ -9,6 +9,7 @@ import { projectPaths } from "../project/paths.js";
 import { assertSafeRunEventPath } from "./events.js";
 import { loadLedger, readProject } from "../research/ledger.js";
 import type { RunEvent } from "../orchestration/contracts.js";
+import { assessResearchDecision } from "../research/decision.js";
 
 export const RunSnapshotSchema = Type.Object({
   schemaVersion: Type.Literal("psyclaw/run-snapshot/v1"),
@@ -22,6 +23,7 @@ export const RunSnapshotSchema = Type.Object({
     Type.Literal("verifying"),
     Type.Literal("completed"),
     Type.Literal("paused"),
+    Type.Literal("awaiting-human"),
     Type.Literal("blocked"),
     Type.Literal("unknown"),
   ]),
@@ -78,10 +80,20 @@ export function asRunSnapshot(value: unknown): RunSnapshot {
 function isRunEvent(value: unknown): value is RunEvent {
   if (typeof value !== "object" || value === null) return false;
   const event = value as Partial<RunEvent>;
-  return event.schemaVersion === "psyclaw/run-event/v1" &&
+  const validTypes: RunEvent["type"][] = ["planned", "started", "receipt", "gate", "checkpoint", "awaiting-human", "decision-resolved", "completed", "blocked"];
+  if (!(event.schemaVersion === "psyclaw/run-event/v1" &&
     typeof event.runId === "string" &&
     typeof event.at === "string" &&
-    typeof event.type === "string";
+    typeof event.type === "string" &&
+    validTypes.includes(event.type as RunEvent["type"]))) return false;
+  if (event.type === "awaiting-human") {
+    return event.researchDecision !== undefined && event.researchDecisionResolution === undefined && assessResearchDecision(event.researchDecision).eligible;
+  }
+  if (event.type === "decision-resolved") {
+    const resolution = event.researchDecisionResolution;
+    return event.researchDecision === undefined && resolution?.schemaVersion === "psyclaw/research-decision-resolution/v1" && resolution.actor === "human" && Boolean(resolution.decisionId && resolution.selectedOption && resolution.rationale && resolution.resolvedAt);
+  }
+  return event.researchDecision === undefined && event.researchDecisionResolution === undefined;
 }
 
 function phaseFromEvents(events: readonly RunEvent[]): RunSnapshot["phase"] {
@@ -99,6 +111,10 @@ function phaseFromEvents(events: readonly RunEvent[]): RunSnapshot["phase"] {
       return "blocked";
     case "checkpoint":
       return "paused";
+    case "awaiting-human":
+      return "awaiting-human";
+    case "decision-resolved":
+      return "executing";
     case "gate":
       return "verifying";
     case "started":
@@ -113,12 +129,12 @@ function phaseFromEvents(events: readonly RunEvent[]): RunSnapshot["phase"] {
 function nextStepFor(phase: RunSnapshot["phase"], blocked: boolean, waitingReasons: readonly string[], corrupt: boolean): string {
   if (corrupt) return "运行事件或检查点不可用，先修复再继续";
   const waiting = waitingReasons.filter((item) => !item.includes("corrupt"));
+  if (phase === "awaiting-human") return `有 ${Math.max(1, waiting.length)} 项研究取舍需要你决定`;
   if (blocked || phase === "blocked") {
-    return waiting.length > 0 ? `有 ${waiting.length} 项门禁需要你确认后再继续` : "门禁未通过，检查证据与 Claim";
+    return "系统将先尝试补充材料或修正流程；无法完成时会说明具体原因和下一步";
   }
-  if (waiting.length > 0) return `有 ${waiting.length} 项待你确认`;
   switch (phase) {
-    case "paused": return "批准从 checkpoint 恢复运行";
+    case "paused": return "运行已暂停，可从当前检查点继续";
     case "completed": return "检查产物，按 APA7 导出 DOCX（图片已内嵌）";
     case "executing": return "模型正在后台执行，无需操作";
     case "verifying": return "模型正在核验门禁";
@@ -281,6 +297,11 @@ export async function projectRunSnapshot(root: string, runId: string): Promise<R
     : checkpoint.kind === "valid" && checkpoint.status === "paused"
       ? "paused"
       : phaseFromEvents(events);
+  const researchDecisions = phase === "awaiting-human"
+    ? events.slice(-1).flatMap((event) => event.type === "awaiting-human" && event.researchDecision
+      ? [redactSecrets(event.researchDecision.question)]
+      : [])
+    : [];
 
   const snapshot: RunSnapshot = {
     schemaVersion: "psyclaw/run-snapshot/v1",
@@ -290,11 +311,7 @@ export async function projectRunSnapshot(root: string, runId: string): Promise<R
     paradigm: project.paradigm,
     phase,
     blocked: gateBlocked.length > 0 || phase === "blocked",
-    waitingOnHuman: [
-      ...(eventCorrupt ? ["run event log is corrupt or unavailable"] : []),
-      ...(checkpointCorrupt ? ["run checkpoint is corrupt or unavailable"] : []),
-      ...gateBlocked.map((gate) => redactSecrets(gate.reason)),
-    ],
+    waitingOnHuman: researchDecisions,
     gates: gates.map((gate) => ({
       gateId: gate.gateId,
       ok: gate.ok,
@@ -310,7 +327,7 @@ export async function projectRunSnapshot(root: string, runId: string): Promise<R
     },
     eventCount: events.length,
     updatedAt: new Date().toISOString(),
-    nextStep: nextStepFor(phase, gateBlocked.length > 0, gateBlocked.map((gate) => redactSecrets(gate.reason)), checkpointCorrupt || eventCorrupt),
+    nextStep: nextStepFor(phase, gateBlocked.length > 0, researchDecisions, checkpointCorrupt || eventCorrupt),
   };
   asRunSnapshot(snapshot);
   return snapshot;

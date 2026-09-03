@@ -1,4 +1,5 @@
 import type { RunEvent } from "../orchestration/contracts.js";
+import { assessResearchDecision, assertResearchDecision } from "../research/decision.js";
 import { lstat } from "node:fs/promises";
 import { appendJsonl, readJsonl } from "../project/jsonl.js";
 import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
@@ -25,6 +26,18 @@ export class RunEventLog {
       ...event,
     };
     if (!full.at.trim()) throw new Error("Run event timestamp cannot be empty");
+    if (full.type === "awaiting-human") {
+      if (!full.researchDecision) throw new Error("awaiting-human requires a substantive research decision");
+      assertResearchDecision(full.researchDecision);
+      if (full.researchDecisionResolution !== undefined) throw new Error("awaiting-human cannot contain a research decision resolution");
+    } else if (full.type === "decision-resolved") {
+      if (!full.researchDecisionResolution) throw new Error("decision-resolved requires a research decision resolution");
+      if (full.researchDecision !== undefined) throw new Error("decision-resolved cannot contain a research decision request");
+    } else if (full.researchDecision !== undefined) {
+      throw new Error("researchDecision is only valid on awaiting-human events");
+    } else if (full.researchDecisionResolution !== undefined) {
+      throw new Error("researchDecisionResolution is only valid on decision-resolved events");
+    }
     const path = await assertSafeRunEventPath(this.root, this.runId);
     await assertRegularRunFile(path, true);
     await appendJsonl(path, full);
@@ -77,6 +90,8 @@ function isRunEvent(value: unknown): value is RunEvent {
     "receipt",
     "gate",
     "checkpoint",
+    "awaiting-human",
+    "decision-resolved",
     "completed",
     "blocked",
   ];
@@ -85,6 +100,11 @@ function isRunEvent(value: unknown): value is RunEvent {
     typeof event.runId === "string" &&
     typeof event.at === "string" &&
     typeof event.type === "string" &&
-    validTypes.includes(event.type as RunEvent["type"])
+    validTypes.includes(event.type as RunEvent["type"]) &&
+    (event.type === "awaiting-human"
+      ? event.researchDecision !== undefined && event.researchDecisionResolution === undefined && assessResearchDecision(event.researchDecision).eligible
+      : event.type === "decision-resolved"
+        ? event.researchDecision === undefined && Boolean(event.researchDecisionResolution)
+        : event.researchDecision === undefined && event.researchDecisionResolution === undefined)
   );
 }
