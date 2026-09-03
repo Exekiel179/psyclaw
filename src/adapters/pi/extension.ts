@@ -96,6 +96,14 @@ async function runPluginCommand(args: string[]): Promise<void> {
 const activeAgentRuns = new Set<string>();
 const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "research-brief"]);
 
+function findLastMatching<T>(items: readonly T[], predicate: (item: T) => boolean): T | undefined {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (item !== undefined && predicate(item)) return item;
+  }
+  return undefined;
+}
+
 function coreSkillPath(name: string): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "skills", "core", name, "SKILL.md");
 }
@@ -246,7 +254,7 @@ async function readControlledRun(root: string): Promise<ControlledRunState | nul
     if (!(value.schemaVersion === "psyclaw/controlled-run/v1" && value.status === "active" && typeof value.runId === "string" && typeof value.projectId === "string" && typeof value.objective === "string" && typeof value.activatedAt === "string")) return null;
     const project = await readProject(root);
     if (project.id !== value.projectId) return null;
-    const authorization = (await readApprovals(root)).findLast((record) => record.kind === "run-mode" && record.runId === value.runId);
+    const authorization = findLastMatching(await readApprovals(root), (record) => record.kind === "run-mode" && record.runId === value.runId);
     if (authorization?.decision !== "approved" || authorization.actor !== "human") return null;
     return { ...value, mode: value.mode === "auto" ? "auto" : "human", selectedSkills: Array.isArray(value.selectedSkills) ? value.selectedSkills.filter((item): item is string => typeof item === "string") : [] } as ControlledRunState;
   } catch {
@@ -1705,7 +1713,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       const resolvedIds = new Set(events
         .filter((event) => event.type === "decision-resolved" && event.researchDecisionResolution)
         .map((event) => event.researchDecisionResolution!.decisionId));
-      const pending = events.findLast((event) =>
+      const pending = findLastMatching(events, (event) =>
         event.type === "awaiting-human" && event.researchDecision && !resolvedIds.has(event.researchDecision.id));
       if (pending?.researchDecision) {
         return {
@@ -1754,7 +1762,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       const resolvedIds = new Set(events
         .filter((event) => event.type === "decision-resolved" && event.researchDecisionResolution)
         .map((event) => event.researchDecisionResolution!.decisionId));
-      const pending = events.findLast((event) =>
+      const pending = findLastMatching(events, (event) =>
         event.type === "awaiting-human" && event.researchDecision?.id === params.decisionId && !resolvedIds.has(params.decisionId));
       if (!pending?.researchDecision) {
         return { content: [{ type: "text", text: `未找到待处理的研究取舍：${params.decisionId}` }], details: { status: "not-found", runId: run.runId }, isError: true };

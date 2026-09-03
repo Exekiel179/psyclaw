@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.17 - 2026-09-03
+
+- Fix Node 22 compatibility in controlled-run authorization and research-decision event lookup.
+- Include the runtime isolation, research workflow, Plugin, MarkItDown, MCP, Panel, and interaction updates prepared in 0.27.16.
+
 ## 0.27.16 - 2026-09-03
 
 - Isolate bundled runtime configuration under ~/.psyclaw and streamline first-launch provider setup.
