@@ -245,7 +245,13 @@ const MODE_PATCHES = [
         // Enable the remaining input handlers only after managed-tool setup completes.
         this.setupKeyHandlers();
         this.setupEditorSubmitHandler();`,
-    next: `// Input must remain usable while optional search binaries are installed.
+    next: `// PsyClaw provides cross-platform Node search tools through its extension.
+        this.setupKeyHandlers();
+        this.setupEditorSubmitHandler();
+        // File completion remains optional; startup never downloads from GitHub.`,
+  },
+  {
+    old: `// Input must remain usable while optional search binaries are installed.
         this.setupKeyHandlers();
         this.setupEditorSubmitHandler();
         const reportToolFailure = (status) => {
@@ -259,6 +265,10 @@ const MODE_PATCHES = [
         }).catch((error) => {
             this.showManagedToolStatus({ type: "warning", message: \`Search tools unavailable: \${error instanceof Error ? error.message : String(error)}\` });
         });`,
+    next: `// PsyClaw provides cross-platform Node search tools through its extension.
+        this.setupKeyHandlers();
+        this.setupEditorSubmitHandler();
+        // File completion remains optional; startup never downloads from GitHub.`,
   },
   {
     old: 'this.ui.terminal.setTitle(`${APP_TITLE} - ${sessionName} - ${cwdBasename}`);',

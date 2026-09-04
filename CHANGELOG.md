@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.19 - 2026-09-04
+
+- Add `psyclaw --continue` and `psyclaw -c` to resume the latest session for the current project through the bundled Pi runtime.
+- Use built-in cross-platform file search fallbacks so Windows startup no longer depends on downloading ripgrep and fd from GitHub Releases.
+
 ## 0.27.18 - 2026-09-03
 
 - Fix the remaining Node 22 type compatibility issue in research-decision lookup.

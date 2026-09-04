@@ -49,6 +49,7 @@ import {
   type ProviderPickerResult,
   type SecretInputResult,
 } from "../../tui/provider-picker.js";
+import { createPsyClawSearchTools } from "./search-tools.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -1649,6 +1650,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (typeof pi.registerTool === "function") {
+  // Override Pi's optional native search tools with deterministic Node fallbacks.
+  // This keeps Windows installations functional when GitHub Releases is blocked.
+  for (const tool of createPsyClawSearchTools()) pi.registerTool(tool);
+
   pi.registerTool({
     name: "psyclaw_research_decision",
     label: "Research decision",
