@@ -2,7 +2,7 @@
 
 PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、可恢复工作流和本地面板接到内置运行时上；只有无法由证据和通行方法消解、且会实质改变研究设计或解释的分歧才交由研究者取舍。它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.18`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.27.19`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -19,19 +19,19 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.18
+npm install -g psyclaw@0.27.19
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.27.18 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.27.19 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.18 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.19 --registry=https://registry.npmmirror.com
 ```
 
 确认命令入口：
@@ -69,6 +69,7 @@ psyclaw brief
 | 需求 | 命令或操作 |
 | --- | --- |
 | 启动研究对话 | `psyclaw` 或 `psyclaw chat` |
+| 续接当前项目最近一次会话 | `psyclaw --continue` 或 `psyclaw -c` |
 | 创建研究项目 | `psyclaw init <goal> --paradigm <profile>` |
 | 启动受控研究流程 | 对话中依次输入 `/init <goal>`、`/run [--skills a,b] [objective]` |
 | 模拟同行评审 | 论文完成后在对话中输入 `/review` |

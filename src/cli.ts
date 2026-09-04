@@ -26,6 +26,7 @@ import { appendJsonlIfMissing } from "./project/jsonl.js";
 import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, c } from "./style/cli-ui.js";
+import { continueSessionArgs } from "./cli-args.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -163,6 +164,11 @@ async function main(): Promise<void> {
   }
   if (command === "--version" || command === "-v" || command === "-V") {
     process.stdout.write(`${PSYCLAW_VERSION}\n`);
+    return;
+  }
+  const continuationArgs = continueSessionArgs(command, args);
+  if (continuationArgs !== undefined) {
+    await ensureConfiguredThenChat(continuationArgs);
     return;
   }
   // Bare `psyclaw` is the primary entrypoint: guide the user through first-run
