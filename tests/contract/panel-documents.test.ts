@@ -1,5 +1,4 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -18,12 +17,9 @@ async function preparePublishEvidence(root: string): Promise<void> {
   await writeFile(join(root, ...pdf.split("/")), "%PDF-1.4\nfixture\n%%EOF", "utf8");
 }
 
-// Detect pandoc at module load so `it.runIf` below is decided before tests run.
-const pandocOk = await new Promise<boolean>((resolve) => {
-  const child = spawn("pandoc", ["--version"], { stdio: "ignore", shell: process.platform === "win32" });
-  child.on("error", () => resolve(false));
-  child.on("close", (code) => resolve(code === 0));
-});
+// The panel is a read-only projection of project files; document discovery,
+// manuscript serving and the reference archive are read endpoints, and all
+// mutation routes are refused at the HTTP method gate (405).
 
 describe("standardized document discovery", () => {
   it("discovers a paper/*.md manuscript even when notes/manuscript.md is absent", async () => {
@@ -77,41 +73,33 @@ describe("standardized document discovery", () => {
 });
 
 describe("generation-time publish (/api/publish)", () => {
-  it("writes the manuscript to paper/ and the panel recognizes it immediately", async () => {
+  it("refuses panel publish writes (405); publishing is owned by the workflow layer", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-publish-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
-    await preparePublishEvidence(root);
     await withServer(root, async (base) => {
       const res = await postJson(base, "/api/publish", { content: "# 发布稿\n\n发布内容", name: "论文初稿", exportDocx: false });
-      expect(res.status).toBe(200);
-      const data = await res.json() as { ok: boolean; markdownPath: string; docxPath: string | null };
-      expect(data.ok).toBe(true);
-      expect(data.markdownPath).toBe("paper/论文初稿.md");
-      expect(data.docxPath).toBeNull();
-
-      const onDisk = await readFile(join(root, "paper", "论文初稿.md"), "utf8");
-      expect(onDisk).toContain("发布内容");
-
-      // manuscript discovery now resolves to the published file
-      const ms = await (await fetch(`${base}/api/manuscript`)).json() as { exists: boolean; path: string | null };
-      expect(ms.exists).toBe(true);
-      expect(ms.path).toBe("paper/论文初稿.md");
-
-      // document registry marks it as the manuscript
-      const docs = await (await fetch(`${base}/api/documents`)).json() as { documents: Array<{ path: string; isManuscript: boolean; imported: boolean }> };
-      expect(docs.documents.find((doc) => doc.path === "paper/论文初稿.md")!.isManuscript).toBe(true);
+      expect(res.status).toBe(405);
+      expect(res.headers.get("allow")).toContain("GET");
+      // The rejected call must not have written anything.
+      const ms = await (await fetch(`${base}/api/manuscript`)).json() as { exists: boolean; markdown: string };
+      expect(ms.exists).toBe(false);
+      expect(ms.markdown).toBe("");
     });
   });
 });
 
 describe("versions and reference archive endpoints", () => {
-  it("lists manuscript versions and serves archived version files", async () => {
+  it("serves published versions read-only after a real publish workflow", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-versions-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await preparePublishEvidence(root);
+    const { publishManuscript } = await import("../../src/workflows/publish.js");
+    await publishManuscript(root, { name: "论文初稿", markdown: "# v1 内容", exportDocx: false });
+    await publishManuscript(root, { name: "论文初稿", markdown: "# v2 内容", exportDocx: false });
     await withServer(root, async (base) => {
-      await postJson(base, "/api/publish", { content: "# v1 内容", name: "论文初稿", exportDocx: false });
-      await postJson(base, "/api/publish", { content: "# v2 内容", name: "论文初稿", exportDocx: false });
+      // Publishing over the panel HTTP surface is refused; versions are read
+      // from the publish.jsonl written by the workflow layer.
+      expect((await postJson(base, "/api/publish", { content: "# v3 内容", name: "论文初稿", exportDocx: false })).status).toBe(405);
 
       const versions = await (await fetch(`${base}/api/versions`)).json() as { versions: Array<{ version: number; markdownPath: string; markdownLoadPath: string }>; current: { version: number } | null };
       expect(versions.versions).toHaveLength(2);
@@ -125,19 +113,18 @@ describe("versions and reference archive endpoints", () => {
     });
   });
 
-  it("checks in-text citations against an empty archive and flags them as gaps", async () => {
+  it("checks in-text citations read-only; the audit endpoint refuses panel writes", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-refs-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await withServer(root, async (base) => {
       const refs = await (await fetch(`${base}/api/references`)).json() as { references: unknown[] };
       expect(refs.references).toEqual([]);
 
+      // Citation auditing runs in the citation workflow (unit-tested); the
+      // panel surface refuses the check-as-write route.
       const res = await postJson(base, "/api/references/check", { text: "（Kessler et al., 2005; Wanberg et al., 2010）" });
-      expect(res.status).toBe(200);
-      const data = await res.json() as { citations: Array<{ surname: string; missing: boolean }>; matched: number; unmatched: number };
-      expect(data.matched).toBe(0);
-      expect(data.unmatched).toBe(2);
-      expect(data.citations.map((c) => c.surname).sort()).toEqual(["Kessler", "Wanberg"]);
+      expect(res.status).toBe(405);
+      expect(await res.text()).toContain("method not allowed");
     });
   });
 });
@@ -218,106 +205,86 @@ describe("assistant message enrichment", () => {
 });
 
 describe("citation-usage endpoints (/api/citations)", () => {
-  it("records a citation use (even unverified) and lists it", async () => {
+  it("refuses citation recording over HTTP; citation use is recorded by the workflow", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-cite-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await withServer(root, async (base) => {
-      // invalid-format DOI → verification errors without network; use still recorded honestly
       const res = await postJson(base, "/api/citations", {
         doi: "not-a-doi",
         reason: "支持：社会支持缓冲压力假说",
         context: "社会支持缓冲压力（某作者, 2005）",
       });
-      expect(res.status).toBe(200);
-      const data = await res.json() as { ok: boolean; record: { citationId: string; verified: boolean; reason: string }; appended: boolean };
-      expect(data.ok).toBe(true);
-      expect(data.record.citationId).toMatch(/^cite_[a-f0-9]{16}$/);
-      expect(data.record.verified).toBe(false);
-      expect(data.record.reason).toContain("缓冲压力假说");
+      expect(res.status).toBe(405);
+      expect(await res.text()).toContain("method not allowed");
 
-      const list = await (await fetch(`${base}/api/citations`)).json() as { citations: Array<{ citationId: string; reason: string }> };
-      expect(list.citations).toHaveLength(1);
-      expect(list.citations[0]!.citationId).toBe(data.record.citationId);
+      // Nothing was appended by the rejected write.
+      const list = await (await fetch(`${base}/api/citations`)).json() as { citations: unknown[] };
+      expect(list.citations).toEqual([]);
     });
   });
 
-  it("rejects a citation use without a reason", async () => {
+  it("rejects every citation write attempt, with or without a reason", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-cite-bad-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await withServer(root, async (base) => {
       const res = await postJson(base, "/api/citations", { doi: "10.1000/x", reason: "", context: "c" });
-      expect(res.status).toBe(400);
+      // The method gate fires before payload validation, so even malformed
+      // payloads cannot reach a writer.
+      expect(res.status).toBe(405);
     });
   });
 });
 
 describe("document import", () => {
-  it("imports an .md manuscript: registers evidence, records import, idempotent by sha256", async () => {
+  it("refuses /api/documents/import over HTTP and keeps discovery read-only", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-import-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await mkdir(join(root, "paper"), { recursive: true });
     await writeFile(join(root, "paper", "论文初稿.md"), "# 手稿\n\n可编辑内容\n", "utf8");
     await withServer(root, async (base) => {
       const res = await postJson(base, "/api/documents/import", { path: "paper/论文初稿.md" });
-      expect(res.status).toBe(200);
-      const data = await res.json() as { ok: boolean; imported: boolean; markdown: string | null; evidenceId: string; kind: string };
-      expect(data.ok).toBe(true);
-      expect(data.imported).toBe(true);
-      expect(data.markdown).toContain("可编辑内容");
-      expect(data.kind).toBe("manuscript");
-      expect(data.evidenceId).toMatch(/^evidence_[a-f0-9]{16}$/);
+      expect(res.status).toBe(405);
+      expect(await res.text()).toContain("method not allowed");
 
-      const evidence = await readFile(join(root, ".psyclaw", "evidence.jsonl"), "utf8");
-      expect(evidence).toContain("论文初稿.md");
-      expect(evidence).toContain('"accessStatus":"partial"');
-      const imports = await readFile(join(root, ".psyclaw", "imports.jsonl"), "utf8");
-      expect(imports).toContain("psyclaw/import/v1");
+      // The rejected call registered nothing in the evidence/import ledger.
+      const evidence = await readFile(join(root, ".psyclaw", "evidence.jsonl"), "utf8").catch(() => "");
+      expect(evidence).not.toContain("论文初稿.md");
+      const imports = await readFile(join(root, ".psyclaw", "imports.jsonl"), "utf8").catch(() => "");
+      expect(imports).not.toContain("psyclaw/import/v1");
 
-      // second import is a no-op returning the existing record without markdown
-      const again = await (await postJson(base, "/api/documents/import", { path: "paper/论文初稿.md" })).json() as { alreadyImported: boolean; markdown: string | null };
-      expect(again.alreadyImported).toBe(true);
-      expect(again.markdown).toBeNull();
-
-      const listing = await (await fetch(`${base}/api/documents`)).json() as { documents: Array<{ path: string; imported: boolean }> };
-      expect(listing.documents.find((doc) => doc.path === "paper/论文初稿.md")!.imported).toBe(true);
+      // Document discovery stays read-only and reflects the real file.
+      const listing = await (await fetch(`${base}/api/documents`)).json() as { documents: Array<{ path: string; imported: boolean; isManuscript: boolean }> };
+      const manuscript = listing.documents.find((doc) => doc.path === "paper/论文初稿.md");
+      expect(manuscript?.isManuscript).toBe(true);
+      expect(manuscript!.imported).toBe(false);
     });
   });
 
-  it("rejects escape paths and unsupported formats", async () => {
+  it("rejects every import path at the method gate before path validation", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-bad-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await mkdir(join(root, "analysis", "scripts"), { recursive: true });
     await writeFile(join(root, "analysis", "scripts", "analyze.py"), "print(1)", "utf8");
     await withServer(root, async (base) => {
+      // Neither a traversal attempt nor an unsupported format can reach an
+      // importer: the read-only panel rejects the mutation first.
       const escape = await postJson(base, "/api/documents/import", { path: "../escape.md" });
-      expect(escape.status).toBe(400);
-      expect(await escape.text()).toContain("relative document path");
+      expect(escape.status).toBe(405);
       const unsupported = await postJson(base, "/api/documents/import", { path: "analysis/scripts/analyze.py" });
-      expect(unsupported.status).toBe(400);
-      expect(await unsupported.text()).toContain("unsupported document format");
+      expect(unsupported.status).toBe(405);
     });
   });
 
-  it.runIf(pandocOk)("imports a .docx manuscript via pandoc into editable markdown", async () => {
+  it("keeps a foreign-format project file discoverable and refuses import writes", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-docs-docx-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await mkdir(join(root, "paper"), { recursive: true });
-    await writeFile(join(root, "paper", "草案.md"), "# 草案\n\n这一段会进入 docx。\n", "utf8");
-    const made = await new Promise<number>((resolve) => {
-      const child = spawn("pandoc", [join(root, "paper", "草案.md"), "-o", join(root, "paper", "草案.docx")], { stdio: "ignore", shell: process.platform === "win32" });
-      child.on("error", () => resolve(1));
-      child.on("close", (code) => resolve(code ?? 1));
-    });
-    expect(made).toBe(0);
-
+    await writeFile(join(root, "paper", "草案.docx"), Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]), "utf8");
     await withServer(root, async (base) => {
       const res = await postJson(base, "/api/documents/import", { path: "paper/草案.docx" });
-      expect(res.status).toBe(200);
-      const data = await res.json() as { ok: boolean; markdown: string | null; format: string };
-      expect(data.ok).toBe(true);
-      expect(data.format).toBe("docx");
-      expect(data.markdown).toContain("草案");
-      expect(data.markdown).toContain("这一段会进入 docx");
+      expect(res.status).toBe(405);
+      const docs = await (await fetch(`${base}/api/documents`)).json() as { documents: Array<{ path: string }> };
+      expect(docs.documents.some((doc) => doc.path === "paper/草案.docx")).toBe(true);
     });
   });
 });

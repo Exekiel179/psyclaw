@@ -12,12 +12,21 @@ async function listen(server: Server, port: number): Promise<number> {
   return typeof address === "object" && address !== null ? address.port : port;
 }
 
-function openWorkbench(url: string): void {
-  const command = process.platform === "win32" ? "cmd" : process.platform === "darwin" ? "open" : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
-  const child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: true });
-  child.on("error", () => undefined);
-  child.unref();
+function openWorkbench(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const command = process.platform === "win32" ? "cmd" : process.platform === "darwin" ? "open" : "xdg-open";
+    const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+    let child;
+    try {
+      child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: true });
+    } catch {
+      resolve(false);
+      return;
+    }
+    child.once("error", () => resolve(false));
+    child.once("spawn", () => resolve(true));
+    child.unref();
+  });
 }
 
 /**
@@ -68,12 +77,22 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
           server = next;
           workbenchUrl = `http://127.0.0.1:${actualPort}`;
         }
-        openWorkbench(workbenchUrl);
-        ctx.ui.notify(`科研工作台已在浏览器中打开：${workbenchUrl}`, "info");
+        openWorkbench(workbenchUrl).then((opened) => {
+          if (opened) {
+            ctx.ui.notify(`科研工作台已在浏览器中打开：${workbenchUrl}`, "info");
+          } else {
+            // The local server is up regardless; give the user a reachable
+            // fallback instead of leaving them with a dead-end error.
+            ctx.ui.notify(`科研工作台已启动，但未能自动打开浏览器。请手动访问：${workbenchUrl}`, "warning");
+          }
+        }).catch((error) => {
+          ctx.ui.notify(`科研工作台已启动，但自动打开失败：${error instanceof Error ? error.message : String(error)}。请手动访问：${workbenchUrl}`, "warning");
+        });
       } catch (error) {
         server = undefined;
         workbenchUrl = undefined;
-        ctx.ui.notify(error instanceof Error ? error.message : "科研工作台暂时无法打开", "error");
+        const detail = error instanceof Error ? error.message : String(error);
+        ctx.ui.notify(`科研工作台启动失败：${detail}`, "error");
       }
     },
   });

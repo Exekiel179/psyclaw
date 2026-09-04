@@ -7,7 +7,7 @@ import extension from "../../src/adapters/pi/extension.js";
 import { bootstrapProject } from "../../src/project/bootstrap.js";
 
 describe("Pi extension contract", () => {
-  it("registers only the small research command surface", async () => {
+  it("registers only the small legacy research command surface without registerTool", async () => {
     const commands = new Map<string, { handler: (args: string, ctx: any) => Promise<void> }>();
     const api = {
       registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
@@ -15,7 +15,27 @@ describe("Pi extension contract", () => {
       },
     } as any;
     extension(api);
-    expect([...commands.keys()]).toEqual(["init", "verify", "brief", "export", "model", "agents"]);
+    // With a legacy Pi API (no registerTool) the extension keeps a minimal
+    // research surface: /verify and /model stay reachable for the CLI/simple
+    // hosts, while UI-gated research commands (run/agents/grill/...) are not
+    // registered at all.
+    expect([...commands.keys()]).toEqual(["init", "verify", "brief", "model"]);
+  });
+
+  it("registers the full research command surface on a modern Pi API", () => {
+    const commands: string[] = [];
+    const api = {
+      registerCommand(name: string) { commands.push(name); },
+      registerTool() {},
+    } as any;
+    extension(api);
+    // `/export` was removed (session-trace export moved to Pi's built-in), and
+    // developer-only commands (verify/model) are gated behind
+    // PSYCLAW_DEVELOPER_COMMANDS=1, so they are absent from the default set.
+    expect(commands).toEqual([
+      "init", "run", "brief", "grill", "review", "loop",
+      "skill", "plugin", "mcp", "install", "provider", "pet", "agents",
+    ]);
   });
 
   it("lets the init command bootstrap through the Pi context cwd", async () => {
@@ -159,6 +179,7 @@ describe("Pi extension contract", () => {
       registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
         if (name === "agents") agentsHandler = options.handler;
       },
+      registerTool() {},
     } as any;
     extension(api);
     const notifications: string[] = [];
@@ -174,7 +195,7 @@ describe("Pi extension contract", () => {
     expect(existsSync(join(root, ".psyclaw"))).toBe(false);
   });
 
-  it("activates /run from compliant analysis documents without /init", async () => {
+  it("keeps ordinary mode when /run has compliant analysis documents but no /init project", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-run-docs-"));
     await mkdir(join(root, "notes"), { recursive: true });
     await writeFile(join(root, "notes", "research-spec.md"), [
@@ -196,15 +217,15 @@ describe("Pi extension contract", () => {
     ].join("\n"), "utf8");
 
     let runHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
-    let entry: Record<string, unknown> | undefined;
-    let sentMessage: string | undefined;
+    let entryCalls = 0;
+    let sentMessages = 0;
     const api = {
       registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
         if (name === "run") runHandler = options.handler;
       },
       registerTool() {},
-      appendEntry(_key: string, value: Record<string, unknown>) { entry = value; },
-      sendUserMessage(text: string) { sentMessage = text; },
+      appendEntry() { entryCalls += 1; },
+      sendUserMessage() { sentMessages += 1; },
     } as any;
     extension(api);
 
@@ -215,13 +236,14 @@ describe("Pi extension contract", () => {
       ui: { notify: (message: string) => notifications.push(message) },
     });
 
-    expect(existsSync(join(root, ".psyclaw", "project.json"))).toBe(true);
-    const project = JSON.parse(await readFile(join(root, ".psyclaw", "project.json"), "utf8"));
-    expect(project.goal).toContain("自我效能");
-    expect(existsSync(join(root, ".psyclaw", "controlled-run.json"))).toBe(true);
-    expect(entry).toMatchObject({ projectId: project.id });
-    expect(sentMessage).toContain("受控研究流程已由用户通过 /run 明确启动");
-    expect(notifications.some((message) => message.includes("合规的分析文档"))).toBe(true);
+    // Analysis documents alone must not silently start a controlled run: /run
+    // only activates a project that was explicitly established via /init, so
+    // ordinary conversation mode is preserved with a clear pointer to /init.
+    expect(notifications.some((message) => message.includes("/init"))).toBe(true);
+    expect(existsSync(join(root, ".psyclaw", "project.json"))).toBe(false);
+    expect(existsSync(join(root, ".psyclaw", "controlled-run.json"))).toBe(false);
+    expect(entryCalls).toBe(0);
+    expect(sentMessages).toBe(0);
   });
 
   it("still warns when /run has neither project.json nor compliant analysis documents", async () => {

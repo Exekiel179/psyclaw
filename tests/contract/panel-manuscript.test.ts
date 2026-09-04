@@ -19,23 +19,21 @@ describe("manuscript panel endpoints", () => {
     });
   });
 
-  it("saves the manuscript to a real project file and reloads it", async () => {
+  it("stays read-only: /api/manuscript rejects writes (405) and reflects real project files", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-ms-save-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await withServer(root, async (base) => {
+      // The panel is a read-only projection; manuscript writes happen through
+      // the agent workflow layer, never through the panel HTTP surface.
       const save = await postJson(base, "/api/manuscript", {
         content: "# 标题\n\n正文含论断 [核心论断](claim:0)。",
         path: "notes/manuscript.md",
       });
-      expect(save.status).toBe(200);
-      const saved = await save.json() as { ok: boolean; path: string; bytes: number };
-      expect(saved.ok).toBe(true);
-      expect(saved.path).toBe("notes/manuscript.md");
+      expect(save.status).toBe(405);
+      expect(save.headers.get("allow")).toContain("GET");
 
-      const onDisk = await readFile(join(root, "notes", "manuscript.md"), "utf8");
-      expect(onDisk).toContain("# 标题");
-      expect(onDisk).toContain("(claim:0)");
-
+      // A manuscript written to the real project file is served read-only.
+      await writeFile(join(root, "notes", "manuscript.md"), "# 标题\n\n正文含论断 [核心论断](claim:0)。\n", "utf8");
       const get = await fetch(`${base}/api/manuscript`);
       const data = await get.json() as { exists: boolean; path: string | null; markdown: string };
       expect(data.exists).toBe(true);
@@ -44,13 +42,16 @@ describe("manuscript panel endpoints", () => {
     });
   });
 
-  it("rejects manuscript paths outside notes/ and outputs/", async () => {
+  it("rejects panel write attempts for any path, including escapes", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-ms-escape-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await withServer(root, async (base) => {
+      // Path validation now lives in the workflow write layer; the panel
+      // refuses every mutation attempt at the method gate before any path is
+      // interpreted, so escape attempts cannot reach a writer.
       const res = await postJson(base, "/api/manuscript", { content: "x", path: "../escape.md" });
-      expect(res.status).toBe(400);
-      expect(await res.text()).toContain("relative manuscript path");
+      expect(res.status).toBe(405);
+      expect(await res.text()).toContain("method not allowed");
     });
   });
 
@@ -70,49 +71,38 @@ describe("manuscript panel endpoints", () => {
 });
 
 describe("ledger claim and evidence endpoints", () => {
-  it("appends a claim to the real .psyclaw/claims.jsonl ledger", async () => {
+  it("keeps the ledger append-only from the agent layer; panel claim writes are refused", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-claim-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await withServer(root, async (base) => {
       const res = await postJson(base, "/api/claim", { text: "真实论断文本", kind: "result", status: "uncertain" });
-      expect(res.status).toBe(200);
-      const data = await res.json() as { ok: boolean; claim: { id: string; text: string; status: string } };
-      expect(data.ok).toBe(true);
-      expect(data.claim.id).toMatch(/^claim_[a-f0-9]{16}$/);
-      expect(data.claim.status).toBe("uncertain");
+      expect(res.status).toBe(405);
+      expect(await res.text()).toContain("method not allowed");
 
-      const onDisk = await readFile(join(root, ".psyclaw", "claims.jsonl"), "utf8");
-      expect(onDisk).toContain("真实论断文本");
-
-      const map = await (await fetch(`${base}/api/literature-map`)).json() as { claims: Array<{ id: string }> };
-      expect(map.claims.some((claim) => claim.id === data.claim.id)).toBe(true);
+      // Claims appended through the real ledger writer are served read-only.
+      const { appendClaim } = await import("../../src/research/ledger.js");
+      await appendClaim(root, { id: "claim_0123456789abcdef", text: "面板展示论断", kind: "definition", evidenceIds: [], status: "supported" });
+      const map = await (await fetch(`${base}/api/literature-map`)).json() as { claims: Array<{ id: string; text: string }> };
+      expect(map.claims.some((claim) => claim.id === "claim_0123456789abcdef" && claim.text === "面板展示论断")).toBe(true);
     });
   });
 
-  it("attaches evidence with a supports link, kept partial until audited", async () => {
+  it("refuses evidence writes over HTTP; ledger projections stay read-only", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-evidence-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await withServer(root, async (base) => {
-      const claimRes = await (await postJson(base, "/api/claim", { text: "被支持的论断", kind: "result", status: "uncertain" })).json() as { claim: { id: string } };
       const res = await postJson(base, "/api/evidence", {
-        claimId: claimRes.claim.id,
+        claimId: "claim_does_not_matter",
         title: "Smith et al. (2021). A Study.",
         doi: "10.1000/sample",
         quote: "原文摘录",
       });
-      expect(res.status).toBe(200);
-      const data = await res.json() as { ok: boolean; evidence: { id: string; accessStatus: string; source: { kind: string; locator: string } }; link: { claimId: string; evidenceId: string; relation: string } };
-      expect(data.ok).toBe(true);
-      expect(data.evidence.source.kind).toBe("doi");
-      expect(data.evidence.accessStatus).toBe("partial");
-      expect(data.link.relation).toBe("supports");
-      expect(data.link.claimId).toBe(claimRes.claim.id);
+      expect(res.status).toBe(405);
+      expect(await res.text()).toContain("method not allowed");
 
-      const evidenceOnDisk = await readFile(join(root, ".psyclaw", "evidence.jsonl"), "utf8");
-      expect(evidenceOnDisk).toContain("10.1000/sample");
-      const claimsOnDisk = await readFile(join(root, ".psyclaw", "claims.jsonl"), "utf8");
-      expect(claimsOnDisk).toContain(`"claimId":"${claimRes.claim.id}"`);
-      expect(claimsOnDisk).toContain("supports");
+      // The API must not have interpreted the payload: nothing was written.
+      const evidenceOnDisk = await readFile(join(root, ".psyclaw", "evidence.jsonl"), "utf8").catch(() => "");
+      expect(evidenceOnDisk).not.toContain("10.1000/sample");
     });
   });
 

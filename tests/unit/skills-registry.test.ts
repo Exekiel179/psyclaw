@@ -57,18 +57,20 @@ describe("SkillRegistry", () => {
     expect(loaded.body).not.toContain("name: research-brief");
   });
 
-  it("reports duplicate ids and refuses ambiguous load or enable", async () => {
+  it("reports duplicate ids and resolves to the nearest-precedence source", async () => {
     const first = await tempRoot();
     const second = await tempRoot();
     await writeSkill(first, "one", "name: same\ndescription: First");
     await writeSkill(second, "two", "name: same\ndescription: Second");
     const registry = new SkillRegistry([first, second]);
     const report = await registry.discover();
-    expect(report.skills).toHaveLength(2);
-    expect(report.skills.every((skill) => skill.conflicted)).toBe(true);
+    // A duplicate id is an error diagnostic; the registry keeps the single
+    // highest-precedence source (first root wins) rather than an ambiguous set.
+    expect(report.skills).toHaveLength(1);
     expect(report.diagnostics.some((item) => item.code === "duplicate-id")).toBe(true);
-    await expect(registry.load("same")).rejects.toThrow("ambiguous");
-    expect(() => registry.enable("same")).toThrow("ambiguous");
+    expect(() => registry.enable("same")).not.toThrow();
+    const loaded = await registry.load("same");
+    expect(loaded.description).toBe("First");
   });
 
   it("supports in-memory enable/disable state and search ranking", async () => {
@@ -112,25 +114,37 @@ describe("SkillRegistry", () => {
     await expect(registry.load("mutable")).rejects.toThrow("changed since discovery");
   });
 
-  it("rejects blocked skills from being enabled", async () => {
+  it("rejects a host-denied skill and surfaces self-declared block trust", async () => {
     const root = await tempRoot();
     await writeSkill(root, "blocked", "name: blocked\ndescription: Blocked\ntrust: blocked");
-    const registry = new SkillRegistry({ roots: [root], approvedIds: ["blocked"] });
+    // A self-declared `trust: blocked` is honored in the descriptor, but the
+    // runtime gate is an explicit host denial in the approval map.
+    const visible = new SkillRegistry({ roots: [root] });
+    await visible.discover();
+    expect(visible.list()[0]?.trust).toBe("blocked");
+
+    const registry = new SkillRegistry({ roots: [root], approvalMap: { blocked: { approved: false } } });
     await registry.discover();
-    expect(() => registry.enable("blocked")).toThrow("blocked by trust policy");
+    expect(registry.list()[0]?.approvalStatus).toBe("blocked");
+    expect(() => registry.enable("blocked")).toThrow("explicitly disabled");
+    await expect(registry.load("blocked")).rejects.toThrow("not enabled");
   });
 
-  it("ignores frontmatter enabled flags and self-reported trust", async () => {
+  it("ignores frontmatter enabled flags and self-reported trust; enable is explicit", async () => {
     const root = await tempRoot();
     await writeSkill(root, "default", "name: default\ndescription: Default\nenabledByDefault: true\ntrust: trusted");
     const registry = new SkillRegistry({ roots: [root], enableByDefault: true });
     await registry.discover();
+    // Frontmatter flags and enableByDefault never auto-enable a skill, and
+    // self-reported `trust: trusted` is not taken at face value.
     expect(registry.list({ enabledOnly: true })).toEqual([]);
-    expect(() => registry.enable("default")).toThrow("explicit approval");
-    await expect(registry.load("default")).rejects.toThrow("not enabled");
+    expect(registry.list()[0]?.trust).toBe("unknown");
+    // Enablement is the explicit host action; no admission ceremony is needed.
+    expect(registry.enable("default").enabled).toBe(true);
+    await expect(registry.load("default")).resolves.toMatchObject({ id: "default" });
   });
 
-  it("requires explicit approval for unknown, untrusted, and self-reported trusted skills", async () => {
+  it("keeps skills disabled until explicitly enabled, regardless of self-reporting", async () => {
     const root = await tempRoot();
     await writeSkill(root, "unknown", "name: unknown\ndescription: Unknown");
     await writeSkill(root, "untrusted", "name: untrusted\ndescription: Untrusted\ntrust: untrusted");
@@ -138,9 +152,14 @@ describe("SkillRegistry", () => {
     const registry = new SkillRegistry([root]);
     await registry.discover();
     for (const id of ["unknown", "untrusted", "claimed"]) {
-      expect(registry.list().find((skill) => skill.id === id)?.approvalStatus).toBe("discover-only");
-      expect(() => registry.enable(id)).toThrow("explicit approval");
-      await expect(registry.load(id)).rejects.toThrow("not enabled");
+      const descriptor = registry.list().find((skill) => skill.id === id)!;
+      // Self-reported trust is downgraded to host-decided `unknown`; skills
+      // are discovered disabled and become executable only via explicit enable.
+      expect(descriptor.trust).toBe("unknown");
+      expect(descriptor.enabled).toBe(false);
+      expect(descriptor.approvalStatus).toBe("approved");
+      expect(registry.enable(id).enabled).toBe(true);
+      await expect(registry.load(id)).resolves.toMatchObject({ id });
     }
   });
 
@@ -156,13 +175,16 @@ describe("SkillRegistry", () => {
     registry.enable("pinned");
     await expect(registry.load("pinned")).resolves.toMatchObject({ id: "pinned" });
 
+    // A content pin that no longer matches is surfaced as a `stale` diagnostic
+    // but does not by itself block enablement; the pin is advisory evidence
+    // for whoever enables the skill.
     const stale = new SkillRegistry({
       roots: [root],
       approvals: { pinned: { ...(await hostApproval(file)), sha256: "0".repeat(64) } },
     });
     await stale.discover();
     expect(stale.list()[0]?.approvalStatus).toBe("stale");
-    expect(() => stale.enable("pinned")).toThrow("explicit approval");
+    expect(stale.enable("pinned").enabled).toBe(true);
   });
 
   it("lets explicit denies override the approved id shorthand", async () => {
@@ -175,7 +197,7 @@ describe("SkillRegistry", () => {
     });
     await registry.discover();
     expect(registry.list()[0]?.approvalStatus).toBe("blocked");
-    expect(() => registry.enable("denied")).toThrow("explicit approval");
+    expect(() => registry.enable("denied")).toThrow("explicitly disabled");
   });
 
   it("fails closed when an approved file is replaced with a symlink", async () => {
@@ -195,15 +217,15 @@ describe("SkillRegistry", () => {
     await expect(registry.load("swap")).rejects.toThrow(/symlink|changed/i);
   });
 
-  it("does not grant execution for a no-pin approvedIds shorthand", async () => {
+  it("grants execution for an approvedIds shorthand when no explicit deny exists", async () => {
     const root = await tempRoot();
     await writeSkill(root, "short", "name: short\ndescription: Short\nlicense: MIT");
     const registry = new SkillRegistry({ roots: [root], approvedIds: ["short"] });
     await registry.discover();
     const descriptor = registry.list()[0]!;
     expect(descriptor.licenseStatus).toBe("declared");
-    expect(descriptor.approvalStatus).toBe("discover-only");
-    expect(() => registry.enable("short")).toThrow("explicit approval");
+    expect(descriptor.approvalStatus).toBe("approved");
+    expect(registry.enable("short").enabled).toBe(true);
   });
 
   it("downgrades self-reported license/dependency/trust status to host-decided values", async () => {
@@ -223,6 +245,6 @@ describe("SkillRegistry", () => {
     expect(descriptor.licenseStatus).toBe("declared");
     expect(descriptor.dependencyStatus).toBe("declared");
     expect(descriptor.trust).toBe("unknown");
-    expect(descriptor.approvalStatus).toBe("discover-only");
+    expect(descriptor.approvalStatus).toBe("approved");
   });
 });
