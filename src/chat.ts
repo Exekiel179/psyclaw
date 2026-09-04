@@ -70,6 +70,7 @@ export interface ChatLaunchOptions {
 export async function launchChat(options: ChatLaunchOptions = {}): Promise<number> {
   const piCli = resolvePiCli();
   const root = packageRoot();
+  const networkPreloadPath = join(root, "dist", "src", "network-routing.js");
   const extensionPath = options.extensionPath ?? join(root, "dist", "src", "extension.js");
   const panelExtensionPath = join(root, "dist", "src", "panel", "extension.js");
   const skillsPath = options.skillsPath ?? join(root, "skills", "core");
@@ -122,6 +123,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     // PsyClaw application name was applied.
     PI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_SESSION_DIR: sessionDir,
+    PSYCLAW_NETWORK_PRELOAD: "1",
   };
   if (process.platform === "darwin") {
     const missing = PROVIDER_PRESETS.filter((preset) => !spawnEnv[preset.apiKeyEnv]);
@@ -141,7 +143,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   }
 
   return new Promise<number>((resolve, reject) => {
-    const child = (options.spawnProcess ?? spawn)(process.execPath, [piCli, ...args], {
+    const child = (options.spawnProcess ?? spawn)(process.execPath, ["--import", networkPreloadPath, piCli, ...args], {
       cwd,
       stdio: "inherit",
       shell: false,
