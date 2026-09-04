@@ -237,7 +237,11 @@ const MODE_PATCHES = [
     next: 'this.getStartupExpansionState(), 0, 0);',
   },
   {
-    old: `const [fdPath] = await Promise.all([
+    old: `// PsyClaw provides cross-platform Node search tools through its extension.
+        this.setupKeyHandlers();
+        this.setupEditorSubmitHandler();
+        // File completion remains optional; startup never downloads from GitHub.`,
+    next: `const [fdPath] = await Promise.all([
             ensureTool("fd", (status) => this.showManagedToolStatus(status)),
             ensureTool("rg", (status) => this.showManagedToolStatus(status)),
         ]);
@@ -245,30 +249,6 @@ const MODE_PATCHES = [
         // Enable the remaining input handlers only after managed-tool setup completes.
         this.setupKeyHandlers();
         this.setupEditorSubmitHandler();`,
-    next: `// PsyClaw provides cross-platform Node search tools through its extension.
-        this.setupKeyHandlers();
-        this.setupEditorSubmitHandler();
-        // File completion remains optional; startup never downloads from GitHub.`,
-  },
-  {
-    old: `// Input must remain usable while optional search binaries are installed.
-        this.setupKeyHandlers();
-        this.setupEditorSubmitHandler();
-        const reportToolFailure = (status) => {
-            if (status.type === "warning") this.showManagedToolStatus(status);
-        };
-        void Promise.all([
-            ensureTool("fd", reportToolFailure),
-            ensureTool("rg", reportToolFailure),
-        ]).then(([fdPath]) => {
-            this.fdPath = fdPath;
-        }).catch((error) => {
-            this.showManagedToolStatus({ type: "warning", message: \`Search tools unavailable: \${error instanceof Error ? error.message : String(error)}\` });
-        });`,
-    next: `// PsyClaw provides cross-platform Node search tools through its extension.
-        this.setupKeyHandlers();
-        this.setupEditorSubmitHandler();
-        // File completion remains optional; startup never downloads from GitHub.`,
   },
   {
     old: 'this.ui.terminal.setTitle(`${APP_TITLE} - ${sessionName} - ${cwdBasename}`);',
@@ -439,27 +419,15 @@ const MANAGED_TOOL_DOWNLOAD_GUARD = `    // PsyClaw supplies Node-based find/gre
     // present, but never fetch optional binaries from GitHub during startup.
     return undefined;`;
 
-/** Disable Pi's optional binary downloads without enabling global offline mode. */
-export function disableManagedToolDownloads(content) {
-  if (content.includes(MANAGED_TOOL_DOWNLOAD_GUARD)) {
-    return { content, applied: false };
-  }
-  const existingToolCheck = `    if (existingPath) {
-        return existingPath;
-    }`;
-  const occurrences = content.split(existingToolCheck).length - 1;
-  if (occurrences !== 1 || !content.includes("export async function ensureTool(tool, onStatus)")) {
-    throw new Error(`Expected exactly one Pi managed-tool availability check, found ${occurrences}`);
-  }
-  return {
-    content: content.replace(existingToolCheck, `${existingToolCheck}\n${MANAGED_TOOL_DOWNLOAD_GUARD}`),
-    applied: true,
-  };
+/** Repair a runtime previously modified by PsyClaw 0.27.20. Fresh Pi installs are unchanged. */
+export function restoreManagedToolDownloads(content) {
+  if (!content.includes(MANAGED_TOOL_DOWNLOAD_GUARD)) return { content, applied: false };
+  return { content: content.replace(`\n${MANAGED_TOOL_DOWNLOAD_GUARD}`, ""), applied: true };
 }
 
-async function applyManagedToolPatches(toolsManagerPath) {
+async function restoreManagedToolManager(toolsManagerPath) {
   const current = await readFile(toolsManagerPath, "utf8");
-  const result = disableManagedToolDownloads(current);
+  const result = restoreManagedToolDownloads(current);
   if (result.applied) await atomicReplace(toolsManagerPath, result.content, true);
   return result.applied;
 }
@@ -477,11 +445,11 @@ export async function rebrandPiRuntime(options = {}) {
   const applied = await applyModePatches(modePath);
   const settingsApplied = await applySettingsPatches(settingsManagerPath);
   const commandApplied = await applySlashCommandPatches(slashCommandsPath);
-  const managedToolsApplied = await applyManagedToolPatches(toolsManagerPath);
+  const managedToolsRestored = await restoreManagedToolManager(toolsManagerPath);
 
   if (!options.quiet) {
     process.stdout.write(
-      `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} · ${commandApplied.length > 0 ? `hidden ${commandApplied.length} Pi command(s)` : "Pi commands already filtered"} · ${managedToolsApplied ? "disabled managed-tool downloads" : "managed-tool downloads already disabled"} (${pkgDir})\n`,
+      `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} · ${commandApplied.length > 0 ? `hidden ${commandApplied.length} Pi command(s)` : "Pi commands already filtered"} · ${managedToolsRestored ? "restored managed-tool downloads" : "managed-tool downloads unchanged"} (${pkgDir})\n`,
     );
     if (applied.length > 0) {
       for (const label of applied) {

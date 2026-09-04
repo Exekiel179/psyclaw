@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.21 - 2026-09-04
+
+- Restore Pi's official `ripgrep` and `fd` installation rules instead of disabling managed downloads.
+- Route official GitHub downloads through configured proxies, or route both GitHub API and Release requests through one mirror when a mainland npm registry is configured.
+
 ## 0.27.20 - 2026-09-04
 
 - Stop Pi's optional `ripgrep` and `fd` GitHub downloads at the managed-tool boundary while continuing to use binaries already available on `PATH`.
