@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.20 - 2026-09-04
+
+- Stop Pi's optional `ripgrep` and `fd` GitHub downloads at the managed-tool boundary while continuing to use binaries already available on `PATH`.
+- Fall back silently to PsyClaw's built-in cross-platform Node search tools when those optional binaries are unavailable.
+
 ## 0.27.19 - 2026-09-04
 
 - Add `psyclaw --continue` and `psyclaw -c` to resume the latest session for the current project through the bundled Pi runtime.

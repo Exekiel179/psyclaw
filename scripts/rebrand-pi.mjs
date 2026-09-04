@@ -435,6 +435,35 @@ async function applySettingsPatches(settingsManagerPath) {
   return applied;
 }
 
+const MANAGED_TOOL_DOWNLOAD_GUARD = `    // PsyClaw supplies Node-based find/grep fallbacks. Keep PATH tools when
+    // present, but never fetch optional binaries from GitHub during startup.
+    return undefined;`;
+
+/** Disable Pi's optional binary downloads without enabling global offline mode. */
+export function disableManagedToolDownloads(content) {
+  if (content.includes(MANAGED_TOOL_DOWNLOAD_GUARD)) {
+    return { content, applied: false };
+  }
+  const existingToolCheck = `    if (existingPath) {
+        return existingPath;
+    }`;
+  const occurrences = content.split(existingToolCheck).length - 1;
+  if (occurrences !== 1 || !content.includes("export async function ensureTool(tool, onStatus)")) {
+    throw new Error(`Expected exactly one Pi managed-tool availability check, found ${occurrences}`);
+  }
+  return {
+    content: content.replace(existingToolCheck, `${existingToolCheck}\n${MANAGED_TOOL_DOWNLOAD_GUARD}`),
+    applied: true,
+  };
+}
+
+async function applyManagedToolPatches(toolsManagerPath) {
+  const current = await readFile(toolsManagerPath, "utf8");
+  const result = disableManagedToolDownloads(current);
+  if (result.applied) await atomicReplace(toolsManagerPath, result.content, true);
+  return result.applied;
+}
+
 export async function rebrandPiRuntime(options = {}) {
   const entry = import.meta.resolve("@earendil-works/pi-coding-agent");
   const pkgDir = dirname(dirname(fileURLToPath(entry)));
@@ -442,15 +471,17 @@ export async function rebrandPiRuntime(options = {}) {
   const modePath = join(pkgDir, "dist", "modes", "interactive", "interactive-mode.js");
   const settingsManagerPath = join(pkgDir, "dist", "core", "settings-manager.js");
   const slashCommandsPath = join(pkgDir, "dist", "core", "slash-commands.js");
+  const toolsManagerPath = join(pkgDir, "dist", "utils", "tools-manager.js");
 
   const pkgResult = await patchPackageJson(pkgPath);
   const applied = await applyModePatches(modePath);
   const settingsApplied = await applySettingsPatches(settingsManagerPath);
   const commandApplied = await applySlashCommandPatches(slashCommandsPath);
+  const managedToolsApplied = await applyManagedToolPatches(toolsManagerPath);
 
   if (!options.quiet) {
     process.stdout.write(
-      `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} · ${commandApplied.length > 0 ? `hidden ${commandApplied.length} Pi command(s)` : "Pi commands already filtered"} (${pkgDir})\n`,
+      `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} · ${commandApplied.length > 0 ? `hidden ${commandApplied.length} Pi command(s)` : "Pi commands already filtered"} · ${managedToolsApplied ? "disabled managed-tool downloads" : "managed-tool downloads already disabled"} (${pkgDir})\n`,
     );
     if (applied.length > 0) {
       for (const label of applied) {
