@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.22 - 2026-09-04
+
+- Keep proxy users on GitHub's official API and Release URLs while routing mainland-registry users exclusively through mainland GitHub mirrors.
+- Retry managed `ripgrep` and `fd` downloads through a second mainland mirror when the primary mirror fails or returns an HTML error page.
+- Preserve Pi's native platform selection, version discovery, extraction, and installation behavior.
+
 ## 0.27.21 - 2026-09-04
 
 - Restore Pi's official `ripgrep` and `fd` installation rules instead of disabling managed downloads.
