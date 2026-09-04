@@ -36,7 +36,8 @@ describe("offline research brief", () => {
     expect(result.briefPath).toBeUndefined();
     expect(await readFile(result.manifestPath, "utf8")).toContain("psyclaw/brief-manifest/v1");
     expect(await readFile(result.verdictPath, "utf8")).toContain("psyclaw/verdict/v1");
-    expect(await readFile(join(root, "notes", "HANDOFF.md"), "utf8")).toContain("resolve blocked");
+    expect(await readFile(join(root, "notes", "HANDOFF.md"), "utf8")).toContain("## Blocked");
+    expect(await readFile(join(root, "notes", "HANDOFF.md"), "utf8")).toContain("retrieve missing evidence, narrow unsupported statements, and rerun the checks");
   });
 
   it("writes a brief only after a supported non-result claim passes", async () => {

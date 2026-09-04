@@ -746,7 +746,7 @@ async function openPluginManager(ctx: ExtensionCommandContext, rows: PluginManag
       footer: "↑/↓ 移动 · Enter 安装或重新安装 · Esc 关闭",
       enterAction: "install",
       toggleEnabled: false,
-      enabledText: "已由 Pi 原生 Plugin 管理器安装；Enter 可重新安装",
+      enabledText: "已安装；Enter 可重新安装",
       missingMessage: "按 Enter 选择项目目录或系统目录并安装。",
     })
   ));
@@ -759,8 +759,8 @@ async function installRecommendedPlugin(ctx: ExtensionCommandContext, row: Plugi
   if (!location) return;
   const local = location.startsWith("项目目录");
   const approved = await ctx.ui.confirm(
-    "使用 Pi 原生管理器安装 Plugin？",
-    `${row.name}\n来源：${row.sourceRef}\n安装位置：${location}\n安装完成后需要执行 /reload。`,
+    `安装 Plugin “${row.name}”？`,
+    `来源：${row.sourceRef}\n安装位置：${location}\n安装完成后需要执行 /reload。`,
   );
   if (!approved) return;
   await nativePluginManager(ctx).installAndPersist(row.sourceRef, { local });
@@ -1523,7 +1523,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           const mcpLines = mcps.items.slice(0, 8).map((item) => `MCP: ${String(item.id)} — ${String(item.name)}`);
           const pluginLines = skills.plugins.slice(0, 8).map((item) => `Plugin: ${String(item.id)} — ${String(item.name)}`);
           const toolLines = skills.externalTools.slice(0, 8).map((item) => `外部工具: ${String(item.id)} — ${String(item.name)}`);
-          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...pluginLines, ...mcpLines, "", ...toolLines, "", "安装：/install skill|mcp|external <id>", "Plugin：/plugin 或 /plugin install <id>", "管理：/skill、/plugin 或 /mcp", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
+          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...pluginLines, ...mcpLines, "", ...toolLines, "", "告诉我需要安装的推荐项，我会自动完成安装与配置；有影响同权限的变更时才暂停确认。也可以打开 /panel 选择推荐项。"].join("\n"), "info");
           return;
         }
         if (kind !== "skill" && kind !== "mcp" && kind !== "external") throw new Error("Usage: /install skill|mcp|external <id>");

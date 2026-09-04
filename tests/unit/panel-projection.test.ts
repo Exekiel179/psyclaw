@@ -39,7 +39,7 @@ describe("panel projection", () => {
     expect(snapshot.goal).toContain("[REDACTED:credential-assignment]");
   });
 
-  it("marks a blocked run and lists discovered runs", async () => {
+  it("marks a blocked run via gates/nextStep and lists discovered runs", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-projection-blocked-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "survey-observational" });
     await appendClaim(root, { id: "c-1", text: "No evidence", kind: "definition", evidenceIds: [], status: "supported" });
@@ -50,7 +50,12 @@ describe("panel projection", () => {
     const snapshot = await projectRunSnapshot(root, "run-blocked");
     expect(snapshot.phase).toBe("blocked");
     expect(snapshot.blocked).toBe(true);
-    expect(snapshot.waitingOnHuman.length).toBeGreaterThan(0);
+    // A blocked run is not an `awaiting-human` research decision: the failed
+    // gate is reported through `gates`, and the system-side recovery step is
+    // the concrete next action.
+    expect(snapshot.waitingOnHuman).toEqual([]);
+    expect(snapshot.gates.some((gate) => !gate.ok)).toBe(true);
+    expect(snapshot.nextStep).toContain("补充材料或修正流程");
 
     const runs = await listRuns(root);
     expect(runs.map((item) => item.runId)).toEqual(["run-blocked"]);
@@ -67,7 +72,7 @@ describe("panel projection", () => {
     expect(snapshot.blocked).toBe(false);
   });
 
-  it("reports a corrupt event log as unknown with a stable diagnostic", async () => {
+  it("reports a corrupt event log as unknown with a stable diagnostic next step", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-projection-corrupt-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "survey-observational" });
     const { mkdir } = await import("node:fs/promises");
@@ -76,7 +81,8 @@ describe("panel projection", () => {
 
     const snapshot = await projectRunSnapshot(root, "run-corrupt");
     expect(snapshot.phase).toBe("unknown");
-    expect(snapshot.waitingOnHuman).toContain("run event log is corrupt or unavailable");
+    expect(snapshot.waitingOnHuman).toEqual([]);
+    expect(snapshot.nextStep).toContain("运行事件或检查点不可用");
   });
 
   it("reports a corrupt checkpoint as unknown instead of trusting a terminal event", async () => {
@@ -89,7 +95,8 @@ describe("panel projection", () => {
 
     const snapshot = await projectRunSnapshot(root, "run-checkpoint-corrupt");
     expect(snapshot.phase).toBe("unknown");
-    expect(snapshot.waitingOnHuman).toContain("run checkpoint is corrupt or unavailable");
+    expect(snapshot.waitingOnHuman).toEqual([]);
+    expect(snapshot.nextStep).toContain("运行事件或检查点不可用");
   });
 
   it("rejects a symlinked run event log instead of reading outside the project", async () => {
@@ -103,6 +110,7 @@ describe("panel projection", () => {
 
     const snapshot = await projectRunSnapshot(root, "run-symlink");
     expect(snapshot.phase).toBe("unknown");
-    expect(snapshot.waitingOnHuman).toContain("run event log is corrupt or unavailable");
+    expect(snapshot.waitingOnHuman).toEqual([]);
+    expect(snapshot.nextStep).toContain("运行事件或检查点不可用");
   });
 });

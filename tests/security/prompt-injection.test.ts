@@ -47,8 +47,11 @@ describe("prompt injection is data, never policy", () => {
     const registry = new SkillRegistry({ roots: [root] });
     await registry.discover();
     const descriptor = registry.list()[0]!;
-    expect(descriptor.approvalStatus).toBe("discover-only");
+    // A skill cannot turn itself on through its own description: discovery
+    // never auto-enables, and self-reported trust stays downgraded.
     expect(descriptor.enabled).toBe(false);
-    expect(() => registry.enable("evil")).toThrow(/explicit approval/);
+    expect(descriptor.trust).toBe("unknown");
+    expect(registry.list({ enabledOnly: true })).toEqual([]);
+    await expect(registry.load("evil")).rejects.toThrow(/not enabled/);
   });
 });

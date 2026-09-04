@@ -189,7 +189,7 @@ describe("updateBundledPi", () => {
     expect(receipt.after).toBe("0.84.2");
     expect(steps).toHaveLength(1);
     expect(steps[0]!.cwd).toBe(root);
-    expect(steps[0]!.command).toBe(`pnpm add --save-exact ${PI_AI}@0.84.2 ${PI_CODING_AGENT}@0.84.2`);
+    expect(steps[0]!.command).toBe(`pnpm add --save-exact ${PI_AI}@0.84.2 ${PI_CODING_AGENT}@0.84.2 --registry=https://registry.npmjs.org/`);
   });
 
   it("reports already-up-to-date without executing", async () => {
@@ -220,7 +220,7 @@ describe("updateBundledPi", () => {
     expect(receipt.after).toBe("0.84.2");
   });
 
-  it("falls back to npm for a globally installed package without a lockfile", async () => {
+  it("repairs the whole product via npm when the package has no lockfile", async () => {
     const root = await makeRoot(false);
     const steps: { command: string; cwd: string }[] = [];
     const receipt = await updateBundledPi({
@@ -231,10 +231,13 @@ describe("updateBundledPi", () => {
         return { exitCode: 0 };
       },
     });
+    // npm-installed packages omit lockfiles; re-pinning the runtime in place
+    // would pair old PsyClaw code with a new runtime, so the repair reinstalls
+    // the published product (outside the directory npm is replacing).
     expect(receipt.ok).toBe(true);
-    expect(steps[0]!.command).toBe(
-      `npm install --save-exact --omit=dev --legacy-peer-deps ${PI_AI}@0.84.2 ${PI_CODING_AGENT}@0.84.2`,
-    );
+    expect(steps).toHaveLength(1);
+    expect(steps[0]!.command).toBe("npm install --global psyclaw@latest");
+    expect(steps[0]!.cwd).toBe(join(root, ".."));
   });
 
   it("fails closed when the executor reports a non-zero exit", async () => {
@@ -306,7 +309,7 @@ describe("updatePsyClaw", () => {
       runtime: { before: "0.84.1", after: "0.84.4" },
     });
     expect(steps.map((step) => step.command)).toEqual([
-      "npm install --global psyclaw@0.26.3",
+      "npm install --global psyclaw@0.26.3 --registry=https://registry.npmjs.org/",
     ]);
     expect(steps.every((step) => step.cwd === join(root, ".."))).toBe(true);
   });
@@ -329,7 +332,7 @@ describe("updatePsyClaw", () => {
     }), "utf8");
     const receipt = await updatePsyClaw({ registry, packageRoot: root });
     expect(receipt.reason).toBe("check only: no changes applied");
-    expect(receipt.commands).toEqual(["npm install --global psyclaw@0.26.3"]);
+    expect(receipt.commands).toEqual(["npm install --global psyclaw@0.26.3 --registry=https://registry.npmjs.org/"]);
   });
 
   it("refuses to overwrite a source checkout", async () => {

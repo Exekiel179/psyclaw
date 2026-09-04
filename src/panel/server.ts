@@ -1036,7 +1036,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           if (!source) throw new Error("Plugin source is missing");
           await options.installPlugin(source, scope);
           response.writeHead(202, { "content-type": "application/json" });
-          response.end(JSON.stringify({ schemaVersion: "psyclaw/plugin-install-receipt/v1", ok: true, id, source, scope, reloadHint: "/reload", message: "Plugin 已由 Pi 原生安装器处理；请执行 /reload。" }));
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/plugin-install-receipt/v1", ok: true, id, source, scope, reloadHint: "/reload", message: "Plugin 安装完成，请执行 /reload。" }));
           return;
         }
         if (kind === "external") {
