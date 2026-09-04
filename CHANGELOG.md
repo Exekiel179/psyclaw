@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.27.23 - 2026-09-04
+
+- Align panel manuscript/document management with the read-only workbench contract: write routes answer 405 and the panel never mutates project files.
+- Harden the /panel workbench launcher: surface real startup failures and fall back to a manual URL when the browser cannot be opened automatically.
+- Replace user-facing instructions to install via Pi internals with system-managed install wording in recommendation, plugin and panel flows.
+- Gate /run behind /init: compliant analysis documents alone no longer auto-bootstrap a controlled project.
+- Route /install recommendation surface to system-managed installation and drop the removed /export command from the registered command set.
 ## 0.27.22 - 2026-09-04
 
 - Keep proxy users on GitHub's official API and Release URLs while routing mainland-registry users exclusively through mainland GitHub mirrors.

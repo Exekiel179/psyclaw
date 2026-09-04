@@ -2,7 +2,7 @@
 
 PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、可恢复工作流和本地面板接到内置运行时上；只有无法由证据和通行方法消解、且会实质改变研究设计或解释的分歧才交由研究者取舍。它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.22`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.27.23`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -19,19 +19,19 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.22
+npm install -g psyclaw@0.27.23
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.27.22 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.27.23 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.22 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.23 --registry=https://registry.npmmirror.com
 ```
 
 PsyClaw 启动时会确保 `ripgrep` 和 `fd` 可用。检测到 `HTTP_PROXY`、`HTTPS_PROXY` 或 `ALL_PROXY` 时，通过代理访问 GitHub 官方 API 与 Release；检测到国内 npm registry 时，版本查询和压缩包统一通过国内 GitHub 镜像，并在镜像网络失败或返回错误页面时自动切换备用镜像。可用 `PSYCLAW_GITHUB_MIRROR=https://your-mirror.example/` 指定自建 HTTPS 镜像。
