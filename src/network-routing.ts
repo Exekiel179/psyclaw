@@ -4,14 +4,14 @@ import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-const DEFAULT_CN_GITHUB_MIRROR = "https://gh-proxy.com/";
+const DEFAULT_CN_GITHUB_MIRRORS = ["https://gh-proxy.com/", "https://gh-proxy.org/"] as const;
 const PROXY_NAMES = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"] as const;
 const CN_REGISTRY_MARKERS = ["npmmirror.com", "registry.npm.taobao.org", "mirrors.cloud.tencent.com", "mirrors.aliyun.com"];
 
 export type NetworkRoute =
   | { mode: "official" }
   | { mode: "proxy" }
-  | { mode: "mirror"; mirror: string };
+  | { mode: "mirror"; mirrors: string[] };
 
 function firstValue(env: NodeJS.ProcessEnv, names: readonly string[]): string | undefined {
   for (const name of names) {
@@ -35,9 +35,9 @@ export function selectNetworkRoute(env: NodeJS.ProcessEnv, registry?: string): N
   if (firstValue(env, PROXY_NAMES)) return { mode: "proxy" };
   const explicitMirror = env.PSYCLAW_GITHUB_MIRROR?.trim();
   const effectiveRegistry = env.PSYCLAW_REGISTRY?.trim() || env.npm_config_registry?.trim() || registry?.trim();
-  if (explicitMirror) return { mode: "mirror", mirror: normalizeMirror(explicitMirror) };
+  if (explicitMirror) return { mode: "mirror", mirrors: [normalizeMirror(explicitMirror)] };
   if (effectiveRegistry && CN_REGISTRY_MARKERS.some((marker) => effectiveRegistry.toLocaleLowerCase().includes(marker))) {
-    return { mode: "mirror", mirror: DEFAULT_CN_GITHUB_MIRROR };
+    return { mode: "mirror", mirrors: [...DEFAULT_CN_GITHUB_MIRRORS] };
   }
   return { mode: "official" };
 }
@@ -84,6 +84,42 @@ function mirrorUrl(mirror: string, input: string | URL | Request): string | URL 
   return input instanceof Request ? new Request(routed, input) : routed;
 }
 
+function githubUrl(input: string | URL | Request): string | undefined {
+  const raw = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+  return raw.startsWith("https://api.github.com/") || raw.startsWith("https://github.com/") ? raw : undefined;
+}
+
+function validMirrorResponse(sourceUrl: string, response: Response): boolean {
+  if (!response.ok) return false;
+  const contentType = response.headers.get("content-type")?.toLocaleLowerCase() ?? "";
+  if (sourceUrl.startsWith("https://api.github.com/")) return contentType.includes("json");
+  return !contentType.includes("text/html");
+}
+
+/** Route only GitHub management requests; Pi remains responsible for tool selection, extraction, and installation. */
+export function createRoutedFetch(route: NetworkRoute, fetchImpl: typeof fetch = globalThis.fetch): typeof fetch {
+  if (route.mode !== "mirror") return fetchImpl;
+  return (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const sourceUrl = githubUrl(input);
+    if (sourceUrl === undefined) return fetchImpl(input, init);
+
+    let lastResponse: Response | undefined;
+    let lastError: unknown;
+    for (const mirror of route.mirrors) {
+      try {
+        const response = await fetchImpl(mirrorUrl(mirror, input), init);
+        if (validMirrorResponse(sourceUrl, response)) return response;
+        lastResponse = response;
+        await response.body?.cancel().catch(() => undefined);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastResponse !== undefined) return lastResponse;
+    throw lastError ?? new TypeError("All configured GitHub mirrors failed");
+  }) as typeof fetch;
+}
+
 async function ensureRequiredSearchTools(): Promise<void> {
   const piEntry = import.meta.resolve("@earendil-works/pi-coding-agent");
   const managerUrl = new URL("./utils/tools-manager.js", piEntry);
@@ -123,8 +159,7 @@ export async function configureRuntimeNetwork(): Promise<NetworkRoute> {
       ...(noProxy === undefined ? {} : { noProxy }),
     }));
   } else if (route.mode === "mirror") {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (input, init) => originalFetch(mirrorUrl(route.mirror, input), init);
+    globalThis.fetch = createRoutedFetch(route, globalThis.fetch);
   }
   return route;
 }
