@@ -402,7 +402,7 @@ export async function validateInstalledRecommendedSkill(root: string, requestedI
   const id = normalizedId(requestedId);
   const target = join(importsRoot(root), plan.skillName!);
   const stat = await lstat(target).catch(() => undefined);
-  if (!stat?.isDirectory() || stat.isSymbolicLink()) throw new Error(`Recommended Skill is not installed: ${id}; run /install skill ${id}`);
+  if (!stat?.isDirectory() || stat.isSymbolicLink()) throw new Error(`Recommended Skill is not installed: ${id}; run /skill install ${id}`);
   const manifest = await readInstallManifest(join(target, INSTALL_MANIFEST));
   if (manifest.id !== id || manifest.skillName !== plan.skillName ||
       (plan.ref !== undefined && manifest.source.ref !== plan.ref) ||

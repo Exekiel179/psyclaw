@@ -79,6 +79,8 @@ psyclaw brief
 | 生成离线简报 | `psyclaw brief` |
 | 写研究移交记录 | `psyclaw handoff` |
 | 扫描本机其他 Agent | `psyclaw agents` |
+| 管理人设提示词 | 对话中 `/agents set`、`/agents use`、`/agents list`、`/agents clear` |
+| 启用开发者命令 | `psyclaw --developer` 或 `psyclaw -D`（显示 `/verify`、`/model`、`/agents run`） |
 | 查看 PsyClaw 和内置运行时更新 | `psyclaw check-updates` |
 | 更新 PsyClaw 和内置运行时 | `psyclaw update` |
 | 导出会话 | 使用 Pi 内置的 `/export` |

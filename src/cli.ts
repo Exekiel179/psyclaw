@@ -26,7 +26,7 @@ import { appendJsonlIfMissing } from "./project/jsonl.js";
 import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, c } from "./style/cli-ui.js";
-import { continueSessionArgs } from "./cli-args.js";
+import { continueSessionArgs, enableDeveloperCommands, extractDeveloperFlag } from "./cli-args.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -155,7 +155,9 @@ async function ensureConfiguredThenChat(args: string[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const parsed = extractDeveloperFlag(process.argv.slice(2));
+  if (parsed.developer) enableDeveloperCommands();
+  const args = parsed.rest;
   const command = args.shift();
   const root = process.cwd();
   if (command === "--help" || command === "-h") {

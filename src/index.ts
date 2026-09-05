@@ -1,6 +1,7 @@
 export * from "./agents/catalog.js";
 export * from "./agents/discover.js";
 export * from "./agents/import.js";
+export * from "./agents/personas.js";
 export * from "./branding.js";
 export * from "./psyclaw-theme.js";
 export * from "./chat.js";

@@ -15,7 +15,7 @@ describe("Pi extension contract", () => {
       },
     } as any;
     extension(api);
-    expect([...commands.keys()]).toEqual(["init", "verify", "brief", "export", "model", "agents"]);
+    expect([...commands.keys()]).toEqual(["init", "verify", "brief", "model", "agents"]);
   });
 
   it("lets the init command bootstrap through the Pi context cwd", async () => {
@@ -152,7 +152,7 @@ describe("Pi extension contract", () => {
     expect(notifications[0]).toContain("[off]");
   });
 
-  it("fails closed before creating an agent run for an uninitialized project", async () => {
+  it("manages agent personas and gates /agents run behind developer mode", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-agents-"));
     let agentsHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     const api = {
@@ -162,16 +162,37 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     const notifications: string[] = [];
-    await agentsHandler?.("inspect the local project", {
+    const ctx = {
       cwd: root,
       hasUI: true,
       ui: {
         confirm: async () => { throw new Error("confirmation should not be requested"); },
         notify: (message: string) => notifications.push(message),
       },
-    });
-    expect(notifications[0]).toContain("请先使用 /init 初始化研究项目");
-    expect(existsSync(join(root, ".psyclaw"))).toBe(false);
+    };
+
+    await agentsHandler?.("", ctx);
+    expect(notifications.at(-1)).toMatch(/无人设|Usage|用法/);
+
+    await agentsHandler?.("set reviewer 你是严格的方法学审稿人，不编造证据。", ctx);
+    expect(notifications.at(-1)).toContain("reviewer");
+
+    await agentsHandler?.("use reviewer", ctx);
+    expect(notifications.at(-1)).toContain("reviewer");
+
+    await agentsHandler?.("run inspect the local project", ctx);
+    expect(notifications.at(-1)).toMatch(/开发者模式|--developer/);
+
+    const previous = process.env.PSYCLAW_DEVELOPER_COMMANDS;
+    process.env.PSYCLAW_DEVELOPER_COMMANDS = "1";
+    try {
+      await agentsHandler?.("run inspect the local project", ctx);
+      expect(notifications.at(-1)).toMatch(/\/init/);
+      expect(existsSync(join(root, ".psyclaw", "plans"))).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.PSYCLAW_DEVELOPER_COMMANDS;
+      else process.env.PSYCLAW_DEVELOPER_COMMANDS = previous;
+    }
   });
 
   it("activates /run from compliant analysis documents without /init", async () => {

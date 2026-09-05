@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.27.25 - 2026-09-05
+
+- Remove the redundant `/install` slash command; use `/skill`, `/plugin`, and `/mcp` instead.
+- Repurpose `/agents` for simple agent persona prompt management (`list|show|set|use|clear|delete`).
+- Hide developer extras (`/verify`, `/model`, `/agents run`) unless launched with `psyclaw --developer` / `-D`.
+- Keep Pi's built-in `/export` in CLI help without reimplementing session export.
+
+
+
 ## 0.27.24 - 2026-09-05
 
 - Route recommended Skill / default ecosystem filler installs through the same mainland GitHub mirror path used for managed tool downloads when a mainland npm registry or `PSYCLAW_GITHUB_MIRROR` is configured.

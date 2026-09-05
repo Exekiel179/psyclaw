@@ -7,7 +7,7 @@ import { runPlanWithPi } from "../../orchestration/pi-executor.js";
 import { atomicWriteFile } from "../../project/jsonl.js";
 import { RunEventLog } from "../../panel/events.js";
 import { readProject } from "../../research/ledger.js";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { PROVIDER_PRESETS, providerCredentialSource, saveProviderConfig } from "../../setup.js";
 import { dirname } from "node:path";
@@ -55,6 +55,16 @@ import {
   formatEcosystemFillerStatus,
 } from "../../workflows/ecosystem-fillers.js";
 import { ensureDefaultEcosystemFillers } from "../../workflows/ensure-default-fillers.js";
+import {
+  activeAgentPersonaPatch,
+  clearActiveAgentPersona,
+  deleteAgentPersona,
+  formatAgentPersonaStatus,
+  getAgentPersona,
+  listAgentPersonas,
+  setAgentPersona,
+  useAgentPersona,
+} from "../../agents/personas.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -550,7 +560,7 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
       // A managed target that exists on disk but fails validation (e.g. a URL
       // install whose manifest/hash does not match the pinned catalog) is still
       // shown as installed so the user sees it; enabling it only takes effect
-      // once the install is repaired through /install.
+      // once the install is repaired through /skill install.
       let onDisk = false;
       try {
         const target = recommendedSkillTarget(root, id, scope);
@@ -834,7 +844,7 @@ function modelExternalToolInstallTask(root: string, item: Record<string, unknown
     `官方来源：${String(item.sourceRef ?? "未提供；请停止并告知用户")}`,
     `当前工作目录：${root}`,
     String(item.installHint ?? "读取官方最新安装说明，选择适合当前操作系统的安装方式。"),
-    "用户已通过 /install 明确请求安装。直接读取官方说明、执行安装并验证版本或最小命令，不要再次请求安装许可。不要读取或输出凭据。",
+    "用户已通过 /mcp install 明确请求安装。直接读取官方说明、执行安装并验证版本或最小命令，不要再次请求安装许可。不要读取或输出凭据。",
     "这是外部工具，不要将它宣称为来源仓库提供的 Skill 或 Pi Plugin。完成后报告实际安装位置、版本和验证结果；只有需要凭据、商业许可证或管理员提权时再请用户处理。",
   ].join("\n");
 }
@@ -1221,7 +1231,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           lines.push(`本次新安装：${result.installed.join(", ")}`);
         }
         if (result.failed.length > 0) {
-          lines.push(`安装失败（可稍后 /install skill <id>）：${result.failed.map((item) => item.id).join(", ")}`);
+          lines.push(`安装失败（可稍后 /skill install <id>）：${result.failed.map((item) => item.id).join(", ")}`);
         }
         ctx.ui.notify(lines.join("\n"), result.failed.length > 0 ? "warning" : "info");
       }
@@ -1229,13 +1239,15 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       /* ignore — defaults must never block chat */
     }
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", async (event) => {
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", async (event, ctx) => {
     const optionSkills = (event as { systemPromptOptions?: { skills?: ReadonlyArray<{ name?: string }> } })
       .systemPromptOptions?.skills;
-    const patch = ecosystemFillerPatch({
+    const fillerPatch = ecosystemFillerPatch({
       skills: optionSkills,
       systemPrompt: typeof event.systemPrompt === "string" ? event.systemPrompt : undefined,
     });
+    const personaPatch = await activeAgentPersonaPatch(ctx.cwd).catch(() => undefined);
+    const patch = personaPatch ? `${fillerPatch}\n\n${personaPatch}` : fillerPatch;
     if (!event.systemPrompt || typeof event.systemPrompt !== "string") {
       return { systemPrompt: patch };
     }
@@ -1567,40 +1579,6 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     description: "打开 MCP 安装与配置管理页",
     handler: async (args, ctx) => {
       try { await showMcpManager(pi, args, ctx, runtimeMcps); } catch (error) { await notifyError(ctx, error); }
-    },
-  });
-
-  if (!legacyTestApi) pi.registerCommand("install", {
-    description: "查看推荐 Skill/MCP，或交给当前模型安装",
-    handler: async (args, ctx) => {
-      try {
-        const [kind, id] = args.trim().split(/\s+/, 2);
-        if (!kind) {
-          const [skills, mcps] = await Promise.all([recommendedItems("skills"), recommendedItems("mcp")]);
-          const skillLines = skills.items.slice(0, 8).map((item) => `Skill: ${String(item.id)} — ${String(item.name)}`);
-          const mcpLines = mcps.items.slice(0, 8).map((item) => `MCP: ${String(item.id)} — ${String(item.name)}`);
-          const pluginLines = skills.plugins.slice(0, 8).map((item) => `Plugin: ${String(item.id)} — ${String(item.name)}`);
-          const toolLines = skills.externalTools.slice(0, 8).map((item) => `外部工具: ${String(item.id)} — ${String(item.name)}`);
-          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...pluginLines, ...mcpLines, "", ...toolLines, "", "安装：/install skill|mcp|external <id>", "Plugin：/plugin 或 /plugin install <id>", "管理：/skill、/plugin 或 /mcp", "也可以打开 /panel 查看推荐页面"].join("\n"), "info");
-          return;
-        }
-        if (kind !== "skill" && kind !== "mcp" && kind !== "external") throw new Error("Usage: /install skill|mcp|external <id>");
-        if (!id) {
-          if (kind === "skill") await showSkillManager(pi, "", ctx);
-          else if (kind === "mcp") await showMcpManager(pi, "", ctx, runtimeMcps);
-          else ctx.ui.notify("Usage: /install external <id>", "info");
-          return;
-        }
-        if (kind === "skill") await showSkillManager(pi, `install ${id}`, ctx);
-        else if (kind === "mcp") await showMcpManager(pi, `install ${id}`, ctx, runtimeMcps);
-        else {
-          const skills = await recommendedItems("skills");
-          const item = skills.externalTools.find((candidate) => candidate.id === id && candidate.installable !== false);
-          if (!item) throw new Error(`未找到可安装的推荐外部工具: ${id}`);
-          pi.sendUserMessage(modelExternalToolInstallTask(ctx.cwd, item), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          ctx.ui.notify(`已将 ${String(item.name ?? id)} 的安装任务交给当前模型；完成后会报告版本与验证结果。`, "info");
-        }
-      } catch (error) { await notifyError(ctx, error); }
     },
   });
 
@@ -2110,64 +2088,127 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
-  // Read-only multi-agent research is a user-facing capability.  Keep the
-  // destructive/developer commands gated, but do not hide the bounded agent
-  // runner behind PSYCLAW_DEVELOPER_COMMANDS in published builds.
-  if (!legacyTestApi) pi.registerCommand("agents", {
-    description: "运行经批准的只读研究 Agent",
+  // User-facing agent persona prompt management. Developer mode adds `/agents run`.
+  pi.registerCommand("agents", {
+    description: "管理 Agent 人设提示词；开发者模式可用 run 启动只读研究子任务",
     handler: async (args, ctx) => {
-      const objective = args.trim();
-      if (!objective) {
-        ctx.ui.notify("Usage: /agents <bounded read-only research task>", "info");
-        return;
-      }
-      if (objective.length > 4_000) {
-        ctx.ui.notify("Agent task is too long; split it into smaller bounded tasks", "error");
-        return;
-      }
-      // Do not let the runner create a partial `.psyclaw/runs` tree outside
-      // an explicitly activated `/init` -> `/run` research workflow.
       try {
-        await readProject(ctx.cwd);
-      } catch {
-        ctx.ui.notify("请先使用 /init 初始化研究项目，再运行 /agents", "warning");
-        return;
-      }
-      if (activeAgentRuns.has(ctx.cwd)) {
-        ctx.ui.notify("A psyclaw agent run is already active for this project", "warning");
-        return;
-      }
-      activeAgentRuns.add(ctx.cwd);
-      try {
-        const runId = `pi_agent_${Date.now()}`;
-        const plan = researchTaskPlan(runId, objective);
-        await mkdir(join(ctx.cwd, ".psyclaw", "plans"), { recursive: true });
-        await atomicWriteFile(join(ctx.cwd, ".psyclaw", "plans", `${runId}.json`), `${JSON.stringify(plan, null, 2)}\n`);
-        const eventLog = new RunEventLog(ctx.cwd, runId);
-        const result = await runPlanWithPi(plan, {
-          cwd: ctx.cwd,
-          agentDir: join(ctx.cwd, ".psyclaw", "pi-agent"),
-          ...(ctx.model?.provider === undefined ? {} : { provider: ctx.model.provider }),
-          ...(ctx.model?.id === undefined ? {} : { model: ctx.model.id }),
-          env: providerEnvironment(ctx.model?.provider),
-          root: ctx.cwd,
-          pauseRequested: async () => {
-            try { await import("node:fs/promises").then(({ access }) => access(join(ctx.cwd, ".psyclaw", "runs", `${runId}.pause`))); return true; }
-            catch { return false; }
-          },
-          onEvent: async (event) => { await eventLog.append(event); },
-        });
-        pi.appendEntry("psyclaw:agent-run", {
-          runId,
-          status: result.status,
-          diagnostics: result.diagnostics,
-          recordedAt: new Date().toISOString(),
-        });
-        ctx.ui.notify(`Agent run ${result.status}: ${result.diagnostics.join("; ") || "verified"}`, result.status === "completed" ? "info" : "warning");
+        const trimmed = args.trim();
+        const [verb, ...rest] = trimmed.split(/\s+/).filter(Boolean);
+        const developerMode = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
+
+        if (!verb || verb === "list" || verb === "status") {
+          ctx.ui.notify(formatAgentPersonaStatus(await listAgentPersonas(ctx.cwd), { developer: developerMode }), "info");
+          return;
+        }
+        if (verb === "show") {
+          const name = rest[0];
+          if (!name) throw new Error("Usage: /agents show <name>");
+          const persona = await getAgentPersona(ctx.cwd, name);
+          if (!persona) throw new Error(`未找到人设：${name}`);
+          ctx.ui.notify([`人设：${persona.name}`, `更新：${persona.updatedAt}`, "", persona.prompt].join("\n"), "info");
+          return;
+        }
+        if (verb === "set") {
+          if (rest.length === 0) throw new Error("Usage: /agents set <name> <prompt> | /agents set <name> --file <path>");
+          const name = rest[0]!;
+          if (rest[1] === "--file") {
+            const file = rest.slice(2).join(" ").trim();
+            if (!file) throw new Error("Usage: /agents set <name> --file <path>");
+            const prompt = await readFile(resolve(ctx.cwd, file), "utf8");
+            const persona = await setAgentPersona(ctx.cwd, name, prompt);
+            ctx.ui.notify(`已保存人设 ${persona.name}（来自文件）`, "info");
+            return;
+          }
+          const prompt = rest.slice(1).join(" ").trim();
+          if (!prompt) throw new Error("Usage: /agents set <name> <prompt>");
+          const persona = await setAgentPersona(ctx.cwd, name, prompt);
+          ctx.ui.notify(`已保存人设 ${persona.name}`, "info");
+          return;
+        }
+        if (verb === "use") {
+          const name = rest[0];
+          if (!name) throw new Error("Usage: /agents use <name>");
+          const persona = await useAgentPersona(ctx.cwd, name);
+          ctx.ui.notify(`已启用人设 ${persona.name}`, "info");
+          return;
+        }
+        if (verb === "clear") {
+          await clearActiveAgentPersona(ctx.cwd);
+          ctx.ui.notify("已清除当前人设", "info");
+          return;
+        }
+        if (verb === "delete" || verb === "remove") {
+          const name = rest[0];
+          if (!name) throw new Error("Usage: /agents delete <name>");
+          await deleteAgentPersona(ctx.cwd, name);
+          ctx.ui.notify(`已删除人设 ${name}`, "info");
+          return;
+        }
+        if (verb === "run") {
+          if (!developerMode) {
+            ctx.ui.notify("只读研究 Agent 运行器仅在开发者模式可用。请用 `psyclaw --developer` 启动。普通人设请用 /agents set|use。", "warning");
+            return;
+          }
+          const objective = rest.join(" ").trim();
+          if (!objective) {
+            ctx.ui.notify("Usage: /agents run <bounded read-only research task>", "info");
+            return;
+          }
+          if (objective.length > 4_000) {
+            ctx.ui.notify("Agent task is too long; split it into smaller bounded tasks", "error");
+            return;
+          }
+          try {
+            await readProject(ctx.cwd);
+          } catch {
+            ctx.ui.notify("请先使用 /init 初始化研究项目，再运行 /agents run", "warning");
+            return;
+          }
+          if (activeAgentRuns.has(ctx.cwd)) {
+            ctx.ui.notify("A psyclaw agent run is already active for this project", "warning");
+            return;
+          }
+          activeAgentRuns.add(ctx.cwd);
+          try {
+            const runId = `pi_agent_${Date.now()}`;
+            const plan = researchTaskPlan(runId, objective);
+            await mkdir(join(ctx.cwd, ".psyclaw", "plans"), { recursive: true });
+            await atomicWriteFile(join(ctx.cwd, ".psyclaw", "plans", `${runId}.json`), `${JSON.stringify(plan, null, 2)}\n`);
+            const eventLog = new RunEventLog(ctx.cwd, runId);
+            const result = await runPlanWithPi(plan, {
+              cwd: ctx.cwd,
+              agentDir: join(ctx.cwd, ".psyclaw", "pi-agent"),
+              ...(ctx.model?.provider === undefined ? {} : { provider: ctx.model.provider }),
+              ...(ctx.model?.id === undefined ? {} : { model: ctx.model.id }),
+              env: providerEnvironment(ctx.model?.provider),
+              root: ctx.cwd,
+              pauseRequested: async () => {
+                try { await import("node:fs/promises").then(({ access }) => access(join(ctx.cwd, ".psyclaw", "runs", `${runId}.pause`))); return true; }
+                catch { return false; }
+              },
+              onEvent: async (event) => { await eventLog.append(event); },
+            });
+            pi.appendEntry("psyclaw:agent-run", {
+              runId,
+              status: result.status,
+              diagnostics: result.diagnostics,
+              recordedAt: new Date().toISOString(),
+            });
+            ctx.ui.notify(`Agent run ${result.status}: ${result.diagnostics.join("; ") || "verified"}`, result.status === "completed" ? "info" : "warning");
+          } finally {
+            activeAgentRuns.delete(ctx.cwd);
+          }
+          return;
+        }
+
+        throw new Error(
+          developerMode
+            ? "Usage: /agents [list|show|set|use|clear|delete|run] …"
+            : "Usage: /agents [list|show|set|use|clear|delete] …",
+        );
       } catch (error) {
         await notifyError(ctx, error);
-      } finally {
-        activeAgentRuns.delete(ctx.cwd);
       }
     },
   });

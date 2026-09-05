@@ -115,7 +115,7 @@ export function formatEcosystemFillerStatus(present: readonly EcosystemFillerId[
   }
   if (present.length < ECOSYSTEM_FILLERS.length) {
     lines.push(
-      `未安装项会在项目初始化或启动时尝试默认安装；也可运行 /install skill <id>，或安装 Plugin ${NATURE_SKILLS_PLUGIN_ID} / ${ACADEMIC_PAPER_SKILLS_PLUGIN_ID}。`,
+      `未安装项会在项目初始化或启动时尝试默认安装；也可运行 /skill install <id>，或安装 Plugin ${NATURE_SKILLS_PLUGIN_ID} / ${ACADEMIC_PAPER_SKILLS_PLUGIN_ID}。`,
     );
   }
   return lines.join("\n");
