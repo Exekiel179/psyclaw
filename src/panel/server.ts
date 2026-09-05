@@ -56,13 +56,19 @@ async function writeRecommendationState(root: string, state: RecommendationState
   await atomicWriteFile(await assertSafeProjectPath(root, ".psyclaw/recommendations.json"), `${JSON.stringify({ ...state, skills: [...new Set(state.skills)].sort(), mcp: [...new Set(state.mcp)].sort() }, null, 2)}\n`);
 }
 
-/** The bundled core skills, always listed so the user can disable (not uninstall) them. */
+/** Bundled capabilities, listed separately from the downloadable ecosystem. */
 const CORE_SKILLS = [
   { id: "academic-grill", name: "学术追问" },
   { id: "research-intake", name: "研究入口" },
   { id: "evidence-capture", name: "证据登记" },
   { id: "citation-audit", name: "引用审计" },
   { id: "research-brief", name: "研究简报" },
+  {
+    id: "psyclaw-ars",
+    name: "PsyClaw ARS",
+    description: "研究、写作、审稿与修订流程；首次启用时确认非商业许可。",
+    locked: true,
+  },
 ] as const;
 
 interface DisabledCapabilities { coreSkills: string[] }
@@ -626,7 +632,7 @@ async function recommendedSkills(): Promise<unknown> {
         items: (catalog.items ?? []).filter((item) => item.kind === "skill").map((item) => ({
           ...item,
           slashCommand: `/skill enable ${String(item.id ?? "")}`,
-          installCommand: `/install skill ${String(item.id ?? "")}`,
+          installCommand: `/skill install ${String(item.id ?? "")}`,
         })),
         plugins: (catalog.plugins ?? []).filter((item) => item.kind === "plugin").map((item) => ({
           ...item,
@@ -650,7 +656,7 @@ async function recommendedMcps(): Promise<unknown> {
   for (const path of candidates) {
     try {
       const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>> };
-      return { ...catalog, items: (catalog.items ?? []).map((item) => ({ ...item, slashCommand: `/mcp enable ${String(item.id ?? "")}`, installCommand: `/install mcp ${String(item.id ?? "")}` })) };
+      return { ...catalog, items: (catalog.items ?? []).map((item) => ({ ...item, slashCommand: `/mcp enable ${String(item.id ?? "")}`, installCommand: `/mcp install ${String(item.id ?? "")}` })) };
     } catch { /* try package layout */ }
   }
   return { schemaVersion: "psyclaw/recommended-mcp/v1", documentVersion: "0.1.0", items: [] };
@@ -943,7 +949,10 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({
           schemaVersion: "psyclaw/enabled-capabilities/v1",
-          coreSkills: CORE_SKILLS.map((skill) => ({ id: skill.id, name: skill.name, enabled: !disabled.coreSkills.includes(skill.id) })),
+          coreSkills: CORE_SKILLS.map((skill) => ({
+            ...skill,
+            enabled: "locked" in skill && skill.locked ? true : !disabled.coreSkills.includes(skill.id),
+          })),
           skills: state.skills.filter((id) => skillIds.has(id)).map((id) => ({ id, name: nameOf("skill", id), enabled: true })),
           mcp: state.mcp.filter((id) => mcpIds.has(id)).map((id) => ({ id, name: nameOf("mcp", id), enabled: true })),
           localSkills,

@@ -4,7 +4,11 @@ import { appendApproval, approvalInputDigest, asProject, assertResearchDecision,
 import type { ResearchDecisionImpact } from "../../research/decision.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
+import { customPersonaPlan, loadCustomPersonas, parseAgentsRequest } from "../../orchestration/personas.js";
+import type { Plan } from "../../orchestration/contracts.js";
 import { atomicWriteFile } from "../../project/jsonl.js";
+import { applyCreation, previewCreation, runArsMultiAgentBridge, type ArsPanelRequest, type CreationKind, type CreationRequest } from "../../index.js";
+import { loadUserRules, userRulesPrompt } from "../../rules/user-rules.js";
 import { RunEventLog } from "../../panel/events.js";
 import { readProject } from "../../research/ledger.js";
 import { join } from "node:path";
@@ -49,6 +53,17 @@ import {
   type ProviderPickerResult,
   type SecretInputResult,
 } from "../../tui/provider-picker.js";
+import {
+  ARS_REPOSITORY_URL,
+  ARS_UPSTREAM_COMMIT,
+  ARS_UPSTREAM_REF,
+  PSYCLAW_ARS_PROFILE_VERSION,
+  detectNatureArsFillers,
+  formatNatureArsFillerStatus,
+  isArsPiActive,
+  isArsPiTurn,
+  psyclawArsPatch,
+} from "../../ars/profile.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -218,6 +233,15 @@ function researchTaskPlan(runId: string, objective: string) {
   };
 }
 
+function creationCommandPrompt(kind: CreationKind, request: string): string {
+  return [
+    `The user explicitly requested /create-${kind}.`,
+    "Call the psyclaw_create tool exactly once. Convert the request into the narrow structured fields accepted by that tool.",
+    "Do not add permissions, shell commands, network access, credential access, gate bypasses, or external publication authority.",
+    `Requested ${kind}: ${request || "Ask the user for the missing name, description, and instructions."}`,
+  ].join("\n");
+}
+
 function academicGrillRequest(subject: string, mode: "init" | "review"): string {
   return [
     "先调用 psyclaw_skill 工具加载 PsyClaw 内置的 academic-grill Skill，然后严格遵循该 Skill 对我的学术研究进行追问。",
@@ -323,6 +347,11 @@ function parseRunArgs(args: string): RunArguments {
   };
 }
 
+function contextProjectTrusted(ctx: unknown): boolean {
+  const candidate = ctx as { isProjectTrusted?: () => boolean };
+  return typeof candidate.isProjectTrusted === "function" && candidate.isProjectTrusted();
+}
+
 function toolApprovalSummary(toolName: string, input: unknown): string {
   const record = input && typeof input === "object" && !Array.isArray(input) ? input as Record<string, unknown> : {};
   const target = [record.path, record.file_path, record.command, record.action, record.server, record.tool]
@@ -334,16 +363,6 @@ function toolNeedsApproval(toolName: string, input: unknown): boolean {
   if (["write", "edit", "bash", "powershell", "psyclaw_workbench", "psyclaw_mcp"].includes(toolName)) return true;
   const action = input && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>).action : undefined;
   return typeof action === "string" && /write|save|publish|install|download|execute|call/i.test(action);
-}
-
-function autoApprovalBlocked(toolName: string, input: unknown): string | undefined {
-  const text = JSON.stringify(input ?? {}).toLocaleLowerCase();
-  const mutatingTool = ["write", "edit", "bash", "powershell"].includes(toolName);
-  if (mutatingTool && /(?:data[\\/]raw|credential|secret|auth\.json|api[_ -]?key)/.test(text)) return "该操作可能覆盖原始数据或接触凭据，不能纳入 /run 的常规授权";
-  if (["bash", "powershell"].includes(toolName) && /\b(rm|rmdir|del|remove-item|format|shutdown|reboot|git\s+reset\s+--hard)\b/i.test(text)) {
-    return "破坏性命令不能纳入 /run 的常规授权";
-  }
-  return undefined;
 }
 
 function requiresSeparateOperationConfirmation(toolName: string, input: unknown): boolean {
@@ -451,7 +470,14 @@ interface PluginManagerRow {
 }
 
 function pluginSourceIdentity(source: string): string {
-  return source.trim().replace(/^git:/, "").replace(/\.git$/i, "").replace(/\/$/, "").toLocaleLowerCase();
+  return source.trim()
+    .replace(/^git:/, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^git@([^:]+):/i, "$1/")
+    .replace(/@[^/]+$/, "")
+    .replace(/\.git$/i, "")
+    .replace(/\/$/, "")
+    .toLocaleLowerCase();
 }
 
 function nativePluginManager(ctx: ExtensionCommandContext): DefaultPackageManager {
@@ -544,7 +570,7 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
       // A managed target that exists on disk but fails validation (e.g. a URL
       // install whose manifest/hash does not match the pinned catalog) is still
       // shown as installed so the user sees it; enabling it only takes effect
-      // once the install is repaired through /install.
+      // once the install is repaired through /skill.
       let onDisk = false;
       try {
         const target = recommendedSkillTarget(root, id, scope);
@@ -746,8 +772,8 @@ async function openPluginManager(ctx: ExtensionCommandContext, rows: PluginManag
       footer: "↑/↓ 移动 · Enter 安装或重新安装 · Esc 关闭",
       enterAction: "install",
       toggleEnabled: false,
-      enabledText: "已安装；Enter 可重新安装",
-      missingMessage: "按 Enter 选择项目目录或系统目录并安装。",
+      enabledText: "已由 Pi 原生 Plugin 管理器安装；Enter 可重新安装",
+      missingMessage: "按 Enter 安装到当前项目。",
     })
   ));
 }
@@ -755,16 +781,8 @@ async function openPluginManager(ctx: ExtensionCommandContext, rows: PluginManag
 async function installRecommendedPlugin(ctx: ExtensionCommandContext, row: PluginManagerRow): Promise<void> {
   if (!row.installable) throw new Error(row.reason ?? `${row.name} 尚未提供可安装的 Plugin package`);
   if (!row.sourceRef) throw new Error(`推荐 Plugin 没有来源网址: ${row.id}`);
-  const location = await ctx.ui.select("选择 Plugin 安装位置", ["项目目录（仅当前项目）", "系统目录（所有项目）"]);
-  if (!location) return;
-  const local = location.startsWith("项目目录");
-  const approved = await ctx.ui.confirm(
-    `安装 Plugin “${row.name}”？`,
-    `来源：${row.sourceRef}\n安装位置：${location}\n安装完成后需要执行 /reload。`,
-  );
-  if (!approved) return;
-  await nativePluginManager(ctx).installAndPersist(row.sourceRef, { local });
-  ctx.ui.notify(`${row.name} 已安装到${location}。请执行 /reload 载入 Plugin。`, "info");
+  await nativePluginManager(ctx).installAndPersist(row.sourceRef, { local: true });
+  ctx.ui.notify(`${row.name} 已安装到项目目录（仅当前项目）。请执行 /reload 载入 Plugin。`, "info");
 }
 
 async function showPluginManager(args: string, ctx: ExtensionCommandContext): Promise<void> {
@@ -819,17 +837,6 @@ function modelMcpInstallTask(root: string, row: McpManagerRow, plan?: Record<str
     "请先阅读来源仓库的实际安装与启动说明，再根据当前操作系统和宿主环境完成可运行的 stdio/HTTP MCP 配置。目录中的版本、命令和依赖只作参考，不得因为哈希、许可证、依赖或本地数据策略检查而中止安装。",
     "安装完成后实际启动一次服务器或执行等价的最小连通性检查，确认启动命令和工作目录有效。不要输出、复制或提交 API Key、令牌及其他凭据。",
     `成功后确保 .psyclaw/recommendations.json 的 mcp 列表包含 ${JSON.stringify(row.id)}，说明写入了哪些配置，并提醒用户执行 /reload。若安装命令本身失败，直接诊断并修复；只有遇到必须由用户提供的凭据或外部软件许可证时才向用户说明。`,
-  ].join("\n");
-}
-
-function modelExternalToolInstallTask(root: string, item: Record<string, unknown>): string {
-  return [
-    `安装推荐外部工具：${String(item.name ?? item.id ?? "external tool")}。`,
-    `官方来源：${String(item.sourceRef ?? "未提供；请停止并告知用户")}`,
-    `当前工作目录：${root}`,
-    String(item.installHint ?? "读取官方最新安装说明，选择适合当前操作系统的安装方式。"),
-    "用户已通过 /install 明确请求安装。直接读取官方说明、执行安装并验证版本或最小命令，不要再次请求安装许可。不要读取或输出凭据。",
-    "这是外部工具，不要将它宣称为来源仓库提供的 Skill 或 Pi Plugin。完成后报告实际安装位置、版本和验证结果；只有需要凭据、商业许可证或管理员提权时再请用户处理。",
   ].join("\n");
 }
 
@@ -1179,6 +1186,16 @@ const WORKFLOW_RUNNERS = {
   "expert-review": runExpertReview,
 } as const;
 
+function natureFillersFromCommandContext(ctx: {
+  getSystemPromptOptions?: () => { skills?: Array<{ name?: string }> };
+  getSystemPrompt?: () => string;
+}): ReturnType<typeof detectNatureArsFillers> {
+  return detectNatureArsFillers({
+    skills: ctx.getSystemPromptOptions?.()?.skills,
+    systemPrompt: ctx.getSystemPrompt?.(),
+  });
+}
+
 export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
@@ -1197,29 +1214,40 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => runtimeMcps.close());
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", async (event, ctx) => {
+    if (!(await readControlledRun(ctx?.cwd ?? process.cwd()))) return;
+    const prompt = userRulesPrompt(await loadUserRules(ctx?.cwd ?? process.cwd()));
+    if (prompt) return { systemPrompt: `${event.systemPrompt}\n\n${prompt}` };
+  });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", (event, ctx) => {
+    if (!isArsPiTurn(event.systemPrompt) && !isArsPiActive(ctx?.sessionManager)) return;
+    return {
+      systemPrompt: `${event.systemPrompt}\n\n${psyclawArsPatch({
+        skills: event.systemPromptOptions?.skills,
+        systemPrompt: event.systemPrompt,
+      })}`,
+    };
+  });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("input", (event, ctx) => {
     if (event.source === "extension") return;
     if (!/^\/(?:login|logout)(?:\s|$)/i.test(event.text.trim())) return;
     ctx.ui.notify("PsyClaw 已统一隐藏底层登录命令。请使用 /provider 配置、切换或更新模型凭据。", "info");
     return { action: "handled" };
   });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("input", async (event, ctx) => {
+    if (event.source === "extension" || isArsPiActive(ctx.sessionManager)) return;
+    if (!/^\/(?:ars-[a-z0-9-]+|skill:(?:deep-research|academic-paper|academic-paper-reviewer|academic-pipeline))(?:\s|$)/i.test(event.text.trim())) return;
+    if (!ctx.hasUI) return { action: "handled" as const };
+    const approved = await ctx.ui.confirm(
+      "启用 ARS？",
+      `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF}\n许可：CC BY-NC 4.0，仅限非商业用途。关键研究阶段仍会请求确认。`,
+    );
+    if (!approved) return { action: "handled" as const };
+  });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
     const run = await readControlledRun(ctx.cwd);
     if (!run || !toolNeedsApproval(event.toolName, event.input)) return;
     const summary = toolApprovalSummary(event.toolName, event.input);
-    const blockedReason = autoApprovalBlocked(event.toolName, event.input);
-    if (blockedReason) {
-      await appendApproval(ctx.cwd, {
-        kind: "tool",
-        nodeId: event.toolCallId,
-        decision: "rejected",
-        actor: "auto",
-        runId: run.runId,
-        sha256: approvalInputDigest({ toolName: event.toolName, input: event.input }),
-        summary: blockedReason,
-      });
-      return { block: true, terminate: true, reason: blockedReason };
-    }
     if (requiresSeparateOperationConfirmation(event.toolName, event.input)) {
       if (!ctx.hasUI) return { block: true, terminate: true, reason: "外部发布需要用户在交互界面中明确确认" };
       const choice = await ctx.ui.select(`确认外部操作\n${summary}`, ["确认执行", "取消"], { timeout: 120_000 });
@@ -1435,6 +1463,19 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
+  for (const kind of ["skill", "hook", "rule", "subagent"] as const) {
+    if (!legacyTestApi) pi.registerCommand(`create-${kind}`, {
+      description: `预览并创建项目级 ${kind}`,
+      handler: async (args, ctx) => {
+        if (!args.trim()) {
+          ctx.ui.notify(`Usage: /create-${kind} <name and requirements>`, "info");
+          return;
+        }
+        pi.sendUserMessage(creationCommandPrompt(kind, args.trim()), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+      },
+    });
+  }
+
   if (!legacyTestApi) pi.registerCommand("skill", {
     description: "管理和安装 Skill",
     handler: async (args, ctx) => {
@@ -1462,6 +1503,64 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         return;
       }
       ctx.ui.notify("Usage: /skill [status|enable <id>|disable <id>|enable-all|disable-all|install <local-directory>]", "info");
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("ars", {
+    description: "启动或管理 PsyClaw ARS 模式",
+    handler: async (args, ctx) => {
+      try {
+        const [action = "status", ...rest] = args.trim().split(/\s+/).filter(Boolean);
+        if (action === "status") {
+          ctx.ui.notify(
+            [
+              `PsyClaw ARS profile v${PSYCLAW_ARS_PROFILE_VERSION}`,
+              "模式：轻量 ARS（不要求 /init 或 /run）",
+              `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF} (${ARS_UPSTREAM_COMMIT.slice(0, 12)})`,
+              "入口：/ars doctor，/ars start，/ars full <task>，/ars stop",
+              formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)),
+            ].join("\n"),
+            "info",
+          );
+          return;
+        }
+        if (action === "install") {
+          ctx.ui.notify("ARS 可直接使用：运行 /ars start 或 /ars full <task>。", "info");
+          return;
+        }
+        if ((action === "start" || action === "full") && !isArsPiActive(ctx.sessionManager)) {
+          const approved = await ctx.ui.confirm(
+            "启用 ARS？",
+            `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF}\n许可：CC BY-NC 4.0，仅限非商业用途。关键研究阶段仍会请求确认。`,
+          );
+          if (!approved) return;
+        }
+        const upstreamCommand = action === "doctor"
+          ? "/ars-pi-doctor"
+          : action === "start"
+            ? "/ars-pi-start"
+            : action === "stop"
+              ? "/ars-pi-stop"
+              : action === "full"
+                ? `/ars-full${rest.length > 0 ? ` ${rest.join(" ")}` : ""}`
+                : undefined;
+        if (!upstreamCommand) {
+          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop]", "info");
+          return;
+        }
+        if (action === "doctor" || action === "full" || action === "start") {
+          ctx.ui.notify(formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)), "info");
+        }
+        // A queued prompt does not get a fresh system prompt in Pi. Wait so the
+        // upstream wrapper can activate ARS and inject its compatibility note.
+        if (action === "full" && !ctx.isIdle()) await ctx.waitForIdle();
+        pi.sendUserMessage(upstreamCommand, {
+          ...(!ctx.isIdle() ? { deliverAs: "followUp" as const } : {}),
+          expandPromptTemplates: true,
+        });
+      } catch (error) {
+        await notifyError(ctx, error);
+      }
     },
   });
 
@@ -1509,40 +1608,6 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     description: "打开 MCP 安装与配置管理页",
     handler: async (args, ctx) => {
       try { await showMcpManager(pi, args, ctx, runtimeMcps); } catch (error) { await notifyError(ctx, error); }
-    },
-  });
-
-  if (!legacyTestApi) pi.registerCommand("install", {
-    description: "查看推荐 Skill/MCP，或交给当前模型安装",
-    handler: async (args, ctx) => {
-      try {
-        const [kind, id] = args.trim().split(/\s+/, 2);
-        if (!kind) {
-          const [skills, mcps] = await Promise.all([recommendedItems("skills"), recommendedItems("mcp")]);
-          const skillLines = skills.items.slice(0, 8).map((item) => `Skill: ${String(item.id)} — ${String(item.name)}`);
-          const mcpLines = mcps.items.slice(0, 8).map((item) => `MCP: ${String(item.id)} — ${String(item.name)}`);
-          const pluginLines = skills.plugins.slice(0, 8).map((item) => `Plugin: ${String(item.id)} — ${String(item.name)}`);
-          const toolLines = skills.externalTools.slice(0, 8).map((item) => `外部工具: ${String(item.id)} — ${String(item.name)}`);
-          ctx.ui.notify(["推荐安装入口", "", ...skillLines, ...pluginLines, ...mcpLines, "", ...toolLines, "", "告诉我需要安装的推荐项，我会自动完成安装与配置；有影响同权限的变更时才暂停确认。也可以打开 /panel 选择推荐项。"].join("\n"), "info");
-          return;
-        }
-        if (kind !== "skill" && kind !== "mcp" && kind !== "external") throw new Error("Usage: /install skill|mcp|external <id>");
-        if (!id) {
-          if (kind === "skill") await showSkillManager(pi, "", ctx);
-          else if (kind === "mcp") await showMcpManager(pi, "", ctx, runtimeMcps);
-          else ctx.ui.notify("Usage: /install external <id>", "info");
-          return;
-        }
-        if (kind === "skill") await showSkillManager(pi, `install ${id}`, ctx);
-        else if (kind === "mcp") await showMcpManager(pi, `install ${id}`, ctx, runtimeMcps);
-        else {
-          const skills = await recommendedItems("skills");
-          const item = skills.externalTools.find((candidate) => candidate.id === id && candidate.installable !== false);
-          if (!item) throw new Error(`未找到可安装的推荐外部工具: ${id}`);
-          pi.sendUserMessage(modelExternalToolInstallTask(ctx.cwd, item), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          ctx.ui.notify(`已将 ${String(item.name ?? id)} 的安装任务交给当前模型；完成后会报告版本与验证结果。`, "info");
-        }
-      } catch (error) { await notifyError(ctx, error); }
     },
   });
 
@@ -1822,6 +1887,78 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "psyclaw_ars_multi_agent",
+    label: "ARS multi-agent review bridge",
+    description: "Run ARS reviewer_full Stage 3 as five process-separated read-only reviewer seats, or Stage 3 re-review as three ordered fenced calls. This is a parallel-agent capability; it preserves ARS checkpoints and never claims independent error processes.",
+    parameters: Type.Object({
+      mode: Type.Union([Type.Literal("reviewer_full"), Type.Literal("reviewer_re_review")]),
+      manuscriptPath: Type.Optional(Type.String()),
+      originalManuscriptPath: Type.Optional(Type.String()),
+      roadmapPath: Type.Optional(Type.String()),
+      authorAdjudicationPath: Type.Optional(Type.String()),
+      revisionEvidenceBundlePath: Type.Optional(Type.String()),
+      responseLetterPath: Type.Optional(Type.String()),
+      editorialDecisionPath: Type.Optional(Type.String()),
+      round1FindingsPath: Type.Optional(Type.String()),
+      reviewerCardsPath: Type.Optional(Type.String()),
+      revisionPatchPaths: Type.Optional(Type.Array(Type.String(), { maxItems: 50 })),
+      applyReportPaths: Type.Optional(Type.Array(Type.String(), { maxItems: 50 })),
+      resumeRunId: Type.Optional(Type.String()),
+      reviewerCards: Type.Optional(Type.String({ maxLength: 40000 })),
+      title: Type.Optional(Type.String()), field: Type.Optional(Type.String()), passportDigest: Type.Optional(Type.String()),
+    }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      try {
+        if (!isArsPiActive(ctx.sessionManager)) throw new Error("ARS mode is not active");
+        if (!contextProjectTrusted(ctx)) throw new Error("project is not trusted");
+        if (!ctx.hasUI || typeof ctx.ui?.confirm !== "function") throw new Error("ARS external model dispatch requires interactive confirmation");
+        const paths = [params.manuscriptPath, params.originalManuscriptPath, params.roadmapPath, params.authorAdjudicationPath, params.revisionEvidenceBundlePath, params.responseLetterPath, params.editorialDecisionPath, params.round1FindingsPath, params.reviewerCardsPath, ...(params.revisionPatchPaths ?? []), ...(params.applyReportPaths ?? [])].filter((value): value is string => typeof value === "string");
+        const approved = await ctx.ui.confirm("将研究材料发送给当前模型 Provider？", `模式：${params.mode}\nProvider/Model：${ctx.model?.provider ?? "unknown"}/${ctx.model?.id ?? "unknown"}\n文件：\n${paths.map((path) => `- ${path}`).join("\n")}\n\nStage 3 可能至少产生 11 次模型调用；进程隔离不代表误差独立。`);
+        if (!approved) throw new Error("ARS dispatch cancelled; no material was sent");
+        const result = await runArsMultiAgentBridge(params as ArsPanelRequest, { root: ctx.cwd, ...(ctx.model?.provider ? { provider: ctx.model.provider } : {}), ...(ctx.model?.id ? { model: ctx.model.id } : {}), env: providerEnvironment(ctx.model?.provider), agentDir: join(ctx.cwd, ".psyclaw", "ars-agent") });
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], details: result, ...(result.status === "blocked" ? { isError: true } : {}) };
+      } catch (error) {
+        return { content: [{ type: "text", text: `ARS multi-agent bridge failed: ${error instanceof Error ? error.message : String(error)}` }], details: { status: "blocked" }, isError: true };
+      }
+    },
+  });
+
+  pi.registerTool({
+    name: "psyclaw_create",
+    label: "Create project capability",
+    description: "Preview and, after an explicit UI confirmation, create one PsyClaw-native project Skill, declarative analysis Hook, additive Rule, or read-only Subagent persona.",
+    parameters: Type.Object({
+      kind: Type.Union([Type.Literal("skill"), Type.Literal("hook"), Type.Literal("rule"), Type.Literal("subagent")]),
+      id: Type.String({ minLength: 1, maxLength: 64 }),
+      description: Type.String({ minLength: 1, maxLength: 1024 }),
+      instructions: Type.Optional(Type.String({ maxLength: 8000 })),
+      event: Type.Optional(Type.Union([Type.Literal("before-plan"), Type.Literal("before-analysis"), Type.Literal("before-delegation"), Type.Literal("before-write"), Type.Literal("after-analysis"), Type.Literal("before-report"), Type.Literal("after-report")])),
+      severity: Type.Optional(Type.Union([Type.Literal("warn"), Type.Literal("block")])),
+      pattern: Type.Optional(Type.String({ maxLength: 500 })),
+      pathPrefix: Type.Optional(Type.String({ maxLength: 200 })),
+      role: Type.Optional(Type.Union([Type.Literal("planner"), Type.Literal("researcher"), Type.Literal("analyst"), Type.Literal("critic"), Type.Literal("writer"), Type.Literal("verifier")])),
+    }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      try {
+        if (!contextProjectTrusted(ctx)) throw new Error("project is not trusted");
+        const request = params as CreationRequest;
+        const preview = await previewCreation(ctx.cwd, request);
+        if (!ctx.hasUI || typeof ctx.ui?.confirm !== "function") {
+          return { content: [{ type: "text", text: JSON.stringify({ ...preview, status: "preview-only", reason: "interactive confirmation unavailable" }, null, 2) }], details: preview };
+        }
+        const approved = await ctx.ui.confirm(`创建 ${params.kind} “${preview.id}”？`, `目标：${preview.path}\nSHA-256：${preview.sha256}\n\n${preview.contents}`);
+        if (!approved) return { content: [{ type: "text", text: "Creation cancelled; no file was written." }], details: { status: "cancelled", preview } };
+        const result = await applyCreation(ctx.cwd, request, preview.sha256, true);
+        return { content: [{ type: "text", text: JSON.stringify({ status: "created", path: result.preview.path, sha256: result.preview.sha256, receipt: result.receipt }, null, 2) }], details: result };
+      } catch (error) {
+        return { content: [{ type: "text", text: `Creation failed: ${error instanceof Error ? error.message : String(error)}` }], details: { status: "failed" }, isError: true };
+      }
+    },
+  });
+
+  pi.registerTool({
     name: "psyclaw_skill",
     label: "Research skill",
     description: "Load one trusted bundled psyclaw core skill and make its use visible to the user. Use this instead of directly reading a core SKILL.md file.",
@@ -2058,9 +2195,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   if (!legacyTestApi) pi.registerCommand("agents", {
     description: "运行经批准的只读研究 Agent",
     handler: async (args, ctx) => {
-      const objective = args.trim();
+      const requested = parseAgentsRequest(args);
+      const objective = requested.objective;
       if (!objective) {
-        ctx.ui.notify("Usage: /agents <bounded read-only research task>", "info");
+        ctx.ui.notify("Usage: /agents [--agent <id>|--agents <id,...>] <bounded read-only research task>", "info");
         return;
       }
       if (objective.length > 4_000) {
@@ -2082,7 +2220,15 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       activeAgentRuns.add(ctx.cwd);
       try {
         const runId = `pi_agent_${Date.now()}`;
-        const plan = researchTaskPlan(runId, objective);
+        let plan: Plan = researchTaskPlan(runId, objective);
+        if (requested.ids.length > 0) {
+          const available = await loadCustomPersonas(ctx.cwd);
+          const byId = new Map(available.map((persona) => [persona.id, persona]));
+          const selected = requested.ids.map((id) => byId.get(id));
+          const missing = requested.ids.filter((_id, index) => !selected[index]);
+          if (missing.length > 0) throw new Error(`Unknown or invalid custom subagent: ${missing.join(", ")}`);
+          plan = customPersonaPlan(runId, objective, selected.filter((persona): persona is NonNullable<typeof persona> => persona !== undefined));
+        }
         await mkdir(join(ctx.cwd, ".psyclaw", "plans"), { recursive: true });
         await atomicWriteFile(join(ctx.cwd, ".psyclaw", "plans", `${runId}.json`), `${JSON.stringify(plan, null, 2)}\n`);
         const eventLog = new RunEventLog(ctx.cwd, runId);
@@ -2092,6 +2238,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           ...(ctx.model?.provider === undefined ? {} : { provider: ctx.model.provider }),
           ...(ctx.model?.id === undefined ? {} : { model: ctx.model.id }),
           env: providerEnvironment(ctx.model?.provider),
+          ...(requested.ids.length > 0 ? { tools: [] as const } : {}),
           root: ctx.cwd,
           pauseRequested: async () => {
             try { await import("node:fs/promises").then(({ access }) => access(join(ctx.cwd, ".psyclaw", "runs", `${runId}.pause`))); return true; }

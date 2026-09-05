@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstat, readdir, readFile, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
   type LoadedSkill,
@@ -217,15 +217,28 @@ async function walkSkillFiles(root: { source: string; resolved: string }, diagno
 }
 
 async function verifyFilePath(sourcePath: string, rootPath: string): Promise<string> {
-  const sourceStat = await lstat(sourcePath);
+  const sourceRoot = resolve(rootPath);
+  const source = resolve(sourcePath);
+  assertContained(sourceRoot, source);
+  const rootStat = await lstat(sourceRoot);
+  if (rootStat.isSymbolicLink()) throw new Error(`Skill root is a symlink: ${sourceRoot}`);
+  if (!rootStat.isDirectory()) throw new Error(`Skill root is not a directory: ${sourceRoot}`);
+  const resolvedRoot = await realpath(sourceRoot);
+  let cursor = sourceRoot;
+  for (const part of relative(sourceRoot, source).split(sep).filter(Boolean)) {
+    cursor = join(cursor, part);
+    const stat = await lstat(cursor);
+    if (stat.isSymbolicLink()) throw new Error(`Skill path contains a symlink: ${sourcePath}`);
+  }
+  const sourceStat = await lstat(source);
   if (sourceStat.isSymbolicLink()) throw new Error(`Skill file is a symlink: ${sourcePath}`);
   if (!sourceStat.isFile()) throw new Error(`Skill path is not a file: ${sourcePath}`);
-  const resolved = await realpath(sourcePath);
-  assertContained(rootPath, resolved);
-  // `sourcePath` is produced by a non-symlink directory walk. If its
-  // canonical form later differs, a parent component was replaced by a
-  // junction/symlink (or the path was otherwise swapped); never follow it.
-  if (!samePath(resolve(sourcePath), resolved)) {
+  const resolved = await realpath(source);
+  assertContained(resolvedRoot, resolved);
+  const expectedResolved = resolve(resolvedRoot, relative(sourceRoot, source));
+  // Ancestors above the controlled root may be OS-managed aliases such as
+  // macOS /var -> /private/var; only paths inside the root are trust-relevant.
+  if (!samePath(expectedResolved, resolved)) {
     throw new Error(`Skill path contains a symlink or changed while reading: ${sourcePath}`);
   }
   return resolved;
@@ -347,21 +360,21 @@ function approvalFor(
   descriptor: Pick<SkillDescriptor, "id" | "sha256" | "sourcePath" | "resolvedPath" | "rootPath" | "trust">,
   approvals: SkillApprovalMap,
 ): SkillApprovalStatus {
+  if (descriptor.trust === "blocked") return "blocked";
   const entry = approvalEntry(approvals, descriptor.id);
-  // Skill metadata and heuristic body inspection are advisory.  A user
-  // selected Skill may execute without a separate supply-chain admission
-  // ceremony; only an explicit host denial remains blocking.
-  if (entry === undefined) return "approved";
+  if (entry === undefined) return "discover-only";
   const approval: SkillApproval = typeof entry === "boolean"
     ? { approved: entry }
     : isValidApproval(entry)
       ? entry
       : { approved: false };
   if (!approval.approved) return "blocked";
-  // Skill enablement is an explicit user choice.  Supply-chain metadata is
-  // still exposed for inspection, but missing license/dependency/hash
-  // evidence is not a runtime gate; the model can resolve or explain it when
-  // the skill is used.  Existing explicit pins remain useful diagnostics.
+  if (!approval.admission || !isValidAdmissionEvidence(approval.admission)) return "discover-only";
+  if (approval.admission.contentSha256.toLocaleLowerCase() !== descriptor.sha256) return "stale";
+  const hasPin = approval.sha256 !== undefined ||
+    approval.sourcePath !== undefined ||
+    approval.resolvedPath !== undefined;
+  if (!hasPin) return "discover-only";
   if (approval.sha256 !== undefined && approval.sha256.toLocaleLowerCase() !== descriptor.sha256) return "stale";
   if (!pathMatchesPin(approval.sourcePath, descriptor) || !pathMatchesPin(approval.resolvedPath, descriptor)) return "stale";
   return "approved";
@@ -381,9 +394,8 @@ export class SkillRegistry {
       this.approvals = new Map();
     } else {
       this.roots = [...(rootsOrOptions.roots ?? [])];
-      // `enableByDefault` is retained for API compatibility. Explicit host
-      // denials remain respected, but ordinary selected Skills need no
-      // separate admission ceremony.
+      // `enableByDefault` is retained for API compatibility; discovery never
+      // bypasses explicit host admission.
       const merged = new Map<string, SkillApprovalEntry>();
       const configured = rootsOrOptions.approvals ?? rootsOrOptions.approvalMap ?? rootsOrOptions.approval;
       if (configured !== undefined) {
@@ -427,7 +439,7 @@ export class SkillRegistry {
       for (const sourcePath of files) {
         let descriptor: SkillDescriptor;
         try {
-          const stable = await readSkillFileStable(sourcePath, root.resolved);
+          const stable = await readSkillFileStable(sourcePath, root.source);
           const resolvedPath = stable.resolvedPath;
           const text = stable.text;
           const parsed = parseSkillDocument(text, sourcePath);
@@ -441,7 +453,7 @@ export class SkillRegistry {
               "suspicious-body",
               `Skill body contains suspicious instructions: ${preflight.findings.join(", ")}`,
               sourcePath,
-              { severity: "warning", skillId: identity.id },
+              { severity: "error", skillId: identity.id },
             ));
           }
           const baseDescriptor: Omit<SkillDescriptor, "approvalStatus"> = {
@@ -451,12 +463,12 @@ export class SkillRegistry {
             description: identity.description,
             sourcePath,
             resolvedPath,
-            rootPath: root.resolved,
+            rootPath: root.source,
             sha256: stable.sha256,
             licenseStatus: deriveLicenseStatus(parsed.metadata),
             dependencyStatus: deriveDependencyStatus(parsed.metadata),
-            trust: deriveTrust(parsed.metadata),
-            risk: deriveRisk(parsed.metadata),
+            trust: preflight.suspicious ? "blocked" : deriveTrust(parsed.metadata),
+            risk: preflight.suspicious ? "critical" : deriveRisk(parsed.metadata),
             enabled: false,
             conflicted: false,
             metadata: Object.freeze({ ...parsed.metadata }),
@@ -544,7 +556,7 @@ export class SkillRegistry {
   async load(id: string): Promise<LoadedSkill> {
     const descriptor = this.unique(id);
     if (!descriptor.enabled) throw new Error(`Skill is not enabled: ${id}`);
-    if (descriptor.approvalStatus === "blocked") throw new Error(`Skill was explicitly disabled: ${id}`);
+    if (descriptor.approvalStatus !== "approved") throw new Error(`Skill lacks explicit approval: ${id}`);
     const stable = await readSkillFileStable(descriptor.sourcePath, descriptor.rootPath);
     if (!samePath(stable.resolvedPath, descriptor.resolvedPath) || stable.sha256 !== descriptor.sha256) {
       throw new Error(`Skill changed since discovery: ${id}`);
@@ -567,7 +579,8 @@ export class SkillRegistry {
 
   private setEnabled(id: string, enabled: boolean): SkillDescriptor {
     const current = this.unique(id);
-    if (enabled && current.approvalStatus === "blocked") throw new Error(`Skill was explicitly disabled: ${id}`);
+    if (enabled && current.trust === "blocked") throw new Error(`Skill is blocked by trust policy: ${id}`);
+    if (enabled && current.approvalStatus !== "approved") throw new Error(`Skill lacks explicit approval: ${id}`);
     const updated = Object.freeze({ ...current, enabled });
     this.entries.set(id, [updated]);
     return updated;

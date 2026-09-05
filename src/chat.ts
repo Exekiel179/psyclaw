@@ -12,6 +12,7 @@ import {
 } from "./branding.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
+import { withBundledWindowsTools } from "./bundled-tools.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -101,9 +102,9 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     ...(options.args ?? []),
   ];
 
-  // Brand the startup: psyclaw theme + native "ψ psyclaw v<psyclaw version>" header
-  // (opt into a quiet screen with PSYCLAW_QUIET_STARTUP=1), and keep the model's
-  // identity as psyclaw rather than "pi".
+  // Brand the startup: psyclaw theme plus the native ASCII banner. quietStartup
+  // hides Skills/Extensions/Themes inventories; PSYCLAW_VERBOSE_STARTUP=1 shows them.
+  // Keep the model's identity as psyclaw rather than "pi".
   const manifest = await resolvePsyClawManifest();
   await ensureQuietStartup();
   await ensurePsyClawTheme();
@@ -114,7 +115,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   // The header banner renders psyclaw's own version (not the bundled pi 0.84.x).
   const agentDir = process.env.PSYCLAW_CODING_AGENT_DIR || join(homedir(), ".psyclaw", "agent");
   const sessionDir = process.env.PSYCLAW_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
-  const spawnEnv: NodeJS.ProcessEnv = {
+  let spawnEnv: NodeJS.ProcessEnv = withBundledWindowsTools({
     ...process.env,
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
     PSYCLAW_CODING_AGENT_DIR: agentDir,
@@ -124,7 +125,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     PI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_SESSION_DIR: sessionDir,
     PSYCLAW_NETWORK_PRELOAD: "1",
-  };
+  }, root);
   if (process.platform === "darwin") {
     const missing = PROVIDER_PRESETS.filter((preset) => !spawnEnv[preset.apiKeyEnv]);
     const values = await Promise.all(missing.map((preset) => readMacOsLaunchctlCredential(preset.apiKeyEnv)));

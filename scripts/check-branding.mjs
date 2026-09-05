@@ -124,9 +124,13 @@ if (manifest.publishConfig?.registry !== "https://registry.npmjs.org/") {
 if (manifest.publishConfig?.access !== "public") {
   contractFailures.push("package.json publishConfig must declare public access");
 }
-const expectedExtensions = ["./dist/src/extension.js", "./dist/src/panel/extension.js"];
+const expectedExtensions = [
+  "./dist/src/extension.js",
+  "./dist/src/panel/extension.js",
+  "./vendor/ars/pi/wrapper.js",
+];
 if (JSON.stringify(manifest.pi?.extensions) !== JSON.stringify(expectedExtensions)) {
-  contractFailures.push("package.json Pi extensions must point to packaged dist files");
+  contractFailures.push("package.json Pi extensions must point to packaged dist files and the bundled ARS wrapper");
 }
 if (governance.id !== "psyclaw") contractFailures.push("package governance id must be psyclaw");
 if (governance.schemaVersion !== "psyclaw/package-governance/v1") {

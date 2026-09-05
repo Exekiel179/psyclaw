@@ -7,5 +7,10 @@
 !dist/apps/panel/index.html
 !skills/
 !skills/**
+!vendor/
+!vendor/ars/
+!vendor/ars/**
+!vendor/windows/
+!vendor/windows/**
 !scripts/
 !scripts/rebrand-pi.mjs

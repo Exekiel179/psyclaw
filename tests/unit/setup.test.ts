@@ -43,8 +43,10 @@ describe("provider setup and first-run detection", () => {
       // into models.json: the runtime already carries their native metadata,
       // and writing a plain OpenAI-compatible duplicate would corrupt it.
       if (preset.id === "opencode-go") continue;
+
       expect(text).toContain(`$${preset.apiKeyEnv}`);
     }
+    expect(text).not.toContain("$OPENCODE_API_KEY");
     expect(text).not.toMatch(/sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}/);
   });
 

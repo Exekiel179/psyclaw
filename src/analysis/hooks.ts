@@ -86,6 +86,16 @@ function result(findings: AnalysisHookFinding[]): AnalysisHookResult {
   return { schemaVersion: ANALYSIS_HOOKS_VERSION, ok: !findings.some((item) => item.severity === "block"), findings };
 }
 
+export function isSafeUserHookPattern(pattern: string): boolean {
+  if (!pattern || pattern.length > 120) return false;
+  // User hooks run on the Node event loop. Reject constructs commonly used for
+  // catastrophic backtracking or non-local matching; hooks are constraints,
+  // so a conservative regex subset is preferable to a blocking process.
+  if (/\\[1-9]|\(\?[=!<]|\(\?<[A-Za-z]/.test(pattern)) return false;
+  if (/\([^)]*[+*][^)]*\)[+*{]|(?:\.\*|\.\+).*(?:\.\*|\.\+)/.test(pattern)) return false;
+  try { new RegExp(pattern, "i"); return true; } catch { return false; }
+}
+
 export async function loadUserAnalysisHooks(root: string): Promise<UserAnalysisHook[]> {
   const path = resolve(root, ".psyclaw", "analysis-hooks.json");
   try {
@@ -94,7 +104,8 @@ export async function loadUserAnalysisHooks(root: string): Promise<UserAnalysisH
     return parsed.hooks.filter((hook): hook is UserAnalysisHook =>
       typeof hook?.id === "string" && /^[a-z0-9][a-z0-9._-]{0,63}$/i.test(hook.id) &&
       (hook.event === "before-plan" || hook.event === "before-analysis" || hook.event === "before-delegation" || hook.event === "before-write" || hook.event === "after-analysis" || hook.event === "before-report" || hook.event === "after-report") &&
-      (hook.severity === "block" || hook.severity === "warn") && typeof hook.message === "string" && hook.message.trim().length > 0,
+      (hook.severity === "block" || hook.severity === "warn") && typeof hook.message === "string" && hook.message.trim().length > 0 &&
+      (hook.pattern === undefined || (typeof hook.pattern === "string" && isSafeUserHookPattern(hook.pattern))),
     );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
