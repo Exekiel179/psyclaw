@@ -49,6 +49,12 @@ import {
   type ProviderPickerResult,
   type SecretInputResult,
 } from "../../tui/provider-picker.js";
+import {
+  detectEcosystemFillers,
+  ecosystemFillerPatch,
+  formatEcosystemFillerStatus,
+} from "../../workflows/ecosystem-fillers.js";
+import { ensureDefaultEcosystemFillers } from "../../workflows/ensure-default-fillers.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -1183,6 +1189,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
   const runtimeMcps = new RuntimeMcpRegistry();
+  let defaultFillersStarted = false;
   if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event) => {
     const enabled = await enabledRecommendedSkillPaths(event.cwd);
     const local = await enabledLocalSkillPaths(event.cwd, {
@@ -1195,6 +1202,44 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       skillPaths: [...enabled.paths, ...local.paths],
       promptPaths: await enabledLocalPromptPaths(event.cwd),
     };
+  });
+  // Seed/install Nature + academic-paper gap-fill skills once per session.
+  // Failures stay soft so offline workspaces still start.
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_start", async (_event, ctx) => {
+    if (defaultFillersStarted) return;
+    defaultFillersStarted = true;
+    try {
+      const result = await ensureDefaultEcosystemFillers(ctx.cwd);
+      if (result.installed.length > 0 || result.failed.length > 0) {
+        const lines = [
+          formatEcosystemFillerStatus([
+            ...result.alreadyPresent,
+            ...result.installed,
+          ]),
+        ];
+        if (result.installed.length > 0) {
+          lines.push(`本次新安装：${result.installed.join(", ")}`);
+        }
+        if (result.failed.length > 0) {
+          lines.push(`安装失败（可稍后 /install skill <id>）：${result.failed.map((item) => item.id).join(", ")}`);
+        }
+        ctx.ui.notify(lines.join("\n"), result.failed.length > 0 ? "warning" : "info");
+      }
+    } catch {
+      /* ignore — defaults must never block chat */
+    }
+  });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", async (event) => {
+    const optionSkills = (event as { systemPromptOptions?: { skills?: ReadonlyArray<{ name?: string }> } })
+      .systemPromptOptions?.skills;
+    const patch = ecosystemFillerPatch({
+      skills: optionSkills,
+      systemPrompt: typeof event.systemPrompt === "string" ? event.systemPrompt : undefined,
+    });
+    if (!event.systemPrompt || typeof event.systemPrompt !== "string") {
+      return { systemPrompt: patch };
+    }
+    return { systemPrompt: `${event.systemPrompt}\n\n${patch}` };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => runtimeMcps.close());
   if (!legacyTestApi && typeof pi.on === "function") pi.on("input", (event, ctx) => {
@@ -1252,11 +1297,24 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       try {
         const parsed = parseInitArgs(args);
         const project = await bootstrapProject({ root: ctx.cwd, ...parsed });
+        const enabled = await enabledRecommendedSkillPaths(ctx.cwd).catch(() => ({ paths: [] as string[], warnings: [] as string[] }));
+        const present = detectEcosystemFillers({
+          skills: await Promise.all(enabled.paths.map(async (path) => {
+            try {
+              const text = await readFile(join(path, "SKILL.md"), "utf8");
+              const name = text.match(/^---[\s\S]*?^name:\s*([^\n]+)/m)?.[1]?.trim();
+              return name ? { name } : {};
+            } catch {
+              return {};
+            }
+          })),
+        });
+        const fillerNote = formatEcosystemFillerStatus(present);
         if (typeof pi.sendUserMessage === "function") {
           pi.sendUserMessage(academicGrillRequest(project.goal, "init"), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。当前保持普通对话；如需进入受控研究流程，请明确运行 /run。`, "info");
+          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。当前保持普通对话；如需进入受控研究流程，请明确运行 /run。\n${fillerNote}`, "info");
         } else {
-          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。使用 /run 启动受控研究流程。`, "info");
+          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。使用 /run 启动受控研究流程。\n${fillerNote}`, "info");
         }
       } catch (error) {
         await notifyError(ctx, error);

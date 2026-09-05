@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.7.0",
-  "syncedAt": "2026-09-03",
+  "documentVersion": "0.9.0",
+  "syncedAt": "2026-09-05",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
@@ -154,6 +154,56 @@
       "description": "对论文 PDF 进行数值一致性、统计方法和研究完整性审查，不将单一异常直接判定为学术不端。",
       "sourceRef": "https://github.com/kingfly51/manuscript-statistical-forensics",
       "installHint": "安装仓库根目录的 SKILL.md 及配套文件；使用时必须提供可读取的论文 PDF。"
+    },
+    {
+      "id": "nature-figure",
+      "name": "Nature Figure",
+      "kind": "skill",
+      "stage": "科研绘图",
+      "description": "按 Nature 风格生成与质检投稿级科研图；作为完整研究工作流的出图查漏补缺，默认安装。",
+      "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
+      "installHint": "安装 skills/nature-figure 完整目录；首次安装可能包含图表示例资源。",
+      "defaultInstall": true
+    },
+    {
+      "id": "nature-ref-verifier",
+      "name": "Nature Reference Verifier",
+      "kind": "skill",
+      "stage": "引用核验",
+      "description": "对参考文献做 DOI/作者/年份等字段多源交叉核对；接在引用审计之后，默认安装。",
+      "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
+      "installHint": "安装 skills/nature-ref-verifier 完整目录。",
+      "defaultInstall": true
+    },
+    {
+      "id": "nature-polishing",
+      "name": "Nature Polishing",
+      "kind": "skill",
+      "stage": "文稿润色",
+      "description": "按 Nature 风格润色学术英文，不改研究主张与引用；用于终稿阶段，默认安装。",
+      "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
+      "installHint": "安装 skills/nature-polishing 完整目录。",
+      "defaultInstall": true
+    },
+    {
+      "id": "academic-paper-strategist",
+      "name": "Academic Paper Strategist",
+      "kind": "skill",
+      "stage": "论文策划",
+      "description": "lishix520/academic-paper-skills 的策划端：平台风格学习、证据化缺口与审稿视角大纲；默认安装。",
+      "sourceRef": "https://github.com/lishix520/academic-paper-skills",
+      "installHint": "安装仓库中的 strategist 完整目录。",
+      "defaultInstall": true
+    },
+    {
+      "id": "academic-paper-composer",
+      "name": "Academic Paper Composer",
+      "kind": "skill",
+      "stage": "论文写作",
+      "description": "lishix520/academic-paper-skills 的写作端：按大纲分章写作并做质量门禁；默认安装。",
+      "sourceRef": "https://github.com/lishix520/academic-paper-skills",
+      "installHint": "安装仓库中的 composer 完整目录。",
+      "defaultInstall": true
     }
   ],
   "plugins": [
@@ -163,17 +213,29 @@
       "kind": "plugin",
       "stage": "研究全流程",
       "description": "以 Plugin 方式提供 Academic Research Suite 的文献研究、写作、评审与修订能力。",
-      "sourceRef": "https://github.com/Imbad0202/academic-research-skills-codex",
-      "installHint": "使用 Pi 原生 Plugin 管理器安装；仓库同时包含 Skill，安装后按其插件说明启用。"
+      "sourceRef": "https://github.com/Imbad0202/academic-research-skills",
+      "installHint": "使用 Pi 原生 Plugin 管理器安装上游原仓库；仓库同时包含 Skill，安装后按其插件说明启用。",
+      "defaultInstall": false
     },
     {
       "id": "nature-skills-plugin",
       "name": "Nature Skills Suite",
       "kind": "plugin",
       "stage": "研究全流程",
-      "description": "以 Plugin 方式提供 Nature Skills 套件，覆盖检索、精读、统计、绘图、写作和评审任务。",
+      "description": "以 Plugin 方式提供 Nature Skills 套件。出图、引用核验、润色三项也会作为默认 Skill 单独安装进工作流。",
       "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
-      "installHint": "使用 Pi 原生 Plugin 管理器安装完整仓库；套件内的 Skill 保持原目录结构。"
+      "installHint": "使用 Pi 原生 Plugin 管理器安装完整仓库；套件内的 Skill 保持原目录结构。",
+      "defaultInstall": true
+    },
+    {
+      "id": "academic-paper-skills-plugin",
+      "name": "Academic Paper Skills",
+      "kind": "plugin",
+      "stage": "论文策划与写作",
+      "description": "lishix520/academic-paper-skills：strategist + composer，用于大纲策划与分章写作查漏补缺（MIT）。",
+      "sourceRef": "https://github.com/lishix520/academic-paper-skills",
+      "installHint": "可安装整仓，或安装默认推荐的 academic-paper-strategist / academic-paper-composer 两个 Skill。",
+      "defaultInstall": true
     },
     {
       "id": "pingouin",
@@ -262,6 +324,82 @@
       "status": "review-required",
       "requiresApproval": true,
       "blockedReason": "Install manifest and content hash must pass validation before activation."
+    },
+    {
+      "id": "nature-figure",
+      "sourceKind": "github",
+      "sourceUrl": "https://github.com/Yuan1z0825/nature-skills.git",
+      "ref": "b1a37a2bf881feb6d71e2587c70f0e4e70b72548",
+      "skillPath": "skills/nature-figure",
+      "skillName": "nature-figure",
+      "license": "Apache-2.0",
+      "target": ".psyclaw/imports/recommended/nature-figure",
+      "dependencies": [
+        "Python matplotlib/seaborn or R ggplot2 for figure backends"
+      ],
+      "status": "default-install",
+      "defaultInstall": true,
+      "requiresApproval": false
+    },
+    {
+      "id": "nature-ref-verifier",
+      "sourceKind": "github",
+      "sourceUrl": "https://github.com/Yuan1z0825/nature-skills.git",
+      "ref": "b1a37a2bf881feb6d71e2587c70f0e4e70b72548",
+      "skillPath": "skills/nature-ref-verifier",
+      "skillName": "nature-ref-verifier",
+      "license": "Apache-2.0",
+      "target": ".psyclaw/imports/recommended/nature-ref-verifier",
+      "dependencies": [],
+      "status": "default-install",
+      "defaultInstall": true,
+      "requiresApproval": false
+    },
+    {
+      "id": "nature-polishing",
+      "sourceKind": "github",
+      "sourceUrl": "https://github.com/Yuan1z0825/nature-skills.git",
+      "ref": "b1a37a2bf881feb6d71e2587c70f0e4e70b72548",
+      "skillPath": "skills/nature-polishing",
+      "skillName": "nature-polishing",
+      "license": "Apache-2.0",
+      "target": ".psyclaw/imports/recommended/nature-polishing",
+      "dependencies": [],
+      "status": "default-install",
+      "defaultInstall": true,
+      "requiresApproval": false
+    },
+    {
+      "id": "academic-paper-strategist",
+      "sourceKind": "github",
+      "sourceUrl": "https://github.com/lishix520/academic-paper-skills.git",
+      "ref": "c325557646e9418939ccc7b99171b149ad6314f1",
+      "skillPath": "strategist",
+      "skillName": "academic-paper-strategist",
+      "license": "MIT",
+      "target": ".psyclaw/imports/recommended/academic-paper-strategist",
+      "dependencies": [
+        "Python >=3.8 for optional verification scripts"
+      ],
+      "status": "default-install",
+      "defaultInstall": true,
+      "requiresApproval": false
+    },
+    {
+      "id": "academic-paper-composer",
+      "sourceKind": "github",
+      "sourceUrl": "https://github.com/lishix520/academic-paper-skills.git",
+      "ref": "c325557646e9418939ccc7b99171b149ad6314f1",
+      "skillPath": "composer",
+      "skillName": "academic-paper-composer",
+      "license": "MIT",
+      "target": ".psyclaw/imports/recommended/academic-paper-composer",
+      "dependencies": [
+        "Python >=3.8 for optional verification scripts"
+      ],
+      "status": "default-install",
+      "defaultInstall": true,
+      "requiresApproval": false
     }
   ]
 }

@@ -12,6 +12,7 @@ import {
 } from "./branding.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
+import { ensureDefaultEcosystemFillers } from "./workflows/ensure-default-fillers.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -78,6 +79,9 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   // Branding is applied on first launch, not during npm installation, so the
   // package install itself never mutates dependency files.
   await applyRuntimeBranding(root);
+  // Seed default Nature / academic-paper gap-fill skills for this workspace.
+  // Network installs run later on session_start / /init so chat can open quickly.
+  await ensureDefaultEcosystemFillers(cwd, { install: false }).catch(() => undefined);
   const developerMode = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const toolAllowlist = developerMode
     ? "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp"

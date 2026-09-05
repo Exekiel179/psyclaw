@@ -27,12 +27,10 @@ const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capt
 
 export const RECOMMENDED_SKILL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   "markitdown-pro": "markitdown-bilibili",
-  "nature-reader": "nature-skills",
-  "nature-figure": "nature-skills",
-  "nature-writing": "nature-skills",
-  "nature-polishing": "nature-skills",
-  "nature-reviewer": "nature-skills",
-  "nature-citation": "nature-skills",
+  // Individual Nature / academic-paper fillers install under their own catalog ids.
+  // Only map legacy alternate names onto those leaf skills — do not collapse them
+  // into a suite id that is not an installable recommended Skill.
+  "nature-citation": "nature-ref-verifier",
 });
 
 export interface RecommendationState {

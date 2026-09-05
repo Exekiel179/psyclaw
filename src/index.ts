@@ -51,6 +51,8 @@ export * from "./workflows/institutional-fulltext.js";
 export * from "./workflows/expert-review.js";
 export * from "./workflows/expert-review-runner.js";
 export * from "./workflows/style-contract.js";
+export * from "./workflows/ecosystem-fillers.js";
+export * from "./workflows/ensure-default-fillers.js";
 export * from "./style/contracts.js";
 export * from "./style/registry.js";
 export * from "./style/artifact.js";

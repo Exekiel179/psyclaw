@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.27.23 - 2026-09-05
+
+- Default-install Nature gap-fill skills (`nature-figure`, `nature-ref-verifier`, `nature-polishing`) into the research/manuscript workflow.
+- Default-install `lishix520/academic-paper-skills` fillers (`academic-paper-strategist`, `academic-paper-composer`) for outline planning and chapter writing.
+- Seed these fillers on `/init` and session start (best-effort, offline-safe) and inject an ecosystem gap-fill prompt patch when they are loaded.
+
+
 ## 0.27.22 - 2026-09-04
 
 - Keep proxy users on GitHub's official API and Release URLs while routing mainland-registry users exclusively through mainland GitHub mirrors.

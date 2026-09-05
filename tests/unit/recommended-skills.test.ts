@@ -50,6 +50,27 @@ describe("recommended Skill lifecycle", () => {
     await expect(readRecommendationState(root)).resolves.toMatchObject({ skills: ["markitdown-bilibili"] });
   });
 
+  it("keeps Nature / academic-paper leaf fillers as distinct installable ids", async () => {
+    expect(normalizeRecommendedSkillId("nature-figure")).toBe("nature-figure");
+    expect(normalizeRecommendedSkillId("nature-polishing")).toBe("nature-polishing");
+    expect(normalizeRecommendedSkillId("nature-citation")).toBe("nature-ref-verifier");
+    expect(normalizeRecommendedSkillId("academic-paper-strategist")).toBe("academic-paper-strategist");
+    const catalog = await readRecommendedCatalog();
+    for (const id of [
+      "nature-figure",
+      "nature-ref-verifier",
+      "nature-polishing",
+      "academic-paper-strategist",
+      "academic-paper-composer",
+    ]) {
+      const item = catalog.items.find((candidate) => candidate.id === id);
+      const plan = catalog.installPrep.find((candidate) => candidate.id === id);
+      expect(item?.defaultInstall).toBe(true);
+      expect(plan?.defaultInstall).toBe(true);
+      expect(plan?.skillName).toBe(id);
+    }
+  });
+
   it("loads only enabled installs whose source, license, and content hashes validate", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-recommendations-"));
     const path = await managedFixture(root, "session-handoff");

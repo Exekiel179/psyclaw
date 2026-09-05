@@ -6,6 +6,7 @@ import { asHandoff, asProject } from "../core/schemas.js";
 import { atomicWriteFile } from "./jsonl.js";
 import { projectPaths, ensureProjectDirectories, assertSafeProjectPath } from "./paths.js";
 import { initializeHitlWorkspace } from "./hitl.js";
+import { ensureDefaultEcosystemFillers } from "../workflows/ensure-default-fillers.js";
 
 export interface BootstrapOptions {
   root: string;
@@ -13,6 +14,8 @@ export interface BootstrapOptions {
   paradigm: ResearchParadigm;
   projectId?: string;
   now?: string;
+  /** When false, only seed recommendation state; skip network installs. Default true. */
+  installDefaultFillers?: boolean;
 }
 
 export async function bootstrapProject(options: BootstrapOptions): Promise<ResearchProject> {
@@ -32,6 +35,11 @@ export async function bootstrapProject(options: BootstrapOptions): Promise<Resea
   asProject(project);
   await ensureProjectDirectories(paths.root);
   await initializeHitlWorkspace(paths.root, project.goal);
+  // Seed Nature + academic-paper gap-fill skills as defaults. Network install is
+  // best-effort and must not block project creation when offline.
+  await ensureDefaultEcosystemFillers(paths.root, {
+    install: options.installDefaultFillers !== false,
+  }).catch(() => undefined);
   const projectFile = await assertSafeProjectPath(paths.root, ".psyclaw/project.json");
   try {
     await writeFile(projectFile, `${JSON.stringify(project, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
