@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.27.24 - 2026-09-05
+
+- Route recommended Skill / default ecosystem filler installs through the same mainland GitHub mirror path used for managed tool downloads when a mainland npm registry or `PSYCLAW_GITHUB_MIRROR` is configured.
+- Prefer mirrored source archives, then mirrored git remotes, while keeping install manifests pinned to the canonical GitHub URL and commit.
+
+
 ## 0.27.23 - 2026-09-05
 
 - Default-install Nature gap-fill skills (`nature-figure`, `nature-ref-verifier`, `nature-polishing`) into the research/manuscript workflow.

@@ -10,6 +10,7 @@ import {
   realpath,
   rename,
   rm,
+  writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -18,6 +19,13 @@ import { fileURLToPath } from "node:url";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { parse as parseYaml } from "yaml";
 import { atomicWriteFile } from "../project/jsonl.js";
+import {
+  createRoutedFetch,
+  githubArchiveUrl,
+  githubCloneUrlCandidates,
+  resolveNetworkRoute,
+  type NetworkRoute,
+} from "../network-routing.js";
 
 const execFileAsync = promisify(execFile);
 const INSTALL_MANIFEST = "psyclaw-install.json";
@@ -239,6 +247,76 @@ async function runGit(args: string[]): Promise<void> {
   await execFileAsync("git", args, { maxBuffer: 4 * 1024 * 1024 });
 }
 
+async function downloadGithubArchive(
+  route: NetworkRoute,
+  sourceUrl: string,
+  ref: string,
+  repoDir: string,
+): Promise<void> {
+  const archiveUrl = githubArchiveUrl(sourceUrl, ref);
+  const fetchImpl = createRoutedFetch(route);
+  const response = await fetchImpl(archiveUrl, { redirect: "follow" });
+  if (!response.ok) {
+    throw new Error(`GitHub archive download failed (${response.status}) for ${archiveUrl}`);
+  }
+  const contentType = response.headers.get("content-type")?.toLocaleLowerCase() ?? "";
+  if (contentType.includes("text/html")) {
+    throw new Error(`GitHub archive mirror returned HTML for ${archiveUrl}`);
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  // gzip magic — reject empty/HTML soft-failures that slip past content-type checks
+  if (bytes.length < 64 || bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
+    throw new Error(`GitHub archive payload is not gzip for ${archiveUrl}`);
+  }
+  const scratch = await mkdtemp(join(tmpdir(), "psyclaw-skill-archive-"));
+  try {
+    const archivePath = join(scratch, "source.tar.gz");
+    await writeFile(archivePath, bytes);
+    await mkdir(repoDir, { recursive: true });
+    await execFileAsync("tar", ["-xzf", archivePath, "-C", repoDir, "--strip-components=1"], {
+      maxBuffer: 32 * 1024 * 1024,
+    });
+  } finally {
+    await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * Materialize a pinned GitHub ref into repoDir using the active network route.
+ * Mainland mirror mode prefers source archives through routed fetch, then falls
+ * back to mirrored git remotes. Proxy/official keep canonical git clone URLs.
+ * Manifests always record the canonical GitHub URL, never a mirror prefix.
+ */
+async function materializeGithubRepo(sourceUrl: string, ref: string, repoDir: string): Promise<void> {
+  const route = await resolveNetworkRoute();
+  const errors: string[] = [];
+
+  if (route.mode === "mirror") {
+    try {
+      await downloadGithubArchive(route, sourceUrl, ref, repoDir);
+      return;
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+      await rm(repoDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  for (const remote of githubCloneUrlCandidates(sourceUrl, route)) {
+    try {
+      await runGit(["clone", "--quiet", "--filter=blob:none", "--no-checkout", remote, repoDir]);
+      await runGit(["-C", repoDir, "checkout", "--quiet", ref]);
+      return;
+    } catch (error) {
+      errors.push(`${remote}: ${error instanceof Error ? error.message : String(error)}`);
+      await rm(repoDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  throw new Error(
+    `Failed to fetch ${sourceUrl}@${ref} through the configured network route (${route.mode}): ${errors.join(" | ")}`,
+  );
+}
+
 function installPlan(catalog: RecommendedCatalog, requestedId: string): { item: RecommendedCatalogItem; plan: RecommendedInstallPlan } {
   const id = normalizedId(requestedId);
   const item = catalog.items.find((candidate) => normalizedId(candidate.id) === id);
@@ -366,8 +444,10 @@ export async function installRecommendedSkill(root: string, requestedId: string,
   const repo = join(temporary, "repo");
   const staging = join(destinationRoot, `.staging-${plan.skillName}-${randomUUID()}`);
   try {
-    await runGit(["clone", "--quiet", "--filter=blob:none", "--no-checkout", plan.sourceUrl!, repo]);
-    await runGit(["-C", repo, "checkout", "--quiet", plan.ref ?? "main"]);
+    // Mainland npm/mirror users fetch through routed archives + mirrored git
+    // remotes; proxy/official keep canonical GitHub. Manifests still pin the
+    // original https://github.com/... URL.
+    await materializeGithubRepo(plan.sourceUrl!, plan.ref ?? "main", repo);
     const source = resolve(repo, plan.skillPath!);
     assertContained(repo, source);
     const sourceReal = await realpath(source);

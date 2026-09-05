@@ -34,7 +34,7 @@ npm install -g psyclaw@0.27.22 --registry=https://registry.npmjs.org/
 npm install -g psyclaw@0.27.22 --registry=https://registry.npmmirror.com
 ```
 
-PsyClaw 启动时会确保 `ripgrep` 和 `fd` 可用。检测到 `HTTP_PROXY`、`HTTPS_PROXY` 或 `ALL_PROXY` 时，通过代理访问 GitHub 官方 API 与 Release；检测到国内 npm registry 时，版本查询和压缩包统一通过国内 GitHub 镜像，并在镜像网络失败或返回错误页面时自动切换备用镜像。可用 `PSYCLAW_GITHUB_MIRROR=https://your-mirror.example/` 指定自建 HTTPS 镜像。
+PsyClaw 启动时会确保 `ripgrep` 和 `fd` 可用。检测到 `HTTP_PROXY`、`HTTPS_PROXY` 或 `ALL_PROXY` 时，通过代理访问 GitHub 官方 API 与 Release；检测到国内 npm registry 时，版本查询、Release 压缩包，以及推荐 Skill / 默认工作流查漏补缺（Nature、academic-paper-skills 等）的 GitHub 拉取，统一走国内 GitHub 镜像：优先镜像源码归档，失败再尝试镜像 git remote，并在镜像不可用或返回错误页面时自动切换备用镜像。安装清单仍记录官方 `https://github.com/...` 地址与 pinned ref。可用 `PSYCLAW_GITHUB_MIRROR=https://your-mirror.example/` 指定自建 HTTPS 镜像。
 
 确认命令入口：
 

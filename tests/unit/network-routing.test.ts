@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createRoutedFetch, selectNetworkRoute } from "../../src/network-routing.js";
+import {
+  createRoutedFetch,
+  githubArchiveUrl,
+  githubCloneUrlCandidates,
+  selectNetworkRoute,
+} from "../../src/network-routing.js";
 
 describe("runtime network routing", () => {
   it("keeps official GitHub URLs when a proxy is configured", () => {
@@ -20,6 +25,18 @@ describe("runtime network routing", () => {
 
   it("rejects insecure remote mirrors", () => {
     expect(() => selectNetworkRoute({ PSYCLAW_GITHUB_MIRROR: "http://mirror.example" })).toThrow(/must be HTTPS/);
+  });
+
+  it("builds mirrored git remotes and archive URLs for recommended Skill installs", () => {
+    const source = "https://github.com/example/skills.git";
+    const mirrorRoute = selectNetworkRoute({}, "https://registry.npmmirror.com");
+    expect(githubCloneUrlCandidates(source, mirrorRoute)).toEqual([
+      "https://gh-proxy.com/https://github.com/example/skills.git",
+      "https://gh-proxy.org/https://github.com/example/skills.git",
+    ]);
+    expect(githubCloneUrlCandidates(source, { mode: "official" })).toEqual([source]);
+    expect(githubCloneUrlCandidates(source, { mode: "proxy" })).toEqual([source]);
+    expect(githubArchiveUrl(source, "abc123")).toBe("https://github.com/example/skills/archive/abc123.tar.gz");
   });
 
   it("tries only mainland mirrors when the first mirror cannot be reached", async () => {

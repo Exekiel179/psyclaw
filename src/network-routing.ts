@@ -42,6 +42,39 @@ export function selectNetworkRoute(env: NodeJS.ProcessEnv, registry?: string): N
   return { mode: "official" };
 }
 
+/** Resolve the active route from env + npmrc/package install provenance. */
+export async function resolveNetworkRoute(env: NodeJS.ProcessEnv = process.env): Promise<NetworkRoute> {
+  return selectNetworkRoute(env, await configuredRegistry());
+}
+
+/**
+ * Git remotes to try when cloning a GitHub repo.
+ * Mirror mode prefixes the canonical GitHub HTTPS URL with each configured
+ * mainland mirror (same convention as createRoutedFetch). Proxy/official keep
+ * the canonical URL so git can use HTTPS_PROXY / direct GitHub access.
+ */
+export function githubCloneUrlCandidates(sourceUrl: string, route: NetworkRoute): string[] {
+  if (!sourceUrl.startsWith("https://github.com/")) {
+    throw new Error(`GitHub clone URL must start with https://github.com/: ${sourceUrl}`);
+  }
+  if (route.mode !== "mirror") return [sourceUrl];
+  return route.mirrors.map((mirror) => `${mirror}${sourceUrl}`);
+}
+
+/**
+ * Canonical GitHub source-archive URL for a branch, tag, or commit.
+ * Prefer this over git smart-HTTP through mirrors: archive downloads reuse the
+ * same routed fetch path already proven for Release assets.
+ */
+export function githubArchiveUrl(sourceUrl: string, ref: string): string {
+  if (!sourceUrl.startsWith("https://github.com/")) {
+    throw new Error(`GitHub archive URL must start with https://github.com/: ${sourceUrl}`);
+  }
+  if (!ref.trim()) throw new Error("GitHub archive ref is required");
+  const cleaned = sourceUrl.replace(/\.git$/i, "").replace(/\/$/, "");
+  return `${cleaned}/archive/${encodeURIComponent(ref)}.tar.gz`;
+}
+
 function npmrcRegistry(text: string): string | undefined {
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
