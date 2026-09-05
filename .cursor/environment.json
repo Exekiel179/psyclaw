@@ -1,9 +1,4 @@
 {
   "name": "PsyClaw",
-  "user": "node",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "."
-  },
   "install": "corepack pnpm install --frozen-lockfile && corepack pnpm build"
 }
