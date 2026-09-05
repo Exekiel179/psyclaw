@@ -18,26 +18,25 @@ describe("psyclaw identity prompt", () => {
 });
 
 describe("ensureQuietStartup", () => {
-  it("writes quietStartup once (default false = show version header) and merges", async () => {
+  it("hides the detailed startup resource inventory by default and merges", async () => {
     const dir = await mkdtemp(join(tmpdir(), "psyclaw-branding-"));
     const path = join(dir, "agent", "settings.json");
     try {
       const first = await ensureQuietStartup(path);
       expect(first.wrote).toBe(true);
-      expect(JSON.parse(await readFile(path, "utf8"))).toMatchObject({ quietStartup: false });
+      expect(JSON.parse(await readFile(path, "utf8"))).toMatchObject({ quietStartup: true });
 
       const second = await ensureQuietStartup(path);
       expect(second.wrote).toBe(false);
 
-      // An explicit `true` flips it (opt into the quiet screen).
-      const flipped = await ensureQuietStartup(path, true);
+      const flipped = await ensureQuietStartup(path, false);
       expect(flipped.wrote).toBe(true);
-      expect(JSON.parse(await readFile(path, "utf8"))).toMatchObject({ quietStartup: true });
+      expect(JSON.parse(await readFile(path, "utf8"))).toMatchObject({ quietStartup: false });
 
       // A pre-existing field survives the merge.
       await writeFile(path, JSON.stringify({ theme: "dark" }), "utf8");
       await ensureQuietStartup(path);
-      expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ theme: "dark", quietStartup: false });
+      expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ theme: "dark", quietStartup: true });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -50,7 +49,7 @@ describe("ensureQuietStartup", () => {
       await writeFile(path, "{not json", "utf8");
       const result = await ensureQuietStartup(path);
       expect(result.wrote).toBe(true);
-      expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ quietStartup: false });
+      expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ quietStartup: true });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

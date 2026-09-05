@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "psyclaw/bundled-upstream/v1",
+  "name": "academic-research-skills",
+  "source": "https://github.com/Imbad0202/academic-research-skills",
+  "ref": "v3.21.1",
+  "commit": "127ff85e4bbfcdd10b95040537b6c6bd7ad17aeb",
+  "archiveSha256": "3b82731b860a021e9c8efbca4cc3a91e472a43b50a21a066e2a44e312c97cdf3",
+  "license": "CC-BY-NC-4.0",
+  "distribution": "Bundled in the PsyClaw npm package for offline runtime loading; no runtime GitHub download is required."
+}

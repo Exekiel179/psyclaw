@@ -18,6 +18,7 @@ export interface PiExecutorOptions {
   agentDir?: string;
   env?: Record<string, string>;
   timeoutMs?: number;
+  tools?: readonly ("read" | "grep" | "find" | "ls")[];
   onEvent?: (event: RunnerEvent) => void | Promise<void>;
   pauseRequested?: () => boolean | Promise<boolean>;
 }
@@ -139,7 +140,7 @@ export function createPiReadOnlyExecutor(options: PiExecutorOptions): WorkerExec
       ...(options.agentDir === undefined ? {} : { agentDir: options.agentDir }),
       ...(options.env === undefined ? {} : { env: options.env }),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
-      tools: ["read", "grep", "find", "ls"],
+      tools: options.tools ?? ["read", "grep", "find", "ls"],
     });
     try {
       await client.start();

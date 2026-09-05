@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.7.0",
-  "syncedAt": "2026-09-03",
+  "documentVersion": "0.7.2",
+  "syncedAt": "2026-09-05",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
@@ -157,15 +157,6 @@
     }
   ],
   "plugins": [
-    {
-      "id": "academic-research-suite-plugin",
-      "name": "ARS Academic Research Suite",
-      "kind": "plugin",
-      "stage": "研究全流程",
-      "description": "以 Plugin 方式提供 Academic Research Suite 的文献研究、写作、评审与修订能力。",
-      "sourceRef": "https://github.com/Imbad0202/academic-research-skills-codex",
-      "installHint": "使用 Pi 原生 Plugin 管理器安装；仓库同时包含 Skill，安装后按其插件说明启用。"
-    },
     {
       "id": "nature-skills-plugin",
       "name": "Nature Skills Suite",

@@ -84,15 +84,13 @@ export interface AcknowledgeBundledPiChangelogResult {
 }
 
 /**
- * Set `quietStartup` in the psyclaw agent settings. Defaults to `false` so Pi's
- * native header ("psyclaw v<version>", keybinding hints, loaded resources) stays
- * visible on startup, imitating the official pi banner; set `PSYCLAW_QUIET_STARTUP=1`
- * (or pass `quiet: true`) to hide it behind the ctrl+o expander instead.
+ * Keep Pi's detailed local resource inventory behind the ctrl+o expander. Set
+ * `PSYCLAW_VERBOSE_STARTUP=1` to show it on every launch.
  * Merges with any existing settings instead of clobbering.
  */
 export async function ensureQuietStartup(
   settingsPath?: string,
-  quiet: boolean = process.env.PSYCLAW_QUIET_STARTUP === "1",
+  quiet: boolean = process.env.PSYCLAW_VERBOSE_STARTUP !== "1",
 ): Promise<EnsureQuietStartupResult> {
   const path = settingsPath ?? join(getAgentDir(), "settings.json");
   let existing: Record<string, unknown> = {};

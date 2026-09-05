@@ -211,6 +211,12 @@ const MODE_PATCHES = [
     next: 'theme.bold(theme.fg("accent", `ψ ${APP_NAME}`))',
   },
   {
+    old: `        // Add header with keybindings from config (unless silenced)
+        if (this.options.verbose || !this.settingsManager.getQuietStartup()) {`,
+    next: `        // Keep the PsyClaw banner even when quietStartup hides inventories.
+        if (true) {`,
+  },
+  {
     old: `const skills = skillsResult.skills;
             if (skills.length > 0) {
                 const groups = this.buildScopeGroups(skills.map((skill) => ({ path: skill.filePath, sourceInfo: skill.sourceInfo })));

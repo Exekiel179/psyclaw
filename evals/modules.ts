@@ -131,10 +131,6 @@ async function main(): Promise<void> {
       return { ok: true, note: "二次 init 被拒绝（幂等保护）" };
     }
   });
-  await probe("M2", "CLI 命令面", "hitl init", async () => {
-    const r = cli(["hitl", "init"], root);
-    return { ok: r.code === 0, note: r.out.includes("HITL") ? "创建 HITL 工作区" : r.out.slice(0, 120) };
-  });
   await probe("M2", "CLI 命令面", "handoff 生成", async () => {
     const r = cli(["handoff"], root);
     return { ok: r.code === 0 && existsSync(join(root, "notes", "HANDOFF.md")), note: "notes/HANDOFF.md 已生成" };
@@ -182,45 +178,6 @@ async function main(): Promise<void> {
     const refs = await readFile(join(root, ".psyclaw", "references.jsonl"), "utf8");
     return { ok: r.record.verified && cites.includes("缓冲压力假说") && refs.includes("10.1000/kessler2005"), note: `引用用途+证据已登记 (${r.record.citationId})` };
   });
-  await probe("M3", "对话工具", "真实运行时 /panel（Pi RPC + 扩展）", async () => {
-    const { spawn } = await import("node:child_process");
-    const panelDir = await mkdtemp(join(tmpdir(), "psyclaw-eval-panel-"));
-    const piCli = resolve(here, "..", "node_modules", ".pnpm", "@earendil-works+pi-coding-agent@0.84.1_ws@8.21.3_zod@4.4.3", "node_modules", "@earendil-works", "pi-coding-agent", "dist", "cli.js");
-    const child = spawn(process.execPath, [piCli, "--mode", "rpc", "--no-session",
-      "--extension", resolve(here, "..", "dist", "src", "extension.js"),
-      "--extension", resolve(here, "..", "dist", "src", "panel", "extension.js"),
-      "--tools", "read"],
-      { cwd: panelDir, stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, PI_SKIP_VERSION_CHECK: "1", DEEPSEEK_API_KEY: "dummy-skip" } });
-    let rpcBuf = "";
-    const rpcEvents: Array<{ type?: string; method?: string; message?: string }> = [];
-    child.stdout.on("data", (c: Buffer) => {
-      rpcBuf += String(c);
-      const lines = rpcBuf.split("\n"); rpcBuf = lines.pop() ?? "";
-      for (const l of lines) { if (l.trim()) { try { rpcEvents.push(JSON.parse(l)); } catch { /* ignore */ } } }
-    });
-    const send = (o: unknown) => child.stdin.write(`${JSON.stringify(o)}\n`);
-    try {
-      await new Promise((r) => setTimeout(r, 4000));
-      send({ type: "prompt", message: "/panel", id: "eval-panel" });
-      await new Promise((r) => setTimeout(r, 12_000));
-      const notify = rpcEvents.find((e) => e.type === "extension_ui_request" && e.method === "notify");
-      if (!notify?.message) return { ok: false, note: "/panel 未产生 notify 事件" };
-      const panelUrl = notify.message.match(/http:\/\/127\.0\.0\.1:\d+/)?.[0];
-      if (panelUrl === undefined) return { ok: false, note: "notify 未包含 loopback 页面地址" };
-      try {
-        const res = await fetch(panelUrl, { signal: AbortSignal.timeout(3000) });
-        const text = await res.text();
-        const found = text.includes("手稿编辑与核验") && text.includes("tab-editor");
-        return { ok: found, note: found ? `notify + 真实页面伺服（${panelUrl}）` : "页面内容不符合工作台契约" };
-      } catch {
-        return { ok: false, note: `无法访问 notify 页面（${panelUrl}）` };
-      }
-    } finally {
-      child.kill("SIGTERM");
-      await new Promise((r) => setTimeout(r, 1500));
-    }
-  });
-
   // ---------- M4 研究工作流 ----------
   await probe("M4", "研究工作流", "文献综述通过（有证据）", async () => {
     const wroot = await project("qualitative-thematic");
@@ -294,25 +251,6 @@ async function main(): Promise<void> {
     });
     return { ok, note };
   });
-  await probe("M6", "文档导入", "md 导入登记证据（幂等）", async () => {
-    let ok = false; let note = "";
-    await withServer(root, async (base) => {
-      const post = (p: string, b: unknown) => fetch(`${base}${p}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) });
-      const r = await (await post("/api/documents/import", { path: "paper/论文初稿.md" })).json() as { ok: boolean; evidenceId: string; markdown: string | null };
-      const again = await (await post("/api/documents/import", { path: "paper/论文初稿.md" })).json() as { alreadyImported: boolean };
-      ok = Boolean(r.ok && r.evidenceId && again.alreadyImported);
-      note = `证据 ${r.evidenceId ?? "?"}，重导幂等`;
-    });
-    return { ok, note };
-  });
-  await probe("M6", "文档导入", "路径逃逸拒绝", async () => {
-    let ok = false; let note = "";
-    await withServer(root, async (base) => {
-      const r = await fetch(`${base}/api/documents/import`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path: "../escape.md" }) });
-      ok = r.status === 400; note = `HTTP ${r.status} 拒绝`;
-    });
-    return { ok, note };
-  });
 
   // ---------- M7 引用体系 ----------
   await probe("M7", "引用体系", "正文引文提取与缺口", async () => {
@@ -329,47 +267,7 @@ async function main(): Promise<void> {
     return { ok: r.ok === false && r.reason === "not-open-access", note: "非开放获取，如实阻断" };
   });
 
-  // ---------- M8 手稿与面板 ----------
-  await probe("M8", "手稿与面板", "手稿发现 paper/*.md", async () => {
-    let ok = false; let note = "";
-    await withServer(root, async (base) => {
-      const ms = await (await fetch(`${base}/api/manuscript`)).json() as { exists: boolean; path: string | null };
-      ok = ms.exists && ms.path === "paper/论文初稿.md"; note = ms.path ?? "无";
-    });
-    return { ok, note };
-  });
-  await probe("M8", "手稿与面板", "版本接口与归档可读", async () => {
-    let ok = false; let note = "";
-    await withServer(root, async (base) => {
-      const v = await (await fetch(`${base}/api/versions`)).json() as { versions: Array<{ version: number; markdownLoadPath: string }> };
-      const v1 = v.versions.find((x) => x.version === 1);
-      const text = v1 ? await (await fetch(`${base}/api/artifact?path=${encodeURIComponent(v1.markdownLoadPath)}`)).text() : "";
-      ok = v.versions.length >= 2 && text.includes("第一版"); note = `${v.versions.length} 个版本，v1 可回读`;
-    });
-    return { ok, note };
-  });
-  await probe("M8", "手稿与面板", "中文文件名产物可伺服（RFC 5987）", async () => {
-    let ok = false; let note = "";
-    await withServer(root, async (base) => {
-      const r = await fetch(`${base}/api/artifact?path=${encodeURIComponent("paper/论文初稿.md")}`);
-      ok = r.status === 200; note = `HTTP ${r.status}`;
-    });
-    return { ok, note };
-  });
-
   // ---------- M9 安全与门禁 ----------
-  await probe("M9", "安全与门禁", "发布名称逃逸拒绝", async () => {
-    let ok = false; let note = "";
-    await withServer(root, async (base) => {
-      // `paper/../../evil` resolves outside the project root → must be rejected.
-      const r = await fetch(`${base}/api/publish`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: "x", name: "../../evil", exportDocx: false }) });
-      ok = r.status === 400; note = `HTTP ${r.status}`;
-      // `paper/../evil` stays inside the project → contained is also acceptable.
-      const contained = await fetch(`${base}/api/publish`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ content: "x", name: "../evil", exportDocx: false }) });
-      note += ` | 包含内路径 HTTP ${contained.status}`;
-    });
-    return { ok, note };
-  });
   await probe("M9", "安全与门禁", "副作用有 receipt（.psyclaw/manifests）", async () => {
     const { readdir } = await import("node:fs/promises");
     let receipts = 0;

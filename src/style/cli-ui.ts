@@ -76,7 +76,6 @@ export function formatCliUsage(): string {
     cmd("/skill", "[status|enable|disable|install]", c.white("管理和安装 Skill")),
     cmd("/mcp", "", c.white("管理 MCP 服务器")),
     cmd("/plugin", "", c.white("打开 Plugin 推荐与管理页")),
-    cmd("/install", "[skill|mcp] [id]", c.white("查看或安装推荐能力")),
     cmd("/provider", "[provider-id]", c.white("查看、配置或切换 Provider")),
     cmd("/panel", "", c.white("打开科研工作台")),
     cmd("/export", "", c.white("使用 Pi 内置命令导出会话")),

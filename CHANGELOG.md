@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.28.0 - 2026-09-06
+
+- Add preview-and-confirm `/create-skill`, `/create-hook`, `/create-rule`, and `/create-subagent` commands with project-local schemas, no-clobber writes, hashes, and audit receipts.
+- Extend `/agents` to run up to four selected project-defined read-only personas in isolated Pi RPC workers.
+- Add a narrow ARS review bridge: fixed five-seat, two-phase Stage 3 review with deterministic validation and provenance, plus ordered three-gate Stage 3′ re-review without false parallelism claims.
+- Remove the user-facing `/install` slash command; install through `/skill`, `/plugin`, `/mcp`, or `/panel`.
+- Add `pnpm test:ars` as the ARS-path minimal acceptance suite.
+- Bundle official Windows x64/arm64 `ripgrep` 15.2.0 and `fd` 10.5.0 executables in the npm package, and expose them to Pi through `PATH` so Windows startup performs no tool download.
+- Hide Pi's detailed local Skills, Extensions, and Themes inventory by default; `ctrl+o` still expands it when needed.
+- Point the ARS recommendation to the original `Imbad0202/academic-research-skills` repository; during an active ARS run, gap-fill only with loaded Nature fillers when present.
+
 ## 0.27.23 - 2026-09-04
 
 - Align panel manuscript/document management with the read-only workbench contract: write routes answer 405 and the panel never mutates project files.
@@ -7,6 +18,7 @@
 - Replace user-facing instructions to install via Pi internals with system-managed install wording in recommendation, plugin and panel flows.
 - Gate /run behind /init: compliant analysis documents alone no longer auto-bootstrap a controlled project.
 - Route /install recommendation surface to system-managed installation and drop the removed /export command from the registered command set.
+
 ## 0.27.22 - 2026-09-04
 
 - Keep proxy users on GitHub's official API and Release URLs while routing mainland-registry users exclusively through mainland GitHub mirrors.

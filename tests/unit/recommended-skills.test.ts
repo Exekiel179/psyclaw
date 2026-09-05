@@ -38,6 +38,12 @@ async function managedFixture(root: string, id: string): Promise<string> {
 }
 
 describe("recommended Skill lifecycle", () => {
+  it("does not offer the system-integrated ARS as a recommended download", async () => {
+    const catalog = await readRecommendedCatalog();
+    const ars = catalog.plugins.find((plugin) => plugin.id === "academic-research-suite-plugin");
+    expect(ars).toBeUndefined();
+  });
+
   it("migrates the old MarkItDown id in recommendation state", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-recommendations-"));
     await mkdir(join(root, ".psyclaw"), { recursive: true });

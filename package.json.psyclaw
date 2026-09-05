@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/package-governance/v1",
   "id": "psyclaw",
-  "apiVersion": "0.27",
+  "apiVersion": "0.28",
   "capabilities": ["research-brief", "evidence-ledger", "integrity-gates"],
   "permissions": {
     "read": ["project-root"],

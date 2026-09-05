@@ -20,8 +20,8 @@ export type SkillRiskLevel = "low" | "medium" | "high" | "critical" | "unknown";
 
 /**
  * Host-side approval is deliberately separate from descriptor metadata.
- * A skill may describe itself as `trusted`; explicit user selection controls
- * activation, while host state remains available for explicit disablement.
+ * A skill may describe itself as `trusted`, but only host-side admission can
+ * approve execution and host policy may block suspicious content.
  */
 export type SkillApprovalStatus = "discover-only" | "approved" | "blocked" | "stale";
 
@@ -67,7 +67,7 @@ export interface SkillDescriptor {
   sourcePath: string;
   /** Canonical path used for reads; never a symlink. */
   resolvedPath: string;
-  /** Canonical root under which the skill was discovered. */
+  /** Caller-provided absolute root; canonical resolution is checked separately. */
   rootPath: string;
   /** SHA-256 of the complete SKILL.md file, including frontmatter. */
   sha256: string;
@@ -76,7 +76,7 @@ export interface SkillDescriptor {
   /** Metadata-derived trust; never sufficient for execution by itself. */
   trust: SkillTrustStatus;
   risk: SkillRiskLevel;
-  /** Host approval state; selected Skills are executable by default. */
+  /** Host approval state; discovery alone never grants execution. */
   approvalStatus: SkillApprovalStatus;
   /** Runtime routing toggle; always false after discovery until explicitly enabled. */
   enabled: boolean;

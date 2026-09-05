@@ -45,6 +45,21 @@ describe("read-only panel server", () => {
       expect(await exportRes.json()).toMatchObject({ format: "json", content: expect.stringContaining("exported") });
       expect((await fetch(`${base}/api/traces`)).status).toBe(404);
 
+      const capabilitiesRes = await fetch(`${base}/api/enabled-capabilities`);
+      const capabilities = (await capabilitiesRes.json()) as {
+        coreSkills: Array<{ id: string; description?: string; enabled: boolean; locked?: boolean }>;
+      };
+      expect(capabilities.coreSkills).toContainEqual(expect.objectContaining({
+        id: "psyclaw-ars",
+        description: expect.stringContaining("研究、写作、审稿与修订流程"),
+        enabled: true,
+        locked: true,
+      }));
+      const plugins = (await (await fetch(`${base}/api/recommended-plugins`)).json()) as {
+        items: Array<{ id: string }>;
+      };
+      expect(plugins.items.some((item) => item.id === "academic-research-suite-plugin")).toBe(false);
+
       const previousKey = process.env.DEEPSEEK_API_KEY;
       process.env.DEEPSEEK_API_KEY = "panel-secret-must-not-leak";
       try {

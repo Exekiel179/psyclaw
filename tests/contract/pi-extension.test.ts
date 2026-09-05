@@ -34,7 +34,8 @@ describe("Pi extension contract", () => {
     // PSYCLAW_DEVELOPER_COMMANDS=1, so they are absent from the default set.
     expect(commands).toEqual([
       "init", "run", "brief", "grill", "review", "loop",
-      "skill", "plugin", "mcp", "install", "provider", "pet", "agents",
+      "create-skill", "create-hook", "create-rule", "create-subagent",
+      "skill", "ars", "plugin", "mcp", "provider", "pet", "agents",
     ]);
   });
 

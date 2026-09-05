@@ -44,7 +44,7 @@ describe("SkillRegistry", () => {
     const descriptor = report.skills[0]!;
     expect(descriptor.id).toBe("research-brief");
     expect(descriptor.sourcePath).toBe(file);
-    expect(descriptor.resolvedPath).toBe(file);
+    expect(descriptor.resolvedPath).toBe(await import("node:fs/promises").then(({ realpath }) => realpath(file)));
     expect(descriptor.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(descriptor.licenseStatus).toBe("declared");
     expect(descriptor.dependencyStatus).toBe("ready");
