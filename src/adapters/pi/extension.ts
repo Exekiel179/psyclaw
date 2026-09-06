@@ -66,7 +66,7 @@ import {
   isArsPiTurn,
   psyclawArsPatch,
 } from "../../ars/profile.js";
-import { ArsModeEditor, enterArsModeEditorText, isArsModeEditorText } from "../../ars/mode-editor.js";
+import { ArsModeEditor, ARS_MODE_STATUS, isArsModeEditorText } from "../../ars/mode-editor.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -1250,6 +1250,36 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
   const runtimeMcps = new RuntimeMcpRegistry();
+  let arsModeEditor: ArsModeEditor | undefined;
+  let arsUiContext: { sessionManager: Parameters<typeof isArsPiActive>[0]; isIdle: () => boolean; hasUI: boolean; ui: { setStatus: (key: string, text: string | undefined) => void } } | undefined;
+
+  const applyArsUiMode = (active: boolean, opts?: { syncSession?: boolean }) => {
+    arsModeEditor?.setConversationMode(active);
+    arsUiContext?.ui.setStatus("ars", active ? ARS_MODE_STATUS : undefined);
+    if (opts?.syncSession === false || !arsUiContext) return;
+    const sessionActive = isArsPiActive(arsUiContext.sessionManager);
+    if (active && !sessionActive) {
+      pi.sendUserMessage("/ars-pi-start", {
+        ...(!arsUiContext.isIdle() ? { deliverAs: "followUp" as const } : {}),
+        expandPromptTemplates: true,
+      });
+    } else if (!active && sessionActive) {
+      pi.sendUserMessage("/ars-pi-stop", {
+        ...(!arsUiContext.isIdle() ? { deliverAs: "followUp" as const } : {}),
+        expandPromptTemplates: true,
+      });
+    }
+  };
+
+  if (!legacyTestApi && typeof pi.registerShortcut === "function") {
+    pi.registerShortcut("shift+tab", {
+      description: "Toggle academic mode",
+      handler: () => {
+        const next = !(arsModeEditor?.isConversationMode() ?? isArsPiActive(arsUiContext?.sessionManager));
+        applyArsUiMode(next);
+      },
+    });
+  }
   if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event) => {
     const enabled = await enabledRecommendedSkillPaths(event.cwd);
     const local = await enabledLocalSkillPaths(event.cwd, {
@@ -1279,12 +1309,21 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_start", (_event, ctx) => {
+    arsUiContext = ctx;
     if (!ctx.hasUI || typeof ctx.ui.setEditorComponent !== "function") return;
+
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       const editor = new ArsModeEditor(tui, theme, keybindings);
+      arsModeEditor = editor;
       editor.onArsModeChange = (active) => {
-        ctx.ui.setStatus("ars", active ? "ARS" : undefined);
+        ctx.ui.setStatus("ars", active ? ARS_MODE_STATUS : undefined);
       };
+      editor.onToggleConversationMode = () => {
+        applyArsUiMode(!editor.isConversationMode());
+      };
+      const restore = isArsPiActive(ctx.sessionManager);
+      editor.setConversationMode(restore);
+      if (restore) ctx.ui.setStatus("ars", ARS_MODE_STATUS);
       return editor;
     });
   });
@@ -1293,19 +1332,6 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     if (!/^\/(?:login|logout)(?:\s|$)/i.test(event.text.trim())) return;
     ctx.ui.notify("PsyClaw 已统一隐藏底层登录命令。请使用 /provider 配置、切换或更新模型凭据。", "info");
     return { action: "handled" };
-  });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("input", async (event, ctx) => {
-    if (event.source === "extension" || isArsPiActive(ctx.sessionManager)) return;
-    const text = event.text.trim();
-    const entersArs = isArsModeEditorText(text)
-      || /^\/(?:ars-[a-z0-9-]+|skill:(?:deep-research|academic-paper|academic-paper-reviewer|academic-pipeline))(?:\s|$)/i.test(text);
-    if (!entersArs) return;
-    if (!ctx.hasUI) return { action: "handled" as const };
-    const approved = await ctx.ui.confirm(
-      "启用 ARS？",
-      `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF}\n许可：CC BY-NC 4.0，仅限非商业用途。关键研究阶段仍会请求确认。`,
-    );
-    if (!approved) return { action: "handled" as const };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
     const run = await readControlledRun(ctx.cwd);
@@ -1570,34 +1596,28 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("ars", {
-    description: "进入 ARS 对话模式，或管理 doctor/start/full/stop",
+    description: "切换 academic mode，或管理 doctor/start/full/stop",
     handler: async (args, ctx) => {
       try {
         const [action, ...rest] = args.trim().split(/\s+/).filter(Boolean);
-        // Bare /ars → conversation mode (ars: + tint). No profile popup.
+        // Bare /ars → sticky academic mode (same as Shift+Tab on). No profile popup.
         if (!action) {
           if (!ctx.hasUI) {
-            ctx.ui.notify("当前环境无编辑器；请改用 /ars start 或发送 ars: <任务>。", "info");
+            ctx.ui.notify("当前环境无编辑器；请改用 Shift+Tab 或 /ars start。", "info");
             return;
           }
-          if (!isArsPiActive(ctx.sessionManager)) {
-            const approved = await ctx.ui.confirm(
-              "启用 ARS？",
-              `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF}\n许可：CC BY-NC 4.0，仅限非商业用途。关键研究阶段仍会请求确认。`,
-            );
-            if (!approved) return;
-          }
-          ctx.ui.setEditorText(enterArsModeEditorText(ctx.ui.getEditorText?.() ?? ""));
-          ctx.ui.setStatus("ars", "ARS");
+          arsUiContext = ctx;
+          applyArsUiMode(true);
           return;
         }
         if (action === "status") {
           ctx.ui.notify(
             [
               `PsyClaw ARS profile v${PSYCLAW_ARS_PROFILE_VERSION}`,
-              "模式：轻量 ARS（输入 ars 后按 Tab，或以 ars: 前缀对话）",
+              "模式：academic mode（Shift+Tab 切换；开启后直接对话）",
+              "Thinking：Ctrl+Shift+Tab（Shift+Tab 已让给 academic mode）",
               `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF} (${ARS_UPSTREAM_COMMIT.slice(0, 12)})`,
-              "入口：ars: <task>，/ars doctor，/ars start，/ars full <task>，/ars stop",
+              "入口：Shift+Tab，/ars doctor，/ars start，/ars full <task>，/ars stop",
               formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)),
             ].join("\n"),
             "info",
@@ -1605,15 +1625,8 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           return;
         }
         if (action === "install") {
-          ctx.ui.notify("ARS 与 Nature/compose 技能已内置：输入 ars 后按 Tab，或以 /ars start、/ars full <task> 使用。", "info");
+          ctx.ui.notify("ARS 与 Nature/compose 技能已内置：按 Shift+Tab 进入 academic mode。", "info");
           return;
-        }
-        if ((action === "start" || action === "full") && !isArsPiActive(ctx.sessionManager)) {
-          const approved = await ctx.ui.confirm(
-            "启用 ARS？",
-            `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF}\n许可：CC BY-NC 4.0，仅限非商业用途。关键研究阶段仍会请求确认。`,
-          );
-          if (!approved) return;
         }
         const upstreamCommand = action === "doctor"
           ? "/ars-pi-doctor"
@@ -1625,11 +1638,16 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
                 ? `/ars-full${rest.length > 0 ? ` ${rest.join(" ")}` : ""}`
                 : undefined;
         if (!upstreamCommand) {
-          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop] 或直接输入 ars 后按 Tab", "info");
+          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop] 或按 Shift+Tab 切换 academic mode", "info");
           return;
         }
+        if (action === "start") {
+          arsUiContext = ctx;
+          applyArsUiMode(true, { syncSession: false });
+        }
         if (action === "stop") {
-          ctx.ui.setStatus("ars", undefined);
+          arsUiContext = ctx;
+          applyArsUiMode(false, { syncSession: false });
           if (ctx.hasUI && isArsModeEditorText(ctx.ui.getEditorText?.() ?? "")) {
             ctx.ui.setEditorText("");
           }

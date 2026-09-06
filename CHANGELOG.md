@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.28.3 - 2026-09-06
+
+- Keep Shift+Tab for sticky academic mode; move Pi thinking-level cycle to Ctrl+Shift+Tab via agent keybindings.json (custom bindings preserved).
+
 ## 0.28.2 - 2026-09-06
 
 - Enter ARS conversation mode with ars + Tab (ars: prefix and tinted editor); bare /ars no longer shows the profile popup.
