@@ -165,7 +165,7 @@ const logo = [
   "",
 ].join("\\n");`;
 
-const GRAD_CORE_SKILLS = "\\x1b[1m\\x1b[38;2;56;189;248m✦ 核心证据链:\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mresearch-intake\\x1b[0m \\x1b[38;2;99;102;241m➔\\x1b[0m \\x1b[1m\\x1b[38;2;129;140;248mevidence-capture\\x1b[0m \\x1b[38;2;168;85;247m➔\\x1b[0m \\x1b[1m\\x1b[38;2;168;85;247mcitation-audit\\x1b[0m \\x1b[38;2;236;72;153m➔\\x1b[0m \\x1b[1m\\x1b[38;2;45;212;191mresearch-brief\\x1b[0m";
+const GRAD_CORE_SKILLS = "\\x1b[1m\\x1b[38;2;56;189;248m✦ 核心证据链:\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mresearch-intake\\x1b[0m \\x1b[38;2;99;102;241m➔\\x1b[0m \\x1b[1m\\x1b[38;2;129;140;248mevidence-capture\\x1b[0m \\x1b[38;2;168;85;247m➔\\x1b[0m \\x1b[1m\\x1b[38;2;168;85;247mcitation-audit\\x1b[0m";
 
 const PSYCLAW_SKILLS_FORMATTER = `const skills = skillsResult.skills;
             if (skills.length > 0) {
@@ -174,7 +174,7 @@ const PSYCLAW_SKILLS_FORMATTER = `const skills = skillsResult.skills;
                     formatPath: (item) => this.formatDisplayPath(item.path),
                     formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
                 });
-                const CORE_PIPELINE = ["research-intake", "evidence-capture", "citation-audit", "research-brief"];
+                const CORE_PIPELINE = ["research-intake", "evidence-capture", "citation-audit"];
                 const availableCore = CORE_PIPELINE.filter((name) => skills.some((s) => s.name === name));
                 const otherSkills = skills.filter((s) => !CORE_PIPELINE.includes(s.name)).map((s) => s.name);
                 const skillCompactList = \`  ${GRAD_CORE_SKILLS}\\n\${theme.fg("dim", \`  ⟡ 生态扩展 (\${otherSkills.length}): \${otherSkills.slice(0, 10).join(", ")}\${otherSkills.length > 10 ? " ... (按 Ctrl+O 展开全部)" : ""}\`)}\`;

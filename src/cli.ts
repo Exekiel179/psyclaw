@@ -16,7 +16,6 @@ import {
   planAgentInstall,
   projectPaths,
   runInstall,
-  runOfflineBrief,
   setupProviders,
   sha256File,
   writeHandoff,
@@ -232,12 +231,6 @@ async function main(): Promise<void> {
       "Markdown 产物": "notes/HANDOFF.md",
       "JSON 结构化快照": "notes/handoff.json",
     }));
-    return;
-  }
-  if (command === "brief") {
-    const result = await runOfflineBrief(root);
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-    if (result.verdict === "blocked") process.exitCode = 2;
     return;
   }
   if (command === "agents" || command === "scan") {

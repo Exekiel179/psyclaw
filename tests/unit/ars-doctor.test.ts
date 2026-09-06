@@ -7,7 +7,7 @@ describe("buildArsDoctorReport", () => {
       repositoryRoot: "/tmp/vendor/ars",
       activeTools: ["psyclaw_ars_multi_agent"],
       commands: ["agents", "create-subagent"],
-      controlledRunActive: false,
+      projectActive: false,
     });
     expect(report).toContain("psyclaw_ars_multi_agent");
     expect(report).toContain("/agents");
@@ -16,5 +16,6 @@ describe("buildArsDoctorReport", () => {
     expect(report).not.toContain("Tectonic:");
     expect(report).not.toContain("Claude hooks: unavailable");
     expect(report).not.toContain("降级模式");
+    expect(report).not.toContain("/run");
   });
 });

@@ -16,7 +16,7 @@ export function defaultPsyClawMarkdown(projectLabel = "未命名研究项目"): 
     "",
     "- `data/raw/` — 原始数据（只读；指纹仅用于防篡改，不作学术核验）",
     "- `data/clean/` — 可分析派生数据",
-    "- `analysis/scripts|configs|results/` — 脚本、规格、结果",
+    "- `analysis/scripts|configs|results|plans/` — 脚本、规格、结果、分析方案",
     "- `analysis/HANDOFF.md` — 分析→学术交接",
     "- `literature/` — 文献",
     "- `paper/` — 手稿与导出",
@@ -25,7 +25,7 @@ export function defaultPsyClawMarkdown(projectLabel = "未命名研究项目"): 
     "",
     "## 流水线（软门禁）",
     "",
-    "初始化仓库 → 澄清 → 审查 → 形成方案 → 审查 → 分析 → 分析报告 → 审查 → academic/ARS（每阶段审查）。",
+    "初始化仓库 → 澄清 → 审查 → 形成方案（`/plan`）→ 审查 → 分析（默认可复现脚本；特殊后端再用 MCP）→ 分析报告 → 审查 → academic/ARS（每阶段审查）。",
     "",
     "第一要务：把结果跑出来。第二：用 AI 语义核查核心字段 + 人用 `/verify` 勾选已核实。不把 SHA256 当学术过关证明。",
     "",
@@ -34,8 +34,8 @@ export function defaultPsyClawMarkdown(projectLabel = "未命名研究项目"): 
     "| 模式 | 用途 |",
     "| --- | --- |",
     "| chat | 普通对话 |",
-    "| analysis | 数据分析与报告 |",
-    "| academic | ARS 写作审稿 |",
+    "| analysis | 数据分析与 `/plan` 统计方案 |",
+    "| academic | ARS 写作审稿（消费 HANDOFF，不重选检验） |",
     "",
   ].join("\n");
 }
@@ -55,7 +55,7 @@ export function defaultAnalysisHandoff(): string {
 }
 
 /**
- * Create the shared clean workspace. Does not run academic-grill or force /run.
+ * Does not run academic-grill or force a separate run command.
  */
 export async function scaffoldWorkspace(root: string, options?: { label?: string }): Promise<{
   root: string;

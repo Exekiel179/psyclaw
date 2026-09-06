@@ -17,9 +17,9 @@ describe("Pi extension contract", () => {
     extension(api);
     // With a legacy Pi API (no registerTool) the extension keeps a minimal
     // research surface: /verify and /model stay reachable for the CLI/simple
-    // hosts, while UI-gated research commands (run/agents/grill/...) are not
+    // hosts, while UI-gated research commands (agents/grill/...) are not
     // registered at all.
-    expect([...commands.keys()]).toEqual(["init", "verify", "brief", "model"]);
+    expect([...commands.keys()]).toEqual(["init", "verify", "model"]);
   });
 
   it("registers the full research command surface on a modern Pi API", () => {
@@ -30,10 +30,12 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     expect(commands).toEqual([
-      "init", "verify", "run", "brief", "grill", "review", "loop",
+      "init", "verify", "grill", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
       "skill", "ars", "plugin", "mcp", "provider", "pet", "agents",
     ]);
+    expect(commands).not.toContain("run");
+    expect(commands).not.toContain("brief");
   });
 
   it("lets the init command bootstrap through the Pi context cwd", async () => {
@@ -194,104 +196,16 @@ describe("Pi extension contract", () => {
     expect(existsSync(join(root, ".psyclaw"))).toBe(false);
   });
 
-  it("keeps ordinary mode when /run has compliant analysis documents but no /init project", async () => {
-    const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-run-docs-"));
-    await mkdir(join(root, "notes"), { recursive: true });
-    await writeFile(join(root, "notes", "research-spec.md"), [
-      "---",
-      "schemaVersion: psyclaw/research-spec/v1",
-      "documentVersion: 1.0.0",
-      "---",
-      "- Status: confirmed",
-      "- Initial goal: 大学生自我效能的纵向研究",
-      "- Paradigm: survey-observational",
-    ].join("\n"), "utf8");
-    await writeFile(join(root, "notes", "plan.md"), [
-      "---",
-      "schemaVersion: psyclaw/hitl-plan/v1",
-      "documentVersion: 1.0.0",
-      "---",
-      "- Status: approved",
-      "- Goal: 大学生自我效能的纵向研究",
-    ].join("\n"), "utf8");
-
-    let runHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
-    let entryCalls = 0;
-    let sentMessages = 0;
+  it("does not register /run or /brief", () => {
+    const names: string[] = [];
     const api = {
-      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
-        if (name === "run") runHandler = options.handler;
-      },
+      registerCommand(name: string) { names.push(name); },
       registerTool() {},
-      appendEntry() { entryCalls += 1; },
-      sendUserMessage() { sentMessages += 1; },
     } as any;
     extension(api);
-
-    const notifications: string[] = [];
-    await runHandler?.("", {
-      cwd: root,
-      isIdle: () => true,
-      ui: { notify: (message: string) => notifications.push(message) },
-    });
-
-    // Analysis documents alone must not silently start a controlled run: /run
-    // only activates a project that was explicitly established via /init, so
-    // ordinary conversation mode is preserved with a clear pointer to /init.
-    expect(notifications.some((message) => message.includes("/init"))).toBe(true);
-    expect(existsSync(join(root, ".psyclaw", "project.json"))).toBe(false);
-    expect(existsSync(join(root, ".psyclaw", "controlled-run.json"))).toBe(false);
-    expect(entryCalls).toBe(0);
-    expect(sentMessages).toBe(0);
-  });
-
-  it("still warns when /run has neither project.json nor compliant analysis documents", async () => {
-    const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-run-none-"));
-    let runHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
-    const api = {
-      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
-        if (name === "run") runHandler = options.handler;
-      },
-      registerTool() {},
-      appendEntry() {},
-      sendUserMessage() {},
-    } as any;
-    extension(api);
-    const notifications: string[] = [];
-    await runHandler?.("", {
-      cwd: root,
-      isIdle: () => true,
-      ui: { notify: (message: string) => notifications.push(message) },
-    });
-    expect(notifications.some((message) => message.includes("research-spec.md") || message.includes("/init"))).toBe(true);
-    expect(existsSync(join(root, ".psyclaw", "project.json"))).toBe(false);
-  });
-
-  it("stores a deduplicated per-run Skill selection without changing global Skill state", async () => {
-    const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-run-skills-"));
-    await bootstrapProject({ root, goal: "Skill-assisted review", paradigm: "qualitative-thematic" });
-    let runHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
-    let sentMessage = "";
-    const api = {
-      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
-        if (name === "run") runHandler = options.handler;
-      },
-      registerTool() {},
-      appendEntry() {},
-      sendUserMessage(text: string) { sentMessage = text; },
-      on() {},
-    } as any;
-    extension(api);
-
-    await runHandler?.("--skills academic-grill,academic-grill Focus the review", {
-      cwd: root,
-      hasUI: false,
-      isIdle: () => true,
-      ui: { notify() {} },
-    });
-
-    const state = JSON.parse(await readFile(join(root, ".psyclaw", "controlled-run.json"), "utf8"));
-    expect(state).toMatchObject({ objective: "Focus the review", selectedSkills: ["academic-grill"] });
-    expect(sentMessage).toContain("本次运行由用户选择的优化 Skill：academic-grill");
+    expect(names).not.toContain("run");
+    expect(names).not.toContain("brief");
+    expect(names).toContain("init");
+    expect(names).toContain("verify");
   });
 });

@@ -41,9 +41,10 @@ export const PRIMARY_PLAN_DOCUMENTS = [
 ] as const;
 
 /**
- * `/run` authorizes ordinary planned execution. This list is intentionally
- * empty: researcher decisions are created dynamically only for unresolved,
- * consequential methodological trade-offs.
+ * `/init` establishes the project workspace. Planned execution continues in
+ * analysis/academic modes. This list is intentionally empty: researcher
+ * decisions are created dynamically only for unresolved, consequential
+ * methodological trade-offs.
  */
 export const DEFAULT_RUN_APPROVAL_NODES: readonly ApprovalNode[] = [];
 

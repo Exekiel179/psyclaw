@@ -2,8 +2,8 @@ import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { appendClaim, appendClaimEvidenceLink, appendEvidence } from "../src/research/ledger.js";
-import { runOfflineBrief } from "../src/research/brief.js";
+import { appendClaim, appendClaimEvidenceLink, appendEvidence, loadLedger, readProject } from "../src/research/ledger.js";
+import { checkEvidenceSufficiency } from "../src/core/evidence-policy.js";
 import { bootstrapProject } from "../src/project/bootstrap.js";
 import type { Claim, ClaimEvidenceLink, Evidence, ResearchParadigm } from "../src/core/contracts.js";
 
@@ -59,7 +59,10 @@ async function runCase(item: CaseFile): Promise<CaseResult> {
     for (const record of item.claims) await appendClaim(root, record);
     for (const record of item.links) await appendClaimEvidenceLink(root, record);
 
-    const result = await runOfflineBrief(root);
+    const project = await readProject(root);
+    const ledger = await loadLedger(root);
+    const gates = checkEvidenceSufficiency({ ...ledger, paradigm: project.paradigm });
+    const verdict: "pass" | "blocked" = gates.some((gate) => !gate.ok) ? "blocked" : "pass";
     const forbiddenArtifactsPresent: string[] = [];
     for (const forbidden of item.forbid) {
       try {
@@ -69,12 +72,12 @@ async function runCase(item: CaseFile): Promise<CaseResult> {
         // absence is the expected, passing outcome
       }
     }
-    const ok = result.verdict === item.expected && forbiddenArtifactsPresent.length === 0;
+    const ok = verdict === item.expected && forbiddenArtifactsPresent.length === 0;
     return {
       id: item.id,
       description: item.description,
       expected: item.expected,
-      actual: result.verdict,
+      actual: verdict,
       ok,
       ...(forbiddenArtifactsPresent.length > 0 ? { forbiddenArtifactsPresent } : {}),
     };
@@ -95,7 +98,7 @@ async function main(): Promise<void> {
   const failed = results.filter((item) => !item.ok);
   const report = {
     schemaVersion: "psyclaw/eval-scorecard/v1",
-    suite: "offline-research-brief",
+    suite: "evidence-sufficiency-gates",
     deterministic: true,
     rubrics: { hardFail, dimensions },
     generatedAt: new Date().toISOString(),

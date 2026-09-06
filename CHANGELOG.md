@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add analysis-mode stats soft-takeover via core skill `analysis-plan`, durable plans under `analysis/plans/`, and `/plan` (new/status/confirm/review/run/defer/handoff). Default execution is local reproducible scripts; MCP only for special backends or explicit request. Bridge to academic via `analysis/HANDOFF.md` without merging ARS planning.
+- Remove the `/run` command. After `/init`, analysis/academic modes and tools use the project itself as the active research context; soft `/verify` gates remain.
+- Remove `/brief`, `psyclaw brief`, and the offline `research-brief` skill/path. Evidence-sufficiency evals now call gates directly.
+- Academic mode soft-routes only the bundled ARS / Nature / compose skill allowlist from natural language; other skills still require explicit `/skill:<name>`.
+- Add `pnpm eval:academic-route` intent suite (per-skill × difficulty, multi-skill, negatives) with primary precision/recall/F1, set recall@k, and negative precision; multi-intent primary follows earliest cue order.
+
 ## 0.29.1 - 2026-09-06
 
 - Bump package governance apiVersion to 0.29 so branding checks pass for the 0.29 line.
@@ -7,7 +15,7 @@
 ## 0.29.0 - 2026-09-06
 
 - Shift+Tab cycles three sticky modes: chat → analysis → academic (Ctrl+Shift+Tab keeps thinking).
-- `/init` only scaffolds a clean shared workspace (`data/raw|clean`, `analysis/`, `literature/`, `paper/`, root `psyclaw.md`, `.psyclaw/`); no auto grill or forced `/run`.
+- `/init` only scaffolds a clean shared workspace (`data/raw|clean`, `analysis/`, `literature/`, `paper/`, root `psyclaw.md`, `.psyclaw/`); no auto grill.
 - Soft research pipeline: clarify → review → plan → analyze → report → academic/ARS reviews; prioritize runnable results, then AI field checks + human `/verify`.
 - Fingerprints protect raw-data tampering only; they are not academic “verified” proof.
 - Analysis and academic share one repo via `analysis/HANDOFF.md`; ARS multi-agent and on-demand PDF engine remain available.

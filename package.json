@@ -73,6 +73,7 @@
     "test:watch": "vitest",
     "eval": "tsx evals/harness.ts",
     "eval:modules": "tsx evals/modules.ts",
+    "eval:academic-route": "tsx evals/academic-soft-route/harness.ts",
     "rebrand": "node scripts/rebrand-pi.mjs",
     "check:branding": "node scripts/check-branding.mjs",
     "release:push": "node scripts/release-push.mjs",
