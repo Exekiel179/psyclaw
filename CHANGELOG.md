@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.28.1 - 2026-09-06
+
+- Add Claude-style Subagent browsing via /agents and Panel, with eight bundled literature/review workers.
+- Make psyclaw update print a compact before→after success summary by default; use --detail for the JSON receipt.
+- Allow Subagent write/network/destructive effects only after interactive confirmation at create and each /agents run.
+
 ## 0.28.0 - 2026-09-06
 
 - Add preview-and-confirm `/create-skill`, `/create-hook`, `/create-rule`, and `/create-subagent` commands with project-local schemas, no-clobber writes, hashes, and audit receipts.
