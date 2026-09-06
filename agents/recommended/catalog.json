@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-agents/v1",
-  "documentVersion": "0.29.0",
+  "documentVersion": "0.29.1",
   "syncedAt": "2026-09-06",
   "sourceDocument": "bundled literature/review subagents",
   "sourceRef": "bundled",

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.29.1 - 2026-09-06
+
+- Bump package governance apiVersion to 0.29 so branding checks pass for the 0.29 line.
+
 ## 0.29.0 - 2026-09-06
 
 - Shift+Tab cycles three sticky modes: chat → analysis → academic (Ctrl+Shift+Tab keeps thinking).
