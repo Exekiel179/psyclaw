@@ -38,6 +38,8 @@ import {
   setLocalSkillEnabled,
   userSkillId,
 } from "../skills/user-skills.js";
+import { loadVerifyChecklist } from "../verify/checklist.js";
+import { readActiveAnalysisPlan } from "../analysis/plan.js";
 
 const activePanelRuns = new Set<string>();
 
@@ -806,7 +808,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
     // The panel is intentionally limited to ecosystem management and Provider
     // configuration. Project files, runs, evidence and manuscripts are read
     // only projections; legacy mutation routes remain unavailable over HTTP.
-    const panelWriteRoutes = ["/api/provider-config", "/api/recommendation-state", "/api/install/execute", "/api/active-provider"];
+    const panelWriteRoutes = ["/api/provider-config", "/api/recommendation-state", "/api/install/execute", "/api/active-provider", "/api/assistant"];
     // Kept false for source compatibility with the legacy handler below; the
     // method gate above makes pause/resume unreachable from the panel API.
     const runAction = false;
@@ -957,6 +959,43 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           skills: state.skills.filter((id) => skillIds.has(id)).map((id) => ({ id, name: nameOf("skill", id), enabled: true })),
           mcp: state.mcp.filter((id) => mcpIds.has(id)).map((id) => ({ id, name: nameOf("mcp", id), enabled: true })),
           localSkills,
+        }));
+        return;
+      }
+      if (url.pathname === "/api/project-status") {
+        let projectJson: Record<string, unknown> | null = null;
+        try {
+          projectJson = JSON.parse(await readFile(join(root, ".psyclaw", "project.json"), "utf8")) as Record<string, unknown>;
+        } catch { /* uninitialized */ }
+
+        let goalMd: string | null = null;
+        try {
+          goalMd = await readFile(join(root, "notes", "goal.md"), "utf8");
+        } catch { /* no goal.md */ }
+
+        const activePlan = await readActiveAnalysisPlan(root);
+        const checklist = await loadVerifyChecklist(root);
+        const unverifiedCount = checklist.items.filter((item) => item.status !== "verified").length;
+
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({
+          schemaVersion: "psyclaw/project-status/v1",
+          initialized: projectJson !== null,
+          id: projectJson?.id ?? null,
+          paradigm: projectJson?.paradigm ?? null,
+          goal: projectJson?.goal ?? (goalMd ? goalMd.slice(0, 300).trim() : null),
+          activePlan: activePlan ? {
+            id: activePlan.id,
+            status: activePlan.status,
+            stage: activePlan.stage,
+            confirmedMethod: activePlan.confirmedMethod ?? null,
+            proposedMethods: activePlan.proposedMethods ?? [],
+          } : null,
+          verify: {
+            total: checklist.items.length,
+            unverified: unverifiedCount,
+            items: checklist.items,
+          },
         }));
         return;
       }

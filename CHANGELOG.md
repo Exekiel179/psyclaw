@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.3 - 2026-09-06
+
+- Fix CLI footer duplicate academic pill and align chat/analysis/academic in single row
+- Update startup banner pipeline, protocol, and mode switch hints to match ARS social science workflow
+- Integrate CLI interactions to Web Panel: 5-step research pipeline stepper, topbar quick actions, init project modal, and interactive web console drawer
+
 ## Unreleased
 
 ## 0.29.2 - 2026-09-07

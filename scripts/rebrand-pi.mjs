@@ -121,8 +121,9 @@ const VAR_STACKED_PET = `[
 const VAR_SLANT_CLASSIC = buildCustomVariant(FONT_SLANT_CLASSIC);
 const VAR_3D_BLOCK = buildCustomVariant(FONT_3D_BLOCK);
 const VAR_SERIF = buildCustomVariant(FONT_SERIF);
-const GRAD_PIPELINE = "\\x1b[38;2;45;212;191m• Pipeline  :\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mintake\\x1b[0m \\x1b[38;2;99;102;241m➔\\x1b[0m \\x1b[1m\\x1b[38;2;129;140;248mcapture\\x1b[0m \\x1b[38;2;168;85;247m➔\\x1b[0m \\x1b[1m\\x1b[38;2;168;85;247mcitation-audit\\x1b[0m \\x1b[38;2;236;72;153m➔\\x1b[0m \\x1b[1m\\x1b[38;2;45;212;191mbrief\\x1b[0m";
-const GRAD_PROTOCOL = "\\x1b[38;2;45;212;191m• Protocol  :\\x1b[0m \\x1b[1m\\x1b[38;2;52;211;153m✔ 2+ Source Cross-Check\\x1b[0m \\x1b[38;2;100;116;139m·\\x1b[0m \\x1b[1m\\x1b[38;2;45;212;191m✔ SHA-256 Provenance Ledger\\x1b[0m";
+const GRAD_PIPELINE = "\\x1b[38;2;45;212;191m• Pipeline  :\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mintake\\x1b[0m \\x1b[38;2;99;102;241m➔\\x1b[0m \\x1b[1m\\x1b[38;2;129;140;248mevidence\\x1b[0m \\x1b[38;2;168;85;247m➔\\x1b[0m \\x1b[1m\\x1b[38;2;168;85;247mstats-plan\\x1b[0m \\x1b[38;2;236;72;153m➔\\x1b[0m \\x1b[1m\\x1b[38;2;244;63;94mmanuscript\\x1b[0m \\x1b[38;2;99;102;241m➔\\x1b[0m \\x1b[1m\\x1b[38;2;45;212;191mpeer-review\\x1b[0m";
+const GRAD_PROTOCOL = "\\x1b[38;2;45;212;191m• Protocol  :\\x1b[0m \\x1b[1m\\x1b[38;2;52;211;153m✔ 2+ Cross-Check\\x1b[0m \\x1b[38;2;100;116;139m·\\x1b[0m \\x1b[1m\\x1b[38;2;45;212;191m✔ SHA-256 Ledger\\x1b[0m \\x1b[38;2;100;116;139m·\\x1b[0m \\x1b[1m\\x1b[38;2;168;85;247m✔ Non-Compromise Gates\\x1b[0m";
+const GRAD_MODES = "\\x1b[38;2;45;212;191m• Modes     :\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mShift+Tab\\x1b[0m \\x1b[38;2;148;163;184m⇄\\x1b[0m \\x1b[1mchat\\x1b[0m \\x1b[38;2;100;116;139m·\\x1b[0m \\x1b[1manalysis\\x1b[0m \\x1b[38;2;100;116;139m·\\x1b[0m \\x1b[1macademic (ARS)\\x1b[0m";
 const GRAD_WORKBENCH = "\\x1b[38;2;45;212;191m• Workbench :\\x1b[0m \\x1b[1m\\x1b[38;2;56;189;248mhttp://127.0.0.1:3721\\x1b[0m \\x1b[38;2;168;85;247m(Interactive Panel Active)\\x1b[0m";
 
 const PSYCLAW_DYNAMIC_BANNER = `const bannerCandidates = [
@@ -154,6 +155,7 @@ const stackedPet = petEnabled ? ${VAR_STACKED_PET} : [];
 const detailLines = terminalColumns >= 86 ? [
   \`  ${GRAD_PIPELINE}\`,
   \`  ${GRAD_PROTOCOL}\`,
+  \`  ${GRAD_MODES}\`,
 ] : [];
 if (terminalColumns >= 76) detailLines.push(\`  ${GRAD_WORKBENCH}\`);
 const logo = [

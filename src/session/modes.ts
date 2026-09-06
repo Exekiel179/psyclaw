@@ -6,9 +6,9 @@ export type PsyClawSessionMode = "chat" | "analysis" | "academic";
 
 export const SESSION_MODES: readonly PsyClawSessionMode[] = ["chat", "analysis", "academic"] as const;
 
-/** Footer status label; chat shows nothing. */
+/** Footer status label. */
 export const MODE_STATUS: Record<PsyClawSessionMode, string | undefined> = {
-  chat: undefined,
+  chat: "chat",
   analysis: "analysis",
   academic: "academic",
 };
