@@ -74,6 +74,7 @@ export function formatCliUsage(): string {
     cmd("/review", "", c.white("运行多角色模拟同行评审")),
     cmd("/loop", "[objective|stop]", c.white("推进或停止当前有界研究循环")),
     cmd("/skill", "[status|enable|disable|install]", c.white("管理和安装 Skill")),
+    cmd("/agents", "[--agent id] [task]", c.white("浏览或运行 Subagent（类 Claude）")),
     cmd("/mcp", "", c.white("管理 MCP 服务器")),
     cmd("/plugin", "", c.white("打开 Plugin 推荐与管理页")),
     cmd("/provider", "[provider-id]", c.white("查看、配置或切换 Provider")),
@@ -118,4 +119,56 @@ export function renderSuccessCard(title: string, details?: Record<string, string
     }
   }
   return lines.join("\n") + "\n";
+}
+
+/**
+ * Compact human summary for `psyclaw update`. Full JSON is reserved for `--detail`.
+ */
+export function renderProductUpdateSummary(receipt: {
+  ok: boolean;
+  reasonCode: string;
+  reason?: string;
+  commands: string[];
+  psyclaw: { before?: string; after?: string; latest?: string };
+}): string {
+  const before = receipt.psyclaw.before;
+  const after = receipt.psyclaw.after ?? receipt.psyclaw.latest;
+  const arrow = before !== undefined && after !== undefined
+    ? `${before} → ${after}`
+    : after ?? before ?? "unknown";
+
+  if (receipt.reasonCode === "update-applied") {
+    return renderSuccessCard("升级成功", { PsyClaw: arrow });
+  }
+  if (receipt.reasonCode === "already-up-to-date") {
+    return renderSuccessCard("已是最新", { PsyClaw: after ?? before ?? "unknown" });
+  }
+  if (receipt.reasonCode === "update-skipped" && receipt.reason?.includes("source checkout")) {
+    const lines = [
+      `  ${c.yellow("➜")} ${c.bold("源码检出：跳过 npm 自覆盖")}`,
+      `    ${c.darkGray("•")} ${c.gray("当前:")} ${c.white(before ?? "unknown")}`,
+      `    ${c.darkGray("•")} ${c.gray("请先 Git 同步，再执行:")} ${c.white(receipt.commands.join(" && ") || "pnpm install && pnpm build")}`,
+      "",
+    ];
+    return lines.join("\n");
+  }
+  if (receipt.reasonCode === "update-skipped" && receipt.reason?.startsWith("check only")) {
+    return [
+      `  ${c.yellow("➜")} ${c.bold("可升级（未执行）")}`,
+      `    ${c.darkGray("•")} ${c.gray("PsyClaw:")} ${c.white(arrow)}`,
+      ...(receipt.commands.length > 0
+        ? [`    ${c.darkGray("•")} ${c.gray("命令:")} ${c.white(receipt.commands[0]!)}`]
+        : []),
+      "",
+    ].join("\n");
+  }
+  if (receipt.ok) {
+    return renderSuccessCard(receipt.reason ?? receipt.reasonCode, { PsyClaw: arrow });
+  }
+  return [
+    `  ${c.red("✗")} ${c.bold("升级未完成")}`,
+    `    ${c.darkGray("•")} ${c.gray("原因:")} ${c.white(receipt.reason ?? receipt.reasonCode)}`,
+    `    ${c.darkGray("•")} ${c.gray("PsyClaw:")} ${c.white(arrow)}`,
+    "",
+  ].join("\n");
 }

@@ -10,6 +10,7 @@ import { readSessionUsage } from "./usage.js";
 import { buildClaimLiteratureMap } from "./literature-map.js";
 import { discoverAgents } from "../agents/discover.js";
 import { KNOWN_AGENTS } from "../agents/catalog.js";
+import { recommendedAgentsForPanel } from "../agents/recommended-personas.js";
 import { planAgentInstall } from "../install/installer.js";
 import { deepSeekProviderSpec, PiModelGateway, type ModelDescriptor } from "../adapters/pi/model.js";
 import { PROVIDER_PRESETS, saveProviderConfig } from "../setup.js";
@@ -1674,6 +1675,11 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       if (url.pathname === "/api/recommended-mcps") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify(await recommendedMcps()));
+        return;
+      }
+      if (url.pathname === "/api/recommended-agents") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify(await recommendedAgentsForPanel(root)));
         return;
       }
       if (url.pathname === "/api/recommended-install-prep") {

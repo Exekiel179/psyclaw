@@ -4,7 +4,9 @@ import { appendApproval, approvalInputDigest, asProject, assertResearchDecision,
 import type { ResearchDecisionImpact } from "../../research/decision.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
-import { customPersonaPlan, loadCustomPersonas, parseAgentsRequest } from "../../orchestration/personas.js";
+import { customPersonaPlan, parseAgentsRequest } from "../../orchestration/personas.js";
+import { elevatedEffects, formatEffects, hasElevatedEffects, normalizeEffects, toolsForEffects } from "../../orchestration/effects.js";
+import { agentManagerRows, loadSelectablePersonas } from "../../agents/recommended-personas.js";
 import type { Plan } from "../../orchestration/contracts.js";
 import { atomicWriteFile } from "../../project/jsonl.js";
 import { applyCreation, previewCreation, runArsMultiAgentBridge, type ArsPanelRequest, type CreationKind, type CreationRequest } from "../../index.js";
@@ -776,6 +778,53 @@ async function openPluginManager(ctx: ExtensionCommandContext, rows: PluginManag
       missingMessage: "按 Enter 安装到当前项目。",
     })
   ));
+}
+
+function agentManagerItems(rows: Awaited<ReturnType<typeof agentManagerRows>>): SkillManagerItem[] {
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    status: row.status,
+    sourceRef: row.sourceRef,
+    details: [
+      `类别：${row.stage}`,
+      `角色：${row.role}`,
+      `来源：${row.source === "bundled" ? "内置 Subagent（类似 Claude Explore/Plan）" : "项目 .psyclaw/agents/custom"}`,
+      `运行：/agents --agent ${row.id} <只读研究任务>`,
+    ],
+  }));
+}
+
+async function openAgentManager(ctx: ExtensionCommandContext, rows: Awaited<ReturnType<typeof agentManagerRows>>): Promise<SkillManagerAction> {
+  return ctx.ui.custom((tui, theme, keybindings, done) => (
+    new SkillManagerComponent(agentManagerItems(rows), tui, theme, keybindings, done, {
+      title: "Subagent（对齐 Claude Code）",
+      itemLabel: "Subagent",
+      footer: "↑/↓ 移动 · Enter 查看用法 · Esc 关闭 · 运行: /agents --agent <id> <任务>",
+      enterAction: "details",
+      toggleEnabled: false,
+      enabledText: "已可选用",
+      lockedMessage: "内置 Subagent 始终可用。运行：/agents --agent <id> <只读研究任务>",
+    })
+  ));
+}
+
+async function showAgentManager(ctx: ExtensionCommandContext, statusOnly = false): Promise<void> {
+  const rows = await agentManagerRows(ctx.cwd);
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function" || statusOnly) {
+    ctx.ui.notify(
+      rows.map((row) => `${row.status === "core" ? "◆" : "●"} ${row.id} — ${row.name}（${row.stage}）`).join("\n")
+        || "暂无 Subagent。可用 /create-subagent 创建（类似 Claude Code）。",
+      "info",
+    );
+    return;
+  }
+  while (true) {
+    const action = await openAgentManager(ctx, await agentManagerRows(ctx.cwd));
+    if (action.type === "close") return;
+    // Enter/Space only show inline notices; keep the manager open.
+  }
 }
 
 async function installRecommendedPlugin(ctx: ExtensionCommandContext, row: PluginManagerRow): Promise<void> {
@@ -1927,7 +1976,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "psyclaw_create",
     label: "Create project capability",
-    description: "Preview and, after an explicit UI confirmation, create one PsyClaw-native project Skill, declarative analysis Hook, additive Rule, or read-only Subagent persona.",
+    description: "Preview and, after an explicit UI confirmation, create one PsyClaw-native project Skill, declarative analysis Hook, additive Rule, or Subagent (Claude-style). Elevated subagent effects require confirmation at create and again at each /agents run.",
     parameters: Type.Object({
       kind: Type.Union([Type.Literal("skill"), Type.Literal("hook"), Type.Literal("rule"), Type.Literal("subagent")]),
       id: Type.String({ minLength: 1, maxLength: 64 }),
@@ -1938,6 +1987,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       pattern: Type.Optional(Type.String({ maxLength: 500 })),
       pathPrefix: Type.Optional(Type.String({ maxLength: 200 })),
       role: Type.Optional(Type.Union([Type.Literal("planner"), Type.Literal("researcher"), Type.Literal("analyst"), Type.Literal("critic"), Type.Literal("writer"), Type.Literal("verifier")])),
+      allowedEffects: Type.Optional(Type.Array(Type.Union([
+        Type.Literal("read"),
+        Type.Literal("write"),
+        Type.Literal("network"),
+        Type.Literal("destructive"),
+      ]), { maxItems: 4 })),
     }),
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -1948,7 +2003,15 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         if (!ctx.hasUI || typeof ctx.ui?.confirm !== "function") {
           return { content: [{ type: "text", text: JSON.stringify({ ...preview, status: "preview-only", reason: "interactive confirmation unavailable" }, null, 2) }], details: preview };
         }
-        const approved = await ctx.ui.confirm(`创建 ${params.kind} “${preview.id}”？`, `目标：${preview.path}\nSHA-256：${preview.sha256}\n\n${preview.contents}`);
+        const effects = request.kind === "subagent" ? normalizeEffects(request.allowedEffects) : ["read" as const];
+        const elevated = request.kind === "subagent" && hasElevatedEffects(effects);
+        const title = elevated
+          ? `创建 Subagent “${preview.id}”（含提升权限）？`
+          : `创建 ${params.kind} “${preview.id}”？`;
+        const body = elevated
+          ? `目标：${preview.path}\n声明 effects：${formatEffects(effects)}\n将开放工具：${toolsForEffects(effects).join(", ")}\nSHA-256：${preview.sha256}\n\n每次 /agents 运行仍会再次确认。凭据读取与绕过门禁仍被禁止。\n\n${preview.contents}`
+          : `目标：${preview.path}\nSHA-256：${preview.sha256}\n\n${preview.contents}`;
+        const approved = await ctx.ui.confirm(title, body);
         if (!approved) return { content: [{ type: "text", text: "Creation cancelled; no file was written." }], details: { status: "cancelled", preview } };
         const result = await applyCreation(ctx.cwd, request, preview.sha256, true);
         return { content: [{ type: "text", text: JSON.stringify({ status: "created", path: result.preview.path, sha256: result.preview.sha256, receipt: result.receipt }, null, 2) }], details: result };
@@ -2193,12 +2256,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   // destructive/developer commands gated, but do not hide the bounded agent
   // runner behind PSYCLAW_DEVELOPER_COMMANDS in published builds.
   if (!legacyTestApi) pi.registerCommand("agents", {
-    description: "运行经批准的只读研究 Agent",
+    description: "浏览或运行 Subagent（对齐 Claude Code）",
     handler: async (args, ctx) => {
+      const trimmed = args.trim();
+      if (!trimmed || trimmed === "status" || trimmed === "list") {
+        try { await showAgentManager(ctx, trimmed === "status" || trimmed === "list"); }
+        catch (error) { await notifyError(ctx, error); }
+        return;
+      }
       const requested = parseAgentsRequest(args);
       const objective = requested.objective;
       if (!objective) {
-        ctx.ui.notify("Usage: /agents [--agent <id>|--agents <id,...>] <bounded read-only research task>", "info");
+        ctx.ui.notify("Usage: /agents [--agent <id>|--agents <id,...>] <task>\n无任务时直接运行 /agents 打开 Subagent 管理页。", "info");
         return;
       }
       if (objective.length > 4_000) {
@@ -2222,12 +2291,57 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         const runId = `pi_agent_${Date.now()}`;
         let plan: Plan = researchTaskPlan(runId, objective);
         if (requested.ids.length > 0) {
-          const available = await loadCustomPersonas(ctx.cwd);
+          const available = await loadSelectablePersonas(ctx.cwd);
           const byId = new Map(available.map((persona) => [persona.id, persona]));
           const selected = requested.ids.map((id) => byId.get(id));
           const missing = requested.ids.filter((_id, index) => !selected[index]);
-          if (missing.length > 0) throw new Error(`Unknown or invalid custom subagent: ${missing.join(", ")}`);
-          plan = customPersonaPlan(runId, objective, selected.filter((persona): persona is NonNullable<typeof persona> => persona !== undefined));
+          if (missing.length > 0) throw new Error(`Unknown or invalid subagent: ${missing.join(", ")}. Run /agents to list bundled and custom subagents.`);
+          const personas = selected.filter((persona): persona is NonNullable<typeof persona> => persona !== undefined);
+          const unionEffects = normalizeEffects(personas.flatMap((persona) => persona.allowedEffects));
+          const elevated = elevatedEffects(unionEffects);
+          if (elevated.length > 0) {
+            if (!ctx.hasUI || typeof ctx.ui.confirm !== "function") {
+              throw new Error(`Subagent effects [${formatEffects(elevated)}] require interactive confirmation`);
+            }
+            const approved = await ctx.ui.confirm(
+              "批准 Subagent 提升权限？",
+              `将启用：${formatEffects(elevated)}\n对应工具：${toolsForEffects(unionEffects).join(", ")}\n任务：${objective.slice(0, 400)}\n\n凭据读取、绕过门禁与外部发布仍被禁止。`,
+            );
+            if (!approved) {
+              ctx.ui.notify("已取消：未批准提升权限，未启动 Subagent。", "warning");
+              return;
+            }
+          }
+          plan = customPersonaPlan(runId, objective, personas);
+          await mkdir(join(ctx.cwd, ".psyclaw", "plans"), { recursive: true });
+          await atomicWriteFile(join(ctx.cwd, ".psyclaw", "plans", `${runId}.json`), `${JSON.stringify(plan, null, 2)}\n`);
+          const eventLog = new RunEventLog(ctx.cwd, runId);
+          const result = await runPlanWithPi(plan, {
+            cwd: ctx.cwd,
+            agentDir: join(ctx.cwd, ".psyclaw", "pi-agent"),
+            ...(ctx.model?.provider === undefined ? {} : { provider: ctx.model.provider }),
+            ...(ctx.model?.id === undefined ? {} : { model: ctx.model.id }),
+            env: providerEnvironment(ctx.model?.provider),
+            ...(elevated.length === 0 ? { tools: [] as const } : {}),
+            allowWrites: unionEffects.includes("write"),
+            allowNetwork: unionEffects.includes("network"),
+            allowDestructive: unionEffects.includes("destructive"),
+            root: ctx.cwd,
+            pauseRequested: async () => {
+              try { await import("node:fs/promises").then(({ access }) => access(join(ctx.cwd, ".psyclaw", "runs", `${runId}.pause`))); return true; }
+              catch { return false; }
+            },
+            onEvent: async (event) => { await eventLog.append(event); },
+          });
+          pi.appendEntry("psyclaw:agent-run", {
+            runId,
+            status: result.status,
+            diagnostics: result.diagnostics,
+            effects: unionEffects,
+            recordedAt: new Date().toISOString(),
+          });
+          ctx.ui.notify(`Agent run ${result.status}: ${result.diagnostics.join("; ") || "verified"}`, result.status === "completed" ? "info" : "warning");
+          return;
         }
         await mkdir(join(ctx.cwd, ".psyclaw", "plans"), { recursive: true });
         await atomicWriteFile(join(ctx.cwd, ".psyclaw", "plans", `${runId}.json`), `${JSON.stringify(plan, null, 2)}\n`);
@@ -2238,7 +2352,6 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           ...(ctx.model?.provider === undefined ? {} : { provider: ctx.model.provider }),
           ...(ctx.model?.id === undefined ? {} : { model: ctx.model.id }),
           env: providerEnvironment(ctx.model?.provider),
-          ...(requested.ids.length > 0 ? { tools: [] as const } : {}),
           root: ctx.cwd,
           pauseRequested: async () => {
             try { await import("node:fs/promises").then(({ access }) => access(join(ctx.cwd, ".psyclaw", "runs", `${runId}.pause`))); return true; }

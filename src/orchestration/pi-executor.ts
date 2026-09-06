@@ -1,3 +1,4 @@
+import type { Effect } from "../core/contracts.js";
 import type { WorkerReport, TaskNode } from "./contracts.js";
 import {
   BoundedOrchestrator,
@@ -8,6 +9,7 @@ import {
   type RunnerEvent,
 } from "./runner.js";
 import { PiRpcClient, type PiRpcMessage } from "../adapters/pi/rpc.js";
+import { formatEffects, hasElevatedEffects, normalizeEffects, toolsForEffects } from "./effects.js";
 
 export interface PiExecutorOptions {
   cwd: string;
@@ -18,7 +20,11 @@ export interface PiExecutorOptions {
   agentDir?: string;
   env?: Record<string, string>;
   timeoutMs?: number;
-  tools?: readonly ("read" | "grep" | "find" | "ls")[];
+  tools?: readonly string[];
+  /** Host ceilings after interactive approval. */
+  allowWrites?: boolean;
+  allowNetwork?: boolean;
+  allowDestructive?: boolean;
   onEvent?: (event: RunnerEvent) => void | Promise<void>;
   pauseRequested?: () => boolean | Promise<boolean>;
 }
@@ -67,7 +73,7 @@ function extractJson(text: string): unknown {
   }
 }
 
-function parseWorkerReport(value: unknown, task: TaskNode, context: WorkerContext): WorkerReport | undefined {
+function parseWorkerReport(value: unknown, task: TaskNode, context: WorkerContext, allowFilesModified: boolean): WorkerReport | undefined {
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
   if (record.schemaVersion !== "psyclaw/worker-report/v1") return undefined;
@@ -77,21 +83,21 @@ function parseWorkerReport(value: unknown, task: TaskNode, context: WorkerContex
   if (!Array.isArray(record.filesModified) || !record.filesModified.every((item) => typeof item === "string")) return undefined;
   if (!Array.isArray(record.blockers) || !record.blockers.every((item) => typeof item === "string")) return undefined;
   if (!Array.isArray(record.verification)) return undefined;
-  if (record.filesModified.length > 0) return undefined;
+  if (!allowFilesModified && record.filesModified.length > 0) return undefined;
   return {
     schemaVersion: "psyclaw/worker-report/v1",
     taskId: task.id,
     dispatchId: context.dispatchId,
     outcome: record.outcome,
     summary: record.summary,
-    filesModified: [],
+    filesModified: record.filesModified as string[],
     verification: record.verification.filter((item): item is { command: string; exitCode: number; outputDigest?: string } => {
       if (!item || typeof item !== "object") return false;
       const candidate = item as Record<string, unknown>;
       return typeof candidate.command === "string" && candidate.command.trim() !== ""
         && Number.isInteger(candidate.exitCode) && (candidate.outputDigest === undefined || typeof candidate.outputDigest === "string");
     }),
-    blockers: record.blockers,
+    blockers: record.blockers as string[],
   };
 }
 
@@ -105,32 +111,59 @@ function lastAssistantText(events: readonly PiRpcMessage[]): string | undefined 
   return undefined;
 }
 
-function taskPrompt(task: TaskNode, context: WorkerContext): string {
+function taskPrompt(task: TaskNode, context: WorkerContext, effects: readonly Effect[]): string {
+  const elevated = hasElevatedEffects(effects);
   return [
-    "You are a read-only psyclaw research worker.",
-    "Do not write, edit, delete, execute shell commands, access network services, or modify credentials.",
-    "Inspect only the supplied task inputs and project files with read/grep/find/ls.",
+    elevated
+      ? `You are a psyclaw research worker with explicitly approved effects: ${formatEffects(effects)}.`
+      : "You are a read-only psyclaw research worker.",
+    elevated
+      ? "Stay within the approved effects. Do not read credentials or bypass project gates."
+      : "Do not write, edit, delete, execute shell commands, access network services, or modify credentials.",
+    elevated
+      ? "Use only the tools enabled for this run."
+      : "Inspect only the supplied task inputs and project files with read/grep/find/ls.",
     "At the end return ONLY one JSON object matching this schema:",
     '{"schemaVersion":"psyclaw/worker-report/v1","taskId":"...","dispatchId":"...","outcome":"succeeded|blocked|failed","summary":"...","filesModified":[],"verification":[{"command":"...","exitCode":0}],"blockers":[]}',
     `taskId=${task.id}`,
     `dispatchId=${context.dispatchId}`,
     `objective=${task.objective}`,
     `inputs=${JSON.stringify(task.inputs)}`,
+    `allowedEffects=${JSON.stringify(effects)}`,
   ].join("\n");
 }
 
+function hostAllowsTaskEffects(
+  effects: readonly Effect[],
+  options: Pick<PiExecutorOptions, "allowWrites" | "allowNetwork" | "allowDestructive">,
+): boolean {
+  for (const effect of effects) {
+    if (effect === "read") continue;
+    if (effect === "write" && options.allowWrites !== true) return false;
+    if (effect === "network" && options.allowNetwork !== true) return false;
+    if (effect === "destructive" && options.allowDestructive !== true) return false;
+  }
+  return true;
+}
+
 /**
- * Execute one task in a separate Pi process with extensions, skills, context
- * files and all mutating tools disabled. This is a process boundary, not a
- * complete OS sandbox; deployments needing hostile-code isolation must add a
- * container or equivalent runtime policy.
+ * Execute one task in a separate Pi process. Mutating tools are available only
+ * when the host options explicitly approve matching effects after user confirm.
  */
-export function createPiReadOnlyExecutor(options: PiExecutorOptions): WorkerExecutor {
+export function createPiWorkerExecutor(options: PiExecutorOptions): WorkerExecutor {
   return async (task: TaskNode, context: WorkerContext): Promise<WorkerExecutionResult> => {
-    const effects = task.allowedEffects ?? ["read"];
-    if (effects.some((effect) => effect !== "read")) {
-      return { report: blockedReport(task, context, "Pi read-only executor cannot run side-effecting tasks") };
+    const effects = normalizeEffects(task.allowedEffects);
+    if (!hostAllowsTaskEffects(effects, options)) {
+      return {
+        report: blockedReport(
+          task,
+          context,
+          `Task effects [${formatEffects(effects)}] exceed approved host ceilings`,
+        ),
+      };
     }
+    const elevated = hasElevatedEffects(effects);
+    const tools = options.tools ?? toolsForEffects(effects);
     const client = new PiRpcClient({
       cwd: options.cwd,
       ...(options.cliPath === undefined ? {} : { cliPath: options.cliPath }),
@@ -140,12 +173,13 @@ export function createPiReadOnlyExecutor(options: PiExecutorOptions): WorkerExec
       ...(options.agentDir === undefined ? {} : { agentDir: options.agentDir }),
       ...(options.env === undefined ? {} : { env: options.env }),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
-      tools: options.tools ?? ["read", "grep", "find", "ls"],
+      tools,
+      ...(elevated ? { allowElevatedTools: true } : {}),
     });
     try {
       await client.start();
-      const events = await client.promptAndWait(taskPrompt(task, context), options.timeoutMs);
-      const report = parseWorkerReport(extractJson(lastAssistantText(events) ?? ""), task, context);
+      const events = await client.promptAndWait(taskPrompt(task, context, effects), options.timeoutMs);
+      const report = parseWorkerReport(extractJson(lastAssistantText(events) ?? ""), task, context, effects.includes("write"));
       if (!report) return { report: blockedReport(task, context, "Worker did not return a valid structured report") };
       return { report };
     } catch {
@@ -156,16 +190,23 @@ export function createPiReadOnlyExecutor(options: PiExecutorOptions): WorkerExec
   };
 }
 
+/** @deprecated Prefer createPiWorkerExecutor; kept as the read-only default alias. */
+export function createPiReadOnlyExecutor(options: PiExecutorOptions): WorkerExecutor {
+  return createPiWorkerExecutor({ ...options, allowWrites: false, allowNetwork: false, allowDestructive: false });
+}
+
 export async function runPlanWithPi(
   plan: Parameters<BoundedOrchestrator["run"]>[0],
   options: PiExecutorOptions & { root?: string; maxWorkers?: number } = { cwd: process.cwd() },
 ): Promise<OrchestrationResult> {
-  const executor = createPiReadOnlyExecutor(options);
+  const executor = createPiWorkerExecutor(options);
   return new BoundedOrchestrator({
     executor,
     root: options.root ?? options.cwd,
     ...(options.maxWorkers === undefined ? {} : { maxWorkers: options.maxWorkers }),
-    allowWrites: false,
+    allowWrites: options.allowWrites === true,
+    allowNetwork: options.allowNetwork === true,
+    allowDestructive: options.allowDestructive === true,
     ...(options.pauseRequested === undefined ? {} : { pauseRequested: options.pauseRequested }),
     ...(options.onEvent === undefined ? {} : { onEvent: options.onEvent }),
   }).run(plan);
@@ -175,12 +216,14 @@ export async function resumePlanWithPi(
   plan: Parameters<BoundedOrchestrator["resume"]>[0],
   options: PiExecutorOptions & { root?: string; maxWorkers?: number } = { cwd: process.cwd() },
 ): Promise<OrchestrationResult> {
-  const executor = createPiReadOnlyExecutor(options);
+  const executor = createPiWorkerExecutor(options);
   return new BoundedOrchestrator({
     executor,
     root: options.root ?? options.cwd,
     ...(options.maxWorkers === undefined ? {} : { maxWorkers: options.maxWorkers }),
-    allowWrites: false,
+    allowWrites: options.allowWrites === true,
+    allowNetwork: options.allowNetwork === true,
+    allowDestructive: options.allowDestructive === true,
     ...(options.pauseRequested === undefined ? {} : { pauseRequested: options.pauseRequested }),
     ...(options.onEvent === undefined ? {} : { onEvent: options.onEvent }),
   }).resume(plan);

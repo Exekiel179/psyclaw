@@ -347,8 +347,12 @@ describe("updatePsyClaw", () => {
         return { exitCode: 0 };
       },
     });
-    expect(receipt.ok).toBe(false);
+    expect(receipt.ok).toBe(true);
+    expect(receipt.executed).toBe(false);
+    expect(receipt.reasonCode).toBe("update-skipped");
     expect(receipt.reason).toContain("source checkout detected");
+    expect(receipt.reason).toContain("refuse npm self-overwrite");
+    expect(receipt.commands).toEqual(["pnpm install", "pnpm build"]);
     expect(ran).toBe(false);
   });
 

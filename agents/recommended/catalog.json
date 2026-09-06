@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "psyclaw/recommended-agents/v1",
+  "documentVersion": "0.28.0",
+  "syncedAt": "2026-09-06",
+  "sourceDocument": "bundled literature/review subagents",
+  "sourceRef": "bundled",
+  "repositoryHint": "对齐 Claude Code：Subagent = md 提示合订本。外仓可后续以 GitHub 源加入 installPrep；当前内置 8 个无需安装。",
+  "items": [
+    {
+      "id": "landscape-mapper",
+      "name": "研究版图分析者",
+      "kind": "agent",
+      "pack": "literature",
+      "role": "researcher",
+      "stage": "文献多智能体",
+      "description": "梳理研究主题、年代分布、代表性论文和研究方向。",
+      "sourceRef": "bundled",
+      "bundled": true
+    },
+    {
+      "id": "methods-scout",
+      "name": "方法学分析者",
+      "kind": "agent",
+      "pack": "literature",
+      "role": "analyst",
+      "stage": "文献多智能体",
+      "description": "识别研究设计、测量与分析线索，区分元数据可判断与不可判断之处。",
+      "sourceRef": "bundled",
+      "bundled": true
+    },
+    {
+      "id": "evidence-critic",
+      "name": "证据批判者",
+      "kind": "agent",
+      "pack": "literature",
+      "role": "critic",
+      "stage": "文献多智能体",
+      "description": "检查证据强弱、偏倚、冲突与因果边界。",
+      "sourceRef": "bundled",
+      "bundled": true
+    },
+    {
+      "id": "gap-finder",
+      "name": "研究缺口分析者",
+      "kind": "agent",
+      "pack": "literature",
+      "role": "verifier",
+      "stage": "文献多智能体",
+      "description": "寻找尚未充分覆盖的问题、对象、情境和方法。",
+      "sourceRef": "bundled",
+      "bundled": true
+    },
+    {
+      "id": "theory-reviewer",
+      "name": "理论与贡献审稿人",
+      "kind": "agent",
+      "pack": "review",
+      "role": "critic",
+      "stage": "同行评审多智能体",
+      "description": "检查问题重要性、理论定位、创新性与主张—证据一致性。",
+      "sourceRef": "bundled",
+      "bundled": true
+    },
+    {
+      "id": "methods-reviewer",
+      "name": "研究设计审稿人",
+      "kind": "agent",
+      "pack": "review",
+      "role": "analyst",
+      "stage": "同行评审多智能体",
+      "description": "检查抽样、设计、测量、效度与因果推断边界。",
+      "sourceRef": "bundled",
+      "bundled": true
+    },
+    {
+      "id": "statistics-reviewer",
+      "name": "统计与可复现性审稿人",
+      "kind": "agent",
+      "pack": "review",
+      "role": "verifier",
+      "stage": "同行评审多智能体",
+      "description": "检查分析策略、效应量、置信区间与可复现信息（不重算统计）。",
+      "sourceRef": "bundled",
+      "bundled": true
+    },
+    {
+      "id": "ethics-editorial-reviewer",
+      "name": "伦理与编辑审稿人",
+      "kind": "agent",
+      "pack": "review",
+      "role": "writer",
+      "stage": "同行评审多智能体",
+      "description": "检查伦理、透明报告、引用表达与可读性。",
+      "sourceRef": "bundled",
+      "bundled": true
+    }
+  ],
+  "installPrep": []
+}

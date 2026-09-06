@@ -167,7 +167,7 @@ export class SkillManagerComponent {
         return;
       }
       if (item.status === "blocked") this.notice = item.reason ?? `该 ${this.options.itemLabel ?? "Skill"} 未通过来源、许可或依赖预检。`;
-      else if (item.status === "core") this.notice = "这是 PsyClaw 核心 Skill，始终加载且不会被同名第三方 Skill 覆盖。";
+      else if (item.status === "core") this.notice = this.options.lockedMessage ?? "这是 PsyClaw 核心 Skill，始终加载且不会被同名第三方 Skill 覆盖。";
       else this.notice = item.sourceRef ? `固定来源：${item.sourceRef}` : "该 Skill 没有可显示的来源信息。";
       this.tui.requestRender();
     }

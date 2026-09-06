@@ -24,6 +24,8 @@ export interface PiRpcOptions {
   agentDir?: string;
   env?: Record<string, string>;
   tools?: readonly string[];
+  /** Required before write/edit/bash are accepted in the tool allowlist. */
+  allowElevatedTools?: boolean;
   /** Extra system guidance for this isolated RPC worker, never sent as a user message. */
   systemPrompt?: string;
   timeoutMs?: number;
@@ -39,6 +41,8 @@ interface PendingRequest {
 }
 
 const SAFE_TOOL_NAMES = new Set(["read", "grep", "find", "ls"]);
+const ELEVATED_TOOL_NAMES = new Set(["write", "edit", "bash"]);
+const ALL_TOOL_NAMES = new Set([...SAFE_TOOL_NAMES, ...ELEVATED_TOOL_NAMES]);
 const SAFE_ENV_NAMES = new Set([
   "PATH", "Path", "SystemRoot", "WINDIR", "ComSpec", "TEMP", "TMP",
   "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "LANG", "LC_ALL",
@@ -77,8 +81,12 @@ export class PiRpcClient {
       throw new Error("model is invalid");
     }
     const tools = config.tools ?? [...SAFE_TOOL_NAMES];
-    if (tools.some((tool) => !SAFE_TOOL_NAMES.has(tool))) {
-      throw new Error("Pi RPC workers may only use read-only tools");
+    const allowElevatedTools = config.allowElevatedTools === true;
+    for (const tool of tools) {
+      if (!ALL_TOOL_NAMES.has(tool)) throw new Error(`unsupported Pi RPC tool: ${tool}`);
+      if (!SAFE_TOOL_NAMES.has(tool) && !allowElevatedTools) {
+        throw new Error("Pi RPC workers may only use read-only tools unless allowElevatedTools is approved");
+      }
     }
     if (config.systemPrompt !== undefined && (!config.systemPrompt.trim() || config.systemPrompt.length > 16_000)) {
       throw new Error("system prompt must be non-empty and at most 16000 characters");

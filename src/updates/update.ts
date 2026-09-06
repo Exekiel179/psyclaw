@@ -154,14 +154,20 @@ export async function updatePsyClaw(options: UpdatePsyClawOptions): Promise<PsyC
   };
 
   if (await hasSourceLockfile(manifest.root)) {
+    // Lockfiles mark a developer checkout. Never npm-overwrite the working tree;
+    // surface the rebuild plan in `commands` the same way `--check` does.
+    const manager = (await packageManagerAt(manifest.root)) ?? "pnpm";
+    const commands = manager === "npm"
+      ? ["npm install", "npm run build"]
+      : ["pnpm install", "pnpm build"];
     return finish({
-      ok: false,
+      ok: true,
       executed: false,
       reasonCode: "update-skipped",
-      reason: "source checkout detected; update with Git, then run pnpm install and pnpm build",
+      reason: "source checkout detected; refuse npm self-overwrite — sync with Git, then rebuild",
       psyclaw,
       runtime,
-      commands: [],
+      commands,
     });
   }
 
