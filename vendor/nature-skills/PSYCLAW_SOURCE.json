@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "psyclaw/bundled-upstream/v1",
+  "name": "nature-skills",
+  "source": "https://github.com/Yuan1z0825/nature-skills",
+  "ref": "main",
+  "commit": "28150f30f8b4017991fca8c7b2839f02c6586d2f",
+  "contentSha256": "3dccb12c2dbfd430d2e133b434a9c8ef88ec9d0c31abded0776aba6e855f6509",
+  "license": "Apache-2.0",
+  "includes": [
+    "skills/nature-figure",
+    "skills/nature-ref-verifier",
+    "skills/nature-polishing",
+    "skills/nature-shared"
+  ],
+  "omissions": [
+    "skills/nature-figure/assets (chart-atlas / figures4papers / gallery examples omitted to keep the npm package small; runtime scripts and references remain)"
+  ],
+  "distribution": "Bundled in the PsyClaw npm package for offline ARS gap-fill; no runtime GitHub download is required."
+}

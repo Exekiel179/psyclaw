@@ -1,6 +1,6 @@
 {
   "name": "psyclaw",
-  "version": "0.28.1",
+  "version": "0.28.2",
   "description": "A standalone, evidence-grounded social-science research agent with research contracts, evidence gates, and recoverable workflows",
   "type": "module",
   "license": "MIT",
@@ -25,6 +25,8 @@
     "skills",
     "agents",
     "vendor/ars",
+    "vendor/nature-skills",
+    "vendor/academic-paper-skills",
     "vendor/windows",
     "scripts/psyclaw.mjs",
     "scripts/rebrand-pi.mjs"
@@ -52,7 +54,12 @@
       "./vendor/ars/deep-research",
       "./vendor/ars/academic-paper",
       "./vendor/ars/academic-paper-reviewer",
-      "./vendor/ars/academic-pipeline"
+      "./vendor/ars/academic-pipeline",
+      "./vendor/nature-skills/skills/nature-figure",
+      "./vendor/nature-skills/skills/nature-ref-verifier",
+      "./vendor/nature-skills/skills/nature-polishing",
+      "./vendor/academic-paper-skills/academic-paper-strategist",
+      "./vendor/academic-paper-skills/academic-paper-composer"
     ],
     "prompts": [
       "./vendor/ars/commands"
@@ -62,7 +69,7 @@
     "build": "node scripts/rebrand-pi.mjs && tsc -p tsconfig.json && node scripts/copy-panel.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "test:ars": "vitest run tests/unit/bundled-ars.test.ts tests/unit/ars-profile.test.ts tests/unit/ars-panel-plan.test.ts tests/unit/ars-bridge.test.ts",
+    "test:ars": "vitest run tests/unit/bundled-ars.test.ts tests/unit/bundled-nature-compose.test.ts tests/unit/ars-profile.test.ts tests/unit/ars-mode-editor.test.ts tests/unit/ars-panel-plan.test.ts tests/unit/ars-bridge.test.ts",
     "test:watch": "vitest",
     "eval": "tsx evals/harness.ts",
     "eval:modules": "tsx evals/modules.ts",

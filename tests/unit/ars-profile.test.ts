@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACADEMIC_COMPOSE_SKILLS,
   detectNatureArsFillers,
   formatNatureArsFillerStatus,
   NATURE_ARS_FILLERS,
+  NATURE_ARS_FILLERS_BUNDLED,
   PSYCLAW_ARS_PROFILE_VERSION,
   psyclawArsPatch,
 } from "../../src/ars/profile.js";
 
-describe("PsyClaw ARS profile v2", () => {
-  it("keeps ARS as the workflow source and only gap-fills with Nature leaves", () => {
+describe("PsyClaw ARS profile v3", () => {
+  it("keeps ARS as the workflow source and gap-fills with bundled Nature leaves", () => {
     const patch = psyclawArsPatch();
-    expect(PSYCLAW_ARS_PROFILE_VERSION).toBe("2");
-    expect(patch).toContain("## PsyClaw ARS profile v2");
+    expect(PSYCLAW_ARS_PROFILE_VERSION).toBe("3");
+    expect(NATURE_ARS_FILLERS_BUNDLED).toBe(true);
+    expect(patch).toContain("## PsyClaw ARS profile v3");
     expect(patch).toContain("ARS remains the workflow source of truth");
     expect(patch).toContain("independent multi-agent review");
     expect(patch).toContain("## Nature gap-fill");
@@ -21,43 +24,33 @@ describe("PsyClaw ARS profile v2", () => {
       "nature-ref-verifier",
       "nature-polishing",
     ]);
+    expect(ACADEMIC_COMPOSE_SKILLS).toEqual([
+      "academic-paper-strategist",
+      "academic-paper-composer",
+    ]);
   });
 
-  it("does not treat identity-prompt mentions as installed Nature skills", () => {
-    const present = detectNatureArsFillers({
-      systemPrompt: "Figure generation should use nature-figure instead of matplotlib defaults.",
-    });
-    expect(present).toEqual([]);
-    expect(psyclawArsPatch({ systemPrompt: "use nature-figure" })).toContain("MISSING nature-figure");
-    expect(psyclawArsPatch({ systemPrompt: "use nature-figure" })).not.toContain("AVAILABLE nature-figure");
-  });
-
-  it("activates only loaded Nature fillers from Pi skill XML or skill names", () => {
-    const xml = [
-      "<available_skills>",
-      "  <skill>",
-      "    <name>nature-figure</name>",
-      "    <description>Publication figures</description>",
-      "  </skill>",
-      "</available_skills>",
-    ].join("\n");
-    expect(detectNatureArsFillers({ systemPrompt: xml })).toEqual(["figure"]);
-    expect(detectNatureArsFillers({ skills: [{ name: "nature-ref-verifier" }, { name: "nature-polishing" }] })).toEqual([
+  it("treats bundled Nature fillers as always available", () => {
+    expect(detectNatureArsFillers()).toEqual(["figure", "ref-verifier", "polishing"]);
+    expect(detectNatureArsFillers({ systemPrompt: "use nature-figure" })).toEqual([
+      "figure",
       "ref-verifier",
       "polishing",
     ]);
-    const patch = psyclawArsPatch({ skills: [{ name: "nature-figure" }] });
+    const patch = psyclawArsPatch();
     expect(patch).toContain("AVAILABLE nature-figure");
-    expect(patch).toContain("MISSING nature-ref-verifier");
-    expect(patch).toContain("MISSING nature-polishing");
-    expect(patch).not.toContain("AVAILABLE nature-reviewer");
+    expect(patch).toContain("AVAILABLE nature-ref-verifier");
+    expect(patch).toContain("AVAILABLE nature-polishing");
+    expect(patch).not.toContain("MISSING nature-figure");
   });
 
-  it("reports Chinese filler status without claiming missing skills are attached", () => {
-    const text = formatNatureArsFillerStatus(["figure"]);
-    expect(text).toContain("nature-figure：已接入");
-    expect(text).toContain("nature-ref-verifier：未安装");
-    expect(text).toContain("nature-polishing：未安装");
-    expect(text).toContain("/plugin install nature-skills-plugin");
+  it("reports Chinese filler status as built-in without plugin install hint", () => {
+    const text = formatNatureArsFillerStatus(["figure", "ref-verifier", "polishing"]);
+    expect(text).toContain("nature-figure：已内置");
+    expect(text).toContain("nature-ref-verifier：已内置");
+    expect(text).toContain("nature-polishing：已内置");
+    expect(text).toContain("academic-paper-strategist");
+    expect(text).toContain("academic-paper-composer");
+    expect(text).not.toContain("/plugin install nature-skills-plugin");
   });
 });

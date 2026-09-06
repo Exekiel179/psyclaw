@@ -100,6 +100,15 @@ export default function (pi) {
   });
 
   pi.on("input", (event) => {
+    // PsyClaw conversation mode: `ars: <task>` (entered via bare `ars` + Tab).
+    const modeMatch = event.text.match(/^ars:\s*([\s\S]*)$/i);
+    if (modeMatch) {
+      setArsActive(true);
+      const body = modeMatch[1].trim();
+      if (!body) return { action: "handled" };
+      return { action: "transform", text: body };
+    }
+
     const match = event.text.match(commandPattern);
     if (!match) {
       if (skillPattern.test(event.text)) setArsActive(true);

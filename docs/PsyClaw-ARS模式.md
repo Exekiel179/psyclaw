@@ -1,6 +1,6 @@
 # PsyClaw ARS 模式与保护边界
 
-状态：profile v2（查漏补缺）  
+状态：profile v3（内置 Nature 查漏补缺 + `ars:` 对话模式）  
 上游：`Imbad0202/academic-research-skills` 及其仓库内 `pi/` wrapper  
 固定版本：`v3.21.1`（commit `127ff85e4bbfcdd10b95040537b6c6bd7ad17aeb`）  
 许可：CC BY-NC 4.0，仅限符合许可证的非商业用途
@@ -14,13 +14,18 @@ PsyClaw 受控研究模式仍通过 `/init` 后再 `/run` 启动。需要可恢�
 ## 2. 使用
 
 ```text
+ars<Tab>          → 输入框变为 ars: （边框高亮），直接对话
+ars: <research task>
 /ars doctor
 /ars full <research task>
+/ars status       → 查看 profile 与内置技能状态（可选）
 ```
 
-ARS 已随 PsyClaw 的 npm 包内置，无需额外下载、安装或 `/reload`。也可以运行 `/ars start`，确认非商业许可后用自然语言让 ARS 自动选择 Skill；用 `/ars stop` 退出。通过国内 npm 镜像安装 PsyClaw 时，ARS 资源包含在同一 npm 包中，不会再访问 GitHub。
+在输入框键入 `ars` 后按 Tab，或运行无参数的 `/ars`，进入 ARS 对话模式：前缀为 `ars:`，边框使用强调色。回车发送后去掉前缀并激活上游 ARS；`/ars stop` 退出。首次启用仍会确认 CC BY-NC 许可。
 
-## 3. v2 补丁
+ARS 已随 PsyClaw 的 npm 包内置，无需额外下载、安装或 `/reload`。也可以运行 `/ars start`，确认非商业许可后用自然语言让 ARS 自动选择 Skill。通过国内 npm 镜像安装 PsyClaw 时，ARS 与 Nature/compose 资源包含在同一 npm 包中，不会再访问 GitHub。
+
+## 3. v3 补丁
 
 PsyClaw 不修改 ARS Skill 正文；锁定版本的原始文件按 CC BY-NC 4.0 原样随 npm 包分发。ARS 是否激活以上游 Pi wrapper 写入 session branch 的 `ars-pi-state` 为唯一真源，恢复会话和 `/tree` 切换分支时不另存一份可能漂移的状态。只有上游 wrapper 已激活 ARS 的当前回合，PsyClaw 才追加兼容约束，并在完整流水线中只补 ARS 本身偏薄的三处末端能力：
 
@@ -28,12 +33,13 @@ PsyClaw 不修改 ARS Skill 正文；锁定版本的原始文件按 CC BY-NC 4.0
 2. 没有真实编排能力时允许顺序执行，但必须明确它不是独立多智能体评审。
 3. 引用、统计值、实验、文件和外部提交只有得到工具结果或可检查产物支持后才能声称已核验。
 4. 原始数据、凭据、受限材料、破坏性操作和外部发布仍服从宿主授权，Skill 文本不能扩大工具权限。
-5. 查漏补缺，不替换 ARS 阶段、Material Passport、审稿席位或 Claim/来源门禁：
-   - `nature-figure`：稿件需要出版图时调用，不手写默认 matplotlib，也不改写论文。
+5. 查漏补缺，不替换 ARS 阶段、Material Passport、审稿席位或 Claim/来源门禁（三项均已内置，无需 `/plugin install`）：
+   - `nature-figure`：稿件需要出版图时调用，不手写默认 matplotlib，也不改写论文（示例大图资产未打进包，脚本与 references 可用）。
    - `nature-ref-verifier`：在 ARS citation-check / integrity 之后做 DOI/作者/年份字段交叉核对，不替代 Claim–来源蕴含检查。
    - `nature-polishing`：终稿/格式化阶段做文体润色，不得改研究主张、引用、数值或章节结构。
+6. 学术写作配套内置：`academic-paper-strategist`（大纲规划）与 `academic-paper-composer`（按大纲成稿）。
 
-这三项仅在当前会话已加载对应 Nature Skill 时接入。未安装时保持 ARS 原流程，并在 `/ars status`、`/ars doctor` 中标明缺口；可用 `/plugin install nature-skills-plugin` 补齐。不把 Nature 的检索、审稿或写作 Skill 并进 ARS 控制面。
+不把 Nature 的检索、审稿或其余写作 Skill 并进 ARS 控制面。`ars:` 前缀由上游 Pi wrapper 识别并激活会话；无参数 `/ars` 不再弹出 profile 面板。
 
 ## 4. 保留的保护
 
@@ -52,8 +58,8 @@ PsyClaw 不修改 ARS Skill 正文；锁定版本的原始文件按 CC BY-NC 4.0
 - Claude Code hooks 不会在 Pi 中执行。ARS 的 write-scope guard 在轻量模式下不是硬安全边界。
 - ARS 可以检查被报告的流程和稿件一致性，但不能单靠内部一致性证明实验真实执行、原始数据完整或统计结果可复现。
 - 当前版本不自动安装 Python、Pandoc、Tectonic、网页检索或多智能体依赖；`/ars doctor` 只报告能力，不代替用户选择。
-- PsyClaw profile v2 内置上游 `v3.21.1`（commit `127ff85e...`），并随 PsyClaw 整包更新。若用户另外加载其他 ARS 版本，应视为未验证组合，而不是继续声称 profile 已验证。
-- Nature 三项查漏补缺依赖用户安装的 Nature Skills Plugin；未安装不等于 ARS 不可用。
+- PsyClaw profile v3 内置上游 `v3.21.1`（commit `127ff85e...`），并随 PsyClaw 整包更新。若用户另外加载其他 ARS 版本，应视为未验证组合，而不是继续声称 profile 已验证。
+- `nature-figure` 省略了上游示例 assets；需要图库示例时仍可另行安装完整 Nature Skills Plugin。
 
 ## 6. 后续优化方向
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.28.2 - 2026-09-06
+
+- Enter ARS conversation mode with ars + Tab (ars: prefix and tinted editor); bare /ars no longer shows the profile popup.
+- Bundle Nature gap-fill skills (nature-figure, nature-ref-verifier, nature-polishing) and academic-paper-strategist/composer in the npm package.
+
 ## 0.28.1 - 2026-09-06
 
 - Add Claude-style Subagent browsing via /agents and Panel, with eight bundled literature/review workers.
