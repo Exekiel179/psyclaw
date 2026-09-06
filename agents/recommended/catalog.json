@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-agents/v1",
-  "documentVersion": "0.29.1",
-  "syncedAt": "2026-09-06",
+  "documentVersion": "0.29.2",
+  "syncedAt": "2026-09-07",
   "sourceDocument": "bundled literature/review subagents",
   "sourceRef": "bundled",
   "repositoryHint": "对齐 Claude Code：Subagent = md 提示合订本。外仓可后续以 GitHub 源加入 installPrep；当前内置 8 个无需安装。",

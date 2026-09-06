@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.29.2 - 2026-09-07
+
 - Add analysis-mode stats soft-takeover via core skill `analysis-plan`, durable plans under `analysis/plans/`, and `/plan` (new/status/confirm/review/run/defer/handoff). Default execution is local reproducible scripts; MCP only for special backends or explicit request. Bridge to academic via `analysis/HANDOFF.md` without merging ARS planning.
 - Remove the `/run` command. After `/init`, analysis/academic modes and tools use the project itself as the active research context; soft `/verify` gates remain.
 - Remove `/brief`, `psyclaw brief`, and the offline `research-brief` skill/path. Evidence-sufficiency evals now call gates directly.
