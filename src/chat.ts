@@ -10,6 +10,7 @@ import {
   ensureQuietStartup,
   PSYCLAW_IDENTITY_PROMPT,
 } from "./branding.js";
+import { ensureAcademicModeKeybindings } from "./ars/keybindings.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
 import { withBundledWindowsTools } from "./bundled-tools.js";
@@ -114,6 +115,8 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
 
   // The header banner renders psyclaw's own version (not the bundled pi 0.84.x).
   const agentDir = process.env.PSYCLAW_CODING_AGENT_DIR || join(homedir(), ".psyclaw", "agent");
+  // Free Shift+Tab for academic mode; move Pi thinking-cycle to Ctrl+Shift+Tab.
+  await ensureAcademicModeKeybindings(agentDir);
   const sessionDir = process.env.PSYCLAW_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
   let spawnEnv: NodeJS.ProcessEnv = withBundledWindowsTools({
     ...process.env,

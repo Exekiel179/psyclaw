@@ -14,16 +14,18 @@ PsyClaw 受控研究模式仍通过 `/init` 后再 `/run` 启动。需要可恢�
 ## 2. 使用
 
 ```text
-ars<Tab>          → 输入框变为 ars: （边框高亮），直接对话
-ars: <research task>
+Shift+Tab          → 切换 academic mode（底栏显示 academic mode，输入框边框高亮）
+Ctrl+Shift+Tab     → 切换 thinking level（Pi 默认 Shift+Tab 已让出给 academic mode）
 /ars doctor
 /ars full <research task>
-/ars status       → 查看 profile 与内置技能状态（可选）
+/ars status        → 查看 profile 与内置技能状态（可选）
 ```
 
-在输入框键入 `ars` 后按 Tab，或运行无参数的 `/ars`，进入 ARS 对话模式：前缀为 `ars:`，边框使用强调色。回车发送后去掉前缀并激活上游 ARS；`/ars stop` 退出。首次启用仍会确认 CC BY-NC 许可。
+按 **Shift+Tab** 进入会话级 academic mode 后，直接正常对话即可，不必每轮再输入命令。再按一次 Shift+Tab，或 `/ars stop`，退出。底栏扩展状态行显示 `academic mode`。进入时不再弹出许可确认框（包内文档与 README 仍标明 CC BY-NC 约束）。
 
-ARS 已随 PsyClaw 的 npm 包内置，无需额外下载、安装或 `/reload`。也可以运行 `/ars start`，确认非商业许可后用自然语言让 ARS 自动选择 Skill。通过国内 npm 镜像安装 PsyClaw 时，ARS 与 Nature/compose 资源包含在同一 npm 包中，不会再访问 GitHub。
+PsyClaw 启动时会把 `~/.psyclaw/agent/keybindings.json` 里的 `app.thinking.cycle` 从 Pi 默认的 `shift+tab` 改到 `ctrl+shift+tab`（若你已自定义其它快捷键则不动）。
+
+ARS 已随 PsyClaw 的 npm 包内置，无需额外下载、安装或 `/reload`。也可以运行 `/ars start`，用自然语言让 ARS 自动选择 Skill。通过国内 npm 镜像安装 PsyClaw 时，ARS 与 Nature/compose 资源包含在同一 npm 包中，不会再访问 GitHub。
 
 ## 3. v3 补丁
 
@@ -39,13 +41,13 @@ PsyClaw 不修改 ARS Skill 正文；锁定版本的原始文件按 CC BY-NC 4.0
    - `nature-polishing`：终稿/格式化阶段做文体润色，不得改研究主张、引用、数值或章节结构。
 6. 学术写作配套内置：`academic-paper-strategist`（大纲规划）与 `academic-paper-composer`（按大纲成稿）。
 
-不把 Nature 的检索、审稿或其余写作 Skill 并进 ARS 控制面。`ars:` 前缀由上游 Pi wrapper 识别并激活会话；无参数 `/ars` 不再弹出 profile 面板。
+不把 Nature 的检索、审稿或其余写作 Skill 并进 ARS 控制面。`Shift+Tab` 开启会话级 academic mode（底层仍为 ARS）；兼容保留 `ars:` 前缀由上游 Pi wrapper 识别并激活。无参数 `/ars` 不再弹出 profile 面板。
 
 ## 4. 保留的保护
 
 | 保护 | ARS 轻量模式 | `/run` 受控模式 | 原因 |
 | --- | --- | --- | --- |
-| 首次开始 ARS 时确认来源与非商业许可 | 保留 | 不适用 | ARS 随系统内置，但使用仍受上游许可证约束 |
+| 首次开始 ARS 时弹窗确认非商业许可 | 不弹窗 | 不适用 | 许可仍以包内 LICENSE/README 为准，不阻断进入 |
 | ARS 阶段转换确认 | 保留 | 不适用 | 研究方向、方法和稿件阶段应由研究者决定 |
 | 普通阶段内写入逐项确认 | 不增加 | `/run` 范围内自动记录 | 避免细粒度确认拖垮工作流 |
 | 原始数据、凭据、破坏性操作、外部发布授权 | 保留 | 保留 | 后果高或不可逆，不能由 Skill 授权 |

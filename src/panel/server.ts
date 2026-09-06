@@ -67,7 +67,7 @@ const CORE_SKILLS = [
   {
     id: "psyclaw-ars",
     name: "PsyClaw ARS",
-    description: "研究、写作、审稿与修订流程；首次启用时确认非商业许可。",
+    description: "研究、写作、审稿与修订流程；随包内置，Shift+Tab 切换 academic mode。",
     locked: true,
   },
 ] as const;

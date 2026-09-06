@@ -4,7 +4,7 @@ PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、
 
 PsyClaw 自有代码使用 MIT 许可证；随 npm 包内置的 Academic Research Skills 位于 `vendor/ars`，保持上游署名并单独遵循 CC BY-NC 4.0，仅限非商业用途。
 
-当前版本：`0.28.2`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.28.3`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -21,19 +21,19 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.28.2
+npm install -g psyclaw@0.28.3
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.28.2 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.28.3 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.28.2 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.28.3 --registry=https://registry.npmmirror.com
 ```
 
 PsyClaw 的 npm 发布包直接携带 Windows x64/arm64 版 `ripgrep` 和 `fd`，Windows 启动时直接使用包内可执行文件，不再联网下载。其他平台缺少这两个工具时仍由锁定的 Pi 原生工具管理器处理：代理环境走 GitHub 官方 API 与 Release，国内 npm registry 环境统一走国内镜像。
@@ -92,7 +92,7 @@ psyclaw brief
 | 创建项目能力 | `/create-skill`、`/create-hook`、`/create-rule`、`/create-subagent`（均先预览并确认） |
 | 运行自定义只读角色 | `/agents --agent <id> <task>` 或 `/agents --agents <id,...> <task>`（最多四个隔离 worker） |
 | 调用已加载 Skill | `/skill:<name>` |
-| 使用 PsyClaw ARS | 输入 `ars` 后按 Tab（或 `ars: <task>`）；也可用 `/ars doctor` / `/ars full <task>` |
+| 使用 PsyClaw ARS | `Shift+Tab` 进入 academic mode（底栏显示）；thinking level 改用 `Ctrl+Shift+Tab`；也可用 `/ars doctor` / `/ars full <task>` |
 | 管理 Plugin | `/plugin`；终端使用 `psyclaw plugin install|remove|list` |
 | 调用已配置 MCP | 模型通过 `psyclaw_mcp` 自动发现并调用 `.psyclaw/mcp/*.json` 中启用的服务器 |
 
