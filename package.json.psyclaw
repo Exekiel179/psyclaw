@@ -1,11 +1,11 @@
 {
   "schemaVersion": "psyclaw/package-governance/v1",
   "id": "psyclaw",
-  "apiVersion": "0.28",
-  "capabilities": ["research-brief", "evidence-ledger", "integrity-gates"],
+  "apiVersion": "0.29",
+  "capabilities": ["research-brief", "evidence-ledger", "integrity-gates", "session-modes", "soft-verify"],
   "permissions": {
     "read": ["project-root"],
-    "write": [".psyclaw", "notes", "outputs", "data/clean"],
+    "write": [".psyclaw", "notes", "outputs", "data/clean", "analysis", "paper", "literature"],
     "network": "disabled-by-default",
     "destructive": "denied-by-default"
   },

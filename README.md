@@ -4,7 +4,7 @@ PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、
 
 PsyClaw 自有代码使用 MIT 许可证；随 npm 包内置的 Academic Research Skills 位于 `vendor/ars`，保持上游署名并单独遵循 CC BY-NC 4.0，仅限非商业用途。
 
-当前版本：`0.29.0`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.29.1`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -21,19 +21,19 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.29.0
+npm install -g psyclaw@0.29.1
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.29.0 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.29.1 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.29.0 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.29.1 --registry=https://registry.npmmirror.com
 ```
 
 PsyClaw 的 npm 发布包直接携带 Windows x64/arm64 版 `ripgrep` 和 `fd`，Windows 启动时直接使用包内可执行文件，不再联网下载。其他平台缺少这两个工具时仍由锁定的 Pi 原生工具管理器处理：代理环境走 GitHub 官方 API 与 Release，国内 npm registry 环境统一走国内镜像。
