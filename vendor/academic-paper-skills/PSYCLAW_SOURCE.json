@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "psyclaw/bundled-upstream/v1",
+  "name": "academic-paper-skills",
+  "source": "https://github.com/lishix520/academic-paper-skills",
+  "ref": "main",
+  "commit": "c325557646e9418939ccc7b99171b149ad6314f1",
+  "contentSha256": "2a38f75feb9cc9a245e1759874315cda4bd201e622aeac760f9b1632fb484426",
+  "license": "MIT",
+  "includes": [
+    "academic-paper-strategist",
+    "academic-paper-composer"
+  ],
+  "distribution": "Bundled in the PsyClaw npm package for offline academic compose workflows; no runtime GitHub download is required."
+}

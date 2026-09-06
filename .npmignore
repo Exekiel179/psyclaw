@@ -12,6 +12,10 @@
 !vendor/
 !vendor/ars/
 !vendor/ars/**
+!vendor/nature-skills/
+!vendor/nature-skills/**
+!vendor/academic-paper-skills/
+!vendor/academic-paper-skills/**
 !vendor/windows/
 !vendor/windows/**
 !scripts/

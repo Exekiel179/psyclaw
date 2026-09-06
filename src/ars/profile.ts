@@ -1,9 +1,15 @@
-export const PSYCLAW_ARS_PROFILE_VERSION = "2" as const;
+export const PSYCLAW_ARS_PROFILE_VERSION = "3" as const;
 export const ARS_REPOSITORY_URL = "https://github.com/Imbad0202/academic-research-skills" as const;
 export const ARS_UPSTREAM_REF = "v3.21.1" as const;
 export const ARS_UPSTREAM_COMMIT = "127ff85e4bbfcdd10b95040537b6c6bd7ad17aeb" as const;
 export const ARS_ARCHIVE_SHA256 = "3b82731b860a021e9c8efbca4cc3a91e472a43b50a21a066e2a44e312c97cdf3" as const;
 export const NATURE_SKILLS_PLUGIN_ID = "nature-skills-plugin" as const;
+/** Nature gap-fill leaves are vendored under vendor/nature-skills and listed in package.json pi.skills. */
+export const NATURE_ARS_FILLERS_BUNDLED = true as const;
+export const ACADEMIC_COMPOSE_SKILLS = [
+  "academic-paper-strategist",
+  "academic-paper-composer",
+] as const;
 
 const ARS_PI_COMPATIBILITY_MARKER = "## Academic Research Skills compatibility for Pi";
 const ARS_PI_STATE_ENTRY_TYPE = "ars-pi-state";
@@ -86,6 +92,9 @@ export function loadedSkillNames(input: ArsPatchInput = {}): Set<string> {
 }
 
 export function detectNatureArsFillers(input: ArsPatchInput = {}): NatureArsFillerId[] {
+  if (NATURE_ARS_FILLERS_BUNDLED) {
+    return NATURE_ARS_FILLERS.map((filler) => filler.id);
+  }
   const names = loadedSkillNames(input);
   return NATURE_ARS_FILLERS
     .filter((filler) => filler.aliases.some((alias) => names.has(alias)))
@@ -97,10 +106,18 @@ export function formatNatureArsFillerStatus(present: readonly NatureArsFillerId[
   const lines = ["Nature 查漏补缺（不替换 ARS 阶段）："];
   for (const filler of NATURE_ARS_FILLERS) {
     const ready = presentSet.has(filler.id);
-    lines.push(`- ${filler.skill}：${ready ? "已接入" : "未安装"}（${filler.stage}）`);
+    const state = NATURE_ARS_FILLERS_BUNDLED
+      ? "已内置"
+      : ready
+        ? "已接入"
+        : "未安装";
+    lines.push(`- ${filler.skill}：${state}（${filler.stage}）`);
   }
-  if (present.length < NATURE_ARS_FILLERS.length) {
+  if (!NATURE_ARS_FILLERS_BUNDLED && present.length < NATURE_ARS_FILLERS.length) {
     lines.push(`未安装项可运行 /plugin install ${NATURE_SKILLS_PLUGIN_ID}；缺席时保持 ARS 原流程，不编造该产物。`);
+  }
+  if (NATURE_ARS_FILLERS_BUNDLED) {
+    lines.push(`学术写作配套：${ACADEMIC_COMPOSE_SKILLS.join("、")} 已内置。`);
   }
   return lines.join("\n");
 }
@@ -113,15 +130,15 @@ function natureGapFillSection(present: readonly NatureArsFillerId[]): string[] {
   ];
   const instructions: Record<NatureArsFillerId, { available: string; missing: string }> = {
     figure: {
-      available: "- AVAILABLE nature-figure (format / manuscript figures): when the manuscript needs publication figures, invoke nature-figure instead of ad-hoc matplotlib. Do not use it to rewrite the paper or invent data.",
+      available: "- AVAILABLE nature-figure (format / manuscript figures; bundled): when the manuscript needs publication figures, invoke nature-figure instead of ad-hoc matplotlib. Do not use it to rewrite the paper or invent data.",
       missing: "- MISSING nature-figure: leave figures unfinished or ARS-native; do not invent publication-ready charts. Offer /plugin install nature-skills-plugin only if the user asks to fill this gap.",
     },
     "ref-verifier": {
-      available: "- AVAILABLE nature-ref-verifier (integrity / citation-check): after ARS citation-check or integrity, invoke nature-ref-verifier for DOI/author/year/field cross-checks. It does not replace ARS claim-source entailment or locator gates.",
+      available: "- AVAILABLE nature-ref-verifier (integrity / citation-check; bundled): after ARS citation-check or integrity, invoke nature-ref-verifier for DOI/author/year/field cross-checks. It does not replace ARS claim-source entailment or locator gates.",
       missing: "- MISSING nature-ref-verifier: keep ARS citation-check as the citation gate; do not claim multi-source field verification that was not run.",
     },
     polishing: {
-      available: "- AVAILABLE nature-polishing (finalization / prose polish): after a draft exists, during finalization/format only, invoke nature-polishing for prose. It must not change research claims, citations, numbers, or section structure.",
+      available: "- AVAILABLE nature-polishing (finalization / prose polish; bundled): after a draft exists, during finalization/format only, invoke nature-polishing for prose. It must not change research claims, citations, numbers, or section structure.",
       missing: "- MISSING nature-polishing: keep ARS writing/format output; do not claim Nature-style polish that was not run.",
     },
   };

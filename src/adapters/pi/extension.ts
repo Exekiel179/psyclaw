@@ -66,6 +66,7 @@ import {
   isArsPiTurn,
   psyclawArsPatch,
 } from "../../ars/profile.js";
+import { ArsModeEditor, enterArsModeEditorText, isArsModeEditorText } from "../../ars/mode-editor.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -1277,6 +1278,16 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       })}`,
     };
   });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_start", (_event, ctx) => {
+    if (!ctx.hasUI || typeof ctx.ui.setEditorComponent !== "function") return;
+    ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+      const editor = new ArsModeEditor(tui, theme, keybindings);
+      editor.onArsModeChange = (active) => {
+        ctx.ui.setStatus("ars", active ? "ARS" : undefined);
+      };
+      return editor;
+    });
+  });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("input", (event, ctx) => {
     if (event.source === "extension") return;
     if (!/^\/(?:login|logout)(?:\s|$)/i.test(event.text.trim())) return;
@@ -1285,7 +1296,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("input", async (event, ctx) => {
     if (event.source === "extension" || isArsPiActive(ctx.sessionManager)) return;
-    if (!/^\/(?:ars-[a-z0-9-]+|skill:(?:deep-research|academic-paper|academic-paper-reviewer|academic-pipeline))(?:\s|$)/i.test(event.text.trim())) return;
+    const text = event.text.trim();
+    const entersArs = isArsModeEditorText(text)
+      || /^\/(?:ars-[a-z0-9-]+|skill:(?:deep-research|academic-paper|academic-paper-reviewer|academic-pipeline))(?:\s|$)/i.test(text);
+    if (!entersArs) return;
     if (!ctx.hasUI) return { action: "handled" as const };
     const approved = await ctx.ui.confirm(
       "启用 ARS？",
@@ -1556,17 +1570,34 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("ars", {
-    description: "启动或管理 PsyClaw ARS 模式",
+    description: "进入 ARS 对话模式，或管理 doctor/start/full/stop",
     handler: async (args, ctx) => {
       try {
-        const [action = "status", ...rest] = args.trim().split(/\s+/).filter(Boolean);
+        const [action, ...rest] = args.trim().split(/\s+/).filter(Boolean);
+        // Bare /ars → conversation mode (ars: + tint). No profile popup.
+        if (!action) {
+          if (!ctx.hasUI) {
+            ctx.ui.notify("当前环境无编辑器；请改用 /ars start 或发送 ars: <任务>。", "info");
+            return;
+          }
+          if (!isArsPiActive(ctx.sessionManager)) {
+            const approved = await ctx.ui.confirm(
+              "启用 ARS？",
+              `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF}\n许可：CC BY-NC 4.0，仅限非商业用途。关键研究阶段仍会请求确认。`,
+            );
+            if (!approved) return;
+          }
+          ctx.ui.setEditorText(enterArsModeEditorText(ctx.ui.getEditorText?.() ?? ""));
+          ctx.ui.setStatus("ars", "ARS");
+          return;
+        }
         if (action === "status") {
           ctx.ui.notify(
             [
               `PsyClaw ARS profile v${PSYCLAW_ARS_PROFILE_VERSION}`,
-              "模式：轻量 ARS（不要求 /init 或 /run）",
+              "模式：轻量 ARS（输入 ars 后按 Tab，或以 ars: 前缀对话）",
               `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF} (${ARS_UPSTREAM_COMMIT.slice(0, 12)})`,
-              "入口：/ars doctor，/ars start，/ars full <task>，/ars stop",
+              "入口：ars: <task>，/ars doctor，/ars start，/ars full <task>，/ars stop",
               formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)),
             ].join("\n"),
             "info",
@@ -1574,7 +1605,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           return;
         }
         if (action === "install") {
-          ctx.ui.notify("ARS 可直接使用：运行 /ars start 或 /ars full <task>。", "info");
+          ctx.ui.notify("ARS 与 Nature/compose 技能已内置：输入 ars 后按 Tab，或以 /ars start、/ars full <task> 使用。", "info");
           return;
         }
         if ((action === "start" || action === "full") && !isArsPiActive(ctx.sessionManager)) {
@@ -1594,11 +1625,14 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
                 ? `/ars-full${rest.length > 0 ? ` ${rest.join(" ")}` : ""}`
                 : undefined;
         if (!upstreamCommand) {
-          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop]", "info");
+          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop] 或直接输入 ars 后按 Tab", "info");
           return;
         }
-        if (action === "doctor" || action === "full" || action === "start") {
-          ctx.ui.notify(formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)), "info");
+        if (action === "stop") {
+          ctx.ui.setStatus("ars", undefined);
+          if (ctx.hasUI && isArsModeEditorText(ctx.ui.getEditorText?.() ?? "")) {
+            ctx.ui.setEditorText("");
+          }
         }
         // A queued prompt does not get a fresh system prompt in Pi. Wait so the
         // upstream wrapper can activate ARS and inject its compatibility note.
