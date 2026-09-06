@@ -29,11 +29,8 @@ describe("Pi extension contract", () => {
       registerTool() {},
     } as any;
     extension(api);
-    // `/export` was removed (session-trace export moved to Pi's built-in), and
-    // developer-only commands (verify/model) are gated behind
-    // PSYCLAW_DEVELOPER_COMMANDS=1, so they are absent from the default set.
     expect(commands).toEqual([
-      "init", "run", "brief", "grill", "review", "loop",
+      "init", "verify", "run", "brief", "grill", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
       "skill", "ars", "plugin", "mcp", "provider", "pet", "agents",
     ]);
@@ -55,10 +52,10 @@ describe("Pi extension contract", () => {
     });
     const project = JSON.parse(await readFile(join(root, ".psyclaw", "project.json"), "utf8"));
     expect(project.paradigm).toBe("qualitative-thematic");
-    expect(notifications[0]).toContain("研究项目已初始化");
+    expect(notifications[0]).toContain("工作仓库已初始化");
   });
 
-  it("does not reinterpret malformed flags as a research goal", async () => {
+  it("allows paradigm-only init without a goal string", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-invalid-"));
     let initHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     const api = {
@@ -72,8 +69,9 @@ describe("Pi extension contract", () => {
       cwd: root,
       ui: { notify: (message: string) => notifications.push(message) },
     });
-    expect(notifications[0]).toContain("Usage:");
-    await expect(readFile(join(root, ".psyclaw", "project.json"), "utf8")).rejects.toThrow();
+    expect(notifications[0]).toContain("工作仓库已初始化");
+    const project = JSON.parse(await readFile(join(root, ".psyclaw", "project.json"), "utf8"));
+    expect(project.goal).toBe("未命名研究项目");
   });
 
   it("lists models without exposing credentials", async () => {

@@ -65,8 +65,19 @@ import {
   isArsPiActive,
   isArsPiTurn,
   psyclawArsPatch,
+  setArsPiSessionActive,
 } from "../../ars/profile.js";
+import { buildArsDoctorReport, ensurePdfEngineForExport } from "../../ars/doctor.js";
+import { arsRoot } from "../../ars/pi-panel-executor.js";
 import { ArsModeEditor, ARS_MODE_STATUS, isArsModeEditorText } from "../../ars/mode-editor.js";
+import {
+  MODE_STATUS,
+  type PsyClawSessionMode,
+  nextSessionMode,
+  parseSessionMode,
+  sessionModePrompt,
+} from "../../session/modes.js";
+import { formatVerifyChecklist, loadVerifyChecklist, markVerifyItem, type VerifyStatus } from "../../verify/checklist.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -81,19 +92,19 @@ const PARADIGMS = new Set<ResearchParadigm>([
   "mixed-methods",
 ]);
 
-function parseInitArgs(args: string): { goal: string; paradigm: ResearchParadigm } {
+function parseInitArgs(args: string): { goal?: string; paradigm?: ResearchParadigm } {
   const trimmed = args.trim();
+  if (!trimmed) return {};
   const match = trimmed.match(/^--paradigm(?:=|\s+)(\S+)(?:\s+([\s\S]*))?$/i);
   if (trimmed.startsWith("--")) {
     const paradigm = match?.[1] as ResearchParadigm | undefined;
     const goal = match?.[2]?.trim();
-    if (!match || !paradigm || !goal) {
-      throw new Error("Usage: /init [--paradigm survey-observational] <research goal>");
+    if (!match || !paradigm) {
+      throw new Error("Usage: /init [--paradigm survey-observational] [optional goal]");
     }
     if (!PARADIGMS.has(paradigm)) throw new Error(`Unsupported paradigm: ${paradigm}`);
-    return { paradigm, goal };
+    return { paradigm, ...(goal ? { goal } : {}) };
   }
-  if (!trimmed) throw new Error("Usage: /init [--paradigm survey-observational] <research goal>");
   return { paradigm: "survey-observational", goal: trimmed };
 }
 
@@ -1252,31 +1263,38 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   const runtimeMcps = new RuntimeMcpRegistry();
   let arsModeEditor: ArsModeEditor | undefined;
   let arsUiContext: { sessionManager: Parameters<typeof isArsPiActive>[0]; isIdle: () => boolean; hasUI: boolean; ui: { setStatus: (key: string, text: string | undefined) => void } } | undefined;
+  let sessionMode: PsyClawSessionMode = "chat";
 
-  const applyArsUiMode = (active: boolean, opts?: { syncSession?: boolean }) => {
-    arsModeEditor?.setConversationMode(active);
-    arsUiContext?.ui.setStatus("ars", active ? ARS_MODE_STATUS : undefined);
+  const applySessionMode = (mode: PsyClawSessionMode, opts?: { syncSession?: boolean }) => {
+    sessionMode = mode;
+    arsModeEditor?.setMode(mode);
+    arsUiContext?.ui.setStatus("mode", MODE_STATUS[mode]);
+    // Clear legacy ars status key when leaving academic.
+    if (mode !== "academic") arsUiContext?.ui.setStatus("ars", undefined);
+    else arsUiContext?.ui.setStatus("ars", ARS_MODE_STATUS);
     if (opts?.syncSession === false || !arsUiContext) return;
-    const sessionActive = isArsPiActive(arsUiContext.sessionManager);
-    if (active && !sessionActive) {
-      pi.sendUserMessage("/ars-pi-start", {
-        ...(!arsUiContext.isIdle() ? { deliverAs: "followUp" as const } : {}),
-        expandPromptTemplates: true,
-      });
-    } else if (!active && sessionActive) {
-      pi.sendUserMessage("/ars-pi-stop", {
-        ...(!arsUiContext.isIdle() ? { deliverAs: "followUp" as const } : {}),
-        expandPromptTemplates: true,
-      });
+    setArsPiSessionActive(
+      typeof (pi as { appendEntry?: unknown }).appendEntry === "function"
+        ? (pi as { appendEntry: (type: string, data: { active: boolean }) => void }).appendEntry.bind(pi)
+        : undefined,
+      mode === "academic",
+    );
+    if (typeof (pi as { appendEntry?: unknown }).appendEntry === "function") {
+      (pi as { appendEntry: (type: string, data: { mode: PsyClawSessionMode }) => void }).appendEntry("psyclaw-session-mode", { mode });
     }
+  };
+
+  const cycleSessionMode = () => {
+    const next = nextSessionMode(arsModeEditor?.getMode() ?? sessionMode);
+    applySessionMode(next);
+    arsUiContext?.ui.setStatus("mode", MODE_STATUS[next] ?? "chat");
   };
 
   if (!legacyTestApi && typeof pi.registerShortcut === "function") {
     pi.registerShortcut("shift+tab", {
-      description: "Toggle academic mode",
+      description: "Cycle chat → analysis → academic",
       handler: () => {
-        const next = !(arsModeEditor?.isConversationMode() ?? isArsPiActive(arsUiContext?.sessionManager));
-        applyArsUiMode(next);
+        cycleSessionMode();
       },
     });
   }
@@ -1300,13 +1318,21 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     if (prompt) return { systemPrompt: `${event.systemPrompt}\n\n${prompt}` };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", (event, ctx) => {
-    if (!isArsPiTurn(event.systemPrompt) && !isArsPiActive(ctx?.sessionManager)) return;
-    return {
-      systemPrompt: `${event.systemPrompt}\n\n${psyclawArsPatch({
-        skills: event.systemPromptOptions?.skills,
-        systemPrompt: event.systemPrompt,
-      })}`,
-    };
+    const modeEntry = [...(ctx?.sessionManager?.getBranch?.() ?? [])].reverse().find((entry) =>
+      entry.type === "custom" && (entry as { customType?: string }).customType === "psyclaw-session-mode");
+    const restored = parseSessionMode((modeEntry as { data?: { mode?: unknown } } | undefined)?.data?.mode)
+      ?? (isArsPiActive(ctx?.sessionManager) ? "academic" : sessionMode);
+    sessionMode = restored;
+    const modeBlock = sessionModePrompt(restored);
+    if (restored === "academic" || isArsPiTurn(event.systemPrompt) || isArsPiActive(ctx?.sessionManager)) {
+      return {
+        systemPrompt: `${event.systemPrompt}\n\n${modeBlock}\n\n${psyclawArsPatch({
+          skills: event.systemPromptOptions?.skills,
+          systemPrompt: event.systemPrompt,
+        })}`,
+      };
+    }
+    return { systemPrompt: `${event.systemPrompt}\n\n${modeBlock}` };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_start", (_event, ctx) => {
     arsUiContext = ctx;
@@ -1315,15 +1341,23 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       const editor = new ArsModeEditor(tui, theme, keybindings);
       arsModeEditor = editor;
-      editor.onArsModeChange = (active) => {
-        ctx.ui.setStatus("ars", active ? ARS_MODE_STATUS : undefined);
+      editor.onModeChange = (mode) => {
+        sessionMode = mode;
+        ctx.ui.setStatus("mode", MODE_STATUS[mode]);
+        if (mode === "academic") ctx.ui.setStatus("ars", ARS_MODE_STATUS);
+        else ctx.ui.setStatus("ars", undefined);
       };
-      editor.onToggleConversationMode = () => {
-        applyArsUiMode(!editor.isConversationMode());
+      editor.onCycleMode = () => {
+        cycleSessionMode();
       };
-      const restore = isArsPiActive(ctx.sessionManager);
-      editor.setConversationMode(restore);
-      if (restore) ctx.ui.setStatus("ars", ARS_MODE_STATUS);
+      const modeEntry = [...ctx.sessionManager.getBranch()].reverse().find((entry) =>
+        entry.type === "custom" && (entry as { customType?: string }).customType === "psyclaw-session-mode");
+      const restore = parseSessionMode((modeEntry as { data?: { mode?: unknown } } | undefined)?.data?.mode)
+        ?? (isArsPiActive(ctx.sessionManager) ? "academic" : "chat");
+      editor.setMode(restore);
+      sessionMode = restore;
+      ctx.ui.setStatus("mode", MODE_STATUS[restore]);
+      if (restore === "academic") ctx.ui.setStatus("ars", ARS_MODE_STATUS);
       return editor;
     });
   });
@@ -1364,17 +1398,45 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     return undefined;
   });
   pi.registerCommand("init", {
-    description: "初始化可追溯的研究项目",
+    description: "搭建干净工作仓库（目录 + psyclaw.md），不自动追问或启动 /run",
     handler: async (args, ctx) => {
       try {
         const parsed = parseInitArgs(args);
         const project = await bootstrapProject({ root: ctx.cwd, ...parsed });
-        if (typeof pi.sendUserMessage === "function") {
-          pi.sendUserMessage(academicGrillRequest(project.goal, "init"), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。当前保持普通对话；如需进入受控研究流程，请明确运行 /run。`, "info");
-        } else {
-          ctx.ui.notify(`研究项目已初始化：${project.id}（${project.paradigm}）。使用 /run 启动受控研究流程。`, "info");
+        ctx.ui.notify(
+          [
+            `工作仓库已初始化：${project.id}`,
+            "已创建 data/raw|clean、analysis/、literature/、paper/、psyclaw.md、.psyclaw/",
+            "Shift+Tab：chat → analysis → academic",
+            "澄清与分析请切到 analysis；写作审稿请切到 academic。可选 /run 加强受控工具。",
+          ].join("\n"),
+          "info",
+        );
+      } catch (error) {
+        await notifyError(ctx, error);
+      }
+    },
+  });
+
+  pi.registerCommand("verify", {
+    description: "人确认关键字段：/verify list | /verify <id> verified|unverified|flagged",
+    handler: async (args, ctx) => {
+      try {
+        const parts = args.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0 || parts[0] === "list") {
+          const checklist = await loadVerifyChecklist(ctx.cwd);
+          ctx.ui.notify(formatVerifyChecklist(checklist), "info");
+          return;
         }
+        const id = parts[0]!;
+        const status = (parts[1] ?? "verified") as VerifyStatus;
+        if (status !== "verified" && status !== "unverified" && status !== "flagged") {
+          ctx.ui.notify("Usage: /verify list | /verify <id> verified|unverified|flagged [备注]", "info");
+          return;
+        }
+        const notes = parts.slice(2).join(" ") || undefined;
+        const checklist = await markVerifyItem(ctx.cwd, id, status, notes);
+        ctx.ui.notify(formatVerifyChecklist(checklist), "info");
       } catch (error) {
         await notifyError(ctx, error);
       }
@@ -1390,7 +1452,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         try {
           project = await readProject(ctx.cwd);
         } catch {
-          ctx.ui.notify("当前目录还没有通过 /init 建立的研究记录，因此保持普通对话模式。需要受控研究流程时，请先运行 /init，再运行 /run。", "warning");
+          ctx.ui.notify("当前目录还没有通过 /init 建立的研究记录。可先 /init 建仓；需要更密受控工具链时再 /run。", "warning");
           return;
         }
         const available = await selectableRunSkills(ctx.cwd);
@@ -1417,8 +1479,8 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
-  if (developerCommands || legacyTestApi) pi.registerCommand("verify", {
-    description: "写入机器可读的交接检查点",
+  if (developerCommands) pi.registerCommand("handoff", {
+    description: "（开发）写入机器可读交接检查点",
     handler: async (_args, ctx) => {
       try {
         const paths = projectPaths(ctx.cwd);
@@ -1436,7 +1498,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           verificationCommands: ["pnpm typecheck", "pnpm test"],
           generatedAt: new Date().toISOString(),
         });
-        ctx.ui.notify("Wrote notes/HANDOFF.md and notes/handoff.json", "info");
+        ctx.ui.notify("Wrote .psyclaw/notes/HANDOFF.md and handoff.json", "info");
       } catch (error) {
         await notifyError(ctx, error);
       }
@@ -1607,17 +1669,17 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             return;
           }
           arsUiContext = ctx;
-          applyArsUiMode(true);
+          applySessionMode("academic");
           return;
         }
         if (action === "status") {
           ctx.ui.notify(
             [
               `PsyClaw ARS profile v${PSYCLAW_ARS_PROFILE_VERSION}`,
-              "模式：academic mode（Shift+Tab 切换；开启后直接对话）",
-              "Thinking：Ctrl+Shift+Tab（Shift+Tab 已让给 academic mode）",
+              `当前模式：${arsModeEditor?.getMode() ?? sessionMode}（Shift+Tab：chat → analysis → academic）`,
+              "Thinking：Ctrl+Shift+Tab",
               `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF} (${ARS_UPSTREAM_COMMIT.slice(0, 12)})`,
-              "入口：Shift+Tab，/ars doctor，/ars start，/ars full <task>，/ars stop",
+              "入口：Shift+Tab，/ars doctor，/ars start，/ars full <task>，/ars stop，/verify",
               formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)),
             ].join("\n"),
             "info",
@@ -1625,32 +1687,53 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           return;
         }
         if (action === "install") {
-          ctx.ui.notify("ARS 与 Nature/compose 技能已内置：按 Shift+Tab 进入 academic mode。", "info");
+          ctx.ui.notify("ARS 与 Nature/compose 技能已内置：Shift+Tab 切到 academic。", "info");
           return;
         }
-        const upstreamCommand = action === "doctor"
-          ? "/ars-pi-doctor"
-          : action === "start"
-            ? "/ars-pi-start"
-            : action === "stop"
-              ? "/ars-pi-stop"
-              : action === "full"
-                ? `/ars-full${rest.length > 0 ? ` ${rest.join(" ")}` : ""}`
-                : undefined;
-        if (!upstreamCommand) {
-          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop] 或按 Shift+Tab 切换 academic mode", "info");
+        if (action === "doctor") {
+          const activeTools = typeof pi.getActiveTools === "function" ? pi.getActiveTools() : [];
+          const commands = typeof pi.getCommands === "function"
+            ? pi.getCommands().map((command: { name: string }) => command.name)
+            : [];
+          const toolNames = [...new Set([
+            ...activeTools.map((name: string) => String(name)),
+            "psyclaw_ars_multi_agent",
+          ])];
+          const commandNames = [...new Set([...commands.map(String), "agents", "create-subagent"])];
+          const report = await buildArsDoctorReport({
+            repositoryRoot: arsRoot(),
+            activeTools: toolNames,
+            commands: commandNames,
+            controlledRunActive: Boolean(await readControlledRun(ctx.cwd)),
+          });
+          if (typeof pi.sendMessage === "function") {
+            pi.sendMessage({ customType: "psyclaw-ars-doctor", content: report, display: true });
+          } else {
+            ctx.ui.notify(report, "info");
+          }
           return;
         }
         if (action === "start") {
           arsUiContext = ctx;
-          applyArsUiMode(true, { syncSession: false });
+          applySessionMode("academic");
+          ctx.ui.notify("academic mode 已开启（Shift+Tab 可切换）", "info");
+          return;
         }
         if (action === "stop") {
           arsUiContext = ctx;
-          applyArsUiMode(false, { syncSession: false });
+          applySessionMode("chat");
           if (ctx.hasUI && isArsModeEditorText(ctx.ui.getEditorText?.() ?? "")) {
             ctx.ui.setEditorText("");
           }
+          ctx.ui.notify("已回到 chat 模式", "info");
+          return;
+        }
+        const upstreamCommand = action === "full"
+          ? `/ars-full${rest.length > 0 ? ` ${rest.join(" ")}` : ""}`
+          : undefined;
+        if (!upstreamCommand) {
+          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop] 或按 Shift+Tab 切换 academic mode", "info");
+          return;
         }
         // A queued prompt does not get a fresh system prompt in Pi. Wait so the
         // upstream wrapper can activate ARS and inject its compatibility note.
@@ -1990,7 +2073,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "psyclaw_ars_multi_agent",
     label: "ARS multi-agent review bridge",
-    description: "Run ARS reviewer_full Stage 3 as five process-separated read-only reviewer seats, or Stage 3 re-review as three ordered fenced calls. This is a parallel-agent capability; it preserves ARS checkpoints and never claims independent error processes.",
+    description: "Run ARS reviewer_full Stage 3 as five process-separated read-only reviewer seats, or Stage 3 re-review as three ordered fenced calls. This is a parallel-agent / multi-agent / subagent workflow capability; it preserves ARS checkpoints and never claims independent error processes.",
     parameters: Type.Object({
       mode: Type.Union([Type.Literal("reviewer_full"), Type.Literal("reviewer_re_review")]),
       manuscriptPath: Type.Optional(Type.String()),
@@ -2022,6 +2105,22 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       } catch (error) {
         return { content: [{ type: "text", text: `ARS multi-agent bridge failed: ${error instanceof Error ? error.message : String(error)}` }], details: { status: "blocked" }, isError: true };
       }
+    },
+  });
+
+  pi.registerTool({
+    name: "psyclaw_ensure_pdf_engine",
+    label: "Ensure PDF engine",
+    description: "Install or locate a PDF engine (tectonic/xelatex) only when the user explicitly asked to export PDF. Do not call during /ars doctor or ordinary startup checks.",
+    parameters: Type.Object({}),
+    executionMode: "sequential",
+    async execute() {
+      const result = await ensurePdfEngineForExport();
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        details: result,
+        ...(result.status === "missing" || result.status === "unsupported-platform" ? { isError: true } : {}),
+      };
     },
   });
 
@@ -2119,21 +2218,24 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       try {
+        // Soft gate: /run is optional denser tooling, not a hard block on getting results.
+        const controlled = await readControlledRun(ctx.cwd);
+        const softNote = controlled
+          ? undefined
+          : "受控 /run 未启用（软门禁）：继续执行；关键字段请 AI 核查并由人 /verify。";
         const request = params.request.trim();
-        if (!(await readControlledRun(ctx.cwd))) {
-          return {
-            content: [{ type: "text", text: JSON.stringify({
-              schemaVersion: "psyclaw/workbench-routing/v1",
-              status: "general-mode",
-              message: "PsyClaw controlled research mode is inactive. Continue as a normal conversational agent; do not impose research workflow gates. The user can run /init and then /run when they want the controlled workflow.",
-            }, null, 2) }],
-            details: { status: "general-mode", request },
-          };
-        }
         const combined = `${request} ${params.identifier ?? ""}`;
         const explicitWorkflow = params.workflow?.trim();
         if (explicitWorkflow) {
-          return runWorkflowTool(ctx.cwd, explicitWorkflow, params.target, params.nStudies);
+          const result = await runWorkflowTool(ctx.cwd, explicitWorkflow, params.target, params.nStudies);
+          if (softNote && result && typeof result === "object" && "content" in result) {
+            const text = Array.isArray(result.content) ? result.content.map((part: { text?: string }) => part.text ?? "").join("\n") : "";
+            return {
+              ...result,
+              content: [{ type: "text", text: `${softNote}\n${text}` }],
+            };
+          }
+          return result;
         }
         const metaAnalysisIntent = /meta[- ]?analysis|meta分析|元分析|系统综述|系统评价|效应量|forest plot|funnel|publication bias/i.test(combined);
         const publishIntent = /publish|finalize|发布|导出|定稿|投稿|export (to )?(docx|word|apa)|docx export|apa ?7/i.test(combined);

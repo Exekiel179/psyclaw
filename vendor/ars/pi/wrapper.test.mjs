@@ -199,3 +199,13 @@ test("/ars-pi-start and /ars-pi-stop toggle automatic invocation", async () => {
     assert.equal(runBeforeAgentStart(harness).includes(location), false);
   }
 });
+
+test("before_agent_start restores ARS state from session entries (silent Shift+Tab path)", () => {
+  const harness = createHarness();
+  harness.setBranch([{ type: "custom", customType: "ars-pi-state", data: { active: true } }]);
+  const systemPrompt = harness.handlers.get("before_agent_start")(
+    { systemPrompt: baseSystemPrompt },
+    harness.sessionContext,
+  )?.systemPrompt ?? baseSystemPrompt;
+  assert.equal(systemPrompt.includes(compatibilityMarker), true);
+});
