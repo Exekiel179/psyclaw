@@ -63,7 +63,7 @@ const CORE_SKILLS = [
   { id: "research-intake", name: "研究入口" },
   { id: "evidence-capture", name: "证据登记" },
   { id: "citation-audit", name: "引用审计" },
-  { id: "research-brief", name: "研究简报" },
+  { id: "analysis-plan", name: "分析方案" },
   {
     id: "psyclaw-ars",
     name: "PsyClaw ARS",

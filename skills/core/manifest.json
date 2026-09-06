@@ -1,15 +1,15 @@
 {
   "schemaVersion": "psyclaw/skill-pack/v1",
   "id": "psyclaw-core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "skills": [
     "academic-grill",
     "research-intake",
     "evidence-capture",
     "citation-audit",
-    "research-brief"
+    "analysis-plan"
   ],
-  "enabledByDefault": ["academic-grill", "research-intake", "evidence-capture", "citation-audit", "research-brief"],
+  "enabledByDefault": ["academic-grill", "research-intake", "evidence-capture", "citation-audit", "analysis-plan"],
   "source": {"kind": "workspace", "ref": "initial-mvp"},
   "license": {"spdx": "MIT", "evidenceRef": "../../LICENSE"},
   "dependencyStatus": "ready"

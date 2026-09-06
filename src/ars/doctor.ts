@@ -21,8 +21,8 @@ export interface ArsDoctorInput {
   activeTools?: readonly string[];
   /** Registered slash command names without leading slash (optional). */
   commands?: readonly string[];
-  /** Whether a controlled /run is active in this project. */
-  controlledRunActive?: boolean;
+  /** Whether `/init` project state is present (tool_call gates active). */
+  projectActive?: boolean;
 }
 
 /**
@@ -37,7 +37,7 @@ export async function buildArsDoctorReport(input: ArsDoctorInput): Promise<strin
     name.includes("ars_multi_agent") || name.includes("multi_agent") || name.includes("multi-agent"));
   const hasAgentsCommand = commands.has("agents") || commands.has("create-subagent");
   const hasAnalysisHooks = true; // PsyClaw ships declarative analysis hooks + /create-hook
-  const hasToolCallGate = input.controlledRunActive === true;
+  const hasToolCallGate = input.projectActive === true;
 
   const python = await probe("python3", ["--version"]);
   const pyyaml = await probe("python3", ["-c", "import yaml; print(f'PyYAML {yaml.__version__}')"]);
@@ -55,10 +55,10 @@ export async function buildArsDoctorReport(input: ArsDoctorInput): Promise<strin
     : "未发现 PsyClaw 编排入口（异常：应随包提供 psyclaw_ars_multi_agent 与 /agents）";
 
   const hooks = [
-    "PsyClaw analysis hooks ✓（/create-hook、.psyclaw/analysis-hooks.json；/run 分析路径强制门禁）",
+    "PsyClaw analysis hooks ✓（/create-hook、.psyclaw/analysis-hooks.json；已 /init 项目的分析路径强制门禁）",
     hasToolCallGate
-      ? "受控 /run tool_call 审批 ✓（高后果写入/外发需确认）"
-      : "受控 /run tool_call 审批：当前未启用 /run（普通对话不拦截）",
+      ? "tool_call 审批 ✓（项目已 /init；高后果写入/外发需确认）"
+      : "tool_call 审批：尚未 /init（普通对话不拦截）",
     "Claude Code PreToolUse：Pi 不加载 Claude hooks.json；写入范围以 PsyClaw 门禁与提示约束为准，不冒充 Claude hook",
   ].join("\n   ");
 

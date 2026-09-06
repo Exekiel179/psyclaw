@@ -59,13 +59,12 @@ psyclaw
 
 初始化会建立 `.psyclaw/data/raw/`、`data/clean/`、`literature/pdfs/`、`notes/` 和 `outputs/`，不再把原始数据目录暴露在项目根目录。`.psyclaw/data/raw/` 是只读保护区；旧项目的 `data/raw/` 仍保持只读兼容，把经确认可用于分析的派生数据放在 `data/clean/`。
 
-在对话界面中，`/init <研究目标>` 只初始化研究项目和规格，随后使用 `/run [本轮目标]` 才启动受控研究流程。没有依次运行 `/init` 和 `/run` 时，PsyClaw 保持普通对话模式，不强制加入研究门禁或阶段式询问。
+在对话界面中，`/init <研究目标>` 初始化研究项目与工作区；随后用 Shift+Tab 切换到 `analysis` 或 `academic` 推进。没有单独的 `/run` 或 `/brief` 命令。未 `/init` 时保持普通对话，不强制研究门禁。
 
-登记本地材料并生成离线证据简报：
+登记本地材料：
 
 ```powershell
 psyclaw evidence add notes\source.md --level user
-psyclaw brief
 ```
 
 ## 常用入口
@@ -74,11 +73,10 @@ psyclaw brief
 | --- | --- |
 | 启动研究对话 | `psyclaw` 或 `psyclaw chat` |
 | 续接当前项目最近一次会话 | `psyclaw --continue` 或 `psyclaw -c` |
-| 创建研究项目 | `psyclaw init <goal> --paradigm <profile>` |
-| 启动受控研究流程 | 对话中依次输入 `/init <goal>`、`/run [--skills a,b] [objective]` |
+| 创建研究项目 | `psyclaw init <goal> --paradigm <profile>` 或对话 `/init <goal>` |
+| 推进分析 / 写作 | Shift+Tab 切换 analysis / academic；可选 `/loop`、`/review` |
 | 模拟同行评审 | 论文完成后在对话中输入 `/review` |
 | 登记本地证据 | `psyclaw evidence add <path> --level user\|fulltext` |
-| 生成离线简报 | `psyclaw brief` |
 | 写研究移交记录 | `psyclaw handoff` |
 | 扫描本机其他 Agent | `psyclaw agents` |
 | 查看 PsyClaw 和内置运行时更新 | `psyclaw check-updates` |

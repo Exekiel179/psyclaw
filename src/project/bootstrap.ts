@@ -19,7 +19,7 @@ export interface BootstrapOptions {
 
 /**
  * Scaffold a clean shared workspace + minimal project.json.
- * Does not run academic-grill or create a controlled /run.
+ * Does not run academic-grill.
  */
 export async function bootstrapProject(options: BootstrapOptions): Promise<ResearchProject> {
   const paths = projectPaths(options.root);

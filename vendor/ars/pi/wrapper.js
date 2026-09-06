@@ -194,7 +194,7 @@ export default function (pi) {
         `Pandoc: ${pandoc}`,
         "PDF engine: not preflighted; install on demand when the user asks to export PDF (psyclaw_ensure_pdf_engine)",
         `Sandbox: ${sandbox}`,
-        "Hooks: PsyClaw analysis hooks + /run tool_call gates when controlled run is active; Claude Code PreToolUse hooks.json is not loaded by Pi",
+        "Hooks: PsyClaw analysis hooks + tool_call gates after /init; Claude Code PreToolUse hooks.json is not loaded by Pi",
       ].join("\n");
 
       pi.sendMessage({ customType: "ars-pi-doctor", content: report, display: true });

@@ -23,7 +23,7 @@ const execFileAsync = promisify(execFile);
 const INSTALL_MANIFEST = "psyclaw-install.json";
 const SHA256_RE = /^[a-f0-9]{40}$/i;
 const CONTENT_SHA256_RE = /^[a-f0-9]{64}$/i;
-const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "research-brief"]);
+const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "analysis-plan"]);
 
 export const RECOMMENDED_SKILL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   "markitdown-pro": "markitdown-bilibili",
