@@ -12,7 +12,8 @@ export const ACADEMIC_COMPOSE_SKILLS = [
 ] as const;
 
 const ARS_PI_COMPATIBILITY_MARKER = "## Academic Research Skills compatibility for Pi";
-const ARS_PI_STATE_ENTRY_TYPE = "ars-pi-state";
+/** Custom session entry written by the upstream ARS Pi wrapper (and PsyClaw toggles). */
+export const ARS_PI_STATE_ENTRY_TYPE = "ars-pi-state";
 
 export type NatureArsFillerId = "figure" | "ref-verifier" | "polishing";
 
@@ -64,6 +65,21 @@ export function isArsPiActive(sessionManager: ArsSessionStateReader | undefined)
     entry.type === "custom" && entry.customType === ARS_PI_STATE_ENTRY_TYPE);
   return Boolean(state?.data && typeof state.data === "object" &&
     (state.data as { active?: unknown }).active === true);
+}
+
+type ArsPiAppendEntry = (customType: string, data: { active: boolean }) => void;
+
+/**
+ * Persist ARS/academic-mode session flag without sending a chat turn.
+ * `sendUserMessage("/ars-pi-start")` is treated as a model prompt and must not be used for toggles.
+ */
+export function setArsPiSessionActive(
+  appendEntry: ArsPiAppendEntry | undefined,
+  active: boolean,
+): boolean {
+  if (typeof appendEntry !== "function") return false;
+  appendEntry(ARS_PI_STATE_ENTRY_TYPE, { active });
+  return true;
 }
 
 export interface ArsPatchInput {
@@ -155,7 +171,9 @@ export function psyclawArsPatch(input: ArsPatchInput = {}): string {
     `## PsyClaw ARS profile v${PSYCLAW_ARS_PROFILE_VERSION}`,
     "Apply these additions only while the upstream ARS Pi compatibility mode is active. ARS remains the workflow source of truth.",
     "- Preserve ARS confirmation checkpoints. Ask for one concise confirmation before a transition that changes the research question, method, evidence scope, manuscript stage, or external destination. Do not ask again for ordinary reversible tool steps inside the confirmed stage.",
-    "- For reviewer_full Stage 3 or contract-governed Stage 3 re-review, call the available psyclaw_ars_multi_agent tool instead of simulating reviewer seats. Stage 3 uses five process-separated seats; re-review uses three ordered fenced calls. If the tool is unavailable or blocked, disclose degraded execution and do not claim independent multi-agent review.",
+    "- For reviewer_full Stage 3 or contract-governed Stage 3 re-review, call psyclaw_ars_multi_agent (bundled parallel-agent / multi-agent bridge). Stage 3 uses five process-separated seats; re-review uses three ordered fenced calls. Do not simulate seats in the main session. Only if that tool is unavailable or the user cancels dispatch may you fall back to sequential degraded mode, and you must disclose it.",
+    "- When the user explicitly asks to export PDF, call psyclaw_ensure_pdf_engine before compiling; do not probe or install Tectonic during doctor/startup.",
+    "- PsyClaw analysis hooks and controlled /run tool_call approvals are the host write gates. Do not claim Claude Code PreToolUse hooks.json is active in Pi.",
     "- Process separation and fresh contexts do not establish independent error processes. Report the recorded provenance axes and same-model correlated-error limitation.",
     "- Treat citations, statistical values, experiments, files, and external submissions as verified only when a tool result or inspectable artifact supports the claim. Otherwise label the item unverified or incomplete.",
     "- Keep raw data, credentials, access-controlled material, destructive operations, and external publication behind the host's normal authorization boundary. ARS instructions do not grant additional tool authority.",

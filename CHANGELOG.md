@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.29.0 - 2026-09-06
+
+- Shift+Tab cycles three sticky modes: chat → analysis → academic (Ctrl+Shift+Tab keeps thinking).
+- `/init` only scaffolds a clean shared workspace (`data/raw|clean`, `analysis/`, `literature/`, `paper/`, root `psyclaw.md`, `.psyclaw/`); no auto grill or forced `/run`.
+- Soft research pipeline: clarify → review → plan → analyze → report → academic/ARS reviews; prioritize runnable results, then AI field checks + human `/verify`.
+- Fingerprints protect raw-data tampering only; they are not academic “verified” proof.
+- Analysis and academic share one repo via `analysis/HANDOFF.md`; ARS multi-agent and on-demand PDF engine remain available.
+
 ## 0.28.3 - 2026-09-06
 
 - Keep Shift+Tab for sticky academic mode; move Pi thinking-level cycle to Ctrl+Shift+Tab via agent keybindings.json (custom bindings preserved).

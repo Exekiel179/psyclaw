@@ -1,11 +1,15 @@
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import type { EditorOptions, EditorTheme, TUI } from "@earendil-works/pi-tui";
-
-/** Match PsyClaw accent (#2ec4b6) for the ARS conversation-mode border. */
-const ARS_BORDER = (text: string): string => `\x1b[38;2;46;196;182m${text}\x1b[39m`;
+import {
+  MODE_BORDER,
+  MODE_STATUS,
+  type PsyClawSessionMode,
+  nextSessionMode,
+} from "../session/modes.js";
 
 export const ARS_MODE_PREFIX = "ars:";
-export const ARS_MODE_STATUS = "academic mode";
+/** @deprecated Use MODE_STATUS.academic */
+export const ARS_MODE_STATUS = "academic";
 
 export function isArsModeEditorText(text: string): boolean {
   return /^ars:/i.test(text.trimStart());
@@ -21,47 +25,65 @@ export function enterArsModeEditorText(existing = ""): string {
 type KeybindingsLike = ConstructorParameters<typeof CustomEditor>[2];
 
 /**
- * Sticky academic conversation mode: Shift+Tab toggles tinted border + footer
- * "academic mode". Messages then use the session ARS state without a per-turn prefix.
+ * Sticky session mode editor: Shift+Tab cycles chat → analysis → academic.
  */
 export class ArsModeEditor extends CustomEditor {
   private readonly restingBorder: (str: string) => string;
-  private conversationMode = false;
-  private borderPainted = false;
-  onArsModeChange?: (active: boolean) => void;
-  onToggleConversationMode?: () => void;
+  private mode: PsyClawSessionMode = "chat";
+  private borderPaintedMode: PsyClawSessionMode = "chat";
+  onModeChange?: (mode: PsyClawSessionMode) => void;
+  onCycleMode?: () => void;
 
   constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsLike, options?: EditorOptions) {
     super(tui, theme, keybindings, options);
     this.restingBorder = theme.borderColor ?? ((text: string) => text);
   }
 
-  isConversationMode(): boolean {
-    return this.conversationMode;
+  getMode(): PsyClawSessionMode {
+    return this.mode;
   }
 
-  setConversationMode(active: boolean): void {
-    if (this.conversationMode === active) {
+  /** @deprecated Prefer getMode() === "academic" */
+  isConversationMode(): boolean {
+    return this.mode === "academic";
+  }
+
+  setMode(mode: PsyClawSessionMode): void {
+    if (this.mode === mode) {
       this.paintBorder();
       return;
     }
-    this.conversationMode = active;
+    this.mode = mode;
     this.paintBorder();
-    this.onArsModeChange?.(active);
+    this.onModeChange?.(mode);
     this.tui.requestRender();
   }
 
+  /** @deprecated Prefer setMode */
+  setConversationMode(active: boolean): void {
+    this.setMode(active ? "academic" : "chat");
+  }
+
+  cycleMode(): PsyClawSessionMode {
+    const next = nextSessionMode(this.mode);
+    this.setMode(next);
+    return next;
+  }
+
+  statusLabel(): string | undefined {
+    return MODE_STATUS[this.mode];
+  }
+
   override handleInput(data: string): void {
-    // Shift+Tab — classic backtab sequence when Kitty protocol is off.
     if (data === "\x1b[Z") {
-      this.onToggleConversationMode?.();
+      this.onCycleMode?.();
       return;
     }
     if (data === "\t") {
       const current = this.getText();
       if (current.trim() === "ars" || current.trim() === "/ars") {
         this.setText("");
-        this.onToggleConversationMode?.();
+        this.setMode("academic");
         return;
       }
     }
@@ -75,14 +97,17 @@ export class ArsModeEditor extends CustomEditor {
   }
 
   private paintBorder(): void {
-    const active = this.conversationMode || isArsModeEditorText(this.getText());
-    if (active === this.borderPainted && active) {
-      this.borderColor = ARS_BORDER;
+    const effective: PsyClawSessionMode =
+      this.mode === "chat" && isArsModeEditorText(this.getText()) ? "academic" : this.mode;
+    if (effective === this.borderPaintedMode && effective !== "chat") {
+      const paint = MODE_BORDER[effective];
+      this.borderColor = paint ?? this.restingBorder;
       return;
     }
-    if (active === this.borderPainted && !active) return;
-    this.borderPainted = active;
-    this.borderColor = active ? ARS_BORDER : this.restingBorder;
+    if (effective === this.borderPaintedMode && effective === "chat") return;
+    this.borderPaintedMode = effective;
+    const paint = MODE_BORDER[effective];
+    this.borderColor = paint ?? this.restingBorder;
     this.tui.requestRender();
   }
 }

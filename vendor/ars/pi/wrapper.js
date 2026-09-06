@@ -173,29 +173,38 @@ export default function (pi) {
       const python = await probe(pi, "python3", ["--version"]);
       const pyyaml = await probe(pi, "python3", ["-c", "import yaml; print(f'PyYAML {yaml.__version__}')"]);
       const pandoc = await probe(pi, "pandoc", ["--version"]);
-      const tectonic = await probe(pi, "tectonic", ["--version"]);
       const sandbox = pi.getCommands().some((command) => command.name === "sandbox")
         ? `detected; allow read access to ${repoRoot} when running outside the checkout`
         : "not detected";
       const format = (matches) => matches.length > 0 ? matches.join(", ") : "none; sequential/degraded mode";
+      const psyclawOrch = [
+        ...uniqueMatches(candidates, /psyclaw_ars_multi_agent|ars multi-agent|parallel-agent/i),
+        ...commands.filter((item) => /agents|create-subagent/i.test(item.search)).map((item) => item.label),
+      ];
+      const orchestrationLine = psyclawOrch.length > 0
+        ? psyclawOrch.join(", ")
+        : format(orchestration);
       const report = [
         "ARS Pi doctor",
         `Repository: ${repoRoot}`,
-        `Orchestration: ${format(orchestration)}`,
+        `Orchestration: ${orchestrationLine}`,
         `Web retrieval: ${format(web)}`,
         `Python: ${python}`,
         `PyYAML: ${pyyaml}`,
         `Pandoc: ${pandoc}`,
-        `Tectonic: ${tectonic}`,
+        "PDF engine: not preflighted; install on demand when the user asks to export PDF (psyclaw_ensure_pdf_engine)",
         `Sandbox: ${sandbox}`,
-        "Claude hooks: unavailable in Pi; write-scope enforcement remains prompt-level",
+        "Hooks: PsyClaw analysis hooks + /run tool_call gates when controlled run is active; Claude Code PreToolUse hooks.json is not loaded by Pi",
       ].join("\n");
 
       pi.sendMessage({ customType: "ars-pi-doctor", content: report, display: true });
     },
   });
 
-  pi.on("before_agent_start", (event) => {
+  pi.on("before_agent_start", (event, ctx) => {
+    // Keep in-memory flag aligned with session entries written by PsyClaw Shift+Tab
+    // (silent appendEntry) or prior /ars-pi-start|/ars-pi-stop handlers.
+    if (ctx?.sessionManager) restoreArsState(ctx);
     if (!arsActive) return { systemPrompt: hideArsSkills(event.systemPrompt) };
     return { systemPrompt: `${event.systemPrompt}\n${compatibility}` };
   });
