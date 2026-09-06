@@ -1,6 +1,7 @@
 export * from "./agents/catalog.js";
 export * from "./agents/discover.js";
 export * from "./agents/import.js";
+export * from "./agents/recommended-personas.js";
 export * from "./ars/profile.js";
 export * from "./ars/contracts.js";
 export * from "./ars/panel-plan.js";

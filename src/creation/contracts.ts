@@ -1,5 +1,6 @@
 import type { AgentRole } from "../orchestration/contracts.js";
 import type { AnalysisHookEvent, AnalysisHookSeverity } from "../analysis/hooks.js";
+import type { Effect } from "../core/contracts.js";
 
 export type CreationKind = "skill" | "hook" | "rule" | "subagent";
 
@@ -13,6 +14,8 @@ export interface CreationRequest {
   pattern?: string;
   pathPrefix?: string;
   role?: AgentRole;
+  /** Subagent effect ceiling. Defaults to read-only; elevated effects need confirm at create and run. */
+  allowedEffects?: Effect[];
 }
 
 export interface CreationPreview {

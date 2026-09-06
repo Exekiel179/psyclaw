@@ -23,6 +23,7 @@
     "dist/src",
     "dist/apps/panel/index.html",
     "skills",
+    "agents",
     "vendor/ars",
     "vendor/windows",
     "scripts/psyclaw.mjs",

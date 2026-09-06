@@ -231,12 +231,13 @@ psyclaw check-updates
 
 ### 8.2 更新 PsyClaw 和内置 Pi
 
+`psyclaw update` 默认升级 PsyClaw 整包，同时安装该版本锁定、验证过的内置 Pi。默认只打印简要结果（例如 `0.27.23 → 0.28.0` 与「升级成功」）；需要完整 JSON 回执时加 `--detail`。只想查看更新计划时使用 `--check`。它不会影响系统中单独安装的 Pi，也不会自行组合未经 PsyClaw 版本验证的 Pi。在带 lockfile 的源码检出中会跳过 npm 自覆盖（`ok: true`、`reasonCode: update-skipped`），并提示先用 Git 同步再按 `pnpm install` / `pnpm build`（或对应 npm 命令）重建。旧的 `--yes` 参数仍兼容，但不再需要。
+
 ```powershell
 psyclaw update
 psyclaw update --check
+psyclaw update --detail
 ```
-
-`psyclaw update` 默认升级 PsyClaw 整包，同时安装该版本锁定、验证过的内置 Pi，并在同一回执中报告两者的更新结果。只想查看更新计划时使用 `--check`。它不会影响系统中单独安装的 Pi，也不会自行组合未经 PsyClaw 版本验证的 Pi。源码仓库中会拒绝自覆盖，开发者应通过 Git 同步后重新构建。旧的 `--yes` 参数仍兼容，但不再需要。
 
 ### 8.3 手动升级 PsyClaw
 

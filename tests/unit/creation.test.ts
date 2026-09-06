@@ -43,4 +43,22 @@ describe("PsyClaw project capability creation", () => {
     await import("node:fs/promises").then(({ writeFile }) => writeFile(join(root, ".psyclaw/agents/custom/broken.md"), "---\ninvalid: [\n---\n"));
     expect((await loadCustomPersonas(root)).map((persona) => persona.id)).toEqual(["methods-critic"]);
   });
+
+  it("allows elevated subagent effects when explicitly declared", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-create-elevated-"));
+    const request = {
+      kind: "subagent" as const,
+      id: "draft-helper",
+      description: "Draft helper",
+      instructions: "Propose manuscript edits under approved write effect.",
+      role: "writer" as const,
+      allowedEffects: ["read", "write"] as const,
+    };
+    const preview = await previewCreation(root, request);
+    expect(preview.contents).toContain("- write");
+    await applyCreation(root, request, preview.sha256, true);
+    const personas = await loadCustomPersonas(root);
+    expect(personas[0]?.allowedEffects).toEqual(["read", "write"]);
+    expect(customPersonaPlan("run", "Edit notes", personas).tasks[0]?.allowedEffects).toEqual(["read", "write"]);
+  });
 });

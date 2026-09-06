@@ -8,12 +8,14 @@ import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
 import { preflightSkillBody } from "../skills/preflight.js";
 import { readUserSkillState, setLocalSkillEnabled } from "../skills/user-skills.js";
 import { isSafeUserHookPattern, type UserAnalysisHookFile } from "../analysis/hooks.js";
+import { formatEffects, hasElevatedEffects, normalizeEffects } from "../orchestration/effects.js";
 import type { CreationPreview, CreationReceipt, CreationRequest } from "./contracts.js";
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const ROLES = new Set(["planner", "researcher", "analyst", "critic", "writer", "verifier"]);
 const EVENTS = new Set(["before-plan", "before-analysis", "before-delegation", "before-write", "after-analysis", "before-report", "after-report"]);
-const FORBIDDEN_POLICY = /(?:bypass|disable|ignore|skip|override).{0,30}(?:gate|approval|policy|audit)|(?:read|collect).{0,20}(?:secret|credential|token|api.?key)|(?:allow|grant).{0,20}(?:write|network|shell|destructive)|external\s+(?:publish|submit)/i;
+const FORBIDDEN_ALWAYS = /(?:bypass|disable|ignore|skip|override).{0,30}(?:gate|approval|policy|audit)|(?:read|collect).{0,20}(?:secret|credential|token|api.?key)|external\s+(?:publish|submit)/i;
+const FORBIDDEN_IMPLICIT_ELEVATION = /(?:allow|grant).{0,20}(?:write|network|shell|destructive)/i;
 
 function clean(value: string, label: string, max = 8_000): string {
   const text = value.trim();
@@ -71,9 +73,11 @@ ${instructions}
     return { path: ".psyclaw/analysis-hooks.json", contents: `${JSON.stringify({ ...current, hooks: [...current.hooks, hook] }, null, 2)}
 ` };
   }
-  if (FORBIDDEN_POLICY.test(`${description}
-${instructions}`)) throw new Error(`${request.kind} attempts to widen authority or bypass policy`);
+  if (FORBIDDEN_ALWAYS.test(`${description}\n${instructions}`)) throw new Error(`${request.kind} attempts to widen authority or bypass policy`);
   if (request.kind === "rule") {
+    if (FORBIDDEN_IMPLICIT_ELEVATION.test(`${description}\n${instructions}`)) {
+      throw new Error("rule attempts to widen authority or bypass policy");
+    }
     return {
       path: `.psyclaw/rules/${id}.md`,
       contents: `---
@@ -91,6 +95,14 @@ ${instructions}
   }
   const role = request.role ?? "researcher";
   if (!ROLES.has(role)) throw new Error("invalid subagent role");
+  const effects = normalizeEffects(request.allowedEffects);
+  if (!hasElevatedEffects(effects) && FORBIDDEN_IMPLICIT_ELEVATION.test(`${description}\n${instructions}`)) {
+    throw new Error("subagent requests elevated effects without declaring allowedEffects; add write/network/destructive explicitly");
+  }
+  const effectLines = effects.map((effect) => `  - ${effect}`).join("\n");
+  const effectNote = hasElevatedEffects(effects)
+    ? `Declared effects: ${formatEffects(effects)}. Elevated tools require an interactive confirmation at each /agents run.`
+    : "Default read-only. Do not write files, execute shell commands, access network services, or read credentials.";
   return {
     path: `.psyclaw/agents/custom/${id}.md`,
     contents: `---
@@ -99,14 +111,14 @@ id: ${id}
 label: ${yaml(description)}
 role: ${role}
 allowedEffects:
-  - read
+${effectLines}
 ---
 
 # ${id}
 
 ${instructions}
 
-Return a structured psyclaw/worker-report/v1 result. Do not write files, execute shell commands, access network services, or read credentials.
+Return a structured psyclaw/worker-report/v1 result. ${effectNote}
 `,
   };
 }

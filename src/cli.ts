@@ -25,7 +25,7 @@ import {
 import { appendJsonlIfMissing } from "./project/jsonl.js";
 import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
-import { formatCliUsage, renderSuccessCard, c } from "./style/cli-ui.js";
+import { formatCliUsage, renderSuccessCard, renderProductUpdateSummary, c } from "./style/cli-ui.js";
 import { continueSessionArgs } from "./cli-args.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
@@ -313,19 +313,22 @@ async function main(): Promise<void> {
   }
   if (command === "update") {
     for (const arg of args) {
-      if (arg.startsWith("--") && arg !== "--check" && arg !== "--yes" && arg !== "--force") {
+      if (arg.startsWith("--") && arg !== "--check" && arg !== "--yes" && arg !== "--force" && arg !== "--detail") {
         throw new Error(`Unknown option: ${arg}`);
       }
     }
     const { updatePsyClaw } = await import("./updates/update.js");
     const { createHttpRegistry } = await import("./updates/registry.js");
     const checkOnly = args.includes("--check");
+    const detail = args.includes("--detail");
     const receipt = await updatePsyClaw({
       registry: createHttpRegistry(),
       force: args.includes("--force"),
       ...(checkOnly ? {} : { executor: (step) => runPackageManager(step.command, step.cwd) }),
     });
-    process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+    process.stdout.write(detail
+      ? `${JSON.stringify(receipt, null, 2)}\n`
+      : renderProductUpdateSummary(receipt));
     if (!receipt.ok) {
       process.exitCode = 1;
     }
