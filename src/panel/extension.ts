@@ -61,18 +61,27 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
             agentDir: getAgentDir(),
             settingsManager: SettingsManager.create(ctx.cwd, getAgentDir(), { projectTrusted: ctx.isProjectTrusted() }),
           });
-          const next = createPanelServer(ctx.cwd, { installSkill: async (task) => {
-            pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          }, installExternalTool: async (task) => {
-            pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
-          }, installPlugin: async (source, scope) => {
-            await packageManager().installAndPersist(source, { local: scope === "project" });
-          }, listPlugins: () => packageManager().listConfiguredPackages().map(({ source, scope, filtered, installedPath }) => ({
-            source,
-            scope,
-            filtered,
-            installed: installedPath !== undefined,
-          })) });
+          const next = createPanelServer(ctx.cwd, {
+            assistant: async (message) => {
+              pi.sendUserMessage(message, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+              return { text: "✓ 指令/提问已转入当前 PsyClaw 智能体并在终端会话中执行。" };
+            },
+            installSkill: async (task) => {
+              pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+            },
+            installExternalTool: async (task) => {
+              pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+            },
+            installPlugin: async (source, scope) => {
+              await packageManager().installAndPersist(source, { local: scope === "project" });
+            },
+            listPlugins: () => packageManager().listConfiguredPackages().map(({ source, scope, filtered, installedPath }) => ({
+              source,
+              scope,
+              filtered,
+              installed: installedPath !== undefined,
+            })),
+          });
           const actualPort = await listen(next, 0);
           server = next;
           workbenchUrl = `http://127.0.0.1:${actualPort}`;

@@ -3,87 +3,2133 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PsyClaw Panel</title>
+  <title>PsyClaw Panel · 学术科研智能体控制台</title>
   <style>
-    :root{color-scheme:light;--bg:#f4f6f8;--surface:#fff;--line:#dfe3e8;--text:#17202a;--muted:#66717d;--accent:#087f73;--accent-soft:#e8f5f3;--ok:#15803d;--warn:#a16207;--bad:#b42318;--radius:6px;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-size:14px}button,input,select{font:inherit}button{cursor:pointer}.shell{min-height:100vh;display:grid;grid-template-rows:56px 1fr}.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:17px}.brand-mark{display:grid;place-items:center;width:30px;height:30px;background:var(--text);color:#fff;border-radius:5px}.local{font-size:12px;color:var(--muted)}.layout{display:grid;grid-template-columns:190px minmax(0,1fr);min-height:0}.nav{padding:18px 12px;background:#eef1f3;border-right:1px solid var(--line)}.nav button{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:4px;border:0;background:transparent;color:var(--muted);text-align:left;border-radius:5px}.nav button.active{background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--line);font-weight:650}.main{padding:22px;min-width:0}.view{display:none}.view.active{display:block}.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:16px}.page-head h1{font-size:20px;margin:0 0 4px}.page-head p{margin:0;color:var(--muted);font-size:13px}.button{border:1px solid var(--line);background:var(--surface);padding:7px 11px;border-radius:5px;color:var(--text)}.button.primary{background:var(--accent);border-color:var(--accent);color:#fff}.button.small{padding:4px 8px;font-size:12px}.button:disabled{opacity:.5;cursor:default}.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}.workspace{display:grid;grid-template-columns:280px minmax(0,1fr);height:calc(100vh - 124px);overflow:hidden}.tree{border-right:1px solid var(--line);overflow:auto;padding:10px}.tree-section{margin:12px 8px 5px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase}.tree-item{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;padding:7px 8px;border-radius:4px;text-align:left;color:var(--text);overflow:hidden}.tree-item:hover,.tree-item.active{background:var(--accent-soft);color:#075e56}.tree-item span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.viewer{overflow:auto}.viewer-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:rgba(255,255,255,.96);border-bottom:1px solid var(--line)}.viewer-path{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.viewer-body{max-width:900px;margin:0 auto;padding:28px 34px 50px}.empty{display:grid;place-items:center;min-height:320px;color:var(--muted)}.markdown{line-height:1.75}.markdown h1,.markdown h2,.markdown h3{line-height:1.3;margin:1.5em 0 .65em}.markdown h1{font-size:26px;border-bottom:1px solid var(--line);padding-bottom:10px}.markdown h2{font-size:20px}.markdown h3{font-size:16px}.markdown p{margin:.8em 0}.markdown blockquote{margin:1em 0;padding:4px 14px;border-left:3px solid var(--accent);color:var(--muted);background:#f8fafb}.markdown code,.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.markdown code{background:#f0f2f4;padding:2px 4px;border-radius:3px}.markdown pre,.raw{white-space:pre-wrap;word-break:break-word;background:#111827;color:#e5e7eb;padding:16px;border-radius:5px;overflow:auto}.markdown table{width:100%;border-collapse:collapse;margin:1em 0}.markdown th,.markdown td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left}.markdown th{font-weight:700;background:#f7f8f9}.toolbar{display:flex;gap:8px;align-items:center}.segmented{display:inline-flex;border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:2px}.segmented button{border:0;background:transparent;padding:5px 10px;border-radius:3px;color:var(--muted)}.segmented button.active{background:var(--text);color:#fff}.trace-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:18px}.metric{padding:12px;border:1px solid var(--line);border-radius:5px}.metric small{display:block;color:var(--muted);margin-bottom:4px}.metric strong{font-size:20px}.timeline{border-left:2px solid var(--line);margin-left:8px}.event{position:relative;padding:0 0 18px 22px}.event:before{content:"";position:absolute;left:-6px;top:4px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px #fff}.event.error:before{background:var(--bad)}.event-head{display:flex;justify-content:space-between;gap:12px;font-weight:650}.event-meta{margin-top:3px;color:var(--muted);font-size:12px}.controls{display:flex;gap:8px;flex-wrap:wrap}.controls input,.controls select,.form input,.form select{border:1px solid var(--line);border-radius:5px;background:var(--surface);padding:7px 9px;color:var(--text)}.table-wrap{overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}table.data{width:100%;border-collapse:collapse;min-width:760px}table.data th,table.data td{padding:9px 11px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}table.data th{position:sticky;top:0;background:#f7f8f9;color:var(--muted);font-size:12px;font-weight:700}table.data tr:last-child td{border-bottom:0}.name{font-weight:650}.subtle{color:var(--muted);font-size:12px;margin-top:2px}.tag{display:inline-block;padding:2px 6px;border-radius:999px;font-size:11px;background:#eef1f3;color:var(--muted)}.tag.ok{background:#eaf7ee;color:var(--ok)}.tag.warn{background:#fff7df;color:var(--warn)}.provider-grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:16px}.section{padding:16px}.section h2{font-size:15px;margin:0 0 14px}.form{display:grid;gap:12px}.field{display:grid;gap:5px}.field label{font-size:12px;color:var(--muted)}.feedback{font-size:12px;color:var(--muted);min-height:18px}.cost{margin-top:16px}.cost-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}.cost-note{font-size:12px;color:var(--muted);margin:0 0 12px}.hidden{display:none!important}
-    @media(max-width:850px){.layout{grid-template-columns:1fr}.nav{display:flex;border-right:0;border-bottom:1px solid var(--line);padding:8px;overflow:auto}.nav button{width:auto;white-space:nowrap;margin:0 4px 0 0}.main{padding:12px}.workspace{grid-template-columns:1fr;height:auto}.tree{max-height:280px;border-right:0;border-bottom:1px solid var(--line)}.viewer{min-height:520px}.provider-grid{grid-template-columns:1fr}.trace-summary,.cost-metrics{grid-template-columns:1fr}.topbar{padding:0 14px}}
-    .event-detail{white-space:pre-wrap;word-break:break-word;background:#f8fafc;border:1px solid var(--line);border-radius:4px;padding:8px;margin:6px 0 2px;font-size:12px;color:var(--text)}
+    :root {
+      color-scheme: light;
+      --brand-primary: #0d766e;
+      --brand-primary-hover: #0f766e;
+      --brand-primary-active: #115e59;
+      --brand-primary-light: #f0fdfa;
+      --brand-primary-border: #ccfbf1;
+      --brand-accent: #0284c7;
+
+      --bg-app: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-subtle: #f1f5f9;
+      --bg-surface-hover: #f8fafc;
+      --bg-active: #e2e8f0;
+      --bg-sidebar: #f8fafc;
+
+      --border-subtle: #e2e8f0;
+      --border-default: #cbd5e1;
+      --border-strong: #94a3b8;
+      --border-divider: #f1f5f9;
+
+      --text-main: #0f172a;
+      --text-secondary: #334155;
+      --text-muted: #64748b;
+      --text-tertiary: #94a3b8;
+
+      --ok-text: #047857;
+      --ok-bg: #ecfdf5;
+      --ok-border: #a7f3d0;
+
+      --warn-text: #b45309;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+
+      --bad-text: #b91c1c;
+      --bad-bg: #fef2f2;
+      --bad-border: #fecaca;
+
+      --info-text: #1d4ed8;
+      --info-bg: #eff6ff;
+      --info-border: #bfdbfe;
+
+      --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+      --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+      --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.04);
+
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, Monaco, Consolas, monospace;
+      --font-serif: "Charter", "Bitstream Charter", Cambria, Georgia, serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-app);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; border: none; background: none; }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 54px 1fr;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 10;
+      position: sticky;
+      top: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #0f172a 0%, #0d766e 100%);
+      color: #ffffff;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      font-size: 16px;
+      line-height: 1;
+      box-shadow: var(--shadow-xs);
+    }
+    .brand-title {
+      font-weight: 650;
+      font-size: 15px;
+      letter-spacing: -0.01em;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 10.5px;
+      font-weight: 550;
+      color: var(--brand-primary);
+      background: var(--brand-primary-light);
+      border: 1px solid var(--brand-primary-border);
+      padding: 1px 6px;
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+    }
+    .topbar-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .local-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-surface-subtle);
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      min-height: 0;
+    }
+
+    .nav {
+      padding: 16px 10px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .nav-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .nav-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-tertiary);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 6px 10px 4px;
+      margin-bottom: 2px;
+    }
+    .nav button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 12.5px;
+      text-align: left;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .nav button svg {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: color 0.15s ease;
+    }
+    .nav button:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+    }
+    .nav button:hover svg {
+      color: var(--text-main);
+    }
+    .nav button.active {
+      background: var(--bg-surface);
+      color: var(--brand-primary);
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-subtle);
+    }
+    .nav button.active svg {
+      color: var(--brand-primary);
+    }
+    .nav-footer {
+      padding: 12px 10px;
+      border-top: 1px solid var(--border-subtle);
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+    .nav-footer code {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      background: var(--bg-surface-subtle);
+      padding: 1px 4px;
+      border-radius: 3px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .main {
+      padding: 24px 28px;
+      min-width: 0;
+      overflow-y: auto;
+    }
+    .view { display: none; }
+    .view.active { display: block; animation: fadeIn 0.18s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
+
+    .page-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .page-head h1 {
+      font-size: 19px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+      margin: 0 0 3px;
+    }
+    .page-head p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 12.5px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-surface);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 12.5px;
+      box-shadow: var(--shadow-xs);
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .button:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-strong);
+      color: var(--text-main);
+    }
+    .button:active {
+      transform: translateY(1px);
+    }
+    .button.primary {
+      background: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(13, 118, 110, 0.2);
+    }
+    .button.primary:hover {
+      background: var(--brand-primary-hover);
+      border-color: var(--brand-primary-hover);
+    }
+    .button.small {
+      padding: 3.5px 8px;
+      font-size: 11.5px;
+      border-radius: var(--radius-xs);
+    }
+    .button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      height: calc(100vh - 130px);
+      overflow: hidden;
+      background: var(--bg-surface);
+    }
+    .tree {
+      border-right: 1px solid var(--border-subtle);
+      overflow-y: auto;
+      padding: 12px 8px;
+      background: #fafbfc;
+    }
+    .tree-section {
+      margin: 12px 6px 4px;
+      color: var(--text-muted);
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tree-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 6px 8px;
+      border-radius: var(--radius-xs);
+      text-align: left;
+      color: var(--text-secondary);
+      font-size: 12.5px;
+      transition: all 0.12s ease;
+      cursor: pointer;
+    }
+    .tree-item svg {
+      width: 14px;
+      height: 14px;
+      color: var(--text-tertiary);
+      flex-shrink: 0;
+      transition: color 0.12s ease;
+    }
+    .tree-item:hover {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border-color: var(--border-subtle);
+    }
+    .tree-item:hover svg {
+      color: var(--text-secondary);
+    }
+    .tree-item.active {
+      background: var(--brand-primary-light);
+      color: var(--brand-primary);
+      font-weight: 600;
+      border-color: var(--brand-primary-border);
+    }
+    .tree-item.active svg {
+      color: var(--brand-primary);
+    }
+    .tree-item span:last-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .viewer {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-surface);
+    }
+    .viewer-head {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .viewer-path-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .viewer-path {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 550;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .viewer-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .viewer-body {
+      max-width: 860px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px 36px 64px;
+      color: var(--text-main);
+    }
+    .viewer-body.empty {
+      display: grid;
+      place-items: center;
+      min-height: 380px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .markdown {
+      line-height: 1.72;
+      font-size: 14px;
+      color: #1e293b;
+    }
+    .markdown h1, .markdown h2, .markdown h3, .markdown h4 {
+      line-height: 1.35;
+      color: #0f172a;
+      font-weight: 650;
+      letter-spacing: -0.015em;
+    }
+    .markdown h1 {
+      font-size: 23px;
+      margin: 1.6em 0 0.7em;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .markdown h1:first-child { margin-top: 0; }
+    .markdown h2 {
+      font-size: 18px;
+      margin: 1.4em 0 0.6em;
+    }
+    .markdown h3 {
+      font-size: 15px;
+      margin: 1.2em 0 0.5em;
+    }
+    .markdown p {
+      margin: 0.85em 0;
+    }
+    .markdown blockquote {
+      margin: 1.2em 0;
+      padding: 8px 16px;
+      border-left: 3px solid var(--brand-primary);
+      color: var(--text-secondary);
+      background: #f8fafc;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-style: normal;
+    }
+    .markdown blockquote p { margin: 0.3em 0; }
+    .markdown ul, .markdown ol {
+      margin: 0.8em 0;
+      padding-left: 22px;
+    }
+    .markdown li {
+      margin: 0.3em 0;
+    }
+    .markdown code, .code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .markdown code {
+      background: var(--bg-surface-subtle);
+      color: #0f766e;
+      padding: 2px 5px;
+      border-radius: var(--radius-xs);
+      border: 1px solid #e2e8f0;
+    }
+    .markdown pre, .raw {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: #0f172a;
+      color: #f1f5f9;
+      padding: 16px 20px;
+      border-radius: var(--radius-md);
+      overflow-x: auto;
+      margin: 1.2em 0;
+      border: 1px solid #1e293b;
+      box-shadow: var(--shadow-sm);
+    }
+    .markdown pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border: none;
+      font-size: inherit;
+    }
+    .markdown table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.4em 0;
+      font-size: 13px;
+    }
+    .markdown th, .markdown td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      text-align: left;
+    }
+    .markdown th {
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: #f8fafc;
+      border-top: 1px solid var(--border-subtle);
+      border-bottom: 2px solid var(--border-default);
+    }
+    .markdown tr:hover td {
+      background: #fafbfc;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 550;
+      background: var(--bg-surface-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      white-space: nowrap;
+    }
+    .tag.ok {
+      background: var(--ok-bg);
+      color: var(--ok-text);
+      border-color: var(--ok-border);
+    }
+    .tag.warn {
+      background: var(--warn-bg);
+      color: var(--warn-text);
+      border-color: var(--warn-border);
+    }
+    .tag.bad {
+      background: var(--bad-bg);
+      color: var(--bad-text);
+      border-color: var(--bad-border);
+    }
+    .tag.info {
+      background: var(--info-bg);
+      color: var(--info-text);
+      border-color: var(--info-border);
+    }
+
+    .segmented {
+      display: inline-flex;
+      background: #f1f5f9;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+      gap: 1px;
+    }
+    .segmented button {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.12s ease;
+    }
+    .segmented button:hover {
+      color: var(--text-main);
+    }
+    .segmented button.active {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      font-weight: 600;
+      box-shadow: var(--shadow-xs);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .search-wrapper {
+      position: relative;
+      flex: 1;
+      min-width: 220px;
+      max-width: 320px;
+    }
+    .search-wrapper svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .controls input, .controls select, .form input, .form select {
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      padding: 6px 10px;
+      color: var(--text-main);
+      font-size: 12.5px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .controls input:focus, .controls select:focus, .form input:focus, .form select:focus {
+      outline: none;
+      border-color: var(--brand-primary);
+      box-shadow: 0 0 0 3px rgba(13, 118, 110, 0.12);
+    }
+    .search-wrapper input {
+      width: 100%;
+      padding-left: 30px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+    }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+      font-size: 12.5px;
+    }
+    table.data th, table.data td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      text-align: left;
+      vertical-align: middle;
+    }
+    table.data th {
+      position: sticky;
+      top: 0;
+      background: #fafbfc;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 650;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 1;
+    }
+    table.data tr:last-child td { border-bottom: 0; }
+    table.data tr:hover td { background: #fafbfc; }
+    .name { font-weight: 600; color: var(--text-main); }
+    .subtle { color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
+
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 18px;
+      margin-bottom: 20px;
+    }
+    .section {
+      padding: 20px;
+    }
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .section h2 {
+      font-size: 15px;
+      font-weight: 650;
+      color: var(--text-main);
+      margin: 0;
+    }
+    .form {
+      display: grid;
+      gap: 14px;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 12px;
+      font-weight: 550;
+      color: var(--text-secondary);
+    }
+    .feedback {
+      font-size: 12px;
+      color: var(--brand-primary);
+      min-height: 18px;
+      font-weight: 500;
+    }
+
+    .cost-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+    .metric {
+      padding: 16px 18px;
+      border: 1px solid var(--border-subtle);
+      background: #fafbfc;
+      border-radius: var(--radius-md);
+      transition: all 0.15s ease;
+    }
+    .metric:hover {
+      background: var(--bg-surface);
+      border-color: var(--border-default);
+      box-shadow: var(--shadow-sm);
+    }
+    .metric small {
+      display: block;
+      color: var(--text-muted);
+      font-size: 11.5px;
+      font-weight: 550;
+      margin-bottom: 6px;
+    }
+    .metric strong {
+      font-size: 22px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+    .cost-note {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin: 0 0 14px;
+    }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      min-height: 280px;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      text-align: center;
+    }
+    .hidden { display: none !important; }
+
+    /* Pipeline Stepper */
+    .pipeline-stepper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      margin-bottom: 18px;
+      overflow-x: auto;
+      box-shadow: var(--shadow-sm);
+    }
+    .stepper-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+    .step-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 550;
+      color: var(--text-secondary);
+      background: var(--bg-surface-subtle);
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .step-item:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+      border-color: var(--border-default);
+    }
+    .step-item.active {
+      background: var(--brand-primary-light);
+      color: var(--brand-primary);
+      border-color: var(--brand-primary-border);
+      font-weight: 600;
+    }
+    .step-arrow {
+      color: var(--text-tertiary);
+      font-size: 11px;
+    }
+
+    /* Topbar Quick Commands */
+    .topbar-cmds {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .topbar-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 550;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .topbar-btn:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+      border-color: var(--border-default);
+    }
+    .topbar-btn.primary {
+      background: var(--brand-primary);
+      color: #fff;
+      border-color: var(--brand-primary);
+    }
+    .topbar-btn.primary:hover {
+      background: var(--brand-primary-hover);
+    }
+
+    /* Interactive Web Console Drawer */
+    .console-fab {
+      position: fixed;
+      bottom: 24px;
+      right: 28px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .console-fab:hover {
+      background: #1e293b;
+      transform: translateY(-2px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    }
+    .console-drawer {
+      position: fixed;
+      bottom: 0;
+      right: 28px;
+      width: 480px;
+      max-width: calc(100vw - 40px);
+      height: 560px;
+      max-height: calc(100vh - 80px);
+      background: #0f172a;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      border-bottom: 0;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      transform: translateY(105%);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .console-drawer.open {
+      transform: translateY(0);
+    }
+    .console-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1e293b;
+      background: #0b1120;
+      border-radius: 12px 12px 0 0;
+    }
+    .console-title {
+      font-size: 13px;
+      font-weight: 650;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .console-status-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #064e3b;
+      color: #34d399;
+      border: 1px solid #047857;
+    }
+    .console-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .console-btn-icon {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: flex;
+    }
+    .console-btn-icon:hover {
+      color: #f8fafc;
+      background: #1e293b;
+    }
+    .console-quick-chips {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: #141e33;
+      border-bottom: 1px solid #1e293b;
+      overflow-x: auto;
+    }
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #334155;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.12s ease;
+    }
+    .chip:hover {
+      background: #334155;
+      color: #fff;
+    }
+    .console-log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .log-entry {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-user {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    .log-agent {
+      color: #e2e8f0;
+      background: #1e293b;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border-left: 3px solid #2dd4bf;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log-sys {
+      color: #94a3b8;
+      font-style: italic;
+      font-size: 11px;
+    }
+    .console-input-box {
+      padding: 12px;
+      background: #0b1120;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      gap: 8px;
+    }
+    .console-input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      border-radius: 6px;
+      outline: none;
+      font-family: var(--font-mono);
+    }
+    .console-input:focus {
+      border-color: #38bdf8;
+    }
+    .console-send-btn {
+      background: var(--brand-primary);
+      color: #fff;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .console-send-btn:hover {
+      background: var(--brand-primary-hover);
+    }
+
+    /* Command Palette Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 20px;
+    }
+    .modal-box {
+      width: 560px;
+      max-width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-modal);
+      overflow: hidden;
+      animation: modalPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalPop {
+      from { transform: scale(0.96); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .modal-head h3 {
+      font-size: 15px;
+      font-weight: 650;
+      margin: 0;
+      color: var(--text-main);
+    }
+    .modal-body {
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+    .modal-foot {
+      padding: 12px 20px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .nav {
+        flex-direction: row;
+        border-right: 0;
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 8px 12px;
+        overflow-x: auto;
+      }
+      .nav-group { flex-direction: row; }
+      .nav-label, .nav-footer { display: none; }
+      .nav button { width: auto; white-space: nowrap; }
+      .main { padding: 16px; }
+      .workspace { grid-template-columns: 1fr; height: auto; }
+      .tree { max-height: 260px; border-right: 0; border-bottom: 1px solid var(--border-subtle); }
+      .viewer { min-height: 480px; }
+      .provider-grid, .cost-metrics { grid-template-columns: 1fr; }
+      .topbar { padding: 0 14px; }
+      .console-drawer { width: 100vw; right: 0; }
+    }
   </style>
 </head>
 <body>
 <div class="shell">
-  <header class="topbar"><div class="brand"><span class="brand-mark">ψ</span>PsyClaw Panel</div><div class="local">Local only</div></header>
+  <!-- 顶栏 Header -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">ψ</span>
+      <div class="brand-title">
+        PsyClaw Panel
+        <span class="brand-badge">Academic Studio</span>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <div class="topbar-cmds">
+        <button id="cmd-init-btn" class="topbar-btn primary" title="初始化或配置社科研究工作区 (/init)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>
+          /init 项目
+        </button>
+        <button id="cmd-plan-btn" class="topbar-btn" title="查看或确认统计分析方案 (/plan)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          /plan 方案
+        </button>
+        <button id="cmd-verify-btn" class="topbar-btn" title="关键字段人机核查清单 (/verify)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          /verify 核查
+        </button>
+      </div>
+      <div class="local-badge">
+        <span class="pulse-dot"></span>
+        安全沙盒 · 本地隔离
+      </div>
+    </div>
+  </header>
+
+  <!-- 主体工作区 Layout -->
   <div class="layout">
+    <!-- 侧边导航栏 Sidebar -->
     <nav class="nav" aria-label="Panel 导航">
-      <button class="active" data-view="project">项目文件</button>
-      <button data-view="ecosystem">Skill / Plugin / MCP / Agent</button>
-      <button data-view="provider">Provider 与成本</button>
+      <div class="nav-group">
+        <div class="nav-label">工作台导航</div>
+        <button class="active" data-view="project">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+          项目文件
+        </button>
+        <button data-view="ecosystem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          能力生态
+        </button>
+        <button data-view="provider">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          模型与成本
+        </button>
+      </div>
+      <div class="nav-footer">
+        <div style="font-weight:600;margin-bottom:2px;color:var(--text-secondary)">PsyClaw 运行提示</div>
+        终端按 <code>Shift+Tab</code> 可在 <strong>chat ⇄ analysis ⇄ academic</strong> 模式间无缝推进。
+      </div>
     </nav>
+
+    <!-- 主面板内容区 Main -->
     <main class="main">
+      <!-- 视图 1：项目文件 -->
       <section id="view-project" class="view active">
-        <div class="page-head"><div><h1>项目文件</h1><p>查看研究文档与 Export 导出结果；内容只读。</p></div><button id="refresh-project" class="button">刷新</button></div>
+        <!-- 科研全流程导航条 Pipeline Stepper -->
+        <div class="pipeline-stepper" id="pipeline-stepper">
+          <span class="stepper-label">ARS 科研流水线:</span>
+          <div class="step-item" data-stage="intake" title="探索性学术追问与目标澄清 (notes/goal.md)">
+            <span>① 选题与入口</span>
+          </div>
+          <span class="step-arrow">➔</span>
+          <div class="step-item" data-stage="evidence" title="证据溯源与文献账本 (notes/evidence.jsonl, claims.jsonl)">
+            <span>② 证据账本</span>
+          </div>
+          <span class="step-arrow">➔</span>
+          <div class="step-item" data-stage="plan" title="统计分析方案与 EDA (analysis/plans/)">
+            <span>③ 统计方案</span>
+          </div>
+          <span class="step-arrow">➔</span>
+          <div class="step-item" data-stage="manuscript" title="论文撰写与图表编排 (paper/, outputs/)">
+            <span>④ 手稿编排</span>
+          </div>
+          <span class="step-arrow">➔</span>
+          <div class="step-item" data-stage="review" title="多角色同行盲审与交叉核验 (notes/review.md)">
+            <span>⑤ 严苛审稿</span>
+          </div>
+        </div>
+
+        <div class="page-head">
+          <div>
+            <h1>项目文件浏览器</h1>
+            <p>只读浏览核心研究文档、Claim 证据账本与 Outputs 导出产物。</p>
+          </div>
+          <button id="refresh-project" class="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            刷新文档
+          </button>
+        </div>
         <div class="panel workspace">
-          <aside id="file-tree" class="tree"><div class="empty">读取中...</div></aside>
+          <aside id="file-tree" class="tree">
+            <div class="empty">读取项目文档中...</div>
+          </aside>
           <section class="viewer">
-            <div class="viewer-head"><div id="viewer-path" class="viewer-path">选择左侧文件</div><span id="viewer-kind" class="tag">只读</span></div>
-            <div id="viewer-body" class="viewer-body empty">选择研究文档或 Export 结果查看</div>
+            <div class="viewer-head">
+              <div class="viewer-path-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <div id="viewer-path" class="viewer-path">选择左侧文件</div>
+              </div>
+              <div class="viewer-actions">
+                <span id="viewer-kind" class="tag info">只读</span>
+                <button id="viewer-copy-btn" class="button small" title="复制当前文档内容">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  复制
+                </button>
+              </div>
+            </div>
+            <div id="viewer-body" class="viewer-body empty">
+              请在左侧文件树选择研究文档、证据卡片或导出结果查看
+            </div>
           </section>
         </div>
       </section>
 
+      <!-- 视图 2：能力生态 -->
       <section id="view-ecosystem" class="view">
-        <div class="page-head"><div><h1>Skill / Plugin / MCP / Agent 生态</h1><p>在同一页面管理研究 Skill、Pi Plugin、MCP 与 Subagent（对齐 Claude Code）。配置变更后使用 <code>/reload</code>。</p></div><button id="refresh-ecosystem" class="button">刷新</button></div>
-        <div class="controls" style="margin-bottom:12px"><input id="eco-search" placeholder="搜索名称或描述"><div class="segmented" aria-label="能力类型"><button class="active" data-eco-kind="all">全部</button><button data-eco-kind="skill">Skill</button><button data-eco-kind="plugin">Plugin</button><button data-eco-kind="mcp">MCP</button><button data-eco-kind="agent">Agent</button></div><select id="eco-kind" aria-label="更多类型"><option value="all">全部来源</option><option value="local">用户 Skill</option><option value="external">外部工具</option></select><select id="eco-status"><option value="all">全部状态</option><option value="enabled">已启用</option><option value="available">未启用</option></select></div>
-        <div class="table-wrap"><table class="data"><thead><tr><th>名称</th><th>类型</th><th>来源</th><th>状态</th><th>操作</th></tr></thead><tbody id="ecosystem-body"><tr><td colspan="5">读取中...</td></tr></tbody></table></div>
+        <div class="page-head">
+          <div>
+            <h1>Skill / Plugin / MCP / Agent 生态</h1>
+            <p>集中发现并受控管理科研 Skill、Pi Plugin、MCP 服务与 Subagent。修改后在终端输入 <code>/reload</code> 即可热更新。</p>
+          </div>
+          <button id="refresh-ecosystem" class="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            刷新生态
+          </button>
+        </div>
+
+        <div class="controls">
+          <div class="search-wrapper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="eco-search" placeholder="搜索能力名称、描述或指令...">
+          </div>
+          <div class="segmented" aria-label="能力类型">
+            <button class="active" data-eco-kind="all">全部类型</button>
+            <button data-eco-kind="skill">Skill</button>
+            <button data-eco-kind="plugin">Plugin</button>
+            <button data-eco-kind="mcp">MCP</button>
+            <button data-eco-kind="agent">Agent</button>
+          </div>
+          <select id="eco-kind" aria-label="更多类型">
+            <option value="all">全部来源</option>
+            <option value="local">用户 Skill</option>
+            <option value="external">外部工具</option>
+          </select>
+          <select id="eco-status" aria-label="状态筛选">
+            <option value="all">全部状态</option>
+            <option value="enabled">已启用</option>
+            <option value="available">未启用</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead>
+              <tr>
+                <th style="width:38%">能力名称与描述</th>
+                <th style="width:14%">类型</th>
+                <th style="width:18%">来源引用</th>
+                <th style="width:15%">运行状态</th>
+                <th style="width:15%;text-align:right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="ecosystem-body">
+              <tr><td colspan="5" class="empty" style="min-height:120px">正在读取生态清单...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
+      <!-- 视图 3：Provider 与成本 -->
       <section id="view-provider" class="view">
-        <div class="page-head"><div><h1>Provider 与成本</h1><p>管理默认模型；成本统计来自全部本地 PsyClaw 会话，不会上传。</p></div><button id="refresh-provider" class="button">刷新</button></div>
-        <div class="provider-grid">
-          <div class="panel section"><h2>当前 Provider</h2><div class="form"><div class="field"><label for="provider-select">Provider</label><select id="provider-select"></select></div><div class="field"><label for="model-select">Model</label><select id="model-select"></select></div><button id="save-provider" class="button primary">设为默认模型</button><div id="provider-feedback" class="feedback"></div></div></div>
-          <div class="panel section"><h2>配置 API Key</h2><div class="form"><div class="field"><label for="provider-key">API Key（留空不会覆盖已有凭据）</label><input id="provider-key" type="password" autocomplete="off" placeholder="输入当前 Provider 的 Key"></div><button id="configure-provider" class="button">保存当前 Provider 配置</button><div id="config-feedback" class="feedback"></div></div></div>
+        <div class="page-head">
+          <div>
+            <h1>Provider 与成本看板</h1>
+            <p>配置默认模型通道；用量统计自动从全部本地 PsyClaw 会话中聚合，数据完全离线不上传。</p>
+          </div>
+          <button id="refresh-provider" class="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            刷新看板
+          </button>
         </div>
-        <div class="cost panel section"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Token 与成本</h2><div class="segmented"><button class="active" data-currency="cny">CNY</button><button data-currency="usd">USD</button></div></div><div id="cost-content">读取中...</div></div>
+
+        <div class="provider-grid">
+          <!-- 默认模型选择 -->
+          <div class="panel section">
+            <div class="section-head">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand-primary)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <h2>默认模型选择</h2>
+            </div>
+            <div class="form">
+              <div class="field">
+                <label for="provider-select">模型供应商 (Provider)</label>
+                <select id="provider-select"></select>
+              </div>
+              <div class="field">
+                <label for="model-select">模型型号 (Model)</label>
+                <select id="model-select"></select>
+              </div>
+              <button id="save-provider" class="button primary" style="margin-top:4px">
+                设为默认模型
+              </button>
+              <div id="provider-feedback" class="feedback"></div>
+            </div>
+          </div>
+
+          <!-- API Key 配置 -->
+          <div class="panel section">
+            <div class="section-head">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand-primary)"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <h2>配置凭据 (API Key)</h2>
+            </div>
+            <div class="form">
+              <div class="field">
+                <label for="provider-key">API Key（留空不覆盖已有凭据）</label>
+                <input id="provider-key" type="password" autocomplete="off" placeholder="输入当前 Provider 的专属 Key">
+              </div>
+              <p class="cost-note" style="margin:0">凭据委托 Pi 官方加密存储，不会在日志中明文打印。</p>
+              <button id="configure-provider" class="button" style="margin-top:4px">
+                保存当前 Provider 配置
+              </button>
+              <div id="config-feedback" class="feedback"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 成本统计面板 -->
+        <div class="cost panel section">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+            <div class="section-head" style="margin:0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand-primary)"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <h2>Token 用量与成本统计</h2>
+            </div>
+            <div class="segmented">
+              <button class="active" data-currency="cny">CNY (¥)</button>
+              <button data-currency="usd">USD ($)</button>
+            </div>
+          </div>
+
+          <div id="cost-content">
+            <div class="empty" style="min-height:160px">正在统计 Token 用量与成本...</div>
+          </div>
+        </div>
       </section>
     </main>
   </div>
 </div>
+
+<!-- 悬浮控制台入口 Floating Action Button -->
+<button id="console-fab" class="console-fab" title="打开/折叠 PsyClaw 交互控制台">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+  <span>PsyClaw 控制台</span>
+</button>
+
+<!-- 抽屉式交互控制台 Console Drawer -->
+<div id="console-drawer" class="console-drawer">
+  <div class="console-header">
+    <div class="console-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#38bdf8"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      <span>科研会话终端</span>
+      <span id="console-status-badge" class="console-status-tag">连线中</span>
+    </div>
+    <div class="console-actions">
+      <button id="console-clear-btn" class="console-btn-icon" title="清空终端历史">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+      <button id="console-close-btn" class="console-btn-icon" title="最小化">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 快捷指令快速贴入栏 -->
+  <div class="console-quick-chips">
+    <span class="chip" data-cmd="/plan status">/plan status</span>
+    <span class="chip" data-cmd="/verify list">/verify list</span>
+    <span class="chip" data-cmd="/grill">/grill 压力追问</span>
+    <span class="chip" data-cmd="/review">/review 同行评审</span>
+    <span class="chip" data-cmd="/agents">/agents 角色</span>
+  </div>
+
+  <!-- 终端流式日志输出区域 -->
+  <div id="console-log" class="console-log">
+    <div class="log-entry">
+      <div class="log-sys">ψ PsyClaw 交互控制台已就绪。支持直接提问或发送斜杠指令 (/init, /plan, /grill, /review, /verify 等)。</div>
+    </div>
+  </div>
+
+  <!-- 输入与触发栏 -->
+  <div class="console-input-box">
+    <input type="text" id="console-input" class="console-input" placeholder="输入科研指令或研究问题 (Enter 发送)..." autocomplete="off" />
+    <button id="console-send-btn" class="console-send-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      发送
+    </button>
+  </div>
+</div>
+
+<!-- /init 项目向导模态框 -->
+<div id="init-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>🚀 初始化研究项目 (/init)</h3>
+      <button id="init-modal-close" class="console-btn-icon" style="color:var(--text-muted)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label for="init-paradigm">研究范式 (Paradigm)</label>
+        <select id="init-paradigm" class="select">
+          <option value="survey-observational">survey-observational (问卷与实证观察研究)</option>
+          <option value="experimental">experimental (随机受控实验 / 心理学实验室)</option>
+          <option value="quasi-experimental">quasi-experimental (准实验 / 双重差分 / 断点回归)</option>
+          <option value="qualitative-thematic">qualitative-thematic (质性扎根理论与主题分析)</option>
+          <option value="meta-analysis">meta-analysis (元分析 / 效应量合并)</option>
+          <option value="longitudinal-panel">longitudinal-panel (追踪面板数据)</option>
+          <option value="mixed-methods">mixed-methods (混合研究方法)</option>
+          <option value="policy-legal">policy-legal (政策制度与法学文本分析)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="init-goal">研究问题与目标 (Research Goal)</label>
+        <textarea id="init-goal" class="textarea" rows="3" placeholder="例如：探究社交媒体主动使用与大学生学业倦怠之间的中介效应机制..."></textarea>
+      </div>
+      <div id="init-preview-cmd" style="font-family:var(--font-mono);font-size:11.5px;background:var(--bg-surface-subtle);padding:8px 10px;border-radius:4px;border:1px solid var(--border-subtle);color:var(--text-secondary)">
+        /init --paradigm survey-observational
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button id="init-cancel-btn" class="button">取消</button>
+      <button id="init-submit-btn" class="button primary">提交并生成指令</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const state={view:"project",files:[],eco:[],ecoKind:"all",models:[],active:{},usage:null,currency:"cny"};
-const $=id=>document.getElementById(id);
-const esc=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
-async function json(url,options){const response=await fetch(url,options);const body=await response.json().catch(()=>({error:"请求失败"}));if(!response.ok)throw new Error(body.error||"请求失败");return body}
-function setView(view){state.view=view;document.querySelectorAll(".nav button").forEach(button=>button.classList.toggle("active",button.dataset.view===view));document.querySelectorAll(".view").forEach(section=>section.classList.toggle("active",section.id===`view-${view}`));if(view==="ecosystem")loadEcosystem();if(view==="provider")loadProvider()}
-document.querySelectorAll(".nav button").forEach(button=>button.addEventListener("click",()=>setView(button.dataset.view)));
+const state = {
+  view: "project",
+  files: [],
+  eco: [],
+  ecoKind: "all",
+  models: [],
+  active: {},
+  usage: null,
+  currency: "cny",
+  currentContent: ""
+};
 
-function inlineMarkdown(text){let value=esc(text);value=value.replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/\*([^*]+)\*/g,"<em>$1</em>");value=value.replace(/\[([^\]]+)\]\(([^)]+)\)/g,(_,label,target)=>/^https?:\/\//i.test(target)?`<a href="${esc(target)}" target="_blank" rel="noreferrer">${label}</a>`:label);return value}
-function renderMarkdown(markdown){const lines=String(markdown).replace(/\r\n/g,"\n").split("\n"),out=[];let i=0,inCode=false,code=[];while(i<lines.length){const line=lines[i],trim=line.trim();if(trim.startsWith("```")){if(inCode){out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);code=[];inCode=false}else inCode=true;i++;continue}if(inCode){code.push(line);i++;continue}const heading=trim.match(/^(#{1,3})\s+(.+)$/);if(heading){const level=heading[1].length;out.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);i++;continue}if(trim.startsWith(">")){out.push(`<blockquote>${inlineMarkdown(trim.replace(/^>\s?/,""))}</blockquote>`);i++;continue}if(/^[-*+]\s+/.test(trim)){const items=[];while(i<lines.length&&/^[-*+]\s+/.test(lines[i].trim()))items.push(lines[i++].trim().replace(/^[-*+]\s+/,""));out.push(`<ul>${items.map(item=>`<li>${inlineMarkdown(item)}</li>`).join("")}</ul>`);continue}if(/^\d+\.\s+/.test(trim)){const items=[];while(i<lines.length&&/^\d+\.\s+/.test(lines[i].trim()))items.push(lines[i++].trim().replace(/^\d+\.\s+/,""));out.push(`<ol>${items.map(item=>`<li>${inlineMarkdown(item)}</li>`).join("")}</ol>`);continue}if(trim.startsWith("|")&&i+1<lines.length&&/^\|?[\s:|-]+\|/.test(lines[i+1].trim())){const cells=value=>value.replace(/^\||\|$/g,"").split("|").map(cell=>cell.trim());const head=cells(trim);i+=2;const rows=[];while(i<lines.length&&lines[i].trim().startsWith("|"))rows.push(cells(lines[i++]));out.push(`<table><thead><tr>${head.map(cell=>`<th>${inlineMarkdown(cell)}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(cell=>`<td>${inlineMarkdown(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);continue}if(!trim){i++;continue}const para=[trim];i++;while(i<lines.length&&lines[i].trim()&&!/^(#{1,3})\s+/.test(lines[i].trim())&&!/^[-*+]\s+/.test(lines[i].trim())&&!/^\d+\.\s+/.test(lines[i].trim())&&!lines[i].trim().startsWith(">")&&!lines[i].trim().startsWith("```"))para.push(lines[i++].trim());out.push(`<p>${inlineMarkdown(para.join(" "))}</p>`)}if(inCode)out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);return out.join("")}
-function groupFiles(files){const priority=["notes/goal.md","notes/research-spec.md","notes/plan.md","notes/decisions.md","notes/HANDOFF.md"];const ordered=[...files].sort((a,b)=>{const ai=priority.indexOf(a),bi=priority.indexOf(b);if(ai>=0||bi>=0)return(ai<0?99:ai)-(bi<0?99:bi);return a.localeCompare(b,"zh-CN")});const groups={"核心文档":ordered.filter(path=>priority.includes(path)),"Export 导出结果":ordered.filter(path=>path.startsWith("outputs/")),"论文与报告":ordered.filter(path=>/^(paper|docs)\//.test(path)&&!priority.includes(path)),"研究记录":ordered.filter(path=>/^(notes|logs)\//.test(path)&&!priority.includes(path))};return groups}
-function renderTree(){const tree=$("file-tree"),groups=groupFiles(state.files);let html="";for(const[name,files]of Object.entries(groups)){if(!files.length)continue;html+=`<div class="tree-section">${esc(name)}</div>${files.map(path=>`<button class="tree-item" data-file="${esc(path)}"><span>◇</span><span>${esc(path.split("/").at(-1))}</span></button>`).join("")}`}tree.innerHTML=html||'<div class="empty">暂无项目文件或 Export 结果</div>';tree.querySelectorAll("[data-file]").forEach(button=>button.addEventListener("click",()=>openFile(button.dataset.file,button)))}
-function selectTree(button){document.querySelectorAll(".tree-item").forEach(item=>item.classList.toggle("active",item===button))}
-async function openFile(path,button){selectTree(button);$("viewer-path").textContent=path;$("viewer-kind").textContent="读取中";$("viewer-body").className="viewer-body empty";$("viewer-body").textContent="读取中...";try{const file=await json(`/api/project-file?path=${encodeURIComponent(path)}`);$("viewer-kind").textContent=file.format;$("viewer-body").className="viewer-body";$("viewer-body").innerHTML=file.format==="markdown"?`<article class="markdown">${renderMarkdown(file.content)}</article>`:`<pre class="raw">${esc(file.format==="json"?JSON.stringify(JSON.parse(file.content),null,2):file.content)}</pre>`}catch(error){$("viewer-body").className="viewer-body empty";$("viewer-body").textContent=error.message}}
-async function loadProject(){const files=await json("/api/project-files");state.files=files.files||[];renderTree();const goal=document.querySelector('[data-file="notes/goal.md"]')||document.querySelector("[data-file]");if(goal)goal.click()}
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? "").replace(/[&<>"']/g, ch => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[ch]));
 
-async function loadEcosystem(){try{const[skills,plugins,mcps,agents,enabled]=await Promise.all([json("/api/recommended-skills"),json("/api/recommended-plugins"),json("/api/recommended-mcps"),json("/api/recommended-agents"),json("/api/enabled-capabilities")]);const skillSet=new Set((enabled.skills||[]).map(item=>item.id)),mcpSet=new Set((enabled.mcp||[]).map(item=>item.id));state.eco=[...(enabled.coreSkills||[]).map(item=>({...item,kind:"core",description:item.description||"PsyClaw 内置 Skill",sourceRef:"bundled",enabled:item.enabled,installed:true})),...(skills.items||[]).map(item=>({...item,kind:"skill",enabled:skillSet.has(item.id),installed:skillSet.has(item.id)})),...(plugins.items||[]).map(item=>({...item,kind:"plugin",enabled:Boolean(item.enabled),installed:Boolean(item.installed)})),...(enabled.localSkills||[]).map(item=>({...item,kind:"local",sourceRef:item.path||"用户目录",installed:true})),...(mcps.items||[]).map(item=>({...item,kind:"mcp",enabled:mcpSet.has(item.id),installed:mcpSet.has(item.id)})),...(agents.items||[]).map(item=>({...item,kind:"agent",enabled:Boolean(item.enabled),installed:Boolean(item.installed),locked:Boolean(item.locked)})),...(skills.externalTools||[]).map(item=>({...item,kind:"external",enabled:false,installed:false}))];renderEcosystem()}catch(error){$("ecosystem-body").innerHTML=`<tr><td colspan="5">${esc(error.message)}</td></tr>`}}
-function renderEcosystem(){const query=$("eco-search").value.trim().toLowerCase(),sourceKind=$("eco-kind").value,status=$("eco-status").value,primaryKind=state.ecoKind;const primaryMatches=item=>primaryKind==="all"||(primaryKind==="skill"?(item.kind==="skill"||item.kind==="core"||item.kind==="local"):item.kind===primaryKind);const items=state.eco.filter(item=>primaryMatches(item)&&(sourceKind==="all"||item.kind===sourceKind)&&(status==="all"||(status==="enabled"?item.enabled:!item.enabled))&&`${item.name} ${item.description||""}`.toLowerCase().includes(query));$("ecosystem-body").innerHTML=items.map(item=>`<tr><td><div class="name">${esc(item.name)}</div><div class="subtle">${esc(item.description||"")}${item.kind==="plugin"&&item.scope?` · ${item.scope==="project"?"当前项目":"所有项目"}${item.filtered?" · 已限定资源范围":""}`:""}${item.kind==="agent"&&item.slashCommand?` · ${esc(item.slashCommand)}`:""}</div></td><td>${esc(item.kind==="core"?"Core Skill":item.kind==="local"?"用户 Skill":item.kind==="agent"?"Agent":item.kind.toUpperCase())}</td><td>${/^https?:/.test(item.sourceRef||"")?`<a href="${esc(item.sourceRef)}" target="_blank" rel="noreferrer">来源</a>`:esc(item.sourceRef||"bundled")}</td><td><span class="tag ${item.enabled?"ok":item.configured?"warn":""}">${item.locked?"内置可用":item.enabled?(item.kind==="plugin"?"已安装":"已启用"):item.kind==="plugin"&&item.configured?"配置存在，文件缺失":item.kind==="external"?"可安装外部工具":"未启用"}</span></td><td>${item.locked||item.kind==="agent"?"—":item.kind==="plugin"&&item.local?"—":item.kind==="plugin"?`<button class="button small ${item.installed?"":"primary"}" onclick="installCapability('plugin','${esc(item.id)}')">${item.installed?"重新安装":"安装"}</button>`:item.kind==="external"?`<button class="button small primary" onclick="installCapability('external','${esc(item.id)}')">安装</button>`:item.enabled?`<button class="button small" onclick="toggleCapability('${item.kind}','${esc(item.id)}',false)">停用</button>`:item.kind==="local"?`<button class="button small primary" onclick="toggleCapability('local','${esc(item.id)}',true)">启用</button>`:`<button class="button small primary" onclick="installCapability('${item.kind}','${esc(item.id)}')">${item.kind==="core"?"启用":"安装"}</button>`}</td></tr>`).join("")||'<tr><td colspan="5">没有匹配项</td></tr>'}
-async function toggleCapability(kind,id,enabled){await json("/api/recommendation-state",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind:kind==="core"?"core-skill":kind==="skill"?"skills":kind==="local"?"local-skill":kind,id,enabled})});await loadEcosystem()}
-async function installCapability(kind,id){if(kind==="core"){await toggleCapability(kind,id,true);return}const scope=kind==="skill"||kind==="plugin"?(confirm("安装到系统目录？\n确定：所有项目使用；取消：仅当前项目使用。")?"user":"project"):undefined;if(!confirm(`确认安装 ${id}？${kind==="external"?"模型将按官方来源安装并验证。":"安装完成后需要 /reload。"}`))return;const result=await json("/api/install/execute",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({kind,id,scope,approved:true,actor:"researcher"})});alert(result.message||(result.ok?"安装任务已处理。":"安装未完成"));await loadEcosystem()}
-[$("eco-search"),$("eco-kind"),$("eco-status")].forEach(control=>control.addEventListener("input",renderEcosystem));
-document.querySelectorAll("[data-eco-kind]").forEach(button=>button.addEventListener("click",()=>{state.ecoKind=button.dataset.ecoKind;document.querySelectorAll("[data-eco-kind]").forEach(item=>item.classList.toggle("active",item===button));renderEcosystem()}));
+async function json(url, options) {
+  const response = await fetch(url, options);
+  const body = await response.json().catch(() => ({ error: "请求解析失败" }));
+  if (!response.ok) throw new Error(body.error || `请求失败 (${response.status})`);
+  return body;
+}
 
-function providerModels(provider){return state.models.filter(model=>model.provider===provider)}
-function updateModels(){const models=providerModels($("provider-select").value);$("model-select").innerHTML=models.map(model=>`<option value="${esc(model.version||model.id.split("/").slice(1).join("/"))}">${esc(model.name)}</option>`).join("");if(state.active.provider===$("provider-select").value&&state.active.model)$("model-select").value=state.active.model}
-async function loadProvider(){try{const[catalog,active,usage]=await Promise.all([json("/api/catalog"),json("/api/active-provider"),json("/api/token-usage")]);state.models=catalog.models||[];state.active=active||{};state.usage=usage;const providers=[...new Set(state.models.map(model=>model.provider))].sort();$("provider-select").innerHTML=providers.map(provider=>`<option value="${esc(provider)}">${esc(provider)}</option>`).join("");if(active.provider&&providers.includes(active.provider))$("provider-select").value=active.provider;updateModels();renderCost()}catch(error){$("provider-feedback").textContent=error.message}}
-function currentModel(){return providerModels($("provider-select").value).find(model=>(model.version||model.id.split("/").slice(1).join("/"))===$("model-select").value)}
-$("provider-select").addEventListener("change",updateModels);
-$("save-provider").addEventListener("click",async()=>{const feedback=$("provider-feedback");feedback.textContent="保存中...";try{await json("/api/active-provider",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({provider:$("provider-select").value,model:$("model-select").value})});feedback.textContent="已保存，重启会话后生效。"}catch(error){feedback.textContent=error.message}});
-$("configure-provider").addEventListener("click",async()=>{const feedback=$("config-feedback"),model=currentModel(),key=$("provider-key").value;if(!model){feedback.textContent="请选择模型";return}feedback.textContent="保存中...";try{await json("/api/provider-config",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:model.provider,name:model.provider,baseUrl:model.endpoint,api:model.provider==="anthropic"?"anthropic-messages":"openai-completions",apiKeyEnv:model.apiKeyEnv,modelId:$("model-select").value,...(key?{apiKey:key}:{})})});$("provider-key").value="";feedback.textContent="配置已保存，重启会话后生效。"}catch(error){feedback.textContent=error.message}});
-function money(usd,cny){return state.currency==="usd"?`$${Number(usd||0).toFixed(4)}`:`¥${Number(cny||0).toFixed(4)}`}
-function renderCost(){const usage=state.usage||{},totals=usage.totals||{},rows=usage.byModel||[];$("cost-content").innerHTML=`<div class="cost-metrics"><div class="metric"><small>总 Token</small><strong>${Number(totals.tokens||0).toLocaleString()}</strong></div><div class="metric"><small>实际费用</small><strong>${money(totals.cost,totals.costCny)}</strong></div><div class="metric"><small>预估费用</small><strong>${money(totals.estimatedCost,totals.estimatedCostCny)}</strong></div></div><p class="cost-note">统计范围：全部本地 PsyClaw 会话。实际账单以 Provider 为准。</p><div class="table-wrap"><table class="data"><thead><tr><th>模型</th><th>输入</th><th>输出</th><th>缓存</th><th>Token</th><th>预估费用</th></tr></thead><tbody>${rows.map(row=>`<tr><td><div class="name">${esc(row.model)}</div><div class="subtle">${esc(row.provider)}</div></td><td>${Number(row.input||0).toLocaleString()}</td><td>${Number(row.output||0).toLocaleString()}</td><td>${Number((row.cacheRead||0)+(row.cacheWrite||0)).toLocaleString()}</td><td>${Number(row.tokens||0).toLocaleString()}</td><td>${money(row.estimatedCost,row.estimatedCostCny)}</td></tr>`).join("")||'<tr><td colspan="6">暂无用量记录</td></tr>'}</tbody></table></div>`}
-document.querySelectorAll("[data-currency]").forEach(button=>button.addEventListener("click",()=>{state.currency=button.dataset.currency;document.querySelectorAll("[data-currency]").forEach(item=>item.classList.toggle("active",item===button));renderCost()}));
-$("refresh-project").addEventListener("click",loadProject);$("refresh-ecosystem").addEventListener("click",loadEcosystem);$("refresh-provider").addEventListener("click",loadProvider);
-loadProject().catch(error=>{$("viewer-body").textContent=error.message});
+function setView(view) {
+  state.view = view;
+  document.querySelectorAll(".nav button").forEach(button => {
+    button.classList.toggle("active", button.dataset.view === view);
+  });
+  document.querySelectorAll(".view").forEach(section => {
+    section.classList.toggle("active", section.id === `view-${view}`);
+  });
+  if (view === "ecosystem") loadEcosystem();
+  if (view === "provider") loadProvider();
+}
+
+document.querySelectorAll(".nav button").forEach(button => {
+  button.addEventListener("click", () => setView(button.dataset.view));
+});
+
+function inlineMarkdown(text) {
+  let value = esc(text);
+  value = value.replace(/`([^`]+)`/g, "<code>$1</code>")
+               .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+               .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, target) =>
+    /^https?:\/\//i.test(target)
+      ? `<a href="${esc(target)}" target="_blank" rel="noreferrer" style="color:var(--brand-accent);text-decoration:none;border-bottom:1px dashed currentColor">${label}</a>`
+      : label
+  );
+  return value;
+}
+
+function renderMarkdown(markdown) {
+  const lines = String(markdown).replace(/\r\n/g, "\n").split("\n"), out = [];
+  let i = 0, inCode = false, code = [];
+  while (i < lines.length) {
+    const line = lines[i], trim = line.trim();
+    if (trim.startsWith("```")) {
+      if (inCode) {
+        out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);
+        code = [];
+        inCode = false;
+      } else {
+        inCode = true;
+      }
+      i++;
+      continue;
+    }
+    if (inCode) {
+      code.push(line);
+      i++;
+      continue;
+    }
+    const heading = trim.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      const level = heading[1].length;
+      out.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      i++;
+      continue;
+    }
+    if (trim.startsWith(">")) {
+      out.push(`<blockquote><p>${inlineMarkdown(trim.replace(/^>\s?/, ""))}</p></blockquote>`);
+      i++;
+      continue;
+    }
+    if (/^[-*+]\s+/.test(trim)) {
+      const items = [];
+      while (i < lines.length && /^[-*+]\s+/.test(lines[i].trim())) {
+        items.push(lines[i++].trim().replace(/^[-*+]\s+/, ""));
+      }
+      out.push(`<ul>${items.map(item => `<li>${inlineMarkdown(item)}</li>`).join("")}</ul>`);
+      continue;
+    }
+    if (/^\d+\.\s+/.test(trim)) {
+      const items = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i].trim())) {
+        items.push(lines[i++].trim().replace(/^\d+\.\s+/,""));
+      }
+      out.push(`<ol>${items.map(item => `<li>${inlineMarkdown(item)}</li>`).join("")}</ol>`);
+      continue;
+    }
+    if (trim.startsWith("|") && i + 1 < lines.length && /^\|?[\s:|-]+\|/.test(lines[i + 1].trim())) {
+      const cells = value => value.replace(/^\||\|$/g, "").split("|").map(cell => cell.trim());
+      const head = cells(trim);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        rows.push(cells(lines[i++]));
+      }
+      out.push(`<table><thead><tr>${head.map(cell => `<th>${inlineMarkdown(cell)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${inlineMarkdown(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
+    if (!trim) {
+      i++;
+      continue;
+    }
+    const para = [trim];
+    i++;
+    while (i < lines.length && lines[i].trim() && !/^(#{1,3})\s+/.test(lines[i].trim()) && !/^[-*+]\s+/.test(lines[i].trim()) && !/^\d+\.\s+/.test(lines[i].trim()) && !lines[i].trim().startsWith(">") && !lines[i].trim().startsWith("```")) {
+      para.push(lines[i++].trim());
+    }
+    out.push(`<p>${inlineMarkdown(para.join(" "))}</p>`);
+  }
+  if (inCode) out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);
+  return out.join("");
+}
+
+function getFileIcon(path) {
+  if (path.endsWith(".md")) {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
+  }
+  if (path.endsWith(".json")) {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`;
+  }
+  if (path.startsWith("outputs/")) {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>`;
+  }
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
+}
+
+function groupFiles(files) {
+  const priority = ["notes/goal.md", "notes/research-spec.md", "notes/plan.md", "notes/decisions.md", "notes/HANDOFF.md"];
+  const ordered = [...files].sort((a, b) => {
+    const ai = priority.indexOf(a), bi = priority.indexOf(b);
+    if (ai >= 0 || bi >= 0) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+    return a.localeCompare(b, "zh-CN");
+  });
+  return {
+    "核心文档": ordered.filter(path => priority.includes(path)),
+    "Export 导出结果": ordered.filter(path => path.startsWith("outputs/")),
+    "论文与报告": ordered.filter(path => /^(paper|docs)\//.test(path) && !priority.includes(path)),
+    "研究记录": ordered.filter(path => /^(notes|logs)\//.test(path) && !priority.includes(path))
+  };
+}
+
+function renderTree() {
+  const tree = $("file-tree"), groups = groupFiles(state.files);
+  let html = "";
+  for (const [name, files] of Object.entries(groups)) {
+    if (!files.length) continue;
+    html += `<div class="tree-section">${esc(name)}</div>${files.map(path => `
+      <button class="tree-item" data-file="${esc(path)}">
+        ${getFileIcon(path)}
+        <span>${esc(path.split("/").at(-1))}</span>
+      </button>`).join("")}`;
+  }
+  tree.innerHTML = html || '<div class="empty">暂无项目文件或 Export 导出结果</div>';
+  tree.querySelectorAll("[data-file]").forEach(button => {
+    button.addEventListener("click", () => openFile(button.dataset.file, button));
+  });
+}
+
+function selectTree(button) {
+  document.querySelectorAll(".tree-item").forEach(item => item.classList.toggle("active", item === button));
+}
+
+async function openFile(path, button) {
+  selectTree(button);
+  $("viewer-path").textContent = path;
+  $("viewer-kind").textContent = "读取中";
+  $("viewer-body").className = "viewer-body empty";
+  $("viewer-body").textContent = "正在加载文件内容...";
+  try {
+    const file = await json(`/api/project-file?path=${encodeURIComponent(path)}`);
+    state.currentContent = file.content;
+    $("viewer-kind").textContent = file.format ? file.format.toUpperCase() : "READONLY";
+    $("viewer-body").className = "viewer-body";
+    $("viewer-body").innerHTML = file.format === "markdown"
+      ? `<article class="markdown">${renderMarkdown(file.content)}</article>`
+      : `<pre class="raw">${esc(file.format === "json" ? JSON.stringify(JSON.parse(file.content), null, 2) : file.content)}</pre>`;
+  } catch (error) {
+    state.currentContent = "";
+    $("viewer-body").className = "viewer-body empty";
+    $("viewer-body").textContent = `读取失败: ${error.message}`;
+  }
+}
+
+// 复制文件内容按钮
+$("viewer-copy-btn").addEventListener("click", async () => {
+  if (!state.currentContent) return;
+  try {
+    await navigator.clipboard.writeText(state.currentContent);
+    const originalText = $("viewer-copy-btn").innerHTML;
+    $("viewer-copy-btn").innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok-text)"><polyline points="20 6 9 17 4 12"/></svg>
+      已复制
+    `;
+    setTimeout(() => { $("viewer-copy-btn").innerHTML = originalText; }, 1800);
+  } catch {
+    alert("无法写入剪贴板，请手动复制。");
+  }
+});
+
+async function loadProject() {
+  const files = await json("/api/project-files");
+  state.files = files.files || [];
+  renderTree();
+  const goal = document.querySelector('[data-file="notes/goal.md"]') || document.querySelector("[data-file]");
+  if (goal) goal.click();
+}
+
+async function loadEcosystem() {
+  try {
+    const [skills, plugins, mcps, agents, enabled] = await Promise.all([
+      json("/api/recommended-skills"),
+      json("/api/recommended-plugins"),
+      json("/api/recommended-mcps"),
+      json("/api/recommended-agents"),
+      json("/api/enabled-capabilities")
+    ]);
+    const skillSet = new Set((enabled.skills || []).map(item => item.id));
+    const mcpSet = new Set((enabled.mcp || []).map(item => item.id));
+    state.eco = [
+      ...(enabled.coreSkills || []).map(item => ({ ...item, kind: "core", description: item.description || "PsyClaw 内置科研核心 Skill", sourceRef: "bundled", enabled: item.enabled, installed: true })),
+      ...(skills.items || []).map(item => ({ ...item, kind: "skill", enabled: skillSet.has(item.id), installed: skillSet.has(item.id) })),
+      ...(plugins.items || []).map(item => ({ ...item, kind: "plugin", enabled: Boolean(item.enabled), installed: Boolean(item.installed) })),
+      ...(enabled.localSkills || []).map(item => ({ ...item, kind: "local", sourceRef: item.path || "用户配置目录", installed: true })),
+      ...(mcps.items || []).map(item => ({ ...item, kind: "mcp", enabled: mcpSet.has(item.id), installed: mcpSet.has(item.id) })),
+      ...(agents.items || []).map(item => ({ ...item, kind: "agent", enabled: Boolean(item.enabled), installed: Boolean(item.installed), locked: Boolean(item.locked) })),
+      ...(skills.externalTools || []).map(item => ({ ...item, kind: "external", enabled: false, installed: false }))
+    ];
+    renderEcosystem();
+  } catch (error) {
+    $("ecosystem-body").innerHTML = `<tr><td colspan="5" class="empty" style="min-height:100px;color:var(--bad-text)">加载能力生态失败: ${esc(error.message)}</td></tr>`;
+  }
+}
+
+function renderEcosystem() {
+  const query = $("eco-search").value.trim().toLowerCase();
+  const sourceKind = $("eco-kind").value;
+  const status = $("eco-status").value;
+  const primaryKind = state.ecoKind;
+  const primaryMatches = item => primaryKind === "all" || (primaryKind === "skill" ? (item.kind === "skill" || item.kind === "core" || item.kind === "local") : item.kind === primaryKind);
+  const items = state.eco.filter(item =>
+    primaryMatches(item) &&
+    (sourceKind === "all" || item.kind === sourceKind) &&
+    (status === "all" || (status === "enabled" ? item.enabled : !item.enabled)) &&
+    `${item.name} ${item.description || ""}`.toLowerCase().includes(query)
+  );
+
+  $("ecosystem-body").innerHTML = items.map(item => `
+    <tr>
+      <td>
+        <div class="name">${esc(item.name)}</div>
+        <div class="subtle">
+          ${esc(item.description || "")}
+          ${item.kind === "plugin" && item.scope ? ` · ${item.scope === "project" ? "当前项目" : "所有项目"}${item.filtered ? " · 已限定资源" : ""}` : ""}
+          ${item.kind === "agent" && item.slashCommand ? ` · <code style="font-family:var(--font-mono);font-size:11px">${esc(item.slashCommand)}</code>` : ""}
+        </div>
+      </td>
+      <td>
+        <span class="tag" style="background:#f1f5f9;font-weight:600">
+          ${esc(item.kind === "core" ? "Core Skill" : item.kind === "local" ? "用户 Skill" : item.kind === "agent" ? "Subagent" : item.kind.toUpperCase())}
+        </span>
+      </td>
+      <td>
+        <span style="font-family:var(--font-mono);font-size:11.5px;color:var(--text-muted)">
+          ${/^https?:/.test(item.sourceRef || "") ? `<a href="${esc(item.sourceRef)}" target="_blank" rel="noreferrer" style="color:var(--brand-accent);text-decoration:none">来源链接</a>` : esc(item.sourceRef || "bundled")}
+        </span>
+      </td>
+      <td>
+        <span class="tag ${item.enabled ? "ok" : item.configured ? "warn" : ""}">
+          ${item.locked ? "内置可用" : item.enabled ? (item.kind === "plugin" ? "已安装" : "已启用") : item.kind === "plugin" && item.configured ? "配置存在，文件缺失" : item.kind === "external" ? "可安装外部工具" : "未启用"}
+        </span>
+      </td>
+      <td style="text-align:right">
+        ${item.locked || item.kind === "agent" ? "—" :
+          item.kind === "plugin" && item.local ? "—" :
+          item.kind === "plugin" ? `<button class="button small ${item.installed ? "" : "primary"}" onclick="installCapability('plugin','${esc(item.id)}')">${item.installed ? "重新安装" : "安装"}</button>` :
+          item.kind === "external" ? `<button class="button small primary" onclick="installCapability('external','${esc(item.id)}')">安装</button>` :
+          item.enabled ? `<button class="button small" onclick="toggleCapability('${item.kind}','${esc(item.id)}',false)">停用</button>` :
+          item.kind === "local" ? `<button class="button small primary" onclick="toggleCapability('local','${esc(item.id)}',true)">启用</button>` :
+          `<button class="button small primary" onclick="installCapability('${item.kind}','${esc(item.id)}')">${item.kind === "core" ? "启用" : "安装"}</button>`
+        }
+      </td>
+    </tr>
+  `).join("") || '<tr><td colspan="5" class="empty" style="min-height:100px">未找到匹配的能力项</td></tr>';
+}
+
+async function toggleCapability(kind, id, enabled) {
+  await json("/api/recommendation-state", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      kind: kind === "core" ? "core-skill" : kind === "skill" ? "skills" : kind === "local" ? "local-skill" : kind,
+      id,
+      enabled
+    })
+  });
+  await loadEcosystem();
+}
+
+async function installCapability(kind, id) {
+  if (kind === "core") {
+    await toggleCapability(kind, id, true);
+    return;
+  }
+  const scope = kind === "skill" || kind === "plugin"
+    ? (confirm("安装到系统全局还是当前项目？\n确定：全局所有项目可用；取消：仅当前项目。") ? "user" : "project")
+    : undefined;
+  if (!confirm(`确认安装 ${id}？${kind === "external" ? "系统将按官方可信来源安装并进行完整性验证。" : "安装完成后需要执行 /reload 生效。"}`)) return;
+  const result = await json("/api/install/execute", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind, id, scope, approved: true, actor: "researcher" })
+  });
+  alert(result.message || (result.ok ? "安装任务已提交并处理。" : "安装未能完成。"));
+  await loadEcosystem();
+}
+
+[$("eco-search"), $("eco-kind"), $("eco-status")].forEach(control => {
+  control.addEventListener("input", renderEcosystem);
+});
+document.querySelectorAll("[data-eco-kind]").forEach(button => {
+  button.addEventListener("click", () => {
+    state.ecoKind = button.dataset.ecoKind;
+    document.querySelectorAll("[data-eco-kind]").forEach(item => item.classList.toggle("active", item === button));
+    renderEcosystem();
+  });
+});
+
+function providerModels(provider) {
+  return state.models.filter(model => model.provider === provider);
+}
+
+function updateModels() {
+  const models = providerModels($("provider-select").value);
+  $("model-select").innerHTML = models.map(model => `
+    <option value="${esc(model.version || model.id.split("/").slice(1).join("/"))}">${esc(model.name)}</option>
+  `).join("");
+  if (state.active.provider === $("provider-select").value && state.active.model) {
+    $("model-select").value = state.active.model;
+  }
+}
+
+async function loadProvider() {
+  try {
+    const [catalog, active, usage] = await Promise.all([
+      json("/api/catalog"),
+      json("/api/active-provider"),
+      json("/api/token-usage")
+    ]);
+    state.models = catalog.models || [];
+    state.active = active || {};
+    state.usage = usage;
+    const providers = [...new Set(state.models.map(model => model.provider))].sort();
+    $("provider-select").innerHTML = providers.map(provider => `
+      <option value="${esc(provider)}">${esc(provider)}</option>
+    `).join("");
+    if (active.provider && providers.includes(active.provider)) {
+      $("provider-select").value = active.provider;
+    }
+    updateModels();
+    renderCost();
+  } catch (error) {
+    $("provider-feedback").textContent = `加载配置失败: ${error.message}`;
+  }
+}
+
+function currentModel() {
+  return providerModels($("provider-select").value).find(
+    model => (model.version || model.id.split("/").slice(1).join("/")) === $("model-select").value
+  );
+}
+
+$("provider-select").addEventListener("change", updateModels);
+
+$("save-provider").addEventListener("click", async () => {
+  const feedback = $("provider-feedback");
+  feedback.textContent = "保存设置中...";
+  try {
+    await json("/api/active-provider", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: $("provider-select").value, model: $("model-select").value })
+    });
+    feedback.textContent = "✓ 默认模型设置已保存，重启会话后生效。";
+    setTimeout(() => { feedback.textContent = ""; }, 3000);
+  } catch (error) {
+    feedback.textContent = `保存失败: ${error.message}`;
+  }
+});
+
+$("configure-provider").addEventListener("click", async () => {
+  const feedback = $("config-feedback"), model = currentModel(), key = $("provider-key").value;
+  if (!model) {
+    feedback.textContent = "请选择模型";
+    return;
+  }
+  feedback.textContent = "正在保存凭据...";
+  try {
+    await json("/api/provider-config", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: model.provider,
+        name: model.provider,
+        baseUrl: model.endpoint,
+        api: model.provider === "anthropic" ? "anthropic-messages" : "openai-completions",
+        apiKeyEnv: model.apiKeyEnv,
+        modelId: $("model-select").value,
+        ...(key ? { apiKey: key } : {})
+      })
+    });
+    $("provider-key").value = "";
+    feedback.textContent = "✓ 凭据配置已安全保存，重启会话后生效。";
+    setTimeout(() => { feedback.textContent = ""; }, 3000);
+  } catch (error) {
+    feedback.textContent = `保存失败: ${error.message}`;
+  }
+});
+
+function money(usd, cny) {
+  return state.currency === "usd" ? `$${Number(usd || 0).toFixed(4)}` : `¥${Number(cny || 0).toFixed(4)}`;
+}
+
+function renderCost() {
+  const usage = state.usage || {}, totals = usage.totals || {}, rows = usage.byModel || [];
+  $("cost-content").innerHTML = `
+    <div class="cost-metrics">
+      <div class="metric">
+        <small>消耗总 TOKEN</small>
+        <strong>${Number(totals.tokens || 0).toLocaleString()}</strong>
+      </div>
+      <div class="metric">
+        <small>已结算实际费用</small>
+        <strong>${money(totals.cost, totals.costCny)}</strong>
+      </div>
+      <div class="metric">
+        <small>全量预估费用</small>
+        <strong>${money(totals.estimatedCost, totals.estimatedCostCny)}</strong>
+      </div>
+    </div>
+    <p class="cost-note">统计范围：全部本地 PsyClaw 会话。实际账单请以相应模型 Provider 控制台为准。</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th style="width:28%">模型型号</th>
+            <th style="width:14%;text-align:right">输入 Token</th>
+            <th style="width:14%;text-align:right">输出 Token</th>
+            <th style="width:14%;text-align:right">缓存读写</th>
+            <th style="width:15%;text-align:right">总 Token</th>
+            <th style="width:15%;text-align:right">预估费用</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <td>
+                <div class="name">${esc(row.model)}</div>
+                <div class="subtle">${esc(row.provider)}</div>
+              </td>
+              <td style="text-align:right;font-family:var(--font-mono)">${Number(row.input || 0).toLocaleString()}</td>
+              <td style="text-align:right;font-family:var(--font-mono)">${Number(row.output || 0).toLocaleString()}</td>
+              <td style="text-align:right;font-family:var(--font-mono)">${Number((row.cacheRead || 0) + (row.cacheWrite || 0)).toLocaleString()}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-weight:600">${Number(row.tokens || 0).toLocaleString()}</td>
+              <td style="text-align:right;font-family:var(--font-mono);font-weight:600;color:var(--brand-primary)">${money(row.estimatedCost, row.estimatedCostCny)}</td>
+            </tr>
+          `).join("") || '<tr><td colspan="6" class="empty" style="min-height:90px">暂无任何本地会话 Token 用量记录</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+document.querySelectorAll("[data-currency]").forEach(button => {
+  button.addEventListener("click", () => {
+    state.currency = button.dataset.currency;
+    document.querySelectorAll("[data-currency]").forEach(item => item.classList.toggle("active", item === button));
+    renderCost();
+  });
+});
+
+$("refresh-project").addEventListener("click", loadProject);
+$("refresh-ecosystem").addEventListener("click", loadEcosystem);
+$("refresh-provider").addEventListener("click", loadProvider);
+
+/* --- 科研全流程导引 Pipeline Stepper 逻辑 --- */
+const PIPELINE_STAGE_FILES = {
+  intake: ["notes/goal.md", "psyclaw.md", "notes/research_questions.md"],
+  evidence: [".psyclaw/evidence.jsonl", ".psyclaw/claims.jsonl", "notes/literature.md", "notes/evidence_ledger.md"],
+  plan: ["analysis/plans/active.json", "analysis/HANDOFF.md", "analysis/scripts/"],
+  manuscript: ["paper/draft.md", "paper/manuscript.md", "outputs/figures/", "outputs/tables/"],
+  review: ["notes/review.md", "notes/decision_request.md", "notes/audit.jsonl"]
+};
+
+document.querySelectorAll(".step-item").forEach(item => {
+  item.addEventListener("click", () => {
+    document.querySelectorAll(".step-item").forEach(el => el.classList.remove("active"));
+    item.classList.add("active");
+    const stage = item.dataset.stage;
+    const candidates = PIPELINE_STAGE_FILES[stage] || [];
+    const found = state.files.find(f => candidates.some(c => f.path.includes(c) || c.includes(f.path)));
+    if (found) {
+      const btn = document.querySelector(`[data-file="${found.path}"]`);
+      openFile(found.path, btn);
+    } else {
+      openConsoleWithMessage(`当前处于 [${item.textContent.trim()}] 阶段。您可以在此向智能体提问或输入指令推进。`);
+    }
+  });
+});
+
+/* --- 交互控制台 Console Drawer 交互 --- */
+const consoleDrawer = $("console-drawer");
+const consoleFab = $("console-fab");
+const consoleLog = $("console-log");
+const consoleInput = $("console-input");
+
+function openConsole() {
+  consoleDrawer.classList.add("open");
+  consoleInput.focus();
+}
+
+function closeConsole() {
+  consoleDrawer.classList.remove("open");
+}
+
+function openConsoleWithMessage(text) {
+  openConsole();
+  appendLog("sys", text);
+}
+
+function appendLog(role, text) {
+  const entry = document.createElement("div");
+  entry.className = "log-entry";
+  if (role === "user") {
+    entry.innerHTML = `<div class="log-user">❯ ${esc(text)}</div>`;
+  } else if (role === "agent") {
+    entry.innerHTML = `<div class="log-agent">${renderMarkdown(text)}</div>`;
+  } else {
+    entry.innerHTML = `<div class="log-sys">ℹ ${esc(text)}</div>`;
+  }
+  consoleLog.appendChild(entry);
+  consoleLog.scrollTop = consoleLog.scrollHeight;
+}
+
+consoleFab.addEventListener("click", () => {
+  if (consoleDrawer.classList.contains("open")) closeConsole();
+  else openConsole();
+});
+$("console-close-btn").addEventListener("click", closeConsole);
+$("console-clear-btn").addEventListener("click", () => {
+  consoleLog.innerHTML = `<div class="log-entry"><div class="log-sys">ψ 终端历史已清空。输入 /help 或提问即可开始。</div></div>`;
+});
+
+async function sendConsoleMessage(msg) {
+  const text = (msg || consoleInput.value).trim();
+  if (!text) return;
+  consoleInput.value = "";
+  appendLog("user", text);
+
+  try {
+    const res = await json("/api/assistant", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: text })
+    });
+    appendLog("agent", res.text || res.message || "✓ 执行成功");
+  } catch (err) {
+    appendLog("sys", `[提示] ${err.message}`);
+  }
+}
+
+$("console-send-btn").addEventListener("click", () => sendConsoleMessage());
+consoleInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendConsoleMessage();
+  }
+});
+
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const cmd = chip.dataset.cmd;
+    if (cmd) {
+      consoleInput.value = cmd;
+      sendConsoleMessage(cmd);
+    }
+  });
+});
+
+/* --- 顶栏快捷命令 Quick Actions --- */
+const initModal = $("init-modal");
+const initParadigm = $("init-paradigm");
+const initGoal = $("init-goal");
+const initPreviewCmd = $("init-preview-cmd");
+
+function updateInitPreview() {
+  const paradigm = initParadigm.value;
+  const goal = initGoal.value.trim();
+  initPreviewCmd.textContent = `/init --paradigm ${paradigm}${goal ? ` "${goal}"` : ""}`;
+}
+
+initParadigm.addEventListener("change", updateInitPreview);
+initGoal.addEventListener("input", updateInitPreview);
+
+$("cmd-init-btn").addEventListener("click", () => {
+  updateInitPreview();
+  initModal.classList.remove("hidden");
+});
+$("init-modal-close").addEventListener("click", () => initModal.classList.add("hidden"));
+$("init-cancel-btn").addEventListener("click", () => initModal.classList.add("hidden"));
+
+$("init-submit-btn").addEventListener("click", async () => {
+  const cmd = initPreviewCmd.textContent.trim();
+  initModal.classList.add("hidden");
+  openConsole();
+  await sendConsoleMessage(cmd);
+  loadProject();
+});
+
+$("cmd-plan-btn").addEventListener("click", async () => {
+  openConsole();
+  await sendConsoleMessage("/plan status");
+});
+
+$("cmd-verify-btn").addEventListener("click", async () => {
+  openConsole();
+  await sendConsoleMessage("/verify list");
+});
+
+/* --- 加载项目状态并更新 Stepper 状态 --- */
+async function loadProjectStatus() {
+  try {
+    const status = await json("/api/project-status");
+    if (!status.initialized) {
+      $("cmd-init-btn").classList.add("primary");
+    } else {
+      $("cmd-init-btn").classList.remove("primary");
+      if (status.activePlan) {
+        document.querySelectorAll(".step-item").forEach(item => {
+          if (item.dataset.stage === "plan") item.classList.add("active");
+        });
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+loadProject().catch(error => {
+  $("viewer-body").textContent = `加载失败: ${error.message}`;
+});
+loadProjectStatus();
 </script>
 </body>
 </html>

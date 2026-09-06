@@ -1184,9 +1184,8 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     sessionMode = mode;
     arsModeEditor?.setMode(mode);
     arsUiContext?.ui.setStatus("mode", MODE_STATUS[mode]);
-    // Clear legacy ars status key when leaving academic.
-    if (mode !== "academic") arsUiContext?.ui.setStatus("ars", undefined);
-    else arsUiContext?.ui.setStatus("ars", ARS_MODE_STATUS);
+    // Clear legacy ars status key so it never duplicates with "mode".
+    arsUiContext?.ui.setStatus("ars", undefined);
     if (opts?.syncSession === false || !arsUiContext) return;
     setArsPiSessionActive(
       typeof (pi as { appendEntry?: unknown }).appendEntry === "function"
@@ -1259,8 +1258,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       editor.onModeChange = (mode) => {
         sessionMode = mode;
         ctx.ui.setStatus("mode", MODE_STATUS[mode]);
-        if (mode === "academic") ctx.ui.setStatus("ars", ARS_MODE_STATUS);
-        else ctx.ui.setStatus("ars", undefined);
+        ctx.ui.setStatus("ars", undefined);
       };
       editor.onCycleMode = () => {
         cycleSessionMode();
@@ -1272,7 +1270,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       editor.setMode(restore);
       sessionMode = restore;
       ctx.ui.setStatus("mode", MODE_STATUS[restore]);
-      if (restore === "academic") ctx.ui.setStatus("ars", ARS_MODE_STATUS);
+      ctx.ui.setStatus("ars", undefined);
       return editor;
     });
   });
