@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
-import { lstat, mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
@@ -29,8 +29,6 @@ import { listCitationUses, recordCitationUse } from "../core/citations.js";
 import { readPublishedVersions } from "../workflows/publish.js";
 // Backward-compatible re-export: existing tests import verifyDoi from the panel server.
 export { verifyDoi } from "../core/doi.js";
-import { resumePlanWithPi } from "../orchestration/pi-executor.js";
-import { RunEventLog } from "./events.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
 import { sessionHelpDocument } from "../session/help.js";
 import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
@@ -42,8 +40,6 @@ import {
 } from "../skills/user-skills.js";
 import { loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../verify/checklist.js";
 import { readActiveAnalysisPlan } from "../analysis/plan.js";
-
-const activePanelRuns = new Set<string>();
 
 interface RecommendationState { schemaVersion: "psyclaw/recommendation-state/v1"; skills: string[]; mcp: string[]; skillScopes?: Record<string, RecommendedSkillScope>; }
 
@@ -822,9 +818,6 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       "/api/crosscheck",
       "/api/wake-options/respond",
     ];
-    // Kept false for source compatibility with the legacy handler below; the
-    // method gate above makes pause/resume unreachable from the panel API.
-    const runAction = false;
     if (request.method !== "GET" && request.method !== "HEAD" && !(request.method === "POST" && panelWriteRoutes.includes(url.pathname))) {
       response.writeHead(405, { "content-type": "application/json", allow: "GET, HEAD" });
       response.end(JSON.stringify({ error: "method not allowed" }));
@@ -1356,54 +1349,6 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         }
         return;
       }
-      if (runAction) {
-        const match = url.pathname.match(/^\/api\/runs\/([A-Za-z0-9][A-Za-z0-9._-]{0,127})\/(pause|resume)$/);
-        const runId = match?.[1] ?? "";
-        const action = match?.[2] ?? "";
-        const body = await readJsonBody(request);
-        const approved = body.approved === true;
-        const actor = String(body.actor ?? "").trim();
-        const reason = String(body.reason ?? "").trim();
-        if (!approved || !actor || reason.length < 3) {
-          response.writeHead(400, { "content-type": "application/json" });
-          response.end(JSON.stringify({ error: "approved=true, actor, and reason (3+ chars) are required" }));
-          return;
-        }
-        const pausePath = await assertSafeProjectPath(root, `.psyclaw/runs/${runId}.pause`);
-        const planPath = await assertSafeProjectPath(root, `.psyclaw/plans/${runId}.json`);
-        if (action === "pause") {
-          await atomicWriteFile(pausePath, `${JSON.stringify({ schemaVersion: "psyclaw/pause-request/v1", runId, actor, reason, requestedAt: new Date().toISOString() }, null, 2)}\n`);
-          response.writeHead(200, { "content-type": "application/json" });
-          response.end(JSON.stringify({ schemaVersion: "psyclaw/run-action-receipt/v1", action, runId, status: "pause-requested", actor }));
-          return;
-        }
-        if (activePanelRuns.has(runId)) {
-          response.writeHead(409, { "content-type": "application/json" });
-          response.end(JSON.stringify({ error: "run is already being resumed" }));
-          return;
-        }
-        let plan: unknown;
-        try { plan = JSON.parse(await readFile(planPath, "utf8")); }
-        catch { response.writeHead(404, { "content-type": "application/json" }); response.end(JSON.stringify({ error: "run plan not found" })); return; }
-        await unlink(pausePath).catch(() => undefined);
-        activePanelRuns.add(runId);
-        try {
-          const eventLog = new RunEventLog(root, runId);
-          const result = await resumePlanWithPi(plan, {
-            cwd: root,
-            root,
-            pauseRequested: async () => {
-              try { await lstat(pausePath); return true; } catch { return false; }
-            },
-            onEvent: async (event) => { await eventLog.append(event); },
-          });
-          response.writeHead(200, { "content-type": "application/json" });
-          response.end(JSON.stringify({ schemaVersion: "psyclaw/run-action-receipt/v1", action, runId, status: result.status, diagnostics: result.diagnostics, actor }));
-        } finally {
-          activePanelRuns.delete(runId);
-        }
-        return;
-      }
       if (url.pathname === "/api/artifacts") {
         const indexPath = projectPaths(root).outputs + "/index.json";
         let indexedArtifacts: Array<Record<string, unknown>> = [];
@@ -1458,40 +1403,6 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           : `inline; filename="${fileName}"`;
         response.writeHead(200, { "content-type": contentType, "content-disposition": contentDisposition });
         response.end(body);
-        return;
-      }
-      if (url.pathname === "/api/artifact/save") {
-        if (request.method !== "POST") {
-          response.writeHead(405, { "content-type": "application/json", allow: "POST" });
-          response.end(JSON.stringify({ error: "method not allowed" }));
-          return;
-        }
-        const body = await readJsonBody(request);
-        const relative = String(body.path ?? "").trim();
-        const content = typeof body.content === "string" ? body.content : "";
-        if (!relative || !/\.svg$/i.test(relative)) throw new Error("only SVG artifacts can be edited");
-        const rel = relative.replaceAll("\\", "/");
-        if (rel.split("/").some((part) => part === ".." || part === "")) throw new Error("a relative artifact path is required");
-        if (!rel.startsWith("outputs/") && !rel.startsWith("analysis/outputs/")) throw new Error("artifact must be under outputs/ or analysis/outputs/");
-        const target = await assertSafeProjectPath(root, rel);
-        const stat = await lstat(target).catch(() => undefined);
-        if (stat !== undefined && (stat.isSymbolicLink() || !stat.isFile())) throw new Error("artifact must be a regular file");
-        await atomicWriteFile(target, content.endsWith("\n") ? content : `${content}\n`);
-        const receipt = {
-          schemaVersion: "psyclaw/tool-receipt/v1",
-          runId: `panel_${randomUUID().replaceAll("-", "")}`,
-          taskId: "panel.artifact.save",
-          tool: "panel.artifact.save",
-          effect: "write",
-          approval: "approved",
-          idempotencyKey: `panel:artifact:${sha256Text(`${rel}\u0000${content}`).slice(0, 24)}`,
-          ok: true,
-          startedAt: new Date().toISOString(),
-          finishedAt: new Date().toISOString(),
-        };
-        await atomicWriteFile(await assertSafeProjectPath(root, `.psyclaw/manifests/${receipt.runId}.receipt.json`), `${JSON.stringify(receipt, null, 2)}\n`);
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ schemaVersion: "psyclaw/artifact-save-receipt/v1", ok: true, path: rel, bytes: Buffer.byteLength(content, "utf8") }));
         return;
       }
       if (url.pathname === "/api/ledger") {
