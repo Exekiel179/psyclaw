@@ -68,4 +68,4 @@ license: MIT
 
 - `/grill` 仍是学术追问；本 Skill 是**判断镜头**，可并行但勿互相替换。
 - 统计计算仍走 analysis 模式与外部库/MCP。
-- 需要再蒸馏其他人：安装并调用推荐 Skill `still-学者`（https://github.com/Exekiel179/still-skills）。
+- 需要再蒸馏其他人：安装并调用推荐 Skill `still-scholar`（https://github.com/Exekiel179/still-skills）。
