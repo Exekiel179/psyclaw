@@ -111,7 +111,7 @@ export class PiRpcClient {
     const args = ["--mode", "rpc"];
     if (this.config.provider !== undefined) args.push("--provider", this.config.provider);
     if (this.config.model !== undefined) args.push("--model", this.config.model);
-    if (this.config.systemPrompt !== undefined) args.push("--append-system-prompt", this.config.systemPrompt);
+    if (this.config.systemPrompt !== undefined) args.push("--system-prompt", this.config.systemPrompt);
     args.push(
       "--no-session",
       "--no-extensions",

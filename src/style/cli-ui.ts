@@ -85,6 +85,7 @@ export function formatCliUsage(): string {
     `  ${c.gray("快捷键：")} ${c.teal("Shift+Tab")} ${c.gray("模式")} ${c.darkGray("·")} ${c.teal("Ctrl+Shift+T")} ${c.gray("Thinking")}`,
     "",
     `  ${c.gray("终端：")} ${c.teal("psyclaw --continue")} ${c.darkGray("/")} ${c.teal("psyclaw -c")} ${c.gray("续接当前项目最近一次会话")}`,
+    `          ${c.teal("psyclaw --continuously-work")} ${c.gray("启动持续自动推进（非模式切换；红字警告：费 token、不保质量）")}`,
     `          ${c.teal("psyclaw -v")} ${c.darkGray("/")} ${c.teal("psyclaw --version")} ${c.gray("查看版本号")}`,
     "",
     `  ${c.darkGray("──────────────────────────────────────────────────────────")}`,

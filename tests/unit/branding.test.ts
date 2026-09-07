@@ -8,6 +8,7 @@ import {
   ensureQuietStartup,
   PSYCLAW_IDENTITY_PROMPT,
 } from "../../src/branding.js";
+import { systemPromptLaunchArgs } from "../../src/chat.js";
 import { PSYCLAW_THEME_NAME } from "../../src/psyclaw-theme.js";
 
 describe("psyclaw identity prompt", () => {
@@ -16,6 +17,15 @@ describe("psyclaw identity prompt", () => {
     expect(PSYCLAW_IDENTITY_PROMPT.toLowerCase()).toContain("never call yourself \"pi\"");
     expect(PSYCLAW_IDENTITY_PROMPT).toContain("Anti-disclosure");
     expect(PSYCLAW_IDENTITY_PROMPT).toMatch(/system prompt|系统提示词/i);
+    expect(PSYCLAW_IDENTITY_PROMPT.startsWith("You are PsyClaw")).toBe(true);
+    expect(PSYCLAW_IDENTITY_PROMPT.toLowerCase()).not.toContain("operating inside pi");
+  });
+
+  it("launches with --system-prompt replace, not append onto pi base", () => {
+    const args = systemPromptLaunchArgs(PSYCLAW_IDENTITY_PROMPT);
+    expect(args[0]).toBe("--system-prompt");
+    expect(args).not.toContain("--append-system-prompt");
+    expect(args[1]).toBe(PSYCLAW_IDENTITY_PROMPT);
   });
 });
 
