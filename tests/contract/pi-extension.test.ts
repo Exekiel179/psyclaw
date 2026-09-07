@@ -19,7 +19,7 @@ describe("Pi extension contract", () => {
     // research surface: /verify and /model stay reachable for the CLI/simple
     // hosts, while UI-gated research commands (agents/grill/...) are not
     // registered at all.
-    expect([...commands.keys()]).toEqual(["init", "verify", "model"]);
+    expect([...commands.keys()]).toEqual(["init", "crosscheck", "verify", "help", "plan", "model"]);
   });
 
   it("registers the full research command surface on a modern Pi API", () => {
@@ -30,7 +30,7 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     expect(commands).toEqual([
-      "init", "verify", "grill", "review", "loop",
+      "init", "crosscheck", "verify", "help", "plan", "grill", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
       "skill", "ars", "plugin", "mcp", "provider", "pet", "agents",
     ]);

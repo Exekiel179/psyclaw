@@ -6,6 +6,13 @@ coverage/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.venv/
+psyclaw.egg-info/
+dist2/
+psyclaw-*.tgz
+
+# Legacy Python package tree (v0.23 lives at tag v0.23.0 only).
+/psyclaw/
 
 # Credentials and local overrides must never enter version control.
 .env
@@ -30,3 +37,6 @@ outputs/
 panel-*.png
 psyclaw-session-*.html
 .tmp-*
+.DS_Store
+.corepack/
+.pnpm-store/

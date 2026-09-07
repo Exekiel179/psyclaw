@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.29.12 - 2026-09-07
+
+- Replace default Pi coding-agent identity with PsyClaw via --system-prompt
+- Add launch-only psyclaw --continuously-work with red token/quality warning (not Shift+Tab)
+- Remove dead Panel pause/resume and /api/artifact/save handlers
+- Scrub CLAUDE.md and 开工纪要 to 0.29; mark 会话复盘 /run notes obsolete; drop empty CHANGELOG Unreleased stubs
+- Pin website/docs install examples to 0.29.12; refresh stale command/verify contract tests
+- Ignore local Python v0.23 remnants (.venv, egg-info, dist2, psyclaw-*.tgz)
+
 ## 0.29.11 - 2026-09-07
 
 - Fix ERR_UNSUPPORTED_ESM_URL_SCHEME on Windows by passing file:// to node --import and startup import
@@ -40,9 +49,6 @@
 - Expand huashu-nuwa for scholar lenses and journal/style skills
 - Mainland built-ins: PSYCLAW_CN/npmmirror GitHub mirrors for fd/rg (raw/codeload), CN-aware update/check-updates, mirrored recommended skill git clone
 
-## Unreleased
-
-
 ## 0.29.4 - 2026-09-07
 
 - Fix Thinking cycle shortcut to Ctrl+Shift+T (modes stay Shift+Tab)
@@ -57,9 +63,6 @@
 - Fix CLI footer duplicate academic pill and align chat/analysis/academic in single row
 - Update startup banner pipeline, protocol, and mode switch hints to match ARS social science workflow
 - Integrate CLI interactions to Web Panel: 5-step research pipeline stepper, topbar quick actions, init project modal, and interactive web console drawer
-
-## Unreleased
-
 
 ## 0.29.2 - 2026-09-07
 

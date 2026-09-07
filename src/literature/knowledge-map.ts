@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import type { KnowledgeEdge, KnowledgeNode, LiteratureLedgerEntry, VerifiedKnowledgeMap } from "./contracts.js";
 
+/**
+ * Build a verified literature knowledge graph from ledger entries.
+ * Currently exported for contracts/tests; primary UI graph uses `src/knowledge-map/`.
+ */
 export function buildVerifiedKnowledgeMap(entries: LiteratureLedgerEntry[], now = new Date().toISOString()): VerifiedKnowledgeMap {
   const nodes = new Map<string, KnowledgeNode>();
   const edges: KnowledgeEdge[] = [];

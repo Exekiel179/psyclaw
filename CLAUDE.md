@@ -1,9 +1,9 @@
-# CLAUDE.md - PsyClaw v0.24 development guide
+# CLAUDE.md - PsyClaw v0.29 development guide
 
-PsyClaw v0.24 is a TypeScript/Node research agent built as a thin adapter and
+PsyClaw v0.29 is a TypeScript/Node research agent built as a thin adapter and
 extension layer over the pinned official Pi runtime. The Python runtime from
 v0.23 remains available at tag `v0.23.0`; do not maintain a second runtime in
-the v0.24 tree.
+the v0.29 tree.
 
 Read `AGENTS.md`, `docs/开工纪要.md`, `docs/架构蓝图.md`, and
 `docs/评测框架.md` before implementation. Those files define the safety and

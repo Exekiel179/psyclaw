@@ -8,7 +8,7 @@ import {
 } from "../session/modes.js";
 
 export const ARS_MODE_PREFIX = "ars:";
-/** @deprecated Use MODE_STATUS.academic */
+/** Alias kept for older imports; prefer MODE_STATUS.academic. */
 export const ARS_MODE_STATUS = "academic";
 
 export function isArsModeEditorText(text: string): boolean {
@@ -43,11 +43,6 @@ export class ArsModeEditor extends CustomEditor {
     return this.mode;
   }
 
-  /** @deprecated Prefer getMode() === "academic" */
-  isConversationMode(): boolean {
-    return this.mode === "academic";
-  }
-
   setMode(mode: PsyClawSessionMode): void {
     if (this.mode === mode) {
       this.paintBorder();
@@ -57,11 +52,6 @@ export class ArsModeEditor extends CustomEditor {
     this.paintBorder();
     this.onModeChange?.(mode);
     this.tui.requestRender();
-  }
-
-  /** @deprecated Prefer setMode */
-  setConversationMode(active: boolean): void {
-    this.setMode(active ? "academic" : "chat");
   }
 
   cycleMode(): PsyClawSessionMode {

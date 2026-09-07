@@ -28,8 +28,8 @@ describe("ARS editor helpers", () => {
 describe("verify checklist", () => {
   it("formats human verify items without sha language", () => {
     const text = formatVerifyChecklist(defaultVerifyChecklist("2026-01-01T00:00:00.000Z"));
-    expect(text).toContain("[ ] n:");
-    expect(text).toContain("/verify");
+    expect(text).toContain("[ ] n/stats");
+    expect(text).toMatch(/\/crosscheck|\/verify/);
     expect(text).not.toContain("sha256");
   });
 });
