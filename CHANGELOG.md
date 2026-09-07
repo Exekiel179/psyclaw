@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.29.15 - 2026-09-08
+
+- Recommend Kimi WebBridge as an installable external tool (recommended catalog 0.7.9)
+- Require WebBridge readiness before Journal Frontier Radar install/enable
+
 ## 0.29.14 - 2026-09-07
 
 - Republish as 0.29.14 after npm staged 0.29.13 without making it publicly available (E409)
