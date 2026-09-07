@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.29.14 - 2026-09-07
+
+- Republish as 0.29.14 after npm staged 0.29.13 without making it publicly available (E409)
+- Same changes as 0.29.13: human verify gate, Windows update repair, academic skill catalog, Computer Use MCP
+
 ## 0.29.13 - 2026-09-07
 
 - analysis/academic: AI /crosscheck then mandatory human Panel verify before handoff/finalize
