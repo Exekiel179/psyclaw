@@ -5,8 +5,17 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const DEFAULT_CN_GITHUB_MIRRORS = ["https://gh-proxy.com/", "https://gh-proxy.org/"] as const;
+export const DEFAULT_CN_NPM_REGISTRY = "https://registry.npmmirror.com";
+export const DEFAULT_OFFICIAL_NPM_REGISTRY = "https://registry.npmjs.org";
 const PROXY_NAMES = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"] as const;
 const CN_REGISTRY_MARKERS = ["npmmirror.com", "registry.npm.taobao.org", "mirrors.cloud.tencent.com", "mirrors.aliyun.com"];
+const GITHUB_FETCH_PREFIXES = [
+  "https://api.github.com/",
+  "https://github.com/",
+  "https://raw.githubusercontent.com/",
+  "https://codeload.github.com/",
+  "https://objects.githubusercontent.com/",
+] as const;
 
 export type NetworkRoute =
   | { mode: "official" }
@@ -31,12 +40,24 @@ function normalizeMirror(value: string): string {
   return `${url.toString().replace(/\/$/, "")}/`;
 }
 
+function isTruthyCnFlag(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLocaleLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "cn";
+}
+
+function looksLikeCnRegistry(registry: string | undefined): boolean {
+  if (!registry) return false;
+  const lower = registry.toLocaleLowerCase();
+  return CN_REGISTRY_MARKERS.some((marker) => lower.includes(marker));
+}
+
 export function selectNetworkRoute(env: NodeJS.ProcessEnv, registry?: string): NetworkRoute {
   if (firstValue(env, PROXY_NAMES)) return { mode: "proxy" };
   const explicitMirror = env.PSYCLAW_GITHUB_MIRROR?.trim();
   const effectiveRegistry = env.PSYCLAW_REGISTRY?.trim() || env.npm_config_registry?.trim() || registry?.trim();
   if (explicitMirror) return { mode: "mirror", mirrors: [normalizeMirror(explicitMirror)] };
-  if (effectiveRegistry && CN_REGISTRY_MARKERS.some((marker) => effectiveRegistry.toLocaleLowerCase().includes(marker))) {
+  if (isTruthyCnFlag(env.PSYCLAW_CN) || looksLikeCnRegistry(effectiveRegistry)) {
     return { mode: "mirror", mirrors: [...DEFAULT_CN_GITHUB_MIRRORS] };
   }
   return { mode: "official" };
@@ -52,7 +73,7 @@ function npmrcRegistry(text: string): string | undefined {
   return undefined;
 }
 
-async function configuredRegistry(): Promise<string | undefined> {
+export async function configuredRegistry(): Promise<string | undefined> {
   for (const path of [join(process.cwd(), ".npmrc"), join(homedir(), ".npmrc")]) {
     const text = await readFile(path, "utf8").catch(() => undefined);
     const registry = text === undefined ? undefined : npmrcRegistry(text);
@@ -77,16 +98,35 @@ async function configuredRegistry(): Promise<string | undefined> {
   return undefined;
 }
 
+/**
+ * Registry used for `psyclaw update` / check-updates install commands.
+ * Mainland routes and PSYCLAW_REGISTRY prefer npmmirror; otherwise official npm.
+ */
+export function resolveNpmInstallRegistry(env: NodeJS.ProcessEnv = process.env, configured?: string): string {
+  const explicit = env.PSYCLAW_REGISTRY?.trim() || env.npm_config_registry?.trim();
+  if (explicit) return explicit.replace(/\/$/, "") + "/";
+  const route = selectNetworkRoute(env, configured);
+  if (route.mode === "mirror" || looksLikeCnRegistry(configured)) return `${DEFAULT_CN_NPM_REGISTRY}/`;
+  return `${DEFAULT_OFFICIAL_NPM_REGISTRY}/`;
+}
+
+/** Rewrite a https://github.com/... URL through the first active GitHub mirror (for git clone). */
+export function rewriteGithubHttpsThroughMirror(sourceUrl: string, route: NetworkRoute): string {
+  if (route.mode !== "mirror" || route.mirrors.length === 0) return sourceUrl;
+  if (!sourceUrl.startsWith("https://github.com/")) return sourceUrl;
+  return `${route.mirrors[0]}${sourceUrl}`;
+}
+
 function mirrorUrl(mirror: string, input: string | URL | Request): string | URL | Request {
   const raw = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
-  if (!raw.startsWith("https://api.github.com/") && !raw.startsWith("https://github.com/")) return input;
+  if (!GITHUB_FETCH_PREFIXES.some((prefix) => raw.startsWith(prefix))) return input;
   const routed = `${mirror}${raw}`;
   return input instanceof Request ? new Request(routed, input) : routed;
 }
 
 function githubUrl(input: string | URL | Request): string | undefined {
   const raw = input instanceof Request ? input.url : input instanceof URL ? input.href : input;
-  return raw.startsWith("https://api.github.com/") || raw.startsWith("https://github.com/") ? raw : undefined;
+  return GITHUB_FETCH_PREFIXES.some((prefix) => raw.startsWith(prefix)) ? raw : undefined;
 }
 
 function validMirrorResponse(sourceUrl: string, response: Response): boolean {

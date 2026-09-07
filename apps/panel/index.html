@@ -266,6 +266,85 @@
       font-size: 12.5px;
     }
 
+    .help-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .help-mode-card {
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-xs);
+    }
+    .help-mode-card .mode-id {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .help-mode-card p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--text-secondary);
+    }
+    .help-block {
+      margin-bottom: 22px;
+    }
+    .help-block h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 650;
+      color: var(--text-main);
+    }
+    .help-steps {
+      margin: 0;
+      padding-left: 1.2rem;
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .help-commands {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .help-cmd {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      background: var(--bg-surface-subtle);
+    }
+    .help-cmd code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+    .help-cmd span {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+    .help-notes {
+      margin: 0;
+      padding-left: 1.2rem;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      line-height: 1.65;
+    }
+    @media (max-width: 960px) {
+      .help-grid, .help-commands { grid-template-columns: 1fr; }
+    }
+
     .button {
       display: inline-flex;
       align-items: center;
@@ -1174,6 +1253,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           模型与成本
         </button>
+        <button data-view="help">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          使用速览
+        </button>
         <button data-view="checklist">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           核对清单
@@ -1382,6 +1465,28 @@
         </div>
       </section>
 
+      <section id="view-help" class="view">
+        <div class="page-head">
+          <div>
+            <h1 id="help-title">使用速览</h1>
+            <p id="help-thinking">加载中…</p>
+          </div>
+        </div>
+        <div class="help-grid" id="help-modes"></div>
+        <div class="help-block">
+          <h2>建议流程</h2>
+          <ol id="help-steps" class="help-steps"></ol>
+        </div>
+        <div class="help-block">
+          <h2>常用命令</h2>
+          <div id="help-commands" class="help-commands"></div>
+        </div>
+        <div class="help-block">
+          <h2>说明</h2>
+          <ul id="help-notes" class="help-notes"></ul>
+        </div>
+      </section>
+
       <section id="view-checklist" class="view">
         <div class="page-head">
           <div>
@@ -1533,6 +1638,9 @@ async function json(url, options) {
 
 function setView(view) {
   state.view = view;
+  if (location.hash.replace(/^#/, "") !== view) {
+    history.replaceState(null, "", `#${view}`);
+  }
   document.querySelectorAll(".nav button").forEach(button => {
     button.classList.toggle("active", button.dataset.view === view);
   });
@@ -1542,8 +1650,30 @@ function setView(view) {
   if (view === "ecosystem") loadEcosystem();
   if (view === "provider") loadProvider();
   if (view === "checklist") loadChecklist();
+  if (view === "help") loadHelp();
   if (view === "chat") mountConsoleInChat();
   else restoreConsoleDrawer();
+}
+
+async function loadHelp() {
+  try {
+    const doc = await json("/api/help");
+    $("help-title").textContent = doc.title || "使用速览";
+    $("help-thinking").textContent = doc.thinking || "";
+    $("help-modes").innerHTML = (doc.modes || []).map(mode => `
+      <article class="help-mode-card">
+        <div class="mode-id">${esc(mode.label || mode.id)}</div>
+        <p>${esc(mode.blurb)}</p>
+      </article>
+    `).join("");
+    $("help-steps").innerHTML = (doc.steps || []).map(step => `<li>${esc(step)}</li>`).join("");
+    $("help-commands").innerHTML = (doc.commands || []).map(row => `
+      <div class="help-cmd"><code>${esc(row.cmd)}</code><span>${esc(row.blurb)}</span></div>
+    `).join("");
+    $("help-notes").innerHTML = (doc.notes || []).map(note => `<li>${esc(note)}</li>`).join("");
+  } catch (error) {
+    $("help-thinking").textContent = `加载失败: ${error.message}`;
+  }
 }
 
 function mountConsoleInChat() {
@@ -2252,6 +2382,14 @@ loadProject().catch(error => {
   $("viewer-body").textContent = `加载失败: ${error.message}`;
 });
 loadProjectStatus();
+
+const initialView = decodeURIComponent((location.hash || "").replace(/^#/, "").trim());
+const knownViews = new Set(["project", "ecosystem", "provider", "checklist", "chat", "help"]);
+if (knownViews.has(initialView)) setView(initialView);
+window.addEventListener("hashchange", () => {
+  const next = decodeURIComponent((location.hash || "").replace(/^#/, "").trim());
+  if (knownViews.has(next) && next !== state.view) setView(next);
+});
 </script>
 </body>
 </html>

@@ -236,7 +236,7 @@ describe("updateBundledPi", () => {
     // the published product (outside the directory npm is replacing).
     expect(receipt.ok).toBe(true);
     expect(steps).toHaveLength(1);
-    expect(steps[0]!.command).toBe("npm install --global psyclaw@latest");
+    expect(steps[0]!.command).toBe("npm install --global psyclaw@latest --registry=https://registry.npmjs.org/");
     expect(steps[0]!.cwd).toBe(join(root, ".."));
   });
 

@@ -1,13 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { createRoutedFetch, selectNetworkRoute } from "../../src/network-routing.js";
+import {
+  createRoutedFetch,
+  resolveNpmInstallRegistry,
+  rewriteGithubHttpsThroughMirror,
+  selectNetworkRoute,
+} from "../../src/network-routing.js";
 
 describe("runtime network routing", () => {
   it("keeps official GitHub URLs when a proxy is configured", () => {
     expect(selectNetworkRoute({ HTTPS_PROXY: "http://127.0.0.1:7890", PSYCLAW_REGISTRY: "https://registry.npmmirror.com" })).toEqual({ mode: "proxy" });
   });
 
-  it("uses one mirror for a mainland npm registry", () => {
+  it("uses mainland mirrors for a mainland npm registry", () => {
     expect(selectNetworkRoute({}, "https://registry.npmmirror.com")).toEqual({
+      mode: "mirror",
+      mirrors: ["https://gh-proxy.com/", "https://gh-proxy.org/"],
+    });
+  });
+
+  it("enables mainland mirrors when PSYCLAW_CN=1", () => {
+    expect(selectNetworkRoute({ PSYCLAW_CN: "1" })).toEqual({
       mode: "mirror",
       mirrors: ["https://gh-proxy.com/", "https://gh-proxy.org/"],
     });
@@ -16,6 +28,20 @@ describe("runtime network routing", () => {
   it("accepts a secure explicit mirror and otherwise uses official URLs", () => {
     expect(selectNetworkRoute({ PSYCLAW_GITHUB_MIRROR: "https://mirror.example/gh" })).toEqual({ mode: "mirror", mirrors: ["https://mirror.example/gh/"] });
     expect(selectNetworkRoute({}, "https://registry.npmjs.org/")).toEqual({ mode: "official" });
+  });
+
+  it("resolves npm install registry for mainland vs official", () => {
+    expect(resolveNpmInstallRegistry({ PSYCLAW_REGISTRY: "https://registry.npmmirror.com/" })).toBe("https://registry.npmmirror.com/");
+    expect(resolveNpmInstallRegistry({ PSYCLAW_CN: "1" })).toBe("https://registry.npmmirror.com/");
+    expect(resolveNpmInstallRegistry({}, "https://registry.npmjs.org/")).toBe("https://registry.npmjs.org/");
+  });
+
+  it("rewrites GitHub clone URLs through the active mirror", () => {
+    expect(rewriteGithubHttpsThroughMirror("https://github.com/a/b.git", { mode: "official" })).toBe("https://github.com/a/b.git");
+    expect(rewriteGithubHttpsThroughMirror("https://github.com/a/b.git", {
+      mode: "mirror",
+      mirrors: ["https://gh-proxy.com/"],
+    })).toBe("https://gh-proxy.com/https://github.com/a/b.git");
   });
 
   it("rejects insecure remote mirrors", () => {
@@ -42,6 +68,20 @@ describe("runtime network routing", () => {
       "https://gh-proxy.com/https://api.github.com/repos/sharkdp/fd/releases/latest",
       "https://gh-proxy.org/https://api.github.com/repos/sharkdp/fd/releases/latest",
     ]);
+  });
+
+  it("routes raw.githubusercontent.com through mirrors", async () => {
+    const urls: string[] = [];
+    const fetchImpl = async (input: string | URL | Request): Promise<Response> => {
+      urls.push(input instanceof Request ? input.url : input.toString());
+      return new Response("ok", { status: 200, headers: { "content-type": "text/plain" } });
+    };
+    const routedFetch = createRoutedFetch(
+      { mode: "mirror", mirrors: ["https://gh-proxy.com/"] },
+      fetchImpl as typeof fetch,
+    );
+    await routedFetch("https://raw.githubusercontent.com/owner/repo/main/file.txt");
+    expect(urls).toEqual(["https://gh-proxy.com/https://raw.githubusercontent.com/owner/repo/main/file.txt"]);
   });
 
   it("rejects a mirror HTML page instead of passing it to Pi as a release archive", async () => {

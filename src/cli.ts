@@ -300,7 +300,13 @@ async function main(): Promise<void> {
   if (command === "check-updates") {
     const { checkUpdates } = await import("./updates/check.js");
     const { createHttpRegistry } = await import("./updates/registry.js");
-    const report = await checkUpdates({ registry: createHttpRegistry(), cwd: root });
+    const { configuredRegistry, resolveNpmInstallRegistry } = await import("./network-routing.js");
+    const configured = await configuredRegistry();
+    const npmRegistry = resolveNpmInstallRegistry(process.env, configured);
+    const report = await checkUpdates({
+      registry: createHttpRegistry({ npmRegistry }),
+      cwd: root,
+    });
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return;
   }
@@ -312,10 +318,14 @@ async function main(): Promise<void> {
     }
     const { updatePsyClaw } = await import("./updates/update.js");
     const { createHttpRegistry } = await import("./updates/registry.js");
+    const { configuredRegistry, resolveNpmInstallRegistry } = await import("./network-routing.js");
+    const configured = await configuredRegistry();
+    const npmRegistry = resolveNpmInstallRegistry(process.env, configured);
     const checkOnly = args.includes("--check");
     const detail = args.includes("--detail");
     const receipt = await updatePsyClaw({
-      registry: createHttpRegistry(),
+      registry: createHttpRegistry({ npmRegistry }),
+      npmRegistry,
       force: args.includes("--force"),
       ...(checkOnly ? {} : { executor: (step) => runPackageManager(step.command, step.cwd) }),
     });

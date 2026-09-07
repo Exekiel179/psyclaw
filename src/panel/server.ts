@@ -31,6 +31,7 @@ export { verifyDoi } from "../core/doi.js";
 import { resumePlanWithPi } from "../orchestration/pi-executor.js";
 import { RunEventLog } from "./events.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
+import { sessionHelpDocument } from "../session/help.js";
 import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
 import {
   readUserSkillState,
@@ -885,6 +886,11 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       if (url.pathname === "/api/stats") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify(await panelStats(root)));
+        return;
+      }
+      if (url.pathname === "/api/help") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-help/v1", ...sessionHelpDocument() }));
         return;
       }
       if (url.pathname === "/api/files") {
