@@ -112,7 +112,7 @@ import {
   continuouslyWorkWarningText,
   isContinuouslyWorkEnabled,
 } from "../../session/continuously-work.js";
-import { formatVerifyChecklist, isNaturalPlanConfirm, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../../verify/checklist.js";
+import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../../verify/checklist.js";
 import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js";
 import { openResearchWorkbench } from "../../panel/workbench.js";
 
@@ -1452,43 +1452,64 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         return;
       }
       if (parts[0] === "skip") {
-        ctx.ui.notify(formatVerifyChecklist(await skipUnverifiedItems(ctx.cwd)), "warning");
+        ctx.ui.notify(
+          `${formatVerifyChecklist(await skipUnverifiedItems(ctx.cwd))}\n注意：skip 不解除 analysis/academic 人审硬门禁。`,
+          "warning",
+        );
         return;
       }
       if (parts[0] === "kind") {
         const kind = (parts[1] ?? "general") as CrosscheckKind;
         pi.sendUserMessage(
           [
-            "交叉核验任务：请作为助手主动提出核对项，不要等用户自己去「申请确认」。",
+            "交叉核验任务：请作为助手主动提出核对项并执行字段核查，不要等用户自己去「申请确认」。",
             `核验类别：${kind}（citations=引文，format=格式，requirements=研究要求，stats=统计结果，general=综合）。`,
-            "输出可勾选清单，并建议用户打开 /panel 核对页逐项确认；若用户跳过，必须在产物中标注「未经核对」。",
+            "核查完成后用 /crosscheck <id> verified 记为 AI 已核（ai-checked），不得自称已过人审。",
+            "analysis / academic 模式下，全文或分析收尾前必须请人在 Panel「核实」或 /crosscheck <id> human；跳过不算通过。",
             "分析前与分析后都要有清单，不能默认跳过。",
           ].join("\n"),
           ctx.isIdle() ? {} : { deliverAs: "followUp" },
         );
-        ctx.ui.notify(`已启动 ${kind} 交叉核验；也可 /panel 打开核对清单。`, "info");
+        ctx.ui.notify(`已启动 ${kind} 交叉核验；人审请打开 /panel → 核对清单。`, "info");
         return;
       }
       const id = parts[0]!;
-      const status = (parts[1] ?? "verified") as VerifyStatus;
-      if (status !== "verified" && status !== "unverified" && status !== "flagged" && status !== "skipped") {
-        ctx.ui.notify("Usage: /crosscheck list | skip | kind <citations|format|requirements|stats> | <id> verified|unverified|flagged|skipped [备注]", "info");
+      const statusRaw = (parts[1] ?? "verified").toLowerCase();
+      const allowed = new Set(["verified", "ai-checked", "unverified", "flagged", "skipped", "human"]);
+      if (!allowed.has(statusRaw)) {
+        ctx.ui.notify(
+          "Usage: /crosscheck list | skip | kind <citations|format|requirements|stats> | <id> verified|ai-checked|human|unverified|flagged|skipped [备注]",
+          "info",
+        );
         return;
       }
       const notes = parts.slice(2).join(" ") || undefined;
-      const checklist = await markVerifyItem(ctx.cwd, id, status, notes);
-      ctx.ui.notify(formatVerifyChecklist(checklist), "info");
+      const source = statusRaw === "human" ? "human" as const : "ai" as const;
+      const checklist = await markVerifyItem(
+        ctx.cwd,
+        id,
+        statusRaw as VerifyStatus | "human",
+        notes,
+        undefined,
+        { source },
+      );
+      const tip = statusRaw === "human" || (statusRaw === "verified" && source === "human")
+        ? "已记为人审通过。"
+        : statusRaw === "verified" || statusRaw === "ai-checked"
+          ? "已记为 AI 已核；analysis/academic 收尾前仍须人在 Panel 点「核实」或 /crosscheck <id> human。"
+          : undefined;
+      ctx.ui.notify(tip ? `${formatVerifyChecklist(checklist)}\n${tip}` : formatVerifyChecklist(checklist), "info");
     } catch (error) {
       await notifyError(ctx, error);
     }
   };
 
   pi.registerCommand("crosscheck", {
-    description: "交叉核验：/crosscheck list|skip|kind <类型>|<id> verified|…",
+    description: "AI 交叉核验 + 人审：/crosscheck list|skip|kind|<id> verified|human|…",
     handler: async (args, ctx) => handleCrosscheck(args, ctx),
   });
   pi.registerCommand("verify", {
-    description: "交叉核验（同 /crosscheck）：模型提出项，人勾选或 skip 标注未经核对",
+    description: "同 /crosscheck；AI 核查后 analysis/academic 须人审",
     handler: async (args, ctx) => handleCrosscheck(args, ctx),
   });
 
@@ -1607,6 +1628,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           return;
         }
         if (cmd === "handoff") {
+          const gate = await assertHumanVerifyGate(ctx.cwd, "analysis-complete");
+          if (!gate.ok) {
+            ctx.ui.notify(gate.message, "error");
+            return;
+          }
           const path = await syncHandoffFromAnalysisPlan(ctx.cwd, plan);
           if (plan.status === "running") {
             plan = advanceAnalysisPlan(
@@ -1669,6 +1695,19 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       const subject = args.trim();
       pi.sendUserMessage(academicGrillRequest(subject, "review"), ctx.isIdle() ? {} : { deliverAs: "followUp" });
       ctx.ui.notify("已启动学术追问。完成后会先展示文档更新建议，并询问是否写回。", "info");
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("brainstorm", {
+    description: "显式启动研究方向头脑风暴（逐题澄清）",
+    handler: async (args, ctx) => {
+      const subject = args.trim();
+      pi.sendUserMessage([
+        "使用 academic-grill Skill 的头脑风暴入口，先提出 2-4 个有理论意义、可回答的研究方向，比较价值、可行性与边界并推荐一个。",
+        "随后按研究者需要逐题澄清，每轮只问一个实质问题，同时给出推荐答案和主要取舍；不要直接替用户执行完整研究或写论文。",
+        subject ? `本次头脑风暴主题：${subject}` : "请根据当前对话和项目材料确定头脑风暴主题；已有信息不要重复询问。",
+      ].join("\n"), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+      ctx.ui.notify("已启动研究方向头脑风暴。完成后可用 /grill 继续严格压力测试。", "info");
     },
   });
 
@@ -2357,11 +2396,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       try {
-        // Soft gate: missing /init or verify does not hard-block results.
+        // Soft gate for missing /init only. Analysis/academic completion still requires human verify.
         const project = await readActiveProject(ctx.cwd);
         const softNote = project
           ? undefined
-          : "尚未 /init（软门禁）：继续执行；关键字段请 AI 核查并由人 /verify。建议先 /init 建仓。";
+          : "尚未 /init（软门禁）：继续执行；收尾前须 AI /crosscheck 后人审。建议先 /init 建仓。";
         const request = params.request.trim();
         const combined = `${request} ${params.identifier ?? ""}`;
         const explicitWorkflow = params.workflow?.trim();
@@ -2394,6 +2433,13 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         }
         if (publishIntent) {
           try {
+            const gate = await assertHumanVerifyGate(ctx.cwd, "academic-finalize");
+            if (!gate.ok) {
+              return {
+                content: [{ type: "text", text: gate.message }],
+                details: { workflow: "publish-manuscript", blocked: true, reason: "human-verify-gate" },
+              };
+            }
             const result = await exportAcademicDocument(ctx.cwd);
             return {
               content: [{ type: "text", text: JSON.stringify({

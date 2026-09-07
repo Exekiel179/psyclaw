@@ -294,6 +294,8 @@ describe("updatePsyClaw", () => {
     const receipt = await updatePsyClaw({
       registry,
       packageRoot: root,
+      platform: "linux",
+      readInstalledVersion: async () => "0.26.3",
       executor: async (step) => {
         steps.push(step);
         return { exitCode: 0 };
@@ -312,6 +314,48 @@ describe("updatePsyClaw", () => {
       "npm install --global psyclaw@0.26.3 --registry=https://registry.npmjs.org/",
     ]);
     expect(steps.every((step) => step.cwd === join(root, ".."))).toBe(true);
+  });
+
+  it("repairs a Windows install that still reports the old version", async () => {
+    const root = await makeInstalledRoot();
+    const steps: string[] = [];
+    let reads = 0;
+    const receipt = await updatePsyClaw({
+      registry,
+      packageRoot: root,
+      platform: "win32",
+      readInstalledVersion: async () => {
+        reads += 1;
+        return reads === 1 ? "0.26.0" : "0.26.3";
+      },
+      executor: async (step) => {
+        steps.push(step.command);
+        return { exitCode: 0 };
+      },
+    });
+    expect(receipt.ok).toBe(true);
+    expect(receipt.reasonCode).toBe("update-applied");
+    expect(steps).toEqual([
+      "npm install --global psyclaw@0.26.3 --registry=https://registry.npmjs.org/",
+      "npm uninstall --global psyclaw --registry=https://registry.npmjs.org/",
+      "npm install --global psyclaw@0.26.3 --registry=https://registry.npmjs.org/",
+    ]);
+    expect(receipt.note).toMatch(/Windows recovery|where\.exe psyclaw/);
+  });
+
+  it("fails when the global install remains stale after Windows repair", async () => {
+    const root = await makeInstalledRoot();
+    const receipt = await updatePsyClaw({
+      registry,
+      packageRoot: root,
+      platform: "win32",
+      readInstalledVersion: async () => "0.26.0",
+      executor: async () => ({ exitCode: 0 }),
+    });
+    expect(receipt.ok).toBe(false);
+    expect(receipt.reasonCode).toBe("update-failed");
+    expect(receipt.reason).toMatch(/still 0\.26\.0/);
+    expect(receipt.note).toMatch(/npm uninstall -g psyclaw/);
   });
 
   it("returns the complete plan without executing for --check", async () => {

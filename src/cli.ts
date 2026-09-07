@@ -93,6 +93,31 @@ function runPackageManager(command: string, cwd: string): Promise<{ exitCode: nu
   });
 }
 
+/** Read the version npm currently has for the global `psyclaw` package. */
+function readGlobalPsyClawVersion(): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const child = spawn("npm", ["list", "-g", "psyclaw", "--depth=0", "--json"], {
+      stdio: ["ignore", "pipe", "ignore"],
+      shell: process.platform === "win32",
+      env: installEnvironment(),
+    });
+    let out = "";
+    child.stdout?.on("data", (chunk: Buffer | string) => {
+      out += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    });
+    child.on("error", () => resolve(undefined));
+    child.on("close", () => {
+      try {
+        const parsed = JSON.parse(out) as { dependencies?: { psyclaw?: { version?: unknown } } };
+        const version = parsed.dependencies?.psyclaw?.version;
+        resolve(typeof version === "string" && version.trim() ? version.trim() : undefined);
+      } catch {
+        resolve(undefined);
+      }
+    });
+  });
+}
+
 function assertKnownOptions(args: readonly string[], allowed: readonly string[]): void {
   const allowedSet = new Set(allowed);
   for (const [index, arg] of args.entries()) {
@@ -335,6 +360,8 @@ async function main(): Promise<void> {
       registry: createHttpRegistry({ npmRegistry }),
       npmRegistry,
       force: args.includes("--force"),
+      platform: process.platform,
+      readInstalledVersion: readGlobalPsyClawVersion,
       ...(checkOnly ? {} : { executor: (step) => runPackageManager(step.command, step.cwd) }),
     });
     process.stdout.write(detail

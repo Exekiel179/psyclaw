@@ -61,6 +61,7 @@ export interface PsyClawUpdateReceipt {
   executed: boolean;
   reasonCode: PiUpdateReason;
   reason?: string;
+  note?: string;
   psyclaw: ProductVersionUpdate;
   runtime: ProductVersionUpdate;
   commands: string[];
@@ -69,7 +70,11 @@ export interface PsyClawUpdateReceipt {
   finishedAt: string;
 }
 
-export type UpdatePsyClawOptions = UpdateBundledPiOptions;
+export type UpdatePsyClawOptions = UpdateBundledPiOptions & {
+  /** After global install, re-read the on-disk global version (catches Windows stale installs). */
+  readInstalledVersion?: () => Promise<string | undefined>;
+  platform?: NodeJS.Platform;
+};
 
 /** Reject anything that is not a plain, installable semver (guards the spawn). */
 const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
@@ -104,6 +109,21 @@ function buildCommand(manager: "pnpm" | "npm", version: string, registry: string
 
 function buildProductCommand(version: string, registry: string): string {
   return `npm install --global psyclaw@${version} --registry=${registry}`;
+}
+
+function buildProductUninstallCommand(registry: string): string {
+  return `npm uninstall --global psyclaw --registry=${registry}`;
+}
+
+/** Guidance when Windows keeps an old global bin (ENOTEMPTY / multiple Node installs). */
+export function windowsUpdateRecoveryNote(expectedVersion: string): string {
+  return [
+    "Windows recovery: close every terminal/IDE still running psyclaw, then:",
+    "  where.exe psyclaw",
+    "  npm uninstall -g psyclaw",
+    `  npm install -g psyclaw@${expectedVersion}`,
+    "Confirm with: psyclaw --version (must match the install you just ran; check PATH if not).",
+  ].join("\n");
 }
 
 async function hasSourceLockfile(root: string): Promise<boolean> {
@@ -256,6 +276,9 @@ export async function updatePsyClaw(options: UpdatePsyClawOptions): Promise<PsyC
         executed: true,
         reasonCode: "update-failed",
         reason: `update command failed: ${command}`,
+        ...((options.platform ?? process.platform) === "win32"
+          ? { note: windowsUpdateRecoveryNote(latestPsyClaw) }
+          : {}),
         psyclaw: versions.psyclaw,
         runtime: versions.runtime,
         commands,
@@ -264,12 +287,63 @@ export async function updatePsyClaw(options: UpdatePsyClawOptions): Promise<PsyC
     }
   }
 
+  const platform = options.platform ?? process.platform;
+  let afterPsyClaw = latestPsyClaw;
+  let afterPi = latestPi;
+  let note: string | undefined = platform === "win32"
+    ? `Re-open the terminal, then run psyclaw --version.\n${windowsUpdateRecoveryNote(latestPsyClaw)}`
+    : undefined;
+
+  if (options.readInstalledVersion) {
+    let installed = await options.readInstalledVersion();
+    if (installed !== undefined && installed !== latestPsyClaw && platform === "win32") {
+      // Common Windows failure: npm exit 0 but ENOTEMPTY left the old tree.
+      const repair = [
+        buildProductUninstallCommand(options.npmRegistry ?? resolveNpmInstallRegistry()),
+        buildProductCommand(latestPsyClaw, options.npmRegistry ?? resolveNpmInstallRegistry()),
+      ];
+      for (const command of repair) {
+        commands.push(command);
+        const { exitCode } = await options.executor({ command, cwd: dirname(manifest.root) });
+        if (exitCode !== 0) {
+          return finish({
+            ok: false,
+            executed: true,
+            reasonCode: "update-failed",
+            reason: `Windows repair failed (${command}); global install still reports ${installed}`,
+            note: windowsUpdateRecoveryNote(latestPsyClaw),
+            psyclaw: { ...versions.psyclaw, after: installed },
+            runtime: versions.runtime,
+            commands,
+            exitCode,
+          });
+        }
+      }
+      installed = await options.readInstalledVersion();
+    }
+    if (installed !== undefined && installed !== latestPsyClaw) {
+      return finish({
+        ok: false,
+        executed: true,
+        reasonCode: "update-failed",
+        reason: `npm finished but global psyclaw is still ${installed} (expected ${latestPsyClaw}). Often a second Node on PATH or a locked Windows folder.`,
+        note: windowsUpdateRecoveryNote(latestPsyClaw),
+        psyclaw: { ...versions.psyclaw, after: installed },
+        runtime: versions.runtime,
+        commands,
+        exitCode: 0,
+      });
+    }
+    if (installed !== undefined) afterPsyClaw = installed;
+  }
+
   return finish({
     ok: true,
     executed: true,
     reasonCode: "update-applied",
-    psyclaw: { ...versions.psyclaw, after: latestPsyClaw },
-    runtime: { ...versions.runtime, after: latestPi },
+    ...(note === undefined ? {} : { note }),
+    psyclaw: { ...versions.psyclaw, after: afterPsyClaw },
+    runtime: { ...versions.runtime, after: afterPi },
     commands,
     exitCode: 0,
   });

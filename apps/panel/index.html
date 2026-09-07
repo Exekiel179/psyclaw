@@ -337,23 +337,41 @@
     .help-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      margin-bottom: 22px;
+      gap: 14px;
+      margin-bottom: 28px;
     }
     .help-mode-card {
+      position: relative;
       border: 1px solid var(--border-subtle);
-      background: var(--bg-surface);
-      border-radius: var(--radius-md);
-      padding: 14px 16px;
-      box-shadow: var(--shadow-xs);
+      background: linear-gradient(165deg, #ffffff 0%, var(--brand-primary-light) 140%);
+      border-radius: 14px;
+      padding: 18px 18px 16px;
+      overflow: hidden;
+    }
+    .help-mode-card::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--brand-primary);
     }
     .help-mode-card .mode-id {
       font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--accent);
-      letter-spacing: 0.04em;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--brand-primary);
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+    }
+    .help-mode-card .mode-label {
+      font-size: 16px;
+      font-weight: 650;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
     }
     .help-mode-card p {
       margin: 0;
@@ -361,56 +379,164 @@
       line-height: 1.55;
       color: var(--text-secondary);
     }
-    .help-block {
+    .help-hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
       margin-bottom: 22px;
+      padding: 20px 22px;
+      border-radius: 16px;
+      border: 1px solid var(--brand-primary-border);
+      background:
+        radial-gradient(120% 80% at 100% 0%, rgba(13, 118, 110, 0.10), transparent 55%),
+        linear-gradient(180deg, #ffffff, #f8fafc);
+    }
+    .help-hero h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+    }
+    .help-hero p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 13px;
+      max-width: 42rem;
+      line-height: 1.5;
+    }
+    .help-kbd {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+    .help-block {
+      margin-bottom: 26px;
     }
     .help-block h2 {
-      margin: 0 0 10px;
-      font-size: 14px;
-      font-weight: 650;
-      color: var(--text-main);
+      margin: 0 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted);
     }
     .help-steps {
       margin: 0;
-      padding-left: 1.2rem;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+    }
+    .help-steps li {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: 13px;
-      line-height: 1.7;
+      line-height: 1.55;
+    }
+    .help-steps li::before {
+      content: attr(data-step);
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: var(--brand-primary-light);
+      color: var(--brand-primary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
     }
     .help-commands {
+      display: grid;
+      gap: 18px;
+    }
+    .help-cmd-group h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 650;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+    .help-cmd-list {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
     .help-cmd {
-      display: flex;
-      gap: 10px;
-      align-items: baseline;
+      display: grid;
+      grid-template-columns: minmax(7.5rem, auto) 1fr;
+      gap: 12px;
+      align-items: center;
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      padding: 10px 12px;
-      background: var(--bg-surface-subtle);
+      border-radius: 12px;
+      padding: 11px 13px;
+      background: var(--bg-surface);
+      transition: border-color 120ms ease, background 120ms ease;
+    }
+    .help-cmd:hover {
+      border-color: var(--brand-primary-border);
+      background: var(--brand-primary-light);
     }
     .help-cmd code {
       font-family: var(--font-mono);
       font-size: 12px;
-      color: var(--text-main);
+      font-weight: 600;
+      color: var(--brand-primary);
       white-space: nowrap;
     }
     .help-cmd span {
       font-size: 12.5px;
-      color: var(--text-muted);
-      line-height: 1.45;
+      color: var(--text-secondary);
+      line-height: 1.4;
     }
     .help-notes {
       margin: 0;
-      padding-left: 1.2rem;
+      padding: 14px 16px;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+      border-radius: 14px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface-subtle);
+    }
+    .help-notes li {
+      position: relative;
+      padding-left: 14px;
       color: var(--text-muted);
       font-size: 12.5px;
-      line-height: 1.65;
+      line-height: 1.55;
+    }
+    .help-notes li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--brand-primary);
+      opacity: 0.55;
     }
     @media (max-width: 960px) {
-      .help-grid, .help-commands { grid-template-columns: 1fr; }
+      .help-grid, .help-cmd-list { grid-template-columns: 1fr; }
+      .help-hero { flex-direction: column; align-items: flex-start; }
     }
 
     .button {
@@ -1561,9 +1687,9 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
           /plan 方案
         </button>
-        <button id="cmd-verify-btn" class="topbar-btn" title="关键字段人机核查清单 (/verify)">
+        <button id="cmd-verify-btn" class="topbar-btn" title="AI 核查清单；人审在此核实 (/crosscheck)">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          /verify 核查
+          /crosscheck
         </button>
       </div>
       <div class="local-badge">
@@ -1809,11 +1935,12 @@
       </section>
 
       <section id="view-help" class="view">
-        <div class="page-head">
+        <div class="help-hero">
           <div>
             <h1 id="help-title">使用速览</h1>
-            <p id="help-thinking">加载中…</p>
+            <p id="help-subtitle">三种模式 · AI 交叉核验 · 内置学术工作流</p>
           </div>
+          <div id="help-thinking" class="help-kbd">加载中…</div>
         </div>
         <div class="help-grid" id="help-modes"></div>
         <div class="help-block">
@@ -1821,7 +1948,7 @@
           <ol id="help-steps" class="help-steps"></ol>
         </div>
         <div class="help-block">
-          <h2>可用命令</h2>
+          <h2>常用命令</h2>
           <div id="help-commands" class="help-commands"></div>
         </div>
         <div class="help-block">
@@ -1834,11 +1961,11 @@
         <div class="page-head">
           <div>
             <h1>交叉核验清单</h1>
-            <p>分析前/后由模型提出项，人在此勾选。可跳过，但会标注「未经核对」。本地写入 <code>.psyclaw/verify-checklist.json</code>。</p>
+            <p>AI 用 <code>/crosscheck</code> 核查字段；<strong>analysis / academic 收尾必须在此点「核实」</strong>（或终端 <code>/crosscheck &lt;id&gt; human</code>）。AI 已核与跳过都不算通过。</p>
           </div>
           <div style="display:flex;gap:8px">
             <button id="refresh-checklist" class="button">刷新</button>
-            <button id="skip-checklist" class="button" title="其余未核项标为跳过/未经核对">跳过未核项</button>
+            <button id="skip-checklist" class="button" title="标为跳过；不解除 analysis/academic 人审门禁">跳过未核项</button>
           </div>
         </div>
         <div class="panel section">
@@ -1881,7 +2008,7 @@
             <div id="console-log" class="console-log">
               <div class="log-entry sys">
                 <div class="log-sys">
-                  💡 <strong>对话已就绪</strong>：与 PsyClaw 智能体及底层学术插件安全连接。支持 <code>/init</code>、<code>/plan</code>、<code>/grill</code>、<code>/verify</code> 等研究指令；随时探讨研究设想或分析数据。
+                  💡 <strong>对话已就绪</strong>：与 PsyClaw 智能体安全连接。支持 <code>/init</code>、<code>/plan</code>、<code>/grill</code>、<code>/crosscheck</code>（AI 核验）等指令。
                 </div>
               </div>
             </div>
@@ -1891,9 +2018,9 @@
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                 /plan status
               </span>
-              <span class="chip" data-cmd="/verify list">
+              <span class="chip" data-cmd="/crosscheck list">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg>
-                /verify list
+                /crosscheck list
               </span>
               <span class="chip" data-cmd="/grill">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
@@ -2035,16 +2162,31 @@ async function loadHelp() {
   try {
     const doc = await json("/api/help");
     $("help-title").textContent = doc.title || "使用速览";
+    $("help-subtitle").textContent = doc.subtitle || "";
     $("help-thinking").textContent = doc.thinking || "";
     $("help-modes").innerHTML = (doc.modes || []).map(mode => `
       <article class="help-mode-card">
-        <div class="mode-id">${esc(mode.label || mode.id)}</div>
+        <div class="mode-id">${esc(mode.hint || mode.id)}</div>
+        <div class="mode-label">${esc(mode.label || mode.id)}</div>
         <p>${esc(mode.blurb)}</p>
       </article>
     `).join("");
-    $("help-steps").innerHTML = (doc.steps || []).map(step => `<li>${esc(step)}</li>`).join("");
-    $("help-commands").innerHTML = (doc.commands || []).map(row => `
-      <div class="help-cmd"><code>${esc(row.cmd)}</code><span>${esc(row.blurb)}</span></div>
+    $("help-steps").innerHTML = (doc.steps || []).map((step, index) =>
+      `<li data-step="${index + 1}">${esc(step)}</li>`
+    ).join("");
+    const groups = new Map();
+    for (const row of (doc.commands || [])) {
+      const key = row.group || "其他";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(row);
+    }
+    $("help-commands").innerHTML = [...groups.entries()].map(([group, rows]) => `
+      <div class="help-cmd-group">
+        <h3>${esc(group)}</h3>
+        <div class="help-cmd-list">
+          ${rows.map(row => `<div class="help-cmd"><code>${esc(row.cmd)}</code><span>${esc(row.blurb)}</span></div>`).join("")}
+        </div>
+      </div>
     `).join("");
     $("help-notes").innerHTML = (doc.notes || []).map(note => `<li>${esc(note)}</li>`).join("");
   } catch (error) {
@@ -2091,7 +2233,7 @@ async function loadChecklist() {
 
 $("refresh-checklist")?.addEventListener("click", loadChecklist);
 $("skip-checklist")?.addEventListener("click", async () => {
-  if (!confirm("将把所有未核项标为跳过，并写入「未经核对」。继续？")) return;
+  if (!confirm("将把未核/AI已核项标为跳过。注意：这不会解除 analysis/academic 收尾人审门禁。继续？")) return;
   await json("/api/crosscheck", {
     method: "POST",
     headers: { "content-type": "application/json" },

@@ -58,13 +58,13 @@ describe("recommended Skill lifecycle", () => {
 
   it("loads only enabled installs whose source, license, and content hashes validate", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-recommendations-"));
-    const path = await managedFixture(root, "session-handoff");
+    const path = await managedFixture(root, "academic-reference-matcher");
     await saveRecommendationState(root, {
       schemaVersion: "psyclaw/recommendation-state/v1",
-      skills: ["session-handoff"],
+      skills: ["academic-reference-matcher"],
       mcp: [],
     });
-    await expect(validateInstalledRecommendedSkill(root, "session-handoff")).resolves.toMatchObject({ path });
+    await expect(validateInstalledRecommendedSkill(root, "academic-reference-matcher")).resolves.toMatchObject({ path });
     await expect(enabledRecommendedSkillPaths(root)).resolves.toEqual({ paths: [path], warnings: [] });
 
     await writeFile(join(path, "SKILL.md"), "tampered\n", "utf8");
@@ -79,5 +79,15 @@ describe("recommended Skill lifecycle", () => {
     const manifest = JSON.parse(await readFile(join(path, "psyclaw-install.json"), "utf8")) as { source: { ref: string } };
     expect(manifest.source.ref).toMatch(/^[a-f0-9]{40}$/);
     await expect(readFile(join(path, ".git", "HEAD"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("keeps the recommended catalog academic-facing without author branding", async () => {
+    const catalog = await readRecommendedCatalog();
+    const blob = JSON.stringify(catalog);
+    expect(blob).not.toMatch(/花叔|Huashu/);
+    expect(catalog.items.some((item) => item.id === "mac-computer-use")).toBe(true);
+    expect(catalog.items.some((item) => item.id === "huashu-weread")).toBe(false);
+    expect(catalog.items.some((item) => item.id === "session-handoff")).toBe(false);
+    expect(catalog.items.some((item) => item.id === "distill-scholar")).toBe(true);
   });
 });

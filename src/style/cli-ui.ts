@@ -67,26 +67,29 @@ export function formatCliUsage(): string {
     "",
     `  ${c.bold(c.white("输入 psyclaw 进入对话，然后使用以下 / 命令："))}`,
     "",
-    cmd("/init", "[--paradigm <id>] <research goal>", c.white("初始化研究项目工作区")),
-    cmd("/plan", "new|status|auto|confirm|run|defer|handoff", c.white("分析方案（也可回复「可以」）")),
-    cmd("/crosscheck", "list|skip|kind <类型>|<id> …", c.white("交叉核验（同 /verify）")),
+    cmd("/init", "[--paradigm <id>] <goal>", c.white("初始化研究项目工作区")),
+    cmd("/plan", "new|status|auto|confirm|run|…", c.white("分析方案（也可回复「可以」）")),
+    cmd("/crosscheck", "list|kind|<id> verified|human …", c.white("AI 核查 + 人审（别名 /verify）")),
+    cmd("/verify", "同 /crosscheck", c.white("AI 核查 + 人审别名")),
+    cmd("/brainstorm", "[subject]", c.white("研究方向头脑风暴与问题澄清")),
     cmd("/grill", "[subject]", c.white("逐题压力测试研究方案")),
-    cmd("/review", "", c.white("运行多角色模拟同行评审")),
-    cmd("/panel", "", c.white("打开科研工作台（核对清单/对话）")),
-    cmd("/help", "", c.white("打开 Panel 使用速览")),
-    cmd("/skill", "[status|enable|disable|install|…]", c.white("管理和安装 Skill（推荐 distill-scholar / distill-journal）")),
-    cmd("/agents", "[--agent id] [task]", c.white("浏览或运行 Subagent（类 Claude）")),
+    cmd("/review", "", c.white("多角色模拟同行评审")),
+    cmd("/panel", "", c.white("打开科研工作台")),
+    cmd("/help", "", c.white("打开 Panel 使用速览（本页同步更新）")),
+    cmd("/skill", "[status|enable|install|…]", c.white("Skill 管理（推荐 distill-scholar / distill-journal）")),
+    cmd("/agents", "[--agent id] [task]", c.white("浏览或运行 Subagent")),
+    cmd("/ars", "[status|doctor|start|full|stop]", c.white("学术模式入口")),
     cmd("/mcp", "", c.white("管理 MCP 服务器")),
     cmd("/plugin", "", c.white("打开 Plugin 推荐与管理页")),
     cmd("/provider", "[provider-id]", c.white("查看、配置或切换 Provider")),
-    cmd("/export", "", c.white("使用 Pi 内置命令导出会话")),
-    cmd("/pet", "on|off|status", c.white("开启、关闭或查看启动横幅宠物")),
+    cmd("/export", "", c.white("导出会话")),
+    cmd("/pet", "on|off|status", c.white("启动横幅宠物")),
     "",
-    `  ${c.gray("快捷键：")} ${c.teal("Shift+Tab")} ${c.gray("模式")} ${c.darkGray("·")} ${c.teal("Ctrl+Shift+T")} ${c.gray("Thinking")}`,
+    `  ${c.gray("快捷键：")} ${c.teal("Shift+Tab")} ${c.gray("模式 chat→analysis→academic")} ${c.darkGray("·")} ${c.teal("Ctrl+Shift+T")} ${c.gray("Thinking")}`,
     "",
-    `  ${c.gray("终端：")} ${c.teal("psyclaw --continue")} ${c.darkGray("/")} ${c.teal("psyclaw -c")} ${c.gray("续接当前项目最近一次会话")}`,
-    `          ${c.teal("psyclaw --continuously-work")} ${c.gray("启动持续自动推进（非模式切换；红字警告：费 token、不保质量）")}`,
-    `          ${c.teal("psyclaw -v")} ${c.darkGray("/")} ${c.teal("psyclaw --version")} ${c.gray("查看版本号")}`,
+    `  ${c.gray("终端：")} ${c.teal("psyclaw --continue")} ${c.darkGray("/")} ${c.teal("psyclaw -c")} ${c.gray("续接最近会话")}`,
+    `          ${c.teal("psyclaw --continuously-work")} ${c.gray("持续自动推进（红字警告：费 token、不保质量）")}`,
+    `          ${c.teal("psyclaw -v")} ${c.darkGray("/")} ${c.teal("psyclaw --version")} ${c.gray("版本号")}`,
     "",
     `  ${c.darkGray("──────────────────────────────────────────────────────────")}`,
     `  ${c.gray("文档与源码:")} ${c.cyan(c.underline("https://github.com/Exekiel179/psyclaw"))}`,
@@ -130,6 +133,7 @@ export function renderProductUpdateSummary(receipt: {
   ok: boolean;
   reasonCode: string;
   reason?: string;
+  note?: string;
   commands: string[];
   psyclaw: { before?: string; after?: string; latest?: string };
 }): string {
@@ -139,8 +143,16 @@ export function renderProductUpdateSummary(receipt: {
     ? `${before} → ${after}`
     : after ?? before ?? "unknown";
 
+  const noteLines = receipt.note
+    ? receipt.note.split("\n").map((line) => `    ${c.darkGray("•")} ${c.gray(line)}`)
+    : [];
+
   if (receipt.reasonCode === "update-applied") {
-    return renderSuccessCard("升级成功", { PsyClaw: arrow });
+    return [
+      renderSuccessCard("升级成功", { PsyClaw: arrow }).trimEnd(),
+      ...noteLines,
+      "",
+    ].join("\n");
   }
   if (receipt.reasonCode === "already-up-to-date") {
     return renderSuccessCard("已是最新", { PsyClaw: after ?? before ?? "unknown" });
@@ -171,6 +183,7 @@ export function renderProductUpdateSummary(receipt: {
     `  ${c.red("✗")} ${c.bold("升级未完成")}`,
     `    ${c.darkGray("•")} ${c.gray("原因:")} ${c.white(receipt.reason ?? receipt.reasonCode)}`,
     `    ${c.darkGray("•")} ${c.gray("PsyClaw:")} ${c.white(arrow)}`,
+    ...noteLines,
     "",
   ].join("\n");
 }

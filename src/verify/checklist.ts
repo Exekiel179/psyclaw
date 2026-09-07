@@ -5,19 +5,32 @@ import { assertSafeProjectPath } from "../project/paths.js";
 export const VERIFY_CHECKLIST_SCHEMA = "psyclaw/verify-checklist/v1" as const;
 export const VERIFY_CHECKLIST_PATH = ".psyclaw/verify-checklist.json" as const;
 
-export type VerifyStatus = "unverified" | "verified" | "flagged" | "skipped";
+/**
+ * Checklist statuses:
+ * - unverified: not checked yet
+ * - ai-checked: AI finished /crosscheck on the item (does NOT satisfy human gate)
+ * - verified: human approved in Panel / wake / `/crosscheck <id> human`
+ * - flagged / skipped: do not satisfy the human gate
+ */
+export type VerifyStatus = "unverified" | "ai-checked" | "verified" | "flagged" | "skipped";
 
-/** Cross-check domains the model may propose; humans mark via Panel or /crosscheck. */
+export type VerifyMarkSource = "ai" | "human";
+
+/** Cross-check domains the model proposes and AI checks via /crosscheck; humans must approve. */
 export type CrosscheckKind = "citations" | "format" | "requirements" | "stats" | "general";
+
+export type VerifyPhase = "pre-analysis" | "post-analysis" | "general";
 
 export interface VerifyItem {
   id: string;
   label: string;
   status: VerifyStatus;
   kind?: CrosscheckKind;
-  phase?: "pre-analysis" | "post-analysis" | "general";
+  phase?: VerifyPhase;
   notes?: string;
   updatedAt?: string;
+  /** Who last set a conclusive mark; gate only accepts human-verified. */
+  approvedBy?: VerifyMarkSource;
 }
 
 export interface VerifyChecklist {
@@ -25,6 +38,12 @@ export interface VerifyChecklist {
   items: VerifyItem[];
   updatedAt: string;
 }
+
+export type HumanVerifyGateScope = "analysis-complete" | "academic-finalize";
+
+export type HumanVerifyGateResult =
+  | { ok: true; checklist: VerifyChecklist }
+  | { ok: false; checklist: VerifyChecklist; pending: VerifyItem[]; message: string };
 
 const DEFAULT_ITEMS: readonly Omit<VerifyItem, "status">[] = [
   { id: "design-estimand", label: "研究问题 / estimand 与拟做分析一致", kind: "requirements", phase: "pre-analysis" },
@@ -38,8 +57,13 @@ const DEFAULT_ITEMS: readonly Omit<VerifyItem, "status">[] = [
   { id: "citations", label: "引文 DOI / 字段交叉核验", kind: "citations", phase: "general" },
 ];
 
-const VALID_STATUS = new Set<VerifyStatus>(["unverified", "verified", "flagged", "skipped"]);
+const VALID_STATUS = new Set<VerifyStatus>(["unverified", "ai-checked", "verified", "flagged", "skipped"]);
 const VALID_KIND = new Set<CrosscheckKind>(["citations", "format", "requirements", "stats", "general"]);
+
+const SCOPE_PHASES: Record<HumanVerifyGateScope, readonly VerifyPhase[]> = {
+  "analysis-complete": ["pre-analysis", "post-analysis"],
+  "academic-finalize": ["pre-analysis", "post-analysis", "general"],
+};
 
 export function defaultVerifyChecklist(now = new Date().toISOString()): VerifyChecklist {
   return {
@@ -55,7 +79,8 @@ function isVerifyItem(item: unknown): item is VerifyItem {
   return typeof row.id === "string"
     && typeof row.label === "string"
     && VALID_STATUS.has(row.status)
-    && (row.kind === undefined || VALID_KIND.has(row.kind));
+    && (row.kind === undefined || VALID_KIND.has(row.kind))
+    && (row.approvedBy === undefined || row.approvedBy === "ai" || row.approvedBy === "human");
 }
 
 export async function loadVerifyChecklist(root: string): Promise<VerifyChecklist> {
@@ -89,6 +114,23 @@ export async function saveVerifyChecklist(root: string, checklist: VerifyCheckli
   await atomicWriteFile(path, `${JSON.stringify(checklist, null, 2)}\n`);
 }
 
+/** Ensure default analysis/academic gate items exist before completion checks. */
+export async function ensureDefaultVerifyChecklist(root: string): Promise<VerifyChecklist> {
+  const checklist = await loadVerifyChecklist(root);
+  const now = new Date().toISOString();
+  let changed = false;
+  for (const proposed of DEFAULT_ITEMS) {
+    if (checklist.items.some((item) => item.id === proposed.id)) continue;
+    checklist.items.push({ ...proposed, status: "unverified", updatedAt: now });
+    changed = true;
+  }
+  if (changed || checklist.items.length === 0) {
+    checklist.updatedAt = now;
+    await saveVerifyChecklist(root, checklist);
+  }
+  return checklist;
+}
+
 /** Create only the checklist items explicitly proposed by a checklist tool call. */
 export async function createVerifyItems(
   root: string,
@@ -116,27 +158,54 @@ export async function createVerifyItems(
   return checklist;
 }
 
+/**
+ * Resolve the status that will be persisted.
+ * AI `/crosscheck <id> verified` becomes `ai-checked` so human approval remains mandatory.
+ */
+export function resolveVerifyMark(
+  requested: VerifyStatus | "human",
+  source: VerifyMarkSource = "ai",
+): { status: VerifyStatus; approvedBy?: VerifyMarkSource } {
+  if (requested === "human") {
+    return { status: "verified", approvedBy: "human" };
+  }
+  if (requested === "verified") {
+    if (source === "human") return { status: "verified", approvedBy: "human" };
+    return { status: "ai-checked", approvedBy: "ai" };
+  }
+  if (requested === "ai-checked") {
+    return { status: "ai-checked", approvedBy: "ai" };
+  }
+  return { status: requested, approvedBy: source };
+}
+
 export async function markVerifyItem(
   root: string,
   id: string,
-  status: VerifyStatus,
+  status: VerifyStatus | "human",
   notes?: string,
   kind?: CrosscheckKind,
+  options?: { source?: VerifyMarkSource },
 ): Promise<VerifyChecklist> {
+  const source = options?.source ?? "ai";
+  const resolved = resolveVerifyMark(status, source);
   const checklist = await loadVerifyChecklist(root);
   const now = new Date().toISOString();
   const existing = checklist.items.find((item) => item.id === id);
   if (existing) {
-    existing.status = status;
+    existing.status = resolved.status;
     existing.updatedAt = now;
+    if (resolved.approvedBy !== undefined) existing.approvedBy = resolved.approvedBy;
+    else delete existing.approvedBy;
     if (notes !== undefined) existing.notes = notes;
     if (kind !== undefined) existing.kind = kind;
   } else {
     const item: VerifyItem = {
       id,
       label: id,
-      status,
+      status: resolved.status,
       updatedAt: now,
+      ...(resolved.approvedBy !== undefined ? { approvedBy: resolved.approvedBy } : {}),
       ...(kind ? { kind } : {}),
       ...(notes !== undefined ? { notes } : {}),
     };
@@ -147,15 +216,16 @@ export async function markVerifyItem(
   return checklist;
 }
 
-/** Mark remaining unverified items as skipped with an explicit disclosure note. */
+/** Mark remaining open items as skipped with an explicit disclosure note. Does not satisfy the human gate. */
 export async function skipUnverifiedItems(root: string, reason = "用户跳过核对"): Promise<VerifyChecklist> {
   const checklist = await loadVerifyChecklist(root);
   const now = new Date().toISOString();
   for (const item of checklist.items) {
-    if (item.status === "unverified") {
+    if (item.status === "unverified" || item.status === "ai-checked") {
       item.status = "skipped";
       item.updatedAt = now;
-      item.notes = item.notes ? `${item.notes}; ${reason}` : `${reason}（未经人核对）`;
+      item.approvedBy = "human";
+      item.notes = item.notes ? `${item.notes}; ${reason}` : `${reason}（未经人核对；analysis/academic 收尾仍须人核实）`;
     }
   }
   checklist.updatedAt = now;
@@ -163,22 +233,72 @@ export async function skipUnverifiedItems(root: string, reason = "用户跳过�
   return checklist;
 }
 
+function itemPhase(item: VerifyItem): VerifyPhase {
+  return item.phase ?? "general";
+}
+
+function isHumanVerified(item: VerifyItem): boolean {
+  return item.status === "verified" && item.approvedBy !== "ai";
+}
+
+/**
+ * Hard gate for analysis handoff and academic finalization.
+ * Only human-approved `verified` items pass; AI checks and skips do not.
+ */
+export function evaluateHumanVerifyGate(
+  checklist: VerifyChecklist,
+  scope: HumanVerifyGateScope,
+): HumanVerifyGateResult {
+  const phases = new Set(SCOPE_PHASES[scope]);
+  const relevant = checklist.items.filter((item) => phases.has(itemPhase(item)));
+  const pending = relevant.filter((item) => !isHumanVerified(item));
+  if (pending.length === 0 && relevant.length > 0) {
+    return { ok: true, checklist };
+  }
+  const scopeLabel = scope === "analysis-complete" ? "分析收尾 / HANDOFF" : "学术定稿";
+  const pendingText = pending.length > 0
+    ? pending.map((item) => `${item.id}(${item.status})`).join(", ")
+    : "清单为空或缺少默认项";
+  return {
+    ok: false,
+    checklist,
+    pending,
+    message: [
+      `人审硬门禁（${scopeLabel}）：须先由 AI /crosscheck，再由人在 Panel「核实」或 /crosscheck <id> human。`,
+      `未过人审：${pendingText}`,
+      "跳过/AI 已核不算通过。打开 /panel → 核对清单。",
+    ].join("\n"),
+  };
+}
+
+export async function assertHumanVerifyGate(
+  root: string,
+  scope: HumanVerifyGateScope,
+): Promise<HumanVerifyGateResult> {
+  const checklist = await ensureDefaultVerifyChecklist(root);
+  return evaluateHumanVerifyGate(checklist, scope);
+}
+
 export function formatVerifyChecklist(checklist: VerifyChecklist): string {
   const lines = [
-    "交叉核验清单（模型提出项 + 人在 Panel/对话中勾选；跳过须标注未经核对）",
+    "交叉核验清单（AI /crosscheck 核查 → 人在 Panel 核实；analysis/academic 收尾强制人审）",
     `更新：${checklist.updatedAt}`,
   ];
   for (const item of checklist.items) {
     const mark = item.status === "verified" ? "[x]"
-      : item.status === "flagged" ? "[!]"
-        : item.status === "skipped" ? "[~]"
-          : "[ ]";
+      : item.status === "ai-checked" ? "[A]"
+        : item.status === "flagged" ? "[!]"
+          : item.status === "skipped" ? "[~]"
+            : "[ ]";
     const kind = item.kind ? `/${item.kind}` : "";
     const phase = item.phase ? ` · ${item.phase}` : "";
-    lines.push(`${mark} ${item.id}${kind}${phase}: ${item.label}${item.notes ? ` — ${item.notes}` : ""}`);
+    const who = item.approvedBy ? ` · ${item.approvedBy}` : "";
+    lines.push(`${mark} ${item.id}${kind}${phase}${who}: ${item.label}${item.notes ? ` — ${item.notes}` : ""}`);
   }
-  lines.push("用法：/crosscheck list | /crosscheck <id> verified|unverified|flagged|skipped [备注]");
-  lines.push("也可：/crosscheck skip（其余未核项标为未经核对）| /crosscheck kind <citations|format|requirements|stats>");
+  lines.push("用法：/crosscheck list | /crosscheck kind <citations|format|requirements|stats>");
+  lines.push("AI 记核：/crosscheck <id> verified|ai-checked|flagged [备注]（记为 AI 已核，不替代人审）");
+  lines.push("人审通过：Panel「核实」或 /crosscheck <id> human [备注]");
+  lines.push("也可：/crosscheck skip（标未经核对；不解除 analysis/academic 人审门禁）");
   return lines.join("\n");
 }
 

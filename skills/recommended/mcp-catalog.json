@@ -1,14 +1,25 @@
 {
   "schemaVersion": "psyclaw/recommended-mcp/v1",
-  "documentVersion": "0.3.0",
+  "documentVersion": "0.3.2",
   "sourceDocument": "学术AI_Skill分享资料.pdf + curated research MCP review",
   "sourceRef": "user-curated",
   "items": [
     {
+      "id": "computer-use-mcp",
+      "name": "Computer Use MCP",
+      "stage": "电脑操控",
+      "description": "本机桌面控制（Windows / macOS / Linux）：截图、键鼠、剪贴板、窗口与应用管理。高风险副作用；默认 discover-only，执行须显式授权。macOS 无 API 原生应用也可另装 Mac Computer Use Skill。",
+      "sourceRef": "https://github.com/zavora-ai/computer-use-mcp",
+      "transport": "stdio",
+      "risk": "desktop-control",
+      "writeEffects": true,
+      "status": "discover-only"
+    },
+    {
       "id": "markitdown-mcp",
-      "name": "Microsoft MarkItDown MCP",
+      "name": "MarkItDown MCP",
       "stage": "材料转换",
-      "description": "微软官方 MarkItDown MCP，通过本机 stdio 提供 convert_to_markdown 工具，把文件或 URI 转换为 Markdown。",
+      "description": "MarkItDown MCP，通过本机 stdio 提供 convert_to_markdown 工具，把文件或 URI 转换为 Markdown。",
       "sourceRef": "https://github.com/microsoft/markitdown/tree/main/packages/markitdown-mcp",
       "transport": "stdio",
       "risk": "local-file-and-network-read",
@@ -83,7 +94,7 @@
     },
     {
       "id": "playwright-mcp",
-      "name": "Microsoft Playwright MCP",
+      "name": "Playwright MCP",
       "stage": "机构全文",
       "description": "通过浏览器访问出版社、机构代理和登录后的页面；下载动作必须单独人工确认。",
       "sourceRef": "https://github.com/microsoft/playwright-mcp",
@@ -116,6 +127,7 @@
     }
   ],
   "installPrep": [
+    {"id":"computer-use-mcp","sourceKind":"github","ref":"latest","license":"MIT","command":"npx -y @zavora-ai/computer-use-mcp","target":".psyclaw/mcp/computer-use-mcp.json","dependencies":["Node.js >=18","npm","OS accessibility / screen permissions"],"status":"review-required","requiresApproval":true,"blockedReason":"Desktop control is high-risk; pin package version and require explicit per-action approval before enabling write effects."},
     {"id":"markitdown-mcp","sourceKind":"pypi","ref":"latest-stable","license":"MIT","command":"python -m pip install markitdown-mcp","target":".psyclaw/mcp/markitdown-mcp.json","dependencies":["Python >=3.10","pip","markitdown-mcp"],"status":"installable","requiresApproval":true},
     {"id":"paper-search-mcp","sourceKind":"github","ref":"c8b642183bb725f0a7faec89e58b558df09079d1","license":"MIT","command":"git clone https://github.com/openags/paper-search-mcp .psyclaw/mcp-src/paper-search-mcp && git -C .psyclaw/mcp-src/paper-search-mcp checkout c8b642183bb725f0a7faec89e58b558df09079d1","target":".psyclaw/mcp/paper-search-mcp.json","dependencies":["Git","Python/uv per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify package entrypoint and lockfile before registering a stdio server."},
     {"id":"scientific-papers-mcp","sourceKind":"github","ref":"646da8d8af653f6b833f3725bae4cafc38a9428e","license":"unknown","command":"git clone https://github.com/benedict2310/Scientific-Papers-MCP .psyclaw/mcp-src/scientific-papers-mcp && git -C .psyclaw/mcp-src/scientific-papers-mcp checkout 646da8d8af653f6b833f3725bae4cafc38a9428e","target":".psyclaw/mcp/scientific-papers-mcp.json","dependencies":["Git","repository runtime requirements"],"status":"blocked","requiresApproval":true,"blockedReason":"License metadata is not verified."},

@@ -47,6 +47,6 @@ export function analysisSoftRoutePrompt(): string {
     "Optional `/plan auto` skips human approval but every result must disclose 未经人审批.",
     "Do not merge this with academic/ARS planning. After an accepted/completed plan (and results), update `analysis/HANDOFF.md` before switching to academic.",
     "Explicit `/skill:` or `/plan` always wins over soft routing. Academic writing intents belong in academic mode.",
-    "Initiate `/crosscheck` / Panel checklist before and after analysis; model proposes items, human marks or skips with 未经核对.",
+    "Initiate `/crosscheck` (AI field check; alias `/verify`) before and after analysis. Then require human approval in Panel or `/crosscheck <id> human` before handoff. AI-checked/skipped do not pass. Panel is the primary human gate for analysis/academic completion.",
   ].join("\n");
 }
