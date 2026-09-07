@@ -1093,12 +1093,19 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         const id = String(body.id ?? "").trim();
         const status = String(body.status ?? "verified") as VerifyStatus;
         if (!id) throw new Error("id is required");
-        if (status !== "verified" && status !== "unverified" && status !== "flagged" && status !== "skipped") {
-          throw new Error("status must be verified|unverified|flagged|skipped");
+        if (
+          status !== "verified"
+          && status !== "ai-checked"
+          && status !== "unverified"
+          && status !== "flagged"
+          && status !== "skipped"
+        ) {
+          throw new Error("status must be verified|ai-checked|unverified|flagged|skipped");
         }
         const kind = typeof body.kind === "string" ? body.kind as CrosscheckKind : undefined;
         const notes = typeof body.notes === "string" ? body.notes : undefined;
-        const checklist = await markVerifyItem(root, id, status, notes, kind);
+        // Panel clicks are human approvals; AI marks go through /crosscheck in-session.
+        const checklist = await markVerifyItem(root, id, status, notes, kind, { source: "human" });
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ schemaVersion: "psyclaw/crosscheck/v1", checklist }));
         return;

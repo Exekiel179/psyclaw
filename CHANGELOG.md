@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.29.13 - 2026-09-07
+
+- analysis/academic: AI /crosscheck then mandatory human Panel verify before handoff/finalize
+- Windows update verifies global install and repairs stale ENOTEMPTY installs
+- Trim recommended catalog: academic-only, no author branding; Mac Computer Use skill + Computer Use MCP
+- Help/Panel copy and verify checklist statuses (ai-checked vs human verified)
+- Pin website/docs install examples to 0.29.13
+
 ## 0.29.12 - 2026-09-07
 
 - Replace default Pi coding-agent identity with PsyClaw via --system-prompt

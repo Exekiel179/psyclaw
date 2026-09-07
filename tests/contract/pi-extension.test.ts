@@ -30,7 +30,7 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     expect(commands).toEqual([
-      "init", "crosscheck", "verify", "help", "plan", "grill", "review", "loop",
+      "init", "crosscheck", "verify", "help", "plan", "grill", "brainstorm", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
       "skill", "ars", "plugin", "mcp", "provider", "pet", "agents",
     ]);
@@ -111,6 +111,32 @@ describe("Pi extension contract", () => {
     ]));
     expect(commands.some((command) => command.name === "skills")).toBe(false);
     expect(commands.every((command) => Boolean(command.description?.trim()))).toBe(true);
+  });
+
+  it("starts explicit research brainstorming with the requested subject", async () => {
+    let brainstormHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const messages: Array<{ text: string; options?: { deliverAs?: string } }> = [];
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "brainstorm") brainstormHandler = options.handler;
+      },
+      registerTool() {},
+      sendUserMessage(text: string, options?: { deliverAs?: string }) { messages.push({ text, options }); },
+    } as any;
+    extension(api);
+
+    const notifications: string[] = [];
+    await brainstormHandler?.("生成式 AI 与大学生批判性思维", {
+      isIdle: () => true,
+      ui: { notify: (message: string) => notifications.push(message) },
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.text).toContain("academic-grill");
+    expect(messages[0]?.text).toContain("头脑风暴");
+    expect(messages[0]?.text).toContain("生成式 AI 与大学生批判性思维");
+    expect(messages[0]?.options).toEqual({});
+    expect(notifications[0]).toContain("已启动研究方向头脑风暴");
   });
 
   it("starts the academic grill with the requested subject", async () => {

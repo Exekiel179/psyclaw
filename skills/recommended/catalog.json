@@ -1,10 +1,19 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.7.6",
+  "documentVersion": "0.7.8",
   "syncedAt": "2026-09-07",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
+    {
+      "id": "mac-computer-use",
+      "name": "Mac Computer Use",
+      "kind": "skill",
+      "stage": "电脑操控",
+      "description": "操控 macOS 上无 API 的原生应用（截图、键鼠、窗口），每步留取证；仅在用户明确授权操控本机 UI 时启用。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-mac-use",
+      "installHint": "git clone 完整仓库到 skills 目录；启用前须本机辅助功能/屏幕录制权限，并经用户明确批准。"
+    },
     {
       "id": "scientific-visualization",
       "name": "Scientific Visualization",
@@ -40,22 +49,6 @@
       "description": "审查并改造已有 Matplotlib 脚本，使其达到论文投稿所需的排版、配色、字体和导出质量。",
       "sourceRef": "https://github.com/preordinary/science-plot-formatter",
       "installHint": "安装仓库中的 .codex/skills/beautify-chart 完整目录；若该路径不存在，再采用 .claude/skills/beautify-chart。"
-    },
-    {
-      "id": "markitdown-bilibili",
-      "name": "MarkItDown + Bilibili",
-      "kind": "skill",
-      "stage": "材料转换",
-      "description": "字幕优先、转录回退，把 B 站课程和讲座转成带来源状态的 Markdown。",
-      "sourceRef": "https://github.com/LHT666-hub/markItdown-pro"
-    },
-    {
-      "id": "session-handoff",
-      "name": "Session Handoff",
-      "kind": "skill",
-      "stage": "任务接力",
-      "description": "把长任务的目标、进度、阻塞和下一步写成可核验的交接状态。",
-      "sourceRef": "https://github.com/LHT666-hub/session-handoff"
     },
     {
       "id": "zotero-translators",
@@ -98,44 +91,12 @@
       "sourceRef": "https://github.com/HKUSTDial/Supervisor-Skills"
     },
     {
-      "id": "openkb",
-      "name": "OpenKB",
-      "kind": "skill",
-      "stage": "知识库",
-      "description": "把异构资料编译成可链接、可检索、可持续更新的知识库。",
-      "sourceRef": "https://github.com/VectifyAI/OpenKB"
-    },
-    {
-      "id": "corpus2skill",
-      "name": "Corpus2Skill",
-      "kind": "skill",
-      "stage": "知识库",
-      "description": "将大规模语料编译成可导航的 Skill 树和文档索引。",
-      "sourceRef": "https://github.com/dukesun99/Corpus2Skill"
-    },
-    {
       "id": "academic-reference-matcher",
       "name": "Academic Reference Matcher",
       "kind": "skill",
       "stage": "引用核验",
       "description": "逐条拆分 Claim、检索来源并输出 Claim–Reference 对照表。",
       "sourceRef": "https://github.com/keros68/academic-reference-matcher"
-    },
-    {
-      "id": "pskoett-ai-skills",
-      "name": "pskoett AI Skills",
-      "kind": "skill",
-      "stage": "经验沉淀",
-      "description": "把失败和纠正沉淀为候选经验，经过验证后晋升为规则或回归测试。",
-      "sourceRef": "https://github.com/pskoett/pskoett-ai-skills"
-    },
-    {
-      "id": "omnidistill",
-      "name": "OmniDistill",
-      "kind": "skill",
-      "stage": "知识蒸馏",
-      "description": "以证据账本统一知识、启发式规则、工作流、反模式和边界。",
-      "sourceRef": "https://github.com/LHT666-hub/OmniDistill"
     },
     {
       "id": "journal-frontier-radar",
@@ -156,93 +117,35 @@
       "installHint": "安装仓库根目录的 SKILL.md 及配套文件；使用时必须提供可读取的论文 PDF。"
     },
     {
-      "id": "huashu-mac-use",
-      "name": "Huashu Mac Use",
-      "kind": "skill",
-      "stage": "电脑操控",
-      "description": "花叔：让 agent 操控 Mac 上无 API 的原生应用（computer use），每步留取证。",
-      "sourceRef": "https://github.com/alchaincyf/huashu-mac-use",
-      "installHint": "git clone 完整仓库到 skills 目录；仅在用户明确授权操控本机 UI 时启用。"
-    },
-    {
-      "id": "huashu-design",
-      "name": "Huashu Design",
-      "kind": "skill",
-      "stage": "设计与视觉",
-      "description": "花叔：HTML 原生高保真原型 / 幻灯片 / 动画设计系统。",
-      "sourceRef": "https://github.com/alchaincyf/huashu-design"
-    },
-    {
       "id": "huashu-excel",
-      "name": "Huashu Excel",
+      "name": "Excel Research Data",
       "kind": "skill",
       "stage": "数据与文档",
-      "description": "花叔：Excel/数据分析全流程（体检→清洗→口径→对账→报告）。",
+      "description": "Excel/表格数据体检、清洗、口径对齐、对账与分析报告，面向研究数据整理。",
       "sourceRef": "https://github.com/alchaincyf/huashu-excel"
     },
     {
       "id": "huashu-md-html",
-      "name": "Huashu MD/HTML",
+      "name": "Markdown Publishing",
       "kind": "skill",
       "stage": "数据与文档",
-      "description": "花叔：万物转 Markdown，以及 md→出版级 HTML/DOCX 流水线。",
+      "description": "将研究材料转为 Markdown，并导出出版级 HTML/DOCX。",
       "sourceRef": "https://github.com/alchaincyf/huashu-md-html"
     },
     {
-      "id": "huashu-weread",
-      "name": "Huashu WeRead",
-      "kind": "skill",
-      "stage": "阅读",
-      "description": "花叔：微信读书顾问（书架/笔记/荐书/复盘）。",
-      "sourceRef": "https://github.com/alchaincyf/huashu-weread"
-    },
-    {
       "id": "huashu-report",
-      "name": "Huashu Report",
+      "name": "Research Report Pipeline",
       "kind": "skill",
       "stage": "研究与写作",
-      "description": "花叔：机构级研究报告生产流水线。",
+      "description": "研究报告生产流水线：结构、证据、图表与成稿导出。",
       "sourceRef": "https://github.com/alchaincyf/huashu-report"
-    },
-    {
-      "id": "darwin-skill",
-      "name": "Darwin Skill",
-      "kind": "skill",
-      "stage": "Skill 工程",
-      "description": "花叔：进化/优化已有 Skill。学者/期刊蒸馏请用推荐的 distill-scholar / distill-journal（非随包 nuwa）。",
-      "sourceRef": "https://github.com/alchaincyf/darwin-skill"
-    },
-    {
-      "id": "freud-skill",
-      "name": "Freud Skill (prompt debugger)",
-      "kind": "skill",
-      "stage": "Skill 工程",
-      "description": "花叔：诊断 prompt/skill 为何不好使（不是西格蒙德精神分析镜头；精神分析用随包 freud-perspective）。",
-      "sourceRef": "https://github.com/alchaincyf/freud-skill"
-    },
-    {
-      "id": "skills-guide",
-      "name": "Skills Guide",
-      "kind": "skill",
-      "stage": "Skill 工程",
-      "description": "花叔：如何编写 Agent Skill。",
-      "sourceRef": "https://github.com/alchaincyf/skills-guide"
-    },
-    {
-      "id": "huashu-skills-index",
-      "name": "Huashu Skills Index",
-      "kind": "skill",
-      "stage": "Skill 工程",
-      "description": "花叔开源 Skills 总目录（旗舰+人物+内置）；按需挑选安装，勿整仓塞进核心。",
-      "sourceRef": "https://github.com/alchaincyf/huashu-skills",
-      "installHint": "优先读仓库 skills.json；只安装用户选中的子 skill / 旗舰仓库。"
     },
     {
       "id": "distill-scholar",
       "name": "Distill Scholar",
       "kind": "skill",
-      "stage": "Skill 工程",
-      "description": "PsyClaw Distill: distill a scholar/school into a methodological lens skill (not upstream nuwa). Install distill-scholar/ from the repo.",
+      "stage": "方法蒸馏",
+      "description": "将学者/学派蒸馏为可调用的方法论镜头 Skill。安装仓库中的 distill-scholar/ 目录。",
       "sourceRef": "https://github.com/Exekiel179/distill-skills",
       "installHint": "Install only the distill-scholar directory (SKILL.md + references)."
     },
@@ -250,8 +153,8 @@
       "id": "distill-journal",
       "name": "Distill Journal",
       "kind": "skill",
-      "stage": "Skill 工程",
-      "description": "PsyClaw Distill: distill journal/venue writing style. Hard gate: ≥3 local full texts; recommend 8–12.",
+      "stage": "方法蒸馏",
+      "description": "蒸馏目标期刊/会议的写作风格。硬门槛：本地至少 3 篇全文；建议 8–12 篇。",
       "sourceRef": "https://github.com/Exekiel179/distill-skills",
       "installHint": "Install only distill-journal/. Prepare ≥3 target-venue full texts under literature/pdfs or a user path before distilling."
     }
@@ -288,13 +191,13 @@
   "externalTools": [
     {
       "id": "markitdown",
-      "name": "Microsoft MarkItDown",
+      "name": "MarkItDown",
       "kind": "external-tool",
       "installable": true,
       "stage": "材料转换",
-      "description": "微软开源的文档转 Markdown 工具，可处理 PDF、Word、PPT、Excel、HTML 等材料，并供文档读取类 Skill 调用。",
+      "description": "文档转 Markdown 工具，可处理 PDF、Word、PPT、Excel、HTML 等研究材料，并供文档读取类 Skill 调用。",
       "sourceRef": "https://github.com/microsoft/markitdown",
-      "installHint": "由当前模型按微软仓库的官方说明安装 MarkItDown，并验证 markitdown 命令可用。微软仓库本身不含 SKILL.md；PsyClaw 将它作为 Skill 可调用的外部工具推荐，不冒充微软官方 Skill。"
+      "installHint": "按仓库官方说明安装 MarkItDown，并验证 markitdown 命令可用。该仓库本身不含 SKILL.md；PsyClaw 将其作为可调用的外部工具推荐。"
     },
     {
       "id": "nirapost",
@@ -303,43 +206,10 @@
       "stage": "网络分析",
       "description": "用于横断面心理网络模拟干预、置换检验和稳定性分析的 R 工具及复现材料；不是 PsyClaw Skill。",
       "sourceRef": "https://github.com/kingfly51/NIRA_post",
-      "installHint": "请按仓库说明安装 NIRApost，并同时安装依赖 https://github.com/JasperNaberman/nodeIdentifyR。该条目仅作为外部 R 工具推荐，不代表 kingfly51 发布了 PsyClaw Skill。"
+      "installHint": "请按仓库说明安装 NIRApost，并同时安装依赖 https://github.com/JasperNaberman/nodeIdentifyR。该条目仅作为外部 R 工具推荐。"
     }
   ],
   "installPrep": [
-    {
-      "id": "markitdown-bilibili",
-      "sourceKind": "github",
-      "sourceUrl": "https://github.com/LHT666-hub/markItdown-pro.git",
-      "ref": "a601bb294f57dc03a681d2b9fa91d4bb5627bd2f",
-      "skillPath": "markitdown-bilibili",
-      "skillName": "markitdown-bilibili",
-      "license": "MIT",
-      "target": ".psyclaw/imports/recommended/markitdown-bilibili",
-      "dependencies": [
-        "Python >=3.10",
-        "markitdown[all]",
-        "yt-dlp",
-        "FFmpeg (optional for transcription)"
-      ],
-      "status": "review-required",
-      "requiresApproval": true,
-      "blockedReason": "Runtime dependencies are installed separately and must pass the Skill doctor before conversion."
-    },
-    {
-      "id": "session-handoff",
-      "sourceKind": "github",
-      "sourceUrl": "https://github.com/LHT666-hub/session-handoff.git",
-      "ref": "e18e41900953e0126b6beb0b24387bbaf2178f44",
-      "skillPath": "session-handoff",
-      "skillName": "session-handoff",
-      "license": "MIT",
-      "target": ".psyclaw/imports/recommended/session-handoff",
-      "dependencies": [],
-      "status": "review-required",
-      "requiresApproval": true,
-      "blockedReason": "Install manifest and content hash must pass validation before activation."
-    },
     {
       "id": "academic-reference-matcher",
       "sourceKind": "github",

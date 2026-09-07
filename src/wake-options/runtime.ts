@@ -90,7 +90,7 @@ export async function applyWakeVerifySync(
   const selected = new Set(selectedIds);
   for (const option of prompt.options) {
     const status: VerifyStatus = selected.has(option.id) ? "verified" : "unverified";
-    await markVerifyItem(root, option.id, status, `wake-options:${prompt.id}`, undefined);
+    await markVerifyItem(root, option.id, status, `wake-options:${prompt.id}`, undefined, { source: "human" });
   }
   return true;
 }
