@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.9 - 2026-09-07
+
+- Emphasize ARS/Nature/compose/analysis-plan/grill are bundled: never ask the user to install them
+- Use natural-language soft-route in chat/analysis/academic (or explicit /skill) instead of install conversations
+- Update /help notes and Nature missing-filler messaging
+
 ## 0.29.8 - 2026-09-07
 
 - Rename distillation skills to distill-scholar and distill-journal; repo https://github.com/Exekiel179/distill-skills

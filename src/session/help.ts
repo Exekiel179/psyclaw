@@ -16,9 +16,9 @@ export function sessionHelpDocument(): SessionHelpDocument {
   return {
     title: "PsyClaw 使用速览",
     modes: [
-      { id: "chat", label: "chat", blurb: "普通对话；不强制研究流水线" },
+      { id: "chat", label: "chat", blurb: "普通对话；也可用自然语言触发已随包的工作流（勿要求安装 ARS/Nature）" },
       { id: "analysis", label: "analysis", blurb: "澄清 → 方案 → 跑数 → 分析报告；统计意图会 soft-takeover" },
-      { id: "academic", label: "academic", blurb: "ARS 文献/写作/审稿；消费 analysis/HANDOFF.md，不重选主检验" },
+      { id: "academic", label: "academic", blurb: "已内置 ARS/Nature/compose；自然语言 soft-route，勿再安装工作流 Skill" },
     ],
     thinking: "Thinking 深度：Ctrl+Shift+T（比 Ctrl+Shift+Tab 更可靠）",
     steps: [
@@ -36,11 +36,12 @@ export function sessionHelpDocument(): SessionHelpDocument {
       { cmd: "/grill", blurb: "学术压力测试（academic-grill）" },
       { cmd: "/review", blurb: "多角色模拟同行评审" },
       { cmd: "/panel", blurb: "科研工作台" },
-      { cmd: "/skill:<name>", blurb: "显式调用技能；学者/期刊蒸馏用推荐 distill-scholar / distill-journal" },
+      { cmd: "/skill:<name>", blurb: "显式调用；ARS/Nature 等已随包，优先对话 soft-route，勿要求安装" },
       { cmd: "/help", blurb: "打开本页" },
     ],
     notes: [
-      "随包含若干方法学人物镜头；学者/期刊风格蒸馏见推荐安装 `distill-scholar` / `distill-journal`（https://github.com/Exekiel179/distill-skills）。",
+      "ARS、Nature gap-fill（nature-figure 等）、academic-paper-strategist/composer、analysis-plan、academic-grill 已随 npm 包内置：不要让模型去安装或 /plugin install 这些工作流 Skill；需要时用对话（chat/analysis/academic 自然语言）或必要时 `/skill:<name>`。",
+      "可选推荐（非工作流核心）：`distill-scholar` / `distill-journal`（https://github.com/Exekiel179/distill-skills）及花叔其它旗舰。",
       "完整白皮书见仓库 docs/使用白皮书.md。",
     ],
   };

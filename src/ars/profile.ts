@@ -147,7 +147,7 @@ function natureGapFillSection(present: readonly NatureArsFillerId[]): string[] {
   const instructions: Record<NatureArsFillerId, { available: string; missing: string }> = {
     figure: {
       available: "- AVAILABLE nature-figure (format / manuscript figures; bundled): when the manuscript needs publication figures, invoke nature-figure instead of ad-hoc matplotlib. Do not use it to rewrite the paper or invent data.",
-      missing: "- MISSING nature-figure: leave figures unfinished or ARS-native; do not invent publication-ready charts. Offer /plugin install nature-skills-plugin only if the user asks to fill this gap.",
+      missing: "- MISSING nature-figure: unexpected for a normal PsyClaw install (Nature fillers are bundled). Leave figures unfinished or ARS-native; do not invent publication-ready charts. Do not ask the user to install Nature plugins—treat as packaging/runtime fault.",
     },
     "ref-verifier": {
       available: "- AVAILABLE nature-ref-verifier (integrity / citation-check; bundled): after ARS citation-check or integrity, invoke nature-ref-verifier for DOI/author/year/field cross-checks. It does not replace ARS claim-source entailment or locator gates.",
