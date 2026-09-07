@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.7.5",
+  "documentVersion": "0.7.6",
   "syncedAt": "2026-09-07",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
@@ -209,7 +209,7 @@
       "name": "Darwin Skill",
       "kind": "skill",
       "stage": "Skill 工程",
-      "description": "花叔：进化/优化已有 Skill。学者/期刊蒸馏请用推荐的 still-scholar / still-journal（非随包 nuwa）。",
+      "description": "花叔：进化/优化已有 Skill。学者/期刊蒸馏请用推荐的 distill-scholar / distill-journal（非随包 nuwa）。",
       "sourceRef": "https://github.com/alchaincyf/darwin-skill"
     },
     {
@@ -238,22 +238,22 @@
       "installHint": "优先读仓库 skills.json；只安装用户选中的子 skill / 旗舰仓库。"
     },
     {
-      "id": "still-scholar",
-      "name": "Still Scholar Distill",
+      "id": "distill-scholar",
+      "name": "Distill Scholar",
       "kind": "skill",
       "stage": "Skill 工程",
-      "description": "PsyClaw Still: distill a scholar/school into a methodological lens skill (not upstream nuwa). Install still-scholar/ from the repo.",
-      "sourceRef": "https://github.com/Exekiel179/still-skills",
-      "installHint": "Install only the still-scholar directory (SKILL.md + references)."
+      "description": "PsyClaw Distill: distill a scholar/school into a methodological lens skill (not upstream nuwa). Install distill-scholar/ from the repo.",
+      "sourceRef": "https://github.com/Exekiel179/distill-skills",
+      "installHint": "Install only the distill-scholar directory (SKILL.md + references)."
     },
     {
-      "id": "still-journal",
-      "name": "Still Journal Style Distill",
+      "id": "distill-journal",
+      "name": "Distill Journal",
       "kind": "skill",
       "stage": "Skill 工程",
-      "description": "PsyClaw Still: distill journal/venue writing style. Hard gate: ≥3 local full texts; recommend 8–12.",
-      "sourceRef": "https://github.com/Exekiel179/still-skills",
-      "installHint": "Install only still-journal/. Prepare ≥3 target-venue full texts under literature/pdfs or a user path before distilling."
+      "description": "PsyClaw Distill: distill journal/venue writing style. Hard gate: ≥3 local full texts; recommend 8–12.",
+      "sourceRef": "https://github.com/Exekiel179/distill-skills",
+      "installHint": "Install only distill-journal/. Prepare ≥3 target-venue full texts under literature/pdfs or a user path before distilling."
     }
   ],
   "plugins": [

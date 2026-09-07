@@ -12,16 +12,16 @@
 
 ## 蒸馏引擎（推荐安装，不随包）
 
-PsyClaw Still 改进版（**不是**花叔 `huashu-nuwa` 原版）：
+PsyClaw Distill 改进版（**不是**花叔 `huashu-nuwa` 原版）：
 
-- 仓库：https://github.com/Exekiel179/still-skills
-- `still-scholar`：学者/学派 → 新镜头 Skill
-- `still-journal`：期刊/文体风格 → 风格 Skill（本地全文 **≥3** 篇，推荐 **8–12**）
+- 仓库：https://github.com/Exekiel179/distill-skills
+- `distill-scholar`：学者/学派 → 新镜头 Skill
+- `distill-journal`：期刊/文体风格 → 风格 Skill（本地全文 **≥3** 篇，推荐 **8–12**）
 
 经 `/skill` 推荐目录安装，或：
 
 ```bash
-git clone https://github.com/Exekiel179/still-skills.git
+git clone https://github.com/Exekiel179/distill-skills.git
 ```
 
 `/grill` 仍是 academic-grill，与人物镜头分离。
