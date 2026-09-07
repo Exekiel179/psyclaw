@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   acknowledgeBundledPiChangelog,
   ensurePsyClawTheme,
@@ -14,6 +14,11 @@ import { ensureAcademicModeKeybindings } from "./ars/keybindings.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
 import { withBundledWindowsTools } from "./bundled-tools.js";
+
+/** Convert a filesystem path to a Node `--import` specifier (file:// on all platforms). */
+export function toImportSpecifier(modulePath: string): string {
+  return pathToFileURL(modulePath).href;
+}
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -147,7 +152,8 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   }
 
   return new Promise<number>((resolve, reject) => {
-    const child = (options.spawnProcess ?? spawn)(process.execPath, ["--import", networkPreloadPath, piCli, ...args], {
+    const importSpecifier = toImportSpecifier(networkPreloadPath);
+    const child = (options.spawnProcess ?? spawn)(process.execPath, ["--import", importSpecifier, piCli, ...args], {
       cwd,
       stdio: "inherit",
       shell: false,

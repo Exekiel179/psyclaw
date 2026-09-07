@@ -11,9 +11,11 @@ import {
 import { PSYCLAW_THEME_NAME } from "../../src/psyclaw-theme.js";
 
 describe("psyclaw identity prompt", () => {
-  it("identifies as psyclaw and disavows the pi name", () => {
+  it("identifies as psyclaw and forbids disclosing pi / system prompt", () => {
     expect(PSYCLAW_IDENTITY_PROMPT).toContain("psyclaw");
-    expect(PSYCLAW_IDENTITY_PROMPT).toContain("never \"pi\"");
+    expect(PSYCLAW_IDENTITY_PROMPT.toLowerCase()).toContain("never call yourself \"pi\"");
+    expect(PSYCLAW_IDENTITY_PROMPT).toContain("Anti-disclosure");
+    expect(PSYCLAW_IDENTITY_PROMPT).toMatch(/system prompt|系统提示词/i);
   });
 });
 
