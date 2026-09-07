@@ -14,6 +14,12 @@ import { ensureAcademicModeKeybindings } from "./ars/keybindings.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
 import { withBundledWindowsTools } from "./bundled-tools.js";
+import {
+  CONTINUOUSLY_WORK_ENV,
+  continuouslyWorkPrompt,
+  continuouslyWorkWarningText,
+} from "./session/continuously-work.js";
+import { c } from "./style/cli-ui.js";
 
 /** Convert a filesystem path to a Node `--import` specifier (file:// on all platforms). */
 export function toImportSpecifier(modulePath: string): string {
@@ -66,6 +72,16 @@ export interface ChatLaunchOptions {
   skillsPath?: string;
   /** Test/development hook for launching the bundled runtime. */
   spawnProcess?: typeof spawn;
+  /**
+   * Launch-only continuously-work option (`psyclaw --continuously-work`).
+   * Not a Shift+Tab mode; cannot be toggled mid-session.
+   */
+  continuouslyWork?: boolean;
+}
+
+/** Pi CLI args that install PsyClaw as the base identity (not an append on "pi"). */
+export function systemPromptLaunchArgs(identityPrompt: string): string[] {
+  return ["--system-prompt", identityPrompt];
 }
 
 /**
@@ -91,11 +107,16 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     : "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp";
   // The base identity is fixed; the user may only append a project supplement
   // (managed from the panel), never rewrite the base.
+  // continuously-work is launch-only via `psyclaw --continuously-work` (not env alone).
+  const continuouslyWork = options.continuouslyWork === true;
   let identityPrompt = PSYCLAW_IDENTITY_PROMPT;
   try {
     const supplement = (await readFile(join(cwd, ".psyclaw", "system-prompt.md"), "utf8")).trim();
     if (supplement) identityPrompt = `${identityPrompt}\n\n${supplement}`;
   } catch { /* no user supplement */ }
+  if (continuouslyWork) {
+    identityPrompt = `${identityPrompt}\n\n${continuouslyWorkPrompt()}`;
+  }
   const args = [
     // Disable Pi's ambient Skill scan. PsyClaw's resources_discover handler
     // adds only existing, deduplicated Skill paths after core Skills.
@@ -104,7 +125,8 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     "--extension", panelExtensionPath,
     "--skill", skillsPath,
     "--tools", toolAllowlist,
-    "--append-system-prompt", identityPrompt,
+    // Replace the default "coding assistant inside pi" identity entirely.
+    ...systemPromptLaunchArgs(identityPrompt),
     ...(options.args ?? []),
   ];
 
@@ -123,6 +145,9 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   // Free Shift+Tab for academic mode; move Pi thinking-cycle to Ctrl+Shift+Tab.
   await ensureAcademicModeKeybindings(agentDir);
   const sessionDir = process.env.PSYCLAW_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
+  if (continuouslyWork) {
+    process.stderr.write(`${c.red(continuouslyWorkWarningText())}\n\n`);
+  }
   let spawnEnv: NodeJS.ProcessEnv = withBundledWindowsTools({
     ...process.env,
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
@@ -133,7 +158,9 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
     PI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_SESSION_DIR: sessionDir,
     PSYCLAW_NETWORK_PRELOAD: "1",
+    ...(continuouslyWork ? { [CONTINUOUSLY_WORK_ENV]: "1" } : {}),
   }, root);
+  if (!continuouslyWork) delete spawnEnv[CONTINUOUSLY_WORK_ENV];
   if (process.platform === "darwin") {
     const missing = PROVIDER_PRESETS.filter((preset) => !spawnEnv[preset.apiKeyEnv]);
     const values = await Promise.all(missing.map((preset) => readMacOsLaunchctlCredential(preset.apiKeyEnv)));
