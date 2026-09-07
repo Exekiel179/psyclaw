@@ -1,6 +1,6 @@
 {
   "name": "psyclaw",
-  "version": "0.29.5",
+  "version": "0.29.6",
   "description": "A standalone, evidence-grounded social-science research agent with research contracts, evidence gates, and recoverable workflows",
   "type": "module",
   "license": "MIT",
@@ -27,7 +27,6 @@
     "vendor/ars",
     "vendor/nature-skills",
     "vendor/academic-paper-skills",
-    "vendor/nuwa-skill",
     "vendor/windows",
     "scripts/psyclaw.mjs",
     "scripts/rebrand-pi.mjs"
@@ -53,7 +52,6 @@
     "skills": [
       "./skills/core",
       "./skills/scholars",
-      "./vendor/nuwa-skill",
       "./vendor/ars/deep-research",
       "./vendor/ars/academic-paper",
       "./vendor/ars/academic-paper-reviewer",

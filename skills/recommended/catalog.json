@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.7.3",
+  "documentVersion": "0.7.4",
   "syncedAt": "2026-09-07",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
@@ -209,7 +209,7 @@
       "name": "Darwin Skill",
       "kind": "skill",
       "stage": "Skill 工程",
-      "description": "花叔：进化/优化已有 Skill。女娲（huashu-nuwa）已随包；需要进化时再装本推荐。",
+      "description": "花叔：进化/优化已有 Skill。学者/期刊蒸馏请用推荐的 still-学者 / still-期刊（非随包 nuwa）。",
       "sourceRef": "https://github.com/alchaincyf/darwin-skill"
     },
     {
@@ -236,6 +236,24 @@
       "description": "花叔开源 Skills 总目录（旗舰+人物+内置）；按需挑选安装，勿整仓塞进核心。",
       "sourceRef": "https://github.com/alchaincyf/huashu-skills",
       "installHint": "优先读仓库 skills.json；只安装用户选中的子 skill / 旗舰仓库。"
+    },
+    {
+      "id": "still-学者",
+      "name": "Still · 学者蒸馏",
+      "kind": "skill",
+      "stage": "Skill 工程",
+      "description": "PsyClaw Still：把学者/学派蒸馏为方法学镜头 Skill（非女娲原版）。仓库含 still-学者 目录。",
+      "sourceRef": "https://github.com/Exekiel179/still-skills",
+      "installHint": "只安装仓库中的 still-学者 完整目录（含 SKILL.md 与 references）。"
+    },
+    {
+      "id": "still-期刊",
+      "name": "Still · 期刊风格蒸馏",
+      "kind": "skill",
+      "stage": "Skill 工程",
+      "description": "PsyClaw Still：期刊/文体风格蒸馏。硬门槛本地全文≥3篇，推荐8–12篇。",
+      "sourceRef": "https://github.com/Exekiel179/still-skills",
+      "installHint": "只安装仓库中的 still-期刊 完整目录（含 SKILL.md 与 references）。蒸馏前准备 literature/pdfs 或指定路径下至少3篇目标刊全文。"
     }
   ],
   "plugins": [
