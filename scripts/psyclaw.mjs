@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { rebrandPiRuntime } from "./rebrand-pi.mjs";
 
 try {
@@ -20,7 +21,10 @@ try {
   // first imported. Prepare the locked runtime before loading PsyClaw's CLI so
   // a clean first launch cannot create the legacy ~/.pi directory.
   await rebrandPiRuntime({ quiet: true });
-  await import("../dist/src/cli.js");
+  // Use an explicit file:// URL so Windows absolute paths never reach the ESM
+  // loader as protocol `c:` (ERR_UNSUPPORTED_ESM_URL_SCHEME).
+  const cliUrl = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "..", "dist", "src", "cli.js")).href;
+  await import(cliUrl);
 } catch (error) {
   process.stderr.write(`PsyClaw could not start: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;

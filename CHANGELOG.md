@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.11 - 2026-09-07
+
+- Fix ERR_UNSUPPORTED_ESM_URL_SCHEME on Windows by passing file:// to node --import and startup import
+- Harden network-routing URL/createRequire bases for Windows paths
+- Identity prompt: refuse dumping system prompt / pi harness / internal skill catalogs
+
 ## 0.29.10 - 2026-09-07
 
 - Sync CLI assistant replies to Panel via SSE (/api/assistant/stream)

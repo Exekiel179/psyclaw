@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
 const DEFAULT_CN_GITHUB_MIRRORS = ["https://gh-proxy.com/", "https://gh-proxy.org/"] as const;
@@ -162,7 +162,9 @@ export function createRoutedFetch(route: NetworkRoute, fetchImpl: typeof fetch =
 
 async function ensureRequiredSearchTools(): Promise<void> {
   const piEntry = import.meta.resolve("@earendil-works/pi-coding-agent");
-  const managerUrl = new URL("./utils/tools-manager.js", piEntry);
+  // Base must be a file:// URL. A bare Windows path (`C:\...`) becomes protocol `c:`.
+  const entryHref = piEntry.startsWith("file:") ? piEntry : pathToFileURL(piEntry).href;
+  const managerUrl = new URL("./utils/tools-manager.js", entryHref);
   const manager = await import(managerUrl.href) as {
     ensureTool(tool: "fd" | "rg", onStatus?: (status: { type: string; message: string }) => void): Promise<string | undefined>;
   };
@@ -184,7 +186,8 @@ async function ensureRequiredSearchTools(): Promise<void> {
 export async function configureRuntimeNetwork(): Promise<NetworkRoute> {
   const route = selectNetworkRoute(process.env, await configuredRegistry());
   if (route.mode === "proxy") {
-    const requireFromPi = createRequire(import.meta.resolve("@earendil-works/pi-coding-agent"));
+    const piResolved = import.meta.resolve("@earendil-works/pi-coding-agent");
+    const requireFromPi = createRequire(piResolved.startsWith("file:") ? piResolved : pathToFileURL(piResolved).href);
     const undici = requireFromPi("undici") as {
       EnvHttpProxyAgent: new (options?: { httpProxy?: string; httpsProxy?: string; noProxy?: string }) => unknown;
       setGlobalDispatcher(dispatcher: unknown): void;
