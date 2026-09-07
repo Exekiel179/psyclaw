@@ -67,4 +67,4 @@ license: MIT
 ## 与 PsyClaw 协作
 
 - 实证测量、量表与统计仍回 analysis / `gelman-perspective` 等方法镜头或受信任 MCP。
-- 继续蒸馏其他精神分析人物（如 Lacan/Klein）：推荐 `still-学者`（https://github.com/Exekiel179/still-skills）。勿与花叔用于调试 prompt 的 `freud-skill` 混淆。
+- 继续蒸馏其他精神分析人物（如 Lacan/Klein）：推荐 `still-scholar`（https://github.com/Exekiel179/still-skills）。勿与花叔用于调试 prompt 的 `freud-skill` 混淆。

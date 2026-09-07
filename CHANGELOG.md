@@ -1,9 +1,14 @@
 # Changelog
 
+## 0.29.7 - 2026-09-07
+
+- Rename recommended distillation skills to English ids still-scholar and still-journal (drop still-学者 / still-期刊 mixed names)
+- Point docs and catalog at https://github.com/Exekiel179/still-skills still-scholar / still-journal
+
 ## 0.29.6 - 2026-09-07
 
-- Remove bundled huashu-nuwa; scholar/journal distillation moves to recommended still-学者 and still-期刊 at https://github.com/Exekiel179/still-skills
-- still-期刊 requires ≥3 local full texts (recommend 8–12)
+- Remove bundled huashu-nuwa; scholar/journal distillation moves to recommended still-scholar and still-journal at https://github.com/Exekiel179/still-skills
+- still-journal requires ≥3 local full texts (recommend 8–12)
 - Update help, scholars README, and perspective skills to point at Still
 
 ## 0.29.5 - 2026-09-07

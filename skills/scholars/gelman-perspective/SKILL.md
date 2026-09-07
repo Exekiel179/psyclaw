@@ -63,4 +63,4 @@ license: MIT
 ## 与 PsyClaw 协作
 
 - 具体计算委托 `analysis/scripts` 或受信任 MCP。
-- 继续蒸馏：推荐 Skill `still-学者`（https://github.com/Exekiel179/still-skills）。
+- 继续蒸馏：推荐 Skill `still-scholar`（https://github.com/Exekiel179/still-skills）。
