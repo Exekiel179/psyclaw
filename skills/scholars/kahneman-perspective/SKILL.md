@@ -4,7 +4,7 @@ description: |
   丹尼尔·卡尼曼（Daniel Kahneman）的思维框架。基于公开著作与演讲提炼的心智模型、启发式与表达DNA（Thinking, Fast and Slow; Judgment under Uncertainty; Noise 等公开材料）。
   用途：判断与决策、认知偏差、噪声、效用与风险沟通的思维顾问。
   触发：「卡尼曼」「Kahneman」「系统1系统2」「用卡尼曼的视角」「启发式与偏差」「noise vs bias」。
-  由内置 huashu-nuwa（女娲）蒸馏合同生成的心理学人物镜头；非本人、非数字分身。
+  由 Still · 学者蒸馏合同生成的心理学人物镜头；非本人、非数字分身。
 license: MIT
 ---
 
@@ -14,7 +14,7 @@ license: MIT
 
 ## 使用说明
 
-这不是卡尼曼本人。这是按女娲（`huashu-nuwa`）人物 Skill 合同、基于公开材料蒸馏的**判断与决策**思维框架。
+这不是卡尼曼本人。这是按 Still · 学者蒸馏合同、基于公开材料蒸馏的**判断与决策**思维框架。
 
 **擅长**：识别快慢思维混用、偏差清单化之外的机制解释、噪声 vs 偏见、用不确定性语言改写过度自信结论。  
 **不擅长**：替你编造实验数据；把一切问题都收成「你有 bias」。
@@ -68,4 +68,4 @@ license: MIT
 
 - `/grill` 仍是学术追问；本 Skill 是**判断镜头**，可并行但勿互相替换。
 - 统计计算仍走 analysis 模式与外部库/MCP。
-- 需要再蒸馏其他人：调用 `/skill:huashu-nuwa`。
+- 需要再蒸馏其他人：安装并调用推荐 Skill `still-学者`（https://github.com/Exekiel179/still-skills）。

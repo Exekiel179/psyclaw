@@ -74,7 +74,7 @@ export function formatCliUsage(): string {
     cmd("/review", "", c.white("运行多角色模拟同行评审")),
     cmd("/panel", "", c.white("打开科研工作台（核对清单/对话）")),
     cmd("/help", "", c.white("打开 Panel 使用速览")),
-    cmd("/skill", "[status|enable|disable|install|…]", c.white("管理和安装 Skill（含学者/期刊蒸馏）")),
+    cmd("/skill", "[status|enable|disable|install|…]", c.white("管理和安装 Skill（推荐 still-学者 / still-期刊）")),
     cmd("/agents", "[--agent id] [task]", c.white("浏览或运行 Subagent（类 Claude）")),
     cmd("/mcp", "", c.white("管理 MCP 服务器")),
     cmd("/plugin", "", c.white("打开 Plugin 推荐与管理页")),

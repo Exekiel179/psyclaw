@@ -36,11 +36,11 @@ export function sessionHelpDocument(): SessionHelpDocument {
       { cmd: "/grill", blurb: "学术压力测试（academic-grill）" },
       { cmd: "/review", blurb: "多角色模拟同行评审" },
       { cmd: "/panel", blurb: "科研工作台" },
-      { cmd: "/skill:<name>", blurb: "显式调用技能；随包含学者/期刊风格蒸馏与若干人物镜头" },
+      { cmd: "/skill:<name>", blurb: "显式调用技能；学者/期刊蒸馏用推荐 still-学者 / still-期刊" },
       { cmd: "/help", blurb: "打开本页" },
     ],
     notes: [
-      "随包内置学者与期刊风格蒸馏引擎（女娲 huashu-nuwa），以及若干方法学人物镜头；其它花叔旗舰（含电脑操控）在推荐目录按需安装。",
+      "随包含若干方法学人物镜头；学者/期刊风格蒸馏见推荐安装 `still-学者` / `still-期刊`（https://github.com/Exekiel179/still-skills）。",
       "完整白皮书见仓库 docs/使用白皮书.md。",
     ],
   };

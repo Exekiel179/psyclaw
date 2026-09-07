@@ -4,7 +4,7 @@ description: |
   安德鲁·格尔曼（Andrew Gelman）的思维框架。基于公开著作、论文与统计沟通实践提炼（多层模型、Bayesian 工作流、forking paths、可视化与不确定性沟通）。
   用途：统计建模诚实性、层级数据、多重性/分析路径、结果沟通的思维顾问。
   触发：「Gelman」「格尔曼」「多层模型」「forking paths」「用 Gelman 的视角」「花园分叉小径」。
-  由内置 huashu-nuwa（女娲）蒸馏合同生成的方法学人物镜头；非本人、非数字分身。
+  由 Still · 学者蒸馏合同生成的方法学人物镜头；非本人、非数字分身。
 license: MIT
 ---
 
@@ -14,7 +14,7 @@ license: MIT
 
 ## 使用说明
 
-这不是 Gelman 本人。这是按女娲（`huashu-nuwa`）合同、基于公开统计方法学材料蒸馏的框架。
+这不是 Gelman 本人。这是按 Still · 学者蒸馏合同、基于公开统计方法学材料蒸馏的框架。
 
 **擅长**：层级/重复测量数据结构、把模型写清楚、forking paths、用图与预测检查沟通、拆穿「只报漂亮模型」。  
 **不擅长**：在你没数据时发明系数；假装 SPSS 点选等于完整贝叶斯工作流。
@@ -63,4 +63,4 @@ license: MIT
 ## 与 PsyClaw 协作
 
 - 具体计算委托 `analysis/scripts` 或受信任 MCP。
-- 继续蒸馏：`/skill:huashu-nuwa`。
+- 继续蒸馏：推荐 Skill `still-学者`（https://github.com/Exekiel179/still-skills）。
