@@ -6,7 +6,6 @@ import { asHandoff, asProject } from "../core/schemas.js";
 import { atomicWriteFile } from "./jsonl.js";
 import { projectPaths, ensureProjectDirectories, assertSafeProjectPath } from "./paths.js";
 import { scaffoldWorkspace } from "./workspace.js";
-import { defaultVerifyChecklist, saveVerifyChecklist } from "../verify/checklist.js";
 
 export interface BootstrapOptions {
   root: string;
@@ -36,7 +35,6 @@ export async function bootstrapProject(options: BootstrapOptions): Promise<Resea
   };
   asProject(project);
   await scaffoldWorkspace(paths.root, { label: goal });
-  await saveVerifyChecklist(paths.root, defaultVerifyChecklist(now));
   const projectFile = await assertSafeProjectPath(paths.root, ".psyclaw/project.json");
   try {
     await writeFile(projectFile, `${JSON.stringify(project, null, 2)}\n`, { encoding: "utf8", flag: "wx" });

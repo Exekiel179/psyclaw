@@ -160,20 +160,29 @@
       display: grid;
       grid-template-columns: 210px minmax(0, 1fr);
       min-height: 0;
+      transition: grid-template-columns 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .layout.nav-collapsed {
+      grid-template-columns: 58px minmax(0, 1fr);
     }
 
     .nav {
-      padding: 16px 10px;
+      padding: 14px 8px;
       background: var(--bg-sidebar);
       border-right: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+      overflow: hidden;
+      transition: padding 0.2s ease;
+      position: relative;
     }
-    .nav-group {
+    .nav-header {
       display: flex;
-      flex-direction: column;
-      gap: 3px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 6px 8px;
+      margin-bottom: 4px;
     }
     .nav-label {
       font-size: 10.5px;
@@ -181,26 +190,67 @@
       color: var(--text-tertiary);
       letter-spacing: 0.05em;
       text-transform: uppercase;
-      padding: 6px 10px 4px;
-      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.15s ease;
+    }
+    .nav-toggle-btn {
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .nav-toggle-btn:hover {
+      background: var(--bg-surface-subtle);
+      color: var(--text-main);
+    }
+    .layout.nav-collapsed .nav-header {
+      justify-content: center;
+      padding: 2px 0 10px;
+    }
+    .layout.nav-collapsed .nav-label {
+      display: none;
+    }
+    .layout.nav-collapsed .nav-toggle-btn svg {
+      transform: rotate(180deg);
+    }
+
+    .nav-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
     .nav button {
       width: 100%;
       display: flex;
       align-items: center;
-      gap: 9px;
-      padding: 8px 10px;
+      gap: 10px;
+      padding: 9px 10px;
       border-radius: var(--radius-sm);
       color: var(--text-secondary);
       font-weight: 500;
       font-size: 12.5px;
       text-align: left;
-      transition: all 0.15s ease;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
       position: relative;
+      white-space: nowrap;
+    }
+    .nav button .nav-btn-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity 0.15s ease;
     }
     .nav button svg {
-      width: 16px;
-      height: 16px;
+      width: 17px;
+      height: 17px;
       color: var(--text-muted);
       flex-shrink: 0;
       transition: color 0.15s ease;
@@ -222,12 +272,29 @@
     .nav button.active svg {
       color: var(--brand-primary);
     }
+
+    /* Collapsed Nav Styles */
+    .layout.nav-collapsed .nav {
+      padding: 12px 6px;
+    }
+    .layout.nav-collapsed .nav button {
+      justify-content: center;
+      padding: 9px 0;
+    }
+    .layout.nav-collapsed .nav button .nav-btn-text {
+      display: none;
+    }
+    .layout.nav-collapsed .nav-footer {
+      display: none;
+    }
+
     .nav-footer {
       padding: 12px 10px;
       border-top: 1px solid var(--border-subtle);
       font-size: 11px;
       color: var(--text-muted);
       line-height: 1.4;
+      transition: opacity 0.15s ease;
     }
     .nav-footer code {
       font-family: var(--font-mono);
@@ -939,89 +1006,47 @@
       background: var(--brand-primary-hover);
     }
 
-    /* Chat drawer — light app chrome (not terminal) */
-    .console-fab {
-      position: fixed;
-      bottom: 24px;
-      right: 28px;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 18px;
-      background: var(--bg-surface);
-      color: var(--brand-primary);
-      border: 1px solid var(--brand-primary-border);
-      border-radius: var(--radius-lg);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: var(--shadow-md);
-      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-    }
-    .console-fab:hover {
-      background: var(--brand-primary-light);
-      border-color: var(--brand-primary);
-      transform: translateY(-1px);
-    }
+    /* In-page chat: Modern Codex / Gemini style */
     .console-drawer {
-      position: fixed;
-      bottom: 0;
-      right: 28px;
-      width: 480px;
-      max-width: calc(100vw - 40px);
-      height: 560px;
-      max-height: calc(100vh - 80px);
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 72vh;
+      flex: 1;
       background: var(--bg-surface);
       color: var(--text-main);
-      border: 1px solid var(--border-subtle);
-      border-bottom: 0;
-      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-      box-shadow: var(--shadow-md);
+      border: none;
       display: flex;
       flex-direction: column;
-      z-index: 1000;
-      transform: translateY(105%);
-      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
       font-family: var(--font-sans);
-    }
-    .console-drawer.open {
-      transform: translateY(0);
-    }
-    .console-drawer.embedded {
-      border: none;
-      border-radius: 0;
-      box-shadow: none;
-      transform: none;
     }
     .console-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 16px;
+      padding: 12px 20px;
       border-bottom: 1px solid var(--border-subtle);
       background: var(--bg-surface);
-      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    }
-    .console-drawer.embedded .console-header {
-      border-radius: 0;
     }
     .console-title {
-      font-size: 13px;
+      font-size: 13.5px;
       font-weight: 650;
       color: var(--text-main);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 9px;
     }
     .console-status-tag {
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 600;
-      padding: 1px 6px;
-      border-radius: var(--radius-xs);
+      padding: 1px 7px;
+      border-radius: 999px;
       background: var(--ok-bg);
       color: var(--ok-text);
       border: 1px solid var(--ok-border);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     .console-actions {
       display: flex;
@@ -1033,140 +1058,372 @@
       border: none;
       color: var(--text-muted);
       cursor: pointer;
-      padding: 4px;
+      padding: 5px;
       border-radius: var(--radius-sm);
       display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
     }
     .console-btn-icon:hover {
       color: var(--text-main);
       background: var(--bg-surface-subtle);
     }
+
+    .console-log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: var(--bg-app);
+      scroll-behavior: smooth;
+    }
+
+    /* Message Rows */
+    .log-entry {
+      display: flex;
+      width: 100%;
+      max-width: 860px;
+      margin: 0 auto;
+      gap: 12px;
+      animation: fadeIn 0.18s ease;
+    }
+    .log-entry.user {
+      justify-content: flex-end;
+    }
+    .log-entry.agent,
+    .log-entry.sys {
+      justify-content: flex-start;
+    }
+
+    /* User Message Bubble */
+    .log-user-wrap {
+      max-width: 82%;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+    .log-user {
+      color: #ffffff;
+      font-weight: 450;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      padding: 10px 15px;
+      border-radius: 16px 16px 4px 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: var(--shadow-sm);
+      line-height: 1.55;
+    }
+
+    /* Agent Message: Codex/Gemini open conversational layout */
+    .agent-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0d766e 0%, #0284c7 100%);
+      color: #ffffff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 15px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(13, 118, 110, 0.2);
+    }
+    .agent-content-wrap {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .agent-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .agent-role-pill {
+      font-size: 10px;
+      font-weight: 550;
+      background: var(--brand-primary-light);
+      color: var(--brand-primary);
+      border: 1px solid var(--brand-primary-border);
+      padding: 0 5px;
+      border-radius: 4px;
+    }
+    .log-agent {
+      color: var(--text-main);
+      background: var(--bg-surface);
+      padding: 14px 18px;
+      border-radius: 4px 16px 16px 16px;
+      border: 1px solid var(--border-subtle);
+      word-break: break-word;
+      box-shadow: var(--shadow-card);
+      line-height: 1.65;
+    }
+    .log-agent > :first-child { margin-top: 0; }
+    .log-agent > :last-child { margin-bottom: 0; }
+    .log-agent p { margin: 8px 0; }
+    .log-agent h1, .log-agent h2, .log-agent h3 {
+      margin: 14px 0 6px;
+      color: var(--text-main);
+      font-weight: 650;
+    }
+    .log-agent h1 { font-size: 16px; }
+    .log-agent h2 { font-size: 14.5px; }
+    .log-agent h3 { font-size: 13.5px; }
+    .log-agent ul, .log-agent ol {
+      margin: 6px 0 6px 20px;
+      padding: 0;
+    }
+    .log-agent li { margin: 3px 0; }
+    .log-agent blockquote {
+      border-left: 3px solid var(--brand-primary);
+      background: var(--brand-primary-light);
+      padding: 6px 12px;
+      margin: 8px 0;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      color: var(--text-secondary);
+    }
+    .log-agent table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 12.5px;
+    }
+    .log-agent th, .log-agent td {
+      padding: 6px 10px;
+      border: 1px solid var(--border-subtle);
+      text-align: left;
+    }
+    .log-agent th {
+      background: var(--bg-surface-subtle);
+      font-weight: 600;
+    }
+
+    /* Code Blocks with Copy Header */
+    .code-container {
+      position: relative;
+      margin: 10px 0;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+    }
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 12px;
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      user-select: none;
+    }
+    .code-copy-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #cbd5e1;
+      background: transparent;
+      border: none;
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    .code-copy-btn:hover {
+      background: #334155;
+      color: #ffffff;
+    }
+    .log-agent pre {
+      margin: 0;
+      padding: 12px 14px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      color: #f1f5f9;
+      background: transparent;
+    }
+    .log-agent code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .log-agent p code, .log-agent li code {
+      background: var(--bg-surface-subtle);
+      color: #0f766e;
+      border: 1px solid var(--border-subtle);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    /* Shimmering Pulsing Dots for Streaming */
+    .agent-typing-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      margin-top: 4px;
+      width: fit-content;
+    }
+    .typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--brand-primary);
+      animation: pulseDot 1.4s infinite ease-in-out both;
+    }
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    .typing-dot:nth-child(3) { animation-delay: 0s; }
+    @keyframes pulseDot {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.35; }
+      40% { transform: scale(1.1); opacity: 1; }
+    }
+
+    /* System & Info Messages */
+    .log-sys {
+      color: var(--text-muted);
+      font-size: 12px;
+      background: var(--bg-surface-subtle);
+      border: 1px dashed var(--border-default);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      text-align: center;
+      width: 100%;
+    }
+    .wake-checklist-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--brand-primary-border);
+      border-left: 3px solid var(--brand-primary);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    /* Quick Action Chips */
     .console-quick-chips {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 14px;
-      background: var(--bg-surface-subtle);
-      border-bottom: 1px solid var(--border-subtle);
+      padding: 8px 16px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
       overflow-x: auto;
+      max-width: 860px;
+      margin: 0 auto;
+      width: 100%;
     }
     .chip {
       font-family: var(--font-mono);
       font-size: 11px;
-      background: var(--bg-surface);
+      background: var(--bg-surface-subtle);
       color: var(--text-secondary);
-      border: 1px solid var(--border-default);
-      padding: 3px 8px;
-      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      padding: 3px 9px;
+      border-radius: 999px;
       cursor: pointer;
       white-space: nowrap;
-      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     .chip:hover {
       background: var(--brand-primary-light);
       border-color: var(--brand-primary-border);
       color: var(--brand-primary);
     }
-    .console-log {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      font-family: var(--font-sans);
-      font-size: 13px;
-      line-height: 1.55;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      background: var(--bg-app);
-    }
-    .log-entry {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      max-width: 92%;
-    }
-    .log-entry.user {
-      align-self: flex-end;
-      align-items: flex-end;
-    }
-    .log-entry.agent,
-    .log-entry.sys {
-      align-self: flex-start;
-      align-items: flex-start;
-    }
-    .log-user {
-      color: #fff;
-      font-weight: 500;
-      background: var(--brand-primary);
-      padding: 10px 12px;
-      border-radius: 12px 12px 4px 12px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      box-shadow: var(--shadow-xs);
-    }
-    .log-agent {
-      color: var(--text-main);
-      background: var(--bg-surface);
-      padding: 10px 12px;
-      border-radius: 12px 12px 12px 4px;
-      border: 1px solid var(--border-subtle);
-      white-space: pre-wrap;
-      word-break: break-word;
-      box-shadow: var(--shadow-xs);
-    }
-    .log-sys {
-      color: var(--text-muted);
-      font-style: normal;
-      font-size: 12px;
-      background: transparent;
-      padding: 2px 0;
-    }
-    .console-input-box {
-      padding: 12px 14px;
+
+    /* Modern Textarea Input Box (Gemini / Codex Style) */
+    .console-input-wrap {
       background: var(--bg-surface);
       border-top: 1px solid var(--border-subtle);
+      padding: 12px 16px 14px;
+    }
+    .console-input-container {
+      max-width: 860px;
+      margin: 0 auto;
       display: flex;
-      gap: 8px;
+      flex-direction: column;
+      gap: 6px;
     }
-    .console-input {
-      flex: 1;
+    .console-input-box {
       background: var(--bg-surface-subtle);
-      border: 1px solid var(--border-default);
-      color: var(--text-main);
-      padding: 10px 12px;
-      font-size: 13px;
-      border-radius: var(--radius-md);
-      outline: none;
-      font-family: var(--font-sans);
+      border: 1.5px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      padding: 8px 12px;
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
     }
-    .console-input:focus {
-      border-color: var(--brand-primary);
+    .console-input-box:focus-within {
       background: var(--bg-surface);
+      border-color: var(--brand-primary);
       box-shadow: 0 0 0 3px var(--brand-primary-border);
+    }
+    .console-textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      resize: none;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: var(--text-main);
+      min-height: 24px;
+      max-height: 160px;
+      padding: 4px 0;
+    }
+    .console-textarea::placeholder {
+      color: var(--text-muted);
     }
     .console-send-btn {
       background: var(--brand-primary);
-      color: #fff;
+      color: #ffffff;
       border: none;
-      padding: 8px 14px;
+      width: 32px;
+      height: 32px;
       border-radius: var(--radius-md);
-      font-size: 13px;
-      font-weight: 600;
       cursor: pointer;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      transition: background 0.15s ease, transform 0.1s ease;
+      margin-bottom: 2px;
+    }
+    .console-send-btn:hover:not(:disabled) {
+      background: var(--brand-primary-hover);
+      transform: translateY(-1px);
+    }
+    .console-send-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .console-input-footer {
       display: flex;
       align-items: center;
-      gap: 4px;
+      justify-content: space-between;
+      padding: 0 4px;
+      font-size: 11px;
+      color: var(--text-muted);
     }
-    .console-send-btn:hover {
-      background: var(--brand-primary-hover);
-    }
-    .log-agent.streaming::after {
-      content: "▍";
-      animation: blink 1s steps(1) infinite;
-      color: var(--brand-primary);
-      margin-left: 2px;
-    }
-    @keyframes blink { 50% { opacity: 0; } }
     .wake-option-list {
       display: grid;
       gap: 8px;
@@ -1280,7 +1537,6 @@
       .viewer { min-height: 480px; }
       .provider-grid, .cost-metrics { grid-template-columns: 1fr; }
       .topbar { padding: 0 14px; }
-      .console-drawer { width: 100vw; right: 0; }
     }
   </style>
 </head>
@@ -1320,32 +1576,37 @@
   <!-- 主体工作区 Layout -->
   <div class="layout">
     <!-- 侧边导航栏 Sidebar -->
-    <nav class="nav" aria-label="Panel 导航">
+    <nav class="nav" id="workbench-nav" aria-label="Panel 导航">
       <div class="nav-group">
-        <div class="nav-label">工作台导航</div>
-        <button class="active" data-view="project">
+        <div class="nav-header">
+          <div class="nav-label">工作台导航</div>
+          <button id="nav-toggle-btn" class="nav-toggle-btn" title="折叠/展开导航栏" aria-label="折叠导航栏">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+        </div>
+        <button class="active" data-view="project" title="项目文件">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-          项目文件
+          <span class="nav-btn-text">项目文件</span>
         </button>
-        <button data-view="ecosystem">
+        <button data-view="ecosystem" title="能力生态">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-          能力生态
+          <span class="nav-btn-text">能力生态</span>
         </button>
-        <button data-view="provider">
+        <button data-view="provider" title="模型与成本">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          模型与成本
+          <span class="nav-btn-text">模型与成本</span>
         </button>
-        <button data-view="help">
+        <button data-view="help" title="使用速览">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          使用速览
+          <span class="nav-btn-text">使用速览</span>
         </button>
-        <button data-view="checklist">
+        <button data-view="checklist" title="核对清单">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-          核对清单
+          <span class="nav-btn-text">核对清单</span>
         </button>
-        <button data-view="chat">
+        <button data-view="chat" title="对话">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          对话
+          <span class="nav-btn-text">对话</span>
         </button>
       </div>
       <div class="nav-footer">
@@ -1560,7 +1821,7 @@
           <ol id="help-steps" class="help-steps"></ol>
         </div>
         <div class="help-block">
-          <h2>常用命令</h2>
+          <h2>可用命令</h2>
           <div id="help-commands" class="help-commands"></div>
         </div>
         <div class="help-block">
@@ -1593,62 +1854,79 @@
       </section>
 
       <section id="view-chat" class="view">
-        <div class="page-head">
+        <div class="page-head" style="margin-bottom: 12px;">
           <div>
             <h1>交互对话</h1>
-            <p>提问会转入当前 PsyClaw 会话；助手回复经 SSE 同步到此处。模型可调用「唤醒选项」弹窗。</p>
+            <p>提问将接入当前 PsyClaw 会话；助手回复经 SSE 流式同步，支持学术指令与「唤醒选项」决策。</p>
           </div>
         </div>
-        <div id="chat-console-host" class="panel section" style="min-height:62vh;padding:0;overflow:hidden;display:flex;flex-direction:column"></div>
+        <div id="chat-console-host" class="panel section" style="min-height:74vh;padding:0;overflow:hidden;display:flex;flex-direction:column;border-radius:var(--radius-md);">
+          <div id="console-drawer" class="console-drawer">
+            <div class="console-header">
+              <div class="console-title">
+                <span class="agent-avatar" style="width:24px;height:24px;font-size:12px">ψ</span>
+                <span>PsyClaw Research Assistant</span>
+                <span id="console-status-badge" class="console-status-tag">
+                  <span class="pulse-dot" style="width:5px;height:5px;"></span>
+                  已连接
+                </span>
+              </div>
+              <div class="console-actions">
+                <button id="console-clear-btn" class="console-btn-icon" title="清空对话记录">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div id="console-log" class="console-log">
+              <div class="log-entry sys">
+                <div class="log-sys">
+                  💡 <strong>对话已就绪</strong>：与 PsyClaw 智能体及底层学术插件安全连接。支持 <code>/init</code>、<code>/plan</code>、<code>/grill</code>、<code>/verify</code> 等研究指令；随时探讨研究设想或分析数据。
+                </div>
+              </div>
+            </div>
+
+            <div class="console-quick-chips">
+              <span class="chip" data-cmd="/plan status">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                /plan status
+              </span>
+              <span class="chip" data-cmd="/verify list">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg>
+                /verify list
+              </span>
+              <span class="chip" data-cmd="/grill">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
+                /grill 压力追问
+              </span>
+              <span class="chip" data-cmd="/review">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                /review 评审
+              </span>
+              <span class="chip" data-cmd="/agents">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                /agents 角色
+              </span>
+            </div>
+
+            <div class="console-input-wrap">
+              <div class="console-input-container">
+                <div class="console-input-box">
+                  <textarea id="console-input" class="console-textarea" placeholder="输入研究问题或指令（Enter 发送，Shift+Enter 换行）…" rows="1"></textarea>
+                  <button id="console-send-btn" class="console-send-btn" title="发送消息 (Enter)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </div>
+                <div class="console-input-footer">
+                  <span>支持 Markdown 与学术指令</span>
+                  <span>PsyClaw 本地隔离环境</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
-  </div>
-</div>
-
-<!-- 悬浮对话入口 -->
-<button id="console-fab" class="console-fab" title="打开/折叠对话">
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-  <span>对话</span>
-</button>
-
-<!-- 抽屉式对话 -->
-<div id="console-drawer" class="console-drawer">
-  <div class="console-header">
-    <div class="console-title">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand-primary)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      <span>对话</span>
-      <span id="console-status-badge" class="console-status-tag">已连接</span>
-    </div>
-    <div class="console-actions">
-      <button id="console-clear-btn" class="console-btn-icon" title="清空对话">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-      </button>
-      <button id="console-close-btn" class="console-btn-icon" title="最小化">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <div class="console-quick-chips">
-    <span class="chip" data-cmd="/plan status">/plan status</span>
-    <span class="chip" data-cmd="/verify list">/verify list</span>
-    <span class="chip" data-cmd="/grill">/grill 压力追问</span>
-    <span class="chip" data-cmd="/review">/review 同行评审</span>
-    <span class="chip" data-cmd="/agents">/agents 角色</span>
-  </div>
-
-  <div id="console-log" class="console-log">
-    <div class="log-entry sys">
-      <div class="log-sys">对话已就绪（SSE）。提问转入当前会话，助手回复会流式同步到此处。支持 /init、/plan、/grill 等指令；模型可弹出「唤醒选项」。</div>
-    </div>
-  </div>
-
-  <div class="console-input-box">
-    <input type="text" id="console-input" class="console-input" placeholder="输入研究问题或指令，Enter 发送…" autocomplete="off" />
-    <button id="console-send-btn" class="console-send-btn">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      发送
-    </button>
   </div>
 </div>
 
@@ -1750,8 +2028,7 @@ function setView(view) {
   if (view === "provider") loadProvider();
   if (view === "checklist") loadChecklist();
   if (view === "help") loadHelp();
-  if (view === "chat") mountConsoleInChat();
-  else restoreConsoleDrawer();
+  if (view === "chat") queueMicrotask(() => $("console-input")?.focus());
 }
 
 async function loadHelp() {
@@ -1773,37 +2050,6 @@ async function loadHelp() {
   } catch (error) {
     $("help-thinking").textContent = `加载失败: ${error.message}`;
   }
-}
-
-function mountConsoleInChat() {
-  const host = $("chat-console-host");
-  const drawer = $("console-drawer");
-  if (!host || !drawer) return;
-  host.appendChild(drawer);
-  drawer.classList.add("open", "embedded");
-  drawer.style.position = "relative";
-  drawer.style.inset = "auto";
-  drawer.style.width = "100%";
-  drawer.style.height = "100%";
-  drawer.style.minHeight = "58vh";
-  drawer.style.boxShadow = "none";
-  drawer.style.borderRadius = "0";
-  drawer.style.transform = "none";
-}
-
-function restoreConsoleDrawer() {
-  const drawer = $("console-drawer");
-  if (!drawer || drawer.parentElement === document.body) return;
-  document.body.appendChild(drawer);
-  drawer.classList.remove("embedded");
-  drawer.style.position = "";
-  drawer.style.inset = "";
-  drawer.style.width = "";
-  drawer.style.height = "";
-  drawer.style.minHeight = "";
-  drawer.style.boxShadow = "";
-  drawer.style.borderRadius = "";
-  drawer.style.transform = "";
 }
 
 async function loadChecklist() {
@@ -1854,7 +2100,7 @@ $("skip-checklist")?.addEventListener("click", async () => {
   await loadChecklist();
 });
 
-document.querySelectorAll(".nav button").forEach(button => {
+document.querySelectorAll(".nav button[data-view]").forEach(button => {
   button.addEventListener("click", () => setView(button.dataset.view));
 });
 
@@ -1873,16 +2119,20 @@ function inlineMarkdown(text) {
 
 function renderMarkdown(markdown) {
   const lines = String(markdown).replace(/\r\n/g, "\n").split("\n"), out = [];
-  let i = 0, inCode = false, code = [];
+  let i = 0, inCode = false, codeLang = "", code = [];
   while (i < lines.length) {
     const line = lines[i], trim = line.trim();
     if (trim.startsWith("```")) {
       if (inCode) {
-        out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);
+        const rawCode = code.join("\n");
+        const langDisplay = codeLang || "code";
+        out.push(`<div class="code-container"><div class="code-header"><span>${esc(langDisplay)}</span><button type="button" class="code-copy-btn" data-code="${esc(rawCode)}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>复制</span></button></div><pre><code>${esc(rawCode)}</code></pre></div>`);
         code = [];
+        codeLang = "";
         inCode = false;
       } else {
         inCode = true;
+        codeLang = trim.slice(3).trim();
       }
       i++;
       continue;
@@ -1942,7 +2192,11 @@ function renderMarkdown(markdown) {
     }
     out.push(`<p>${inlineMarkdown(para.join(" "))}</p>`);
   }
-  if (inCode) out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);
+  if (inCode) {
+    const rawCode = code.join("\n");
+    const langDisplay = codeLang || "code";
+    out.push(`<div class="code-container"><div class="code-header"><span>${esc(langDisplay)}</span><button type="button" class="code-copy-btn" data-code="${esc(rawCode)}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>复制</span></button></div><pre><code>${esc(rawCode)}</code></pre></div>`);
+  }
   return out.join("");
 }
 
@@ -2343,8 +2597,6 @@ document.querySelectorAll(".step-item").forEach(item => {
 });
 
 /* --- 交互对话 + SSE + 唤醒选项 --- */
-const consoleDrawer = $("console-drawer");
-const consoleFab = $("console-fab");
 const consoleLog = $("console-log");
 const consoleInput = $("console-input");
 const streamBubbles = new Map();
@@ -2352,12 +2604,8 @@ let lastLocalUserText = "";
 let wakeState = null;
 
 function openConsole() {
-  consoleDrawer.classList.add("open");
-  consoleInput.focus();
-}
-
-function closeConsole() {
-  consoleDrawer.classList.remove("open");
+  setView("chat");
+  queueMicrotask(() => consoleInput?.focus());
 }
 
 function openConsoleWithMessage(text) {
@@ -2369,9 +2617,22 @@ function appendLog(role, text) {
   const entry = document.createElement("div");
   entry.className = `log-entry ${role}`;
   if (role === "user") {
-    entry.innerHTML = `<div class="log-user">${esc(text)}</div>`;
+    entry.innerHTML = `
+      <div class="log-user-wrap">
+        <div class="log-user">${esc(text)}</div>
+      </div>
+    `;
   } else if (role === "agent") {
-    entry.innerHTML = `<div class="log-agent">${renderMarkdown(text)}</div>`;
+    entry.innerHTML = `
+      <div class="agent-avatar">ψ</div>
+      <div class="agent-content-wrap">
+        <div class="agent-meta">
+          <span>PsyClaw Assistant</span>
+          <span class="agent-role-pill">Core</span>
+        </div>
+        <div class="log-agent">${renderMarkdown(text)}</div>
+      </div>
+    `;
   } else {
     entry.innerHTML = `<div class="log-sys">${esc(text)}</div>`;
   }
@@ -2386,7 +2647,21 @@ function ensureStreamBubble(messageId) {
   entry = document.createElement("div");
   entry.className = "log-entry agent";
   entry.dataset.messageId = messageId;
-  entry.innerHTML = `<div class="log-agent streaming"></div>`;
+  entry.innerHTML = `
+    <div class="agent-avatar">ψ</div>
+    <div class="agent-content-wrap">
+      <div class="agent-meta">
+        <span>PsyClaw Assistant</span>
+        <span class="agent-role-pill">Streaming</span>
+      </div>
+      <div class="log-agent" style="display:none"></div>
+      <div class="agent-typing-indicator">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+  `;
   consoleLog.appendChild(entry);
   streamBubbles.set(messageId, entry);
   consoleLog.scrollTop = consoleLog.scrollHeight;
@@ -2396,9 +2671,24 @@ function ensureStreamBubble(messageId) {
 function updateStreamBubble(messageId, text, done) {
   const entry = ensureStreamBubble(messageId);
   const bubble = entry.querySelector(".log-agent");
+  const indicator = entry.querySelector(".agent-typing-indicator");
+  const pill = entry.querySelector(".agent-role-pill");
   if (!bubble) return;
-  bubble.classList.toggle("streaming", !done);
-  bubble.innerHTML = renderMarkdown(text || (done ? "" : "…"));
+
+  if (text) {
+    bubble.style.display = "block";
+    bubble.innerHTML = renderMarkdown(text);
+  }
+
+  if (done) {
+    if (indicator) indicator.remove();
+    if (pill) pill.textContent = "Answered";
+    bubble.style.display = "block";
+  } else {
+    if (text && indicator) {
+      indicator.style.display = "none";
+    }
+  }
   consoleLog.scrollTop = consoleLog.scrollHeight;
 }
 
@@ -2450,7 +2740,10 @@ function connectAssistantStream() {
   es.addEventListener("wake_options", (ev) => {
     try {
       const data = JSON.parse(ev.data);
-      if (data.prompt) showWakeModal(data.prompt);
+      if (data.prompt) {
+        appendWakeChecklist(data.prompt);
+        showWakeModal(data.prompt, { switchChecklist: false });
+      }
     } catch { /* ignore */ }
   });
   es.addEventListener("wake_options_resolved", (ev) => {
@@ -2466,8 +2759,32 @@ function connectAssistantStream() {
   es.onerror = () => setConsoleStatus("重连中", false);
 }
 
-function showWakeModal(prompt, { switchChecklist = true } = {}) {
-  const firstOpen = !wakeState || wakeState.id !== prompt.id;
+function appendWakeChecklist(prompt) {
+  if (!prompt || prompt.mode !== "checklist") return;
+  const existing = document.querySelector(`[data-wake-checklist-id="${CSS.escape(prompt.id)}"]`);
+  if (existing) return;
+  const entry = document.createElement("div");
+  entry.className = "log-entry sys";
+  entry.dataset.wakeChecklistId = prompt.id;
+  const items = (prompt.options || []).map(option => `
+    <li data-option-id="${esc(option.id)}"><span class="wake-checklist-mark">${option.checked ? "[x]" : "[ ]"}</span> <span>${esc(option.label)}</span>${option.description ? `<small>${esc(option.description)}</small>` : ""}</li>
+  `).join("");
+  entry.innerHTML = `<div class="log-sys wake-checklist-card"><strong>${esc(prompt.title || "交叉核验清单")}</strong>${prompt.prompt ? `<p>${esc(prompt.prompt)}</p>` : ""}<ul>${items}</ul><span class="wake-checklist-hint">请在当前对话中的弹窗完成勾选。</span></div>`;
+  consoleLog.appendChild(entry);
+  consoleLog.scrollTop = consoleLog.scrollHeight;
+}
+
+function updateWakeChecklist(promptId, selectedIds) {
+  const entry = document.querySelector(`[data-wake-checklist-id="${CSS.escape(promptId)}"]`);
+  if (!entry) return;
+  const selected = new Set(selectedIds || []);
+  entry.querySelectorAll("li[data-option-id]").forEach(item => {
+    const mark = item.querySelector(".wake-checklist-mark");
+    if (mark) mark.textContent = selected.has(item.dataset.optionId) ? "[x]" : "[ ]";
+  });
+}
+
+function showWakeModal(prompt) {
   wakeState = {
     id: prompt.id,
     mode: prompt.mode,
@@ -2502,13 +2819,12 @@ function showWakeModal(prompt, { switchChecklist = true } = {}) {
       } else {
         wakeState.selected.add(option.id);
       }
-      showWakeModal(prompt, { switchChecklist: false });
+      showWakeModal(prompt);
     });
     list.appendChild(btn);
   }
   $("wake-modal").classList.remove("hidden");
   openConsole();
-  if (firstOpen && switchChecklist && prompt.mode === "checklist") setView("checklist");
 }
 
 function hideWakeModal() {
@@ -2527,8 +2843,8 @@ async function submitWake(cancel = false) {
       body: JSON.stringify({ promptId, selectedIds, cancel: Boolean(cancel) }),
     });
     hideWakeModal();
+    updateWakeChecklist(promptId, selectedIds);
     appendLog("sys", cancel ? "已取消唤醒选项" : `已提交选择：${selectedIds.join(", ") || "（空）"}`);
-    await loadChecklist().catch(() => {});
   } catch (err) {
     appendLog("sys", `[唤醒选项] ${err.message}`);
   }
@@ -2538,22 +2854,54 @@ $("wake-modal-close")?.addEventListener("click", () => submitWake(true));
 $("wake-cancel-btn")?.addEventListener("click", () => submitWake(true));
 $("wake-submit-btn")?.addEventListener("click", () => submitWake(false));
 
-consoleFab.addEventListener("click", () => {
-  if (consoleDrawer.classList.contains("open")) closeConsole();
-  else openConsole();
-});
-$("console-close-btn").addEventListener("click", closeConsole);
 $("console-clear-btn").addEventListener("click", () => {
   consoleLog.innerHTML = `<div class="log-entry sys"><div class="log-sys">对话已清空。输入问题或 /help 即可继续。</div></div>`;
   streamBubbles.clear();
+});
+
+// 自适应高度调整函数
+function autoResizeConsoleInput() {
+  if (!consoleInput) return;
+  consoleInput.style.height = "auto";
+  const nextHeight = Math.min(Math.max(consoleInput.scrollHeight, 24), 160);
+  consoleInput.style.height = `${nextHeight}px`;
+}
+
+consoleInput.addEventListener("input", autoResizeConsoleInput);
+
+// 代码块全局点击复制事件代理
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".code-copy-btn");
+  if (!btn) return;
+  const rawCode = btn.dataset.code;
+  if (!rawCode) return;
+  try {
+    await navigator.clipboard.writeText(rawCode);
+    const textSpan = btn.querySelector("span");
+    if (textSpan) {
+      const originalText = textSpan.textContent;
+      textSpan.textContent = "已复制";
+      btn.style.color = "var(--ok-text)";
+      setTimeout(() => {
+        textSpan.textContent = originalText;
+        btn.style.color = "";
+      }, 1800);
+    }
+  } catch {
+    alert("无法写入剪贴板，请手动选中文本复制。");
+  }
 });
 
 async function sendConsoleMessage(msg) {
   const text = (msg || consoleInput.value).trim();
   if (!text) return;
   consoleInput.value = "";
+  autoResizeConsoleInput();
   lastLocalUserText = text;
   appendLog("user", text);
+
+  const sendBtn = $("console-send-btn");
+  if (sendBtn) sendBtn.disabled = true;
 
   try {
     const res = await json("/api/assistant", {
@@ -2565,6 +2913,8 @@ async function sendConsoleMessage(msg) {
     if (res.text) appendLog("sys", res.text);
   } catch (err) {
     appendLog("sys", `[提示] ${err.message}`);
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
   }
 }
 
@@ -2583,10 +2933,30 @@ document.querySelectorAll(".chip").forEach(chip => {
     const cmd = chip.dataset.cmd;
     if (cmd) {
       consoleInput.value = cmd;
+      autoResizeConsoleInput();
       sendConsoleMessage(cmd);
     }
   });
 });
+
+/* --- 侧边栏折叠与展开交互 --- */
+const layoutEl = document.querySelector(".layout");
+const navToggleBtn = $("nav-toggle-btn");
+
+function initNavCollapse() {
+  const saved = localStorage.getItem("psyclaw_nav_collapsed");
+  if (saved === "true") {
+    layoutEl?.classList.add("nav-collapsed");
+  }
+}
+
+navToggleBtn?.addEventListener("click", () => {
+  if (!layoutEl) return;
+  const isCollapsed = layoutEl.classList.toggle("nav-collapsed");
+  localStorage.setItem("psyclaw_nav_collapsed", isCollapsed ? "true" : "false");
+});
+
+initNavCollapse();
 
 /* --- 顶栏快捷命令 Quick Actions --- */
 const initModal = $("init-modal");
