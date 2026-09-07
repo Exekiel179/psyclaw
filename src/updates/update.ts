@@ -1,5 +1,6 @@
 import { access } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { resolveNpmInstallRegistry } from "../network-routing.js";
 import { PI_AI, PI_CODING_AGENT, resolvePsyClawManifest } from "./manifest.js";
 import { type PiRelease, type RegistryClient } from "./registry.js";
 import { compareSemver } from "./status.js";
@@ -43,6 +44,8 @@ export interface UpdateBundledPiOptions {
   now?: () => string;
   /** When omitted, the library call is a dry run and never mutates the workspace. */
   executor?: PiUpdateExecutor;
+  /** npm registry for install commands; defaults from PSYCLAW_REGISTRY / CN routing. */
+  npmRegistry?: string;
 }
 
 export interface ProductVersionUpdate {
@@ -91,15 +94,16 @@ async function packageManagerAt(root: string): Promise<"pnpm" | "npm" | undefine
   return undefined;
 }
 
-function buildCommand(manager: "pnpm" | "npm", version: string): string {
+function buildCommand(manager: "pnpm" | "npm", version: string, registry: string): string {
   const spec = `${PI_AI}@${version} ${PI_CODING_AGENT}@${version}`;
+  const registryFlag = `--registry=${registry}`;
   return manager === "pnpm"
-    ? `pnpm add --save-exact ${spec} --registry=https://registry.npmjs.org/`
-    : `npm install --save-exact --omit=dev --legacy-peer-deps ${spec} --registry=https://registry.npmjs.org/`;
+    ? `pnpm add --save-exact ${spec} ${registryFlag}`
+    : `npm install --save-exact --omit=dev --legacy-peer-deps ${spec} ${registryFlag}`;
 }
 
-function buildProductCommand(version: string): string {
-  return `npm install --global psyclaw@${version} --registry=https://registry.npmjs.org/`;
+function buildProductCommand(version: string, registry: string): string {
+  return `npm install --global psyclaw@${version} --registry=${registry}`;
 }
 
 async function hasSourceLockfile(root: string): Promise<boolean> {
@@ -214,7 +218,7 @@ export async function updatePsyClaw(options: UpdatePsyClawOptions): Promise<PsyC
   // Force can repair a locally drifted runtime without composing an untested
   // PsyClaw/Pi version pair.
   if (selfNeedsUpdate || runtimeNeedsRepair) {
-    commands.push(buildProductCommand(latestPsyClaw));
+    commands.push(buildProductCommand(latestPsyClaw, options.npmRegistry ?? resolveNpmInstallRegistry()));
   }
 
   const versions = {
@@ -342,9 +346,10 @@ export async function updateBundledPi(options: UpdateBundledPiOptions): Promise<
   const manager = await packageManagerAt(manifest.root);
   // npm packages intentionally omit lockfiles. Updating Pi in place can leave
   // old PsyClaw code paired with a new runtime, so repair the whole product.
+  const npmRegistry = options.npmRegistry ?? resolveNpmInstallRegistry();
   const command = manager === undefined
-    ? "npm install --global psyclaw@latest"
-    : buildCommand(manager, latestVersion);
+    ? `npm install --global psyclaw@latest --registry=${npmRegistry}`
+    : buildCommand(manager, latestVersion, npmRegistry);
 
   if (options.executor === undefined) {
     return finish({

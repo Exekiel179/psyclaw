@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.29.5 - 2026-09-07
+
+- /help opens Panel「使用速览」; simplify help copy and note bundled scholar/journal distillation
+- Expand huashu-nuwa for scholar lenses and journal/style skills
+- Mainland built-ins: PSYCLAW_CN/npmmirror GitHub mirrors for fd/rg (raw/codeload), CN-aware update/check-updates, mirrored recommended skill git clone
+
+## Unreleased
+
+
 ## 0.29.4 - 2026-09-07
 
 - Fix Thinking cycle shortcut to Ctrl+Shift+T (modes stay Shift+Tab)

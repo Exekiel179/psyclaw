@@ -20,13 +20,36 @@ export interface RegistryClient {
 
 const REQUEST_TIMEOUT_MS = 8000;
 const PI_LATEST_VERSION_URL = "https://pi.dev/api/latest-version";
+const DEFAULT_NPM_REGISTRY = "https://registry.npmjs.org";
+const DEFAULT_PYPI_JSON = "https://pypi.org/pypi";
 
-export function createHttpRegistry(fetchFn: typeof fetch = fetch): RegistryClient {
+export interface HttpRegistryOptions {
+  fetchFn?: typeof fetch;
+  /** Base URL without trailing slash, e.g. https://registry.npmmirror.com */
+  npmRegistry?: string;
+  /**
+   * PyPI JSON API prefix without package segment.
+   * Official: https://pypi.org/pypi
+   * Tencent mirror: https://mirrors.cloud.tencent.com/pypi/web/json
+   */
+  pypiJsonBase?: string;
+}
+
+export function createHttpRegistry(
+  fetchFnOrOptions: typeof fetch | HttpRegistryOptions = fetch,
+): RegistryClient {
+  const options: HttpRegistryOptions = typeof fetchFnOrOptions === "function"
+    ? { fetchFn: fetchFnOrOptions }
+    : fetchFnOrOptions;
+  const fetchFn = options.fetchFn ?? fetch;
+  const npmRegistry = (options.npmRegistry ?? DEFAULT_NPM_REGISTRY).replace(/\/$/, "");
+  const pypiJsonBase = (options.pypiJsonBase ?? DEFAULT_PYPI_JSON).replace(/\/$/, "");
+
   return {
     async latestNpm(packageName: string): Promise<string | undefined> {
       try {
         const response = await fetchFn(
-          `https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`,
+          `${npmRegistry}/${encodeURIComponent(packageName)}/latest`,
           { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
         );
         if (!response.ok) return undefined;
@@ -39,7 +62,7 @@ export function createHttpRegistry(fetchFn: typeof fetch = fetch): RegistryClien
     async npmDependencies(packageName: string, version: string): Promise<Record<string, string> | undefined> {
       try {
         const response = await fetchFn(
-          `https://registry.npmjs.org/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`,
+          `${npmRegistry}/${encodeURIComponent(packageName)}/${encodeURIComponent(version)}`,
           { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
         );
         if (!response.ok) return undefined;
@@ -57,7 +80,7 @@ export function createHttpRegistry(fetchFn: typeof fetch = fetch): RegistryClien
     async latestPypi(packageName: string): Promise<string | undefined> {
       try {
         const response = await fetchFn(
-          `https://pypi.org/pypi/${encodeURIComponent(packageName)}/json`,
+          `${pypiJsonBase}/${encodeURIComponent(packageName)}/json`,
           { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
         );
         if (!response.ok) return undefined;

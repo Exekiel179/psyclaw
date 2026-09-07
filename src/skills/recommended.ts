@@ -18,6 +18,11 @@ import { fileURLToPath } from "node:url";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { parse as parseYaml } from "yaml";
 import { atomicWriteFile } from "../project/jsonl.js";
+import {
+  configuredRegistry,
+  rewriteGithubHttpsThroughMirror,
+  selectNetworkRoute,
+} from "../network-routing.js";
 
 const execFileAsync = promisify(execFile);
 const INSTALL_MANIFEST = "psyclaw-install.json";
@@ -368,7 +373,11 @@ export async function installRecommendedSkill(root: string, requestedId: string,
   const repo = join(temporary, "repo");
   const staging = join(destinationRoot, `.staging-${plan.skillName}-${randomUUID()}`);
   try {
-    await runGit(["clone", "--quiet", "--filter=blob:none", "--no-checkout", plan.sourceUrl!, repo]);
+    const cloneUrl = rewriteGithubHttpsThroughMirror(
+      plan.sourceUrl!,
+      selectNetworkRoute(process.env, await configuredRegistry()),
+    );
+    await runGit(["clone", "--quiet", "--filter=blob:none", "--no-checkout", cloneUrl, repo]);
     await runGit(["-C", repo, "checkout", "--quiet", plan.ref ?? "main"]);
     const source = resolve(repo, plan.skillPath!);
     assertContained(repo, source);

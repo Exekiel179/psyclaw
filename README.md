@@ -4,7 +4,7 @@ PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、
 
 PsyClaw 自有代码使用 MIT 许可证；随 npm 包内置的 Academic Research Skills 位于 `vendor/ars`，保持上游署名并单独遵循 CC BY-NC 4.0，仅限非商业用途。
 
-当前版本：`0.29.4`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.29.5`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -21,22 +21,37 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.29.4
+npm install -g psyclaw@0.29.5
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.29.4 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.29.5 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.29.4 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.29.5 --registry=https://registry.npmmirror.com
 ```
 
-PsyClaw 的 npm 发布包直接携带 Windows x64/arm64 版 `ripgrep` 和 `fd`，Windows 启动时直接使用包内可执行文件，不再联网下载。其他平台缺少这两个工具时仍由锁定的 Pi 原生工具管理器处理：代理环境走 GitHub 官方 API 与 Release，国内 npm registry 环境统一走国内镜像。
+或安装脚本：
+
+```bash
+PSYCLAW_CN=1 curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
+```
+
+检测到国内 npm registry（如 npmmirror）、`PSYCLAW_CN=1` 或 `PSYCLAW_GITHUB_MIRROR` 时，内置路径统一走国内可用路由：
+
+- 首启 `fd` / `ripgrep`（macOS/Linux）：GitHub API 与 Release 经 `gh-proxy` 等镜像；Windows 仍用包内二进制，无需下载
+- `psyclaw update` / `check-updates`：读版本与安装命令使用 `PSYCLAW_REGISTRY` 或 npmmirror，不再写死官方 npm
+- 推荐 Skill 的托管 `git clone`：经 GitHub 镜像前缀
+- `fetch` 覆盖 `api.github.com`、`github.com`、`raw.githubusercontent.com`、`codeload.github.com`
+
+建议把 `registry=https://registry.npmmirror.com` 写入 `~/.npmrc`，以免下次启动检测不到国内源。已有 HTTP(S) 代理时优先走代理、保持官方 GitHub URL。
+
+PsyClaw 的 npm 发布包直接携带 Windows x64/arm64 版 `ripgrep` 和 `fd`，Windows 启动时直接使用包内可执行文件，不再联网下载。
 
 确认命令入口：
 

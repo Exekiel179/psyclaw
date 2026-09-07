@@ -4,13 +4,19 @@
 #   curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
 #
 # Optional environment variables:
-#   PSYCLAW_VERSION=0.24.0
+#   PSYCLAW_VERSION=0.29.4
 #   PSYCLAW_REGISTRY=https://registry.npmjs.org
+#   PSYCLAW_CN=1   # use npmmirror + enable GitHub mirrors for first-launch fd/rg
 set -eu
 
-VERSION="${PSYCLAW_VERSION:-0.24.0}"
+VERSION="${PSYCLAW_VERSION:-0.29.4}"
 VERSION="${VERSION#v}"
-REGISTRY="${PSYCLAW_REGISTRY:-https://registry.npmjs.org}"
+if [ "${PSYCLAW_CN:-}" = "1" ] || [ "${PSYCLAW_CN:-}" = "true" ]; then
+  REGISTRY="${PSYCLAW_REGISTRY:-https://registry.npmmirror.com}"
+  export PSYCLAW_CN=1
+else
+  REGISTRY="${PSYCLAW_REGISTRY:-https://registry.npmjs.org}"
+fi
 
 say() { printf '\033[36m>\033[0m %s\n' "$1"; }
 ok()  { printf '\033[32mOK\033[0m %s\n' "$1"; }
@@ -30,4 +36,8 @@ printf '%s' "$VERSION_TEXT" | grep -F "v$VERSION" >/dev/null \
   || die "Installed command did not report PsyClaw v$VERSION."
 
 ok "PsyClaw v$VERSION installed."
+if [ "${PSYCLAW_CN:-}" = "1" ] || [ "${PSYCLAW_CN:-}" = "true" ] || printf '%s' "$REGISTRY" | grep -qi 'npmmirror\|taobao\|aliyun\|tencent'; then
+  printf '\nMainland tip: keep registry on npmmirror (or set PSYCLAW_CN=1 / PSYCLAW_GITHUB_MIRROR) so first-launch fd/rg and recommended skill clones use GitHub mirrors.\n'
+  printf 'Example: echo "registry=https://registry.npmmirror.com" >> ~/.npmrc\n'
+fi
 printf '\nNext: run psyclaw, configure a provider, and initialize a research project.\n'

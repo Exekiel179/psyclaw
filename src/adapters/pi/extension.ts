@@ -96,7 +96,8 @@ import {
   sessionModePrompt,
 } from "../../session/modes.js";
 import { formatVerifyChecklist, isNaturalPlanConfirm, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../../verify/checklist.js";
-import { formatSessionHelp } from "../../session/help.js";
+import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js";
+import { openResearchWorkbench } from "../../panel/workbench.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -1282,7 +1283,17 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       return { action: "handled" };
     }
     if (/^\/help(?:\s|$)/i.test(event.text.trim())) {
-      ctx.ui.notify(formatSessionHelp(), "info");
+      try {
+        const { url, opened } = await openResearchWorkbench({
+          cwd: ctx.cwd,
+          isProjectTrusted: () => ctx.isProjectTrusted(),
+          isIdle: () => ctx.isIdle(),
+          sendUserMessage: (message, options) => pi.sendUserMessage(message, options ?? {}),
+        }, { view: "help" });
+        ctx.ui.notify(formatSessionHelpBrief(url) + (opened ? "" : "\n（未能自动打开浏览器时请手动访问）"), opened ? "info" : "warning");
+      } catch (error) {
+        ctx.ui.notify(`${formatSessionHelp()}\n\n（Panel 未启动：${error instanceof Error ? error.message : String(error)}）`, "info");
+      }
       return { action: "handled" };
     }
 
@@ -1461,9 +1472,19 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("help", {
-    description: "三种模式速览与常用命令",
+    description: "打开 Panel 使用速览",
     handler: async (_args, ctx) => {
-      ctx.ui.notify(formatSessionHelp(), "info");
+      try {
+        const { url, opened } = await openResearchWorkbench({
+          cwd: ctx.cwd,
+          isProjectTrusted: () => ctx.isProjectTrusted(),
+          isIdle: () => ctx.isIdle(),
+          sendUserMessage: (message, options) => pi.sendUserMessage(message, options ?? {}),
+        }, { view: "help" });
+        ctx.ui.notify(formatSessionHelpBrief(url) + (opened ? "" : "\n（未能自动打开浏览器时请手动访问）"), opened ? "info" : "warning");
+      } catch (error) {
+        ctx.ui.notify(`${formatSessionHelp()}\n\n（Panel 未启动：${error instanceof Error ? error.message : String(error)}）`, "info");
+      }
     },
   });
   pi.registerCommand("plan", {
