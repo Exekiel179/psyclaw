@@ -8,6 +8,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { listRuns, projectRunSnapshot } from "./projection.js";
 import { readSessionUsage } from "./usage.js";
 import { buildClaimLiteratureMap } from "./literature-map.js";
+import { panelHub, type PanelHub, type WakeOptionsAnswer } from "./hub.js";
 import { discoverAgents } from "../agents/discover.js";
 import { KNOWN_AGENTS } from "../agents/catalog.js";
 import { recommendedAgentsForPanel } from "../agents/recommended-personas.js";
@@ -451,6 +452,8 @@ export interface PanelServerOptions {
   panelHtmlPath?: string;
   /** Optional browser assistant. The callback owns the Pi/model boundary. */
   assistant?: (message: string) => Promise<{ text: string }>;
+  /** Shared SSE / wake-options hub (defaults to process singleton). */
+  hub?: PanelHub;
   /** Queue an approved installation task into the current PsyClaw model session. */
   installSkill?: (task: string) => Promise<void>;
   /** Queue an explicitly requested external-tool installation task. */
@@ -802,6 +805,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
   // `dist/apps/panel`, keeping the same relative layout in src and dist.
   const panelHtmlPath = options.panelHtmlPath ??
     join(dirname(fileURLToPath(import.meta.url)), "..", "..", "apps", "panel", "index.html");
+  const hub = options.hub ?? panelHub;
 
   return createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://localhost");
@@ -809,7 +813,15 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
     // The panel is intentionally limited to ecosystem management and Provider
     // configuration. Project files, runs, evidence and manuscripts are read
     // only projections; legacy mutation routes remain unavailable over HTTP.
-    const panelWriteRoutes = ["/api/provider-config", "/api/recommendation-state", "/api/install/execute", "/api/active-provider", "/api/assistant"];
+    const panelWriteRoutes = [
+      "/api/provider-config",
+      "/api/recommendation-state",
+      "/api/install/execute",
+      "/api/active-provider",
+      "/api/assistant",
+      "/api/crosscheck",
+      "/api/wake-options/respond",
+    ];
     // Kept false for source compatibility with the legacy handler below; the
     // method gate above makes pause/resume unreachable from the panel API.
     const runAction = false;
@@ -819,6 +831,71 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       return;
     }
     try {
+      if (url.pathname === "/api/assistant/stream") {
+        response.writeHead(200, {
+          "content-type": "text/event-stream; charset=utf-8",
+          "cache-control": "no-cache, no-transform",
+          connection: "keep-alive",
+          "x-accel-buffering": "no",
+        });
+        response.write(":\n\n");
+        const unsubscribe = hub.subscribe(response);
+        const heartbeat = setInterval(() => {
+          try {
+            response.write(`event: ping\ndata: ${JSON.stringify({ type: "ping", at: new Date().toISOString() })}\n\n`);
+          } catch {
+            clearInterval(heartbeat);
+            unsubscribe();
+          }
+        }, 15_000);
+        request.on("close", () => {
+          clearInterval(heartbeat);
+          unsubscribe();
+        });
+        return;
+      }
+      if (url.pathname === "/api/wake-options/pending") {
+        const prompt = hub.getPendingWake();
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({
+          schemaVersion: "psyclaw/wake-options-pending/v1",
+          prompt: prompt ?? null,
+          panelClients: hub.subscriberCount(),
+        }));
+        return;
+      }
+      if (url.pathname === "/api/wake-options/respond") {
+        if (request.method !== "POST") {
+          response.writeHead(405, { "content-type": "application/json", allow: "POST" });
+          response.end(JSON.stringify({ error: "method not allowed" }));
+          return;
+        }
+        const body = await readJsonBody(request);
+        const promptId = String(body.promptId ?? "").trim();
+        const selectedIds = Array.isArray(body.selectedIds)
+          ? body.selectedIds.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean)
+          : [];
+        const cancelled = body.cancel === true;
+        if (!promptId) {
+          response.writeHead(400, { "content-type": "application/json" });
+          response.end(JSON.stringify({ error: "promptId is required" }));
+          return;
+        }
+        const answer: WakeOptionsAnswer = {
+          promptId,
+          selectedIds: cancelled ? [] : selectedIds,
+          source: cancelled ? "cancel" : "panel",
+          ...(typeof body.notes === "string" && body.notes.trim() ? { notes: body.notes.trim() } : {}),
+        };
+        const ok = hub.resolveWake(answer);
+        response.writeHead(ok ? 200 : 409, { "content-type": "application/json" });
+        response.end(JSON.stringify({
+          schemaVersion: "psyclaw/wake-options-receipt/v1",
+          ok,
+          answer,
+        }));
+        return;
+      }
       if (url.pathname === "/api/runs") {
         const runs = await listRuns(root);
         response.writeHead(200, { "content-type": "application/json" });

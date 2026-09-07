@@ -2,6 +2,7 @@ import type { Server } from "node:http";
 import { spawn } from "node:child_process";
 import { DefaultPackageManager, getAgentDir, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { createPanelServer } from "./server.js";
+import { panelHub } from "./hub.js";
 
 let server: Server | undefined;
 let workbenchUrl: string | undefined;
@@ -51,9 +52,15 @@ export async function openResearchWorkbench(
       settingsManager: SettingsManager.create(host.cwd, getAgentDir(), { projectTrusted: host.isProjectTrusted() }),
     });
     const next = createPanelServer(host.cwd, {
+      hub: panelHub,
       assistant: async (message) => {
+        panelHub.broadcast({ type: "user_echo", text: message });
         host.sendUserMessage(message, host.isIdle() ? {} : { deliverAs: "followUp" });
-        return { text: "✓ 指令/提问已转入当前 PsyClaw 智能体并在终端会话中执行。" };
+        return {
+          text: panelHub.hasPanelClients()
+            ? "已转入当前会话；回复将通过 SSE 同步到本对话区。"
+            : "已转入当前会话；请保持 Panel 打开以接收流式回复。",
+        };
       },
       installSkill: async (task) => {
         host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
