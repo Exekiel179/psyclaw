@@ -1,6 +1,6 @@
 ---
 name: analysis-plan
-description: Soft-takeover stats planning in analysis mode — light EDA, clarifying questions, structured proposal, soft confirm, review, then run now or later via local scripts (MCP only when needed).
+description: Soft-takeover stats planning in analysis mode — light EDA, per-analysis human choices, natural-language confirm, optional auto mode, then local scripts (MCP only when needed).
 license: MIT
 ---
 
@@ -10,20 +10,30 @@ Use this skill only in **analysis** mode. Do not start academic/ARS writing from
 
 ## Stages
 
-1. **Clarify + light EDA** — Inspect available data under `data/clean` (or documented paths). Write a short profile (shape, dtypes, missingness, key ranges) once; do not spam ad-hoc probes. Ask only high-value clarifying questions that change the estimand, sample treatment, or method family.
-2. **Propose** — Produce a structured plan: goal, confirmatory vs exploratory, primary outcome, primary analysis, alternatives considered, missing-data / multiplicity / exclusion notes, and proposed script layout under `analysis/scripts/`.
-3. **Soft confirm** — Present the proposal clearly and ask the researcher to confirm with `/plan confirm <method>` (or reject). Soft confirm is not an ARS checkpoint and not a hard `awaiting-human` safety gate.
-4. **Review** — Run `/plan review` (or ask the user to). Fix warn/block findings before execution.
-5. **Execute** — `/plan run` (now) or `/plan defer` (later). Default backend: **local reproducible scripts** using mature libraries (pandas / pingouin / statsmodels / scipy, or R equivalents). Use MCP only for special backends (SPSS / Mplus / MNE / Stata) or when the user explicitly asks.
-6. **Handoff** — After results exist, update `analysis/HANDOFF.md` (`/plan handoff`) before the user switches to academic mode. Academic mode must consume the handoff and must not re-choose primary tests.
+1. **Clarify + light EDA** — Inspect `data/clean` once; write a compact profile. Ask only high-value clarifying questions.
+2. **Per-analysis choices (required)** — Do **not** dump one mega-plan and stop. For **each** analysis you propose, present a short decision card:
+   - Question (what this analysis answers)
+   - Options: **first option must be a concrete new method**; you may add alternatives; put「已经足够，先执行已选」**last**, never as the default recommendation
+   - Your recommendation with rationale
+   - Wait for the user to pick (or say「可以」to accept the recommendation) before adding the next analysis
+3. **Soft confirm** — Prefer natural language: ask the user to reply **「可以 / 确认」**. Do **not** insist on typing `/plan confirm`. Soft confirm ≠ ARS checkpoint ≠ hard awaiting-human.
+4. **Auto mode** — If the user said `/plan auto`, proceed without waiting, but every report/script summary must state **「未经人审批」**.
+5. **Pre-analysis crosscheck** — Before running scripts, propose checklist items (design/estimand, method choice, missingness). Prefer Panel `/panel` checklist; `/crosscheck` works in-terminal. Skipping is allowed only with **「未经核对」** labels.
+6. **Execute** — Local reproducible scripts under `analysis/scripts/` by default; MCP only for special backends or explicit request.
+7. **Post-analysis crosscheck** — After results: N, effects+CI, table–text, method–script match, claim language. Same Panel/skip rules.
+8. **Handoff** — Update `analysis/HANDOFF.md` before academic mode.
+
+## Volume rule
+
+Never tell the user “分析方法已经足够了” as a closing statement. If the plan is getting long, still offer **another concrete method as option 1**, and only then offer「已经足够」as an explicit selectable option.
 
 ## Persistence
 
-Keep durable state in `analysis/plans/` via `/plan` commands (`new`, `status`, `confirm`, `review`, `run`, `defer`, `handoff`). Prefer thin entrypoints (`run_all.py`) and reviewable modules; never invent numerical results.
+Keep state in `analysis/plans/` (`/plan new|status|auto|human|run|defer|handoff`). Natural-language「可以」confirms and runs when a plan is awaiting confirm.
 
 ## Boundaries
 
 - Never overwrite `data/raw`.
-- Never implement novel statistical algorithms inside PsyClaw core; call libraries or trusted MCP.
-- Do not merge this plan with ARS stage planning.
-- Label unverified claims; use `/verify` for human marks on critical fields.
+- No novel stats algorithms in PsyClaw core.
+- Do not merge with ARS planning.
+- Model **initiates** crosschecks; humans mark items — do not expect users to invent `/verify` ids themselves.

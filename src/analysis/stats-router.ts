@@ -43,9 +43,10 @@ export function analysisSoftRoutePrompt(): string {
   return [
     "## Analysis soft-route (stats plan)",
     "While analysis mode is active, clear statistical / data-analysis intents soft-takeover into `/skill:analysis-plan` without waiting for an explicit slash from the user.",
-    "Stages: clarify + light EDA → structured proposal → soft human confirm (`/plan confirm`) → plan review (`/plan review`) → `/plan run` (now) or `/plan defer` (later).",
-    "Default backend: local reproducible scripts under `analysis/scripts/`. MCP only for special backends or explicit request.",
+    "Stages: clarify + light EDA → **per-analysis choices** (first option = concrete new method; 「已经足够」only as last option) → soft confirm via natural language「可以」→ pre-check → execute → post-check → handoff.",
+    "Optional `/plan auto` skips human approval but every result must disclose 未经人审批.",
     "Do not merge this with academic/ARS planning. After an accepted/completed plan (and results), update `analysis/HANDOFF.md` before switching to academic.",
     "Explicit `/skill:` or `/plan` always wins over soft routing. Academic writing intents belong in academic mode.",
+    "Initiate `/crosscheck` / Panel checklist before and after analysis; model proposes items, human marks or skips with 未经核对.",
   ].join("\n");
 }

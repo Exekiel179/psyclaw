@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.29.4 - 2026-09-07
+
+- Fix Thinking cycle shortcut to Ctrl+Shift+T (modes stay Shift+Tab)
+- /help prints three-mode whitepaper snippet and common commands
+- Soft confirm before stats/writing when project was never /init
+- Analysis plan UX: NL confirm, /plan auto with 未经人审批 disclosure, per-analysis choices
+- /crosscheck (alias /verify) model-driven checklist; Panel checklist + full-page chat
+- Bundle huashu-nuwa (女娲) plus kahneman/gelman/freud-perspective; other Huashu flagships including huashu-mac-use in recommended catalog
+
 ## 0.29.3 - 2026-09-06
 
 - Fix CLI footer duplicate academic pill and align chat/analysis/academic in single row
@@ -7,6 +16,7 @@
 - Integrate CLI interactions to Web Panel: 5-step research pipeline stepper, topbar quick actions, init project modal, and interactive web console drawer
 
 ## Unreleased
+
 
 ## 0.29.2 - 2026-09-07
 

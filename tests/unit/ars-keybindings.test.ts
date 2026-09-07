@@ -22,6 +22,14 @@ describe("ensureAcademicModeKeybindings", () => {
     expect(second.updated).toBe(true);
   });
 
+  it("migrates legacy ctrl+shift+tab to ctrl+shift+t", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "psyclaw-kb-"));
+    await writeFile(join(dir, "keybindings.json"), `${JSON.stringify({ "app.thinking.cycle": "ctrl+shift+tab" }, null, 2)}\n`);
+    const result = await ensureAcademicModeKeybindings(dir);
+    expect(result.updated).toBe(true);
+    expect(result.thinkingCycleKey).toBe("ctrl+shift+t");
+  });
+
   it("preserves a custom thinking-cycle binding", async () => {
     const dir = await mkdtemp(join(tmpdir(), "psyclaw-kb-"));
     await writeFile(join(dir, "keybindings.json"), `${JSON.stringify({ "app.thinking.cycle": "alt+t" }, null, 2)}\n`);

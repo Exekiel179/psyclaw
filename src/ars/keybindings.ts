@@ -2,23 +2,34 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
-/** Pi default for app.thinking.cycle; PsyClaw reclaims it for academic mode. */
+/** Pi default for app.thinking.cycle; PsyClaw reclaims it for session modes. */
 export const PI_DEFAULT_THINKING_CYCLE_KEY = "shift+tab";
-/** Replacement binding so thinking level remains reachable. */
-export const PSYCLAW_THINKING_CYCLE_KEY = "ctrl+shift+tab";
+/**
+ * Thinking-level cycle. Prefer ctrl+shift+t: many terminals/macOS apps swallow
+ * ctrl+shift+tab for their own tab switching, so that chord never reaches Pi.
+ */
+export const PSYCLAW_THINKING_CYCLE_KEY = "ctrl+shift+t";
+/** Prior PsyClaw default that is unreliable in common terminals. */
+export const LEGACY_PSYCLAW_THINKING_CYCLE_KEYS = ["ctrl+shift+tab"] as const;
 
-function bindsShiftTab(value: unknown): boolean {
+function needsMigration(value: unknown): boolean {
   if (value === undefined) return true;
-  if (typeof value === "string") return value === PI_DEFAULT_THINKING_CYCLE_KEY;
+  if (typeof value === "string") {
+    return value === PI_DEFAULT_THINKING_CYCLE_KEY
+      || (LEGACY_PSYCLAW_THINKING_CYCLE_KEYS as readonly string[]).includes(value);
+  }
   if (Array.isArray(value)) {
-    return value.length === 0 || value.includes(PI_DEFAULT_THINKING_CYCLE_KEY);
+    if (value.length === 0) return true;
+    return value.every((item) =>
+      item === PI_DEFAULT_THINKING_CYCLE_KEY
+      || (LEGACY_PSYCLAW_THINKING_CYCLE_KEYS as readonly string[]).includes(item));
   }
   return false;
 }
 
 /**
- * Ensure Shift+Tab is free for academic mode by moving thinking-level cycle off
- * it when the user still has Pi's default (or no) binding.
+ * Ensure Shift+Tab is free for session modes by moving thinking-level cycle off
+ * it (and off the legacy ctrl+shift+tab chord that terminals often intercept).
  */
 export async function ensureAcademicModeKeybindings(
   agentDir: string = getAgentDir(),
@@ -35,7 +46,7 @@ export async function ensureAcademicModeKeybindings(
   }
 
   const current = config["app.thinking.cycle"];
-  if (!bindsShiftTab(current)) {
+  if (!needsMigration(current)) {
     return {
       path,
       updated: false,

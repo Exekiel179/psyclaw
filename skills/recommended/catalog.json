@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.7.2",
-  "syncedAt": "2026-09-05",
+  "documentVersion": "0.7.3",
+  "syncedAt": "2026-09-07",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
@@ -154,6 +154,88 @@
       "description": "对论文 PDF 进行数值一致性、统计方法和研究完整性审查，不将单一异常直接判定为学术不端。",
       "sourceRef": "https://github.com/kingfly51/manuscript-statistical-forensics",
       "installHint": "安装仓库根目录的 SKILL.md 及配套文件；使用时必须提供可读取的论文 PDF。"
+    },
+    {
+      "id": "huashu-mac-use",
+      "name": "Huashu Mac Use",
+      "kind": "skill",
+      "stage": "电脑操控",
+      "description": "花叔：让 agent 操控 Mac 上无 API 的原生应用（computer use），每步留取证。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-mac-use",
+      "installHint": "git clone 完整仓库到 skills 目录；仅在用户明确授权操控本机 UI 时启用。"
+    },
+    {
+      "id": "huashu-design",
+      "name": "Huashu Design",
+      "kind": "skill",
+      "stage": "设计与视觉",
+      "description": "花叔：HTML 原生高保真原型 / 幻灯片 / 动画设计系统。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-design"
+    },
+    {
+      "id": "huashu-excel",
+      "name": "Huashu Excel",
+      "kind": "skill",
+      "stage": "数据与文档",
+      "description": "花叔：Excel/数据分析全流程（体检→清洗→口径→对账→报告）。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-excel"
+    },
+    {
+      "id": "huashu-md-html",
+      "name": "Huashu MD/HTML",
+      "kind": "skill",
+      "stage": "数据与文档",
+      "description": "花叔：万物转 Markdown，以及 md→出版级 HTML/DOCX 流水线。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-md-html"
+    },
+    {
+      "id": "huashu-weread",
+      "name": "Huashu WeRead",
+      "kind": "skill",
+      "stage": "阅读",
+      "description": "花叔：微信读书顾问（书架/笔记/荐书/复盘）。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-weread"
+    },
+    {
+      "id": "huashu-report",
+      "name": "Huashu Report",
+      "kind": "skill",
+      "stage": "研究与写作",
+      "description": "花叔：机构级研究报告生产流水线。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-report"
+    },
+    {
+      "id": "darwin-skill",
+      "name": "Darwin Skill",
+      "kind": "skill",
+      "stage": "Skill 工程",
+      "description": "花叔：进化/优化已有 Skill。女娲（huashu-nuwa）已随包；需要进化时再装本推荐。",
+      "sourceRef": "https://github.com/alchaincyf/darwin-skill"
+    },
+    {
+      "id": "freud-skill",
+      "name": "Freud Skill (prompt debugger)",
+      "kind": "skill",
+      "stage": "Skill 工程",
+      "description": "花叔：诊断 prompt/skill 为何不好使（不是西格蒙德精神分析镜头；精神分析用随包 freud-perspective）。",
+      "sourceRef": "https://github.com/alchaincyf/freud-skill"
+    },
+    {
+      "id": "skills-guide",
+      "name": "Skills Guide",
+      "kind": "skill",
+      "stage": "Skill 工程",
+      "description": "花叔：如何编写 Agent Skill。",
+      "sourceRef": "https://github.com/alchaincyf/skills-guide"
+    },
+    {
+      "id": "huashu-skills-index",
+      "name": "Huashu Skills Index",
+      "kind": "skill",
+      "stage": "Skill 工程",
+      "description": "花叔开源 Skills 总目录（旗舰+人物+内置）；按需挑选安装，勿整仓塞进核心。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-skills",
+      "installHint": "优先读仓库 skills.json；只安装用户选中的子 skill / 旗舰仓库。"
     }
   ],
   "plugins": [

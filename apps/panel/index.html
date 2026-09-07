@@ -1174,10 +1174,18 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           模型与成本
         </button>
+        <button data-view="checklist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          核对清单
+        </button>
+        <button data-view="chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          对话
+        </button>
       </div>
       <div class="nav-footer">
         <div style="font-weight:600;margin-bottom:2px;color:var(--text-secondary)">PsyClaw 运行提示</div>
-        终端按 <code>Shift+Tab</code> 可在 <strong>chat ⇄ analysis ⇄ academic</strong> 模式间无缝推进。
+        终端 <code>Shift+Tab</code> 切换模式；Thinking 用 <code>Ctrl+Shift+T</code>。
       </div>
     </nav>
 
@@ -1373,6 +1381,39 @@
           </div>
         </div>
       </section>
+
+      <section id="view-checklist" class="view">
+        <div class="page-head">
+          <div>
+            <h1>交叉核验清单</h1>
+            <p>分析前/后由模型提出项，人在此勾选。可跳过，但会标注「未经核对」。本地写入 <code>.psyclaw/verify-checklist.json</code>。</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="refresh-checklist" class="button">刷新</button>
+            <button id="skip-checklist" class="button" title="其余未核项标为跳过/未经核对">跳过未核项</button>
+          </div>
+        </div>
+        <div class="panel section">
+          <table>
+            <thead>
+              <tr><th>状态</th><th>ID</th><th>类别</th><th>阶段</th><th>说明</th><th>操作</th></tr>
+            </thead>
+            <tbody id="checklist-body">
+              <tr><td colspan="6" class="empty">正在读取核对清单...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="view-chat" class="view">
+        <div class="page-head">
+          <div>
+            <h1>交互对话</h1>
+            <p>整页对话视图（不再只依赖右下角抽屉）。打开本页时会把控制台嵌到此处。</p>
+          </div>
+        </div>
+        <div id="chat-console-host" class="panel section" style="min-height:62vh;padding:0;overflow:hidden;display:flex;flex-direction:column"></div>
+      </section>
     </main>
   </div>
 </div>
@@ -1500,7 +1541,86 @@ function setView(view) {
   });
   if (view === "ecosystem") loadEcosystem();
   if (view === "provider") loadProvider();
+  if (view === "checklist") loadChecklist();
+  if (view === "chat") mountConsoleInChat();
+  else restoreConsoleDrawer();
 }
+
+function mountConsoleInChat() {
+  const host = $("chat-console-host");
+  const drawer = $("console-drawer");
+  if (!host || !drawer) return;
+  host.appendChild(drawer);
+  drawer.classList.add("open");
+  drawer.style.position = "relative";
+  drawer.style.inset = "auto";
+  drawer.style.width = "100%";
+  drawer.style.height = "100%";
+  drawer.style.minHeight = "58vh";
+  drawer.style.boxShadow = "none";
+  drawer.style.borderRadius = "0";
+}
+
+function restoreConsoleDrawer() {
+  const drawer = $("console-drawer");
+  if (!drawer || drawer.parentElement === document.body) return;
+  document.body.appendChild(drawer);
+  drawer.style.position = "";
+  drawer.style.inset = "";
+  drawer.style.width = "";
+  drawer.style.height = "";
+  drawer.style.minHeight = "";
+  drawer.style.boxShadow = "";
+  drawer.style.borderRadius = "";
+}
+
+async function loadChecklist() {
+  const body = $("checklist-body");
+  if (!body) return;
+  body.innerHTML = `<tr><td colspan="6" class="empty">正在读取核对清单...</td></tr>`;
+  try {
+    const data = await json("/api/crosscheck");
+    const items = data.checklist?.items || [];
+    body.innerHTML = items.map(item => {
+      const status = item.status || "unverified";
+      return `<tr>
+        <td>${esc(status)}</td>
+        <td><code>${esc(item.id)}</code></td>
+        <td>${esc(item.kind || "general")}</td>
+        <td>${esc(item.phase || "general")}</td>
+        <td>${esc(item.label)}${item.notes ? `<div style="color:var(--text-muted);font-size:11px">${esc(item.notes)}</div>` : ""}</td>
+        <td style="white-space:nowrap">
+          <button class="button" data-check-id="${esc(item.id)}" data-check-status="verified">核实</button>
+          <button class="button" data-check-id="${esc(item.id)}" data-check-status="flagged">存疑</button>
+          <button class="button" data-check-id="${esc(item.id)}" data-check-status="skipped">跳过</button>
+        </td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="6" class="empty">清单为空</td></tr>`;
+    body.querySelectorAll("[data-check-id]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await json("/api/crosscheck", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id: btn.dataset.checkId, status: btn.dataset.checkStatus }),
+        });
+        await loadChecklist();
+      });
+    });
+  } catch (error) {
+    body.innerHTML = `<tr><td colspan="6" class="empty">加载失败: ${esc(error.message)}</td></tr>`;
+  }
+}
+
+$("refresh-checklist")?.addEventListener("click", loadChecklist);
+$("skip-checklist")?.addEventListener("click", async () => {
+  if (!confirm("将把所有未核项标为跳过，并写入「未经核对」。继续？")) return;
+  await json("/api/crosscheck", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "skip" }),
+  });
+  await loadChecklist();
+});
 
 document.querySelectorAll(".nav button").forEach(button => {
   button.addEventListener("click", () => setView(button.dataset.view));
@@ -2105,8 +2225,10 @@ $("cmd-plan-btn").addEventListener("click", async () => {
 });
 
 $("cmd-verify-btn").addEventListener("click", async () => {
+  setView("checklist");
+  await loadChecklist();
   openConsole();
-  await sendConsoleMessage("/verify list");
+  await sendConsoleMessage("/crosscheck list");
 });
 
 /* --- 加载项目状态并更新 Stepper 状态 --- */

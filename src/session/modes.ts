@@ -48,8 +48,9 @@ export function sessionModePrompt(mode: PsyClawSessionMode): string {
       "Write under data/clean, analysis/scripts|configs|results|plans, and analysis/HANDOFF.md. Never overwrite data/raw (or legacy .psyclaw/data/raw).",
       "Default: write local reproducible analysis scripts under analysis/scripts/ with mature libraries. Use MCP only for special backends (SPSS/Mplus/MNE/Stata) or when the user asks. Do not invent numerical results.",
       "For important fields (N, primary effects, table–text consistency), run an AI semantic check and ask the human to mark items verified via /verify. Do not treat file hashes as academic proof.",
-      "Do not hard-block ordinary progress for missing verify marks; label unverified claims clearly and continue unless the user stops you.",
-      "Do not start ARS/paper writing here; bridge via analysis/HANDOFF.md after the plan has results.",
+      "Do not hard-block ordinary progress for missing verify marks; label unverified/skipped claims clearly (未经核对) and continue unless the user stops you.",
+      "When proposing more analyses, never close with「已经足够」as prose — offer a concrete new method first and put「已经足够」only as a selectable last option.",
+      "Prefer natural-language confirmation (「可以」); /plan auto skips approval with mandatory 未经人审批 disclosure.",
       analysisSoftRoutePrompt(),
     ].join("\n");
   }
