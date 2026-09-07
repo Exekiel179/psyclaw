@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { markVerifyItem, type VerifyStatus } from "../verify/checklist.js";
+import { createVerifyItems, markVerifyItem, type VerifyStatus } from "../verify/checklist.js";
 import {
   panelHub,
   type WakeOptionItem,
@@ -66,6 +66,19 @@ export function buildWakePrompt(request: WakeOptionsRequest, now = Date.now()): 
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + timeoutMs).toISOString(),
   };
+}
+
+export async function createWakeVerifyChecklist(
+  root: string,
+  prompt: WakeOptionsPrompt,
+): Promise<boolean> {
+  if (!prompt.syncVerify || prompt.mode !== "checklist") return false;
+  await createVerifyItems(root, prompt.options.map((option) => ({
+    id: option.id,
+    label: option.label,
+    phase: "general" as const,
+  })));
+  return true;
 }
 
 export async function applyWakeVerifySync(

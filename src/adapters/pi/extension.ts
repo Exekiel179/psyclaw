@@ -36,12 +36,14 @@ import { WakeOptionsComponent } from "../../tui/wake-options.js";
 import {
   applyWakeVerifySync,
   buildWakePrompt,
+  createWakeVerifyChecklist,
   formatWakeResult,
   labelsFor,
   waitForPanelWakeAnswer,
   type WakeOptionsResult,
 } from "../../wake-options/runtime.js";
 import { panelHub } from "../../panel/hub.js";
+import { appendChoiceRecord, type ChoiceRecordSource } from "../../research/choice.js";
 import type { WakeOptionsAnswer } from "../../panel/hub.js";
 import {
   enabledLocalSkillPaths,
@@ -106,6 +108,10 @@ import {
   parseSessionMode,
   sessionModePrompt,
 } from "../../session/modes.js";
+import {
+  continuouslyWorkWarningText,
+  isContinuouslyWorkEnabled,
+} from "../../session/continuously-work.js";
 import { formatVerifyChecklist, isNaturalPlanConfirm, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../../verify/checklist.js";
 import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js";
 import { openResearchWorkbench } from "../../panel/workbench.js";
@@ -1263,6 +1269,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_start", (_event, ctx) => {
     arsUiContext = ctx;
+    if (isContinuouslyWorkEnabled() && ctx.hasUI) {
+      ctx.ui.setStatus("cw", "continuously-work");
+      ctx.ui.notify(continuouslyWorkWarningText(), "error");
+    }
     if (!ctx.hasUI || typeof ctx.ui.setEditorComponent !== "function") return;
 
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
@@ -2462,6 +2472,36 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   pi.registerTool({
+    name: "psyclaw_record_choice",
+    label: "记录选择",
+    description: "记录研究者对选项的回应。结构化唤醒选项或直接文本回应都必须记录；直接回应需保留原文并填写解析后的选项。",
+    parameters: Type.Object({
+      prompt: Type.String({ minLength: 1, description: "当时向研究者提出的问题或选择提示" }),
+      originalResponse: Type.String({ minLength: 1, description: "研究者的原始回应，不能改写或省略" }),
+      selectedIds: Type.Array(Type.String(), { description: "解析后的选项 ID；无法明确解析时为空" }),
+      selectedLabels: Type.Array(Type.String(), { description: "解析后的选项名称" }),
+      source: Type.Union([Type.Literal("tool"), Type.Literal("free-text")]),
+      context: Type.Optional(Type.String({ description: "选择发生时的研究或任务上下文" })),
+    }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      try {
+        const record = await appendChoiceRecord(ctx.cwd, {
+          prompt: params.prompt,
+          originalResponse: params.originalResponse,
+          selectedIds: params.selectedIds,
+          selectedLabels: params.selectedLabels,
+          source: params.source as ChoiceRecordSource,
+          ...(params.context === undefined ? {} : { context: params.context }),
+        });
+        return { content: [{ type: "text", text: JSON.stringify(record, null, 2) }], details: record };
+      } catch (error) {
+        return { content: [{ type: "text", text: `选择记录失败：${error instanceof Error ? error.message : String(error)}` }], details: { status: "failed" }, isError: true };
+      }
+    },
+  });
+
+  pi.registerTool({
     name: "psyclaw_wake_options",
     label: "唤醒选项",
     description: "向研究者弹出结构化选择或核对清单勾选（唤醒选项）。当用户在 Panel 中交互时优先弹窗；同时在 CLI 渲染同等选项。适用于：单选/多选决策、核对清单勾选、确认下一步。不要用自由文本「请回复选项编号」替代本工具。",
@@ -2500,6 +2540,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           ...(params.syncVerify === undefined ? {} : { syncVerify: params.syncVerify }),
           ...(params.timeoutMs === undefined ? {} : { timeoutMs: params.timeoutMs }),
         });
+        if (wakePrompt.mode === "checklist") {
+          await createWakeVerifyChecklist(ctx.cwd, wakePrompt);
+        }
         const timeoutMs = Math.max(5_000, new Date(wakePrompt.expiresAt).getTime() - Date.now());
         const panelClients = panelHub.subscriberCount();
         if (ctx.hasUI) {

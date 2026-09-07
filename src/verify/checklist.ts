@@ -63,27 +63,57 @@ export async function loadVerifyChecklist(root: string): Promise<VerifyChecklist
   try {
     const parsed = JSON.parse(await readFile(path, "utf8")) as Partial<VerifyChecklist>;
     if (parsed.schemaVersion !== VERIFY_CHECKLIST_SCHEMA || !Array.isArray(parsed.items)) {
-      return defaultVerifyChecklist();
+      return {
+        schemaVersion: VERIFY_CHECKLIST_SCHEMA,
+        items: [],
+        updatedAt: new Date().toISOString(),
+      };
     }
     const items = parsed.items.filter(isVerifyItem);
-    // Merge in any new default ids without wiping human marks.
-    const byId = new Map(items.map((item) => [item.id, item]));
-    for (const seed of DEFAULT_ITEMS) {
-      if (!byId.has(seed.id)) byId.set(seed.id, { ...seed, status: "unverified" });
-    }
     return {
       schemaVersion: VERIFY_CHECKLIST_SCHEMA,
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
-      items: [...byId.values()],
+      items,
     };
   } catch {
-    return defaultVerifyChecklist();
+    return {
+      schemaVersion: VERIFY_CHECKLIST_SCHEMA,
+      items: [],
+      updatedAt: new Date().toISOString(),
+    };
   }
 }
 
 export async function saveVerifyChecklist(root: string, checklist: VerifyChecklist): Promise<void> {
   const path = await assertSafeProjectPath(root, VERIFY_CHECKLIST_PATH);
   await atomicWriteFile(path, `${JSON.stringify(checklist, null, 2)}\n`);
+}
+
+/** Create only the checklist items explicitly proposed by a checklist tool call. */
+export async function createVerifyItems(
+  root: string,
+  items: readonly Pick<VerifyItem, "id" | "label" | "kind" | "phase">[],
+): Promise<VerifyChecklist> {
+  const checklist = await loadVerifyChecklist(root);
+  const now = new Date().toISOString();
+  for (const proposed of items) {
+    if (!proposed.id.trim() || !proposed.label.trim()) continue;
+    const existing = checklist.items.find((item) => item.id === proposed.id);
+    if (existing) continue;
+    checklist.items.push({
+      id: proposed.id,
+      label: proposed.label,
+      status: "unverified",
+      ...(proposed.kind ? { kind: proposed.kind } : {}),
+      ...(proposed.phase ? { phase: proposed.phase } : {}),
+      updatedAt: now,
+    });
+  }
+  if (items.length > 0) {
+    checklist.updatedAt = now;
+    await saveVerifyChecklist(root, checklist);
+  }
+  return checklist;
 }
 
 export async function markVerifyItem(
