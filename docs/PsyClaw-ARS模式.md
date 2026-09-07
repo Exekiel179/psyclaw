@@ -10,7 +10,7 @@
 | `analysis` | analysis | 澄清→`/plan` 方案→跑数→分析报告→审查→HANDOFF |
 | `academic` | academic | ARS 写作/审稿；消费 `analysis/HANDOFF.md`，不重选主检验 |
 
-Thinking level：`Ctrl+Shift+Tab`。
+Thinking level：`Ctrl+Shift+T`（多数终端会拦截 Ctrl+Shift+Tab）。
 
 ## Analysis 软路由（统计方案）
 

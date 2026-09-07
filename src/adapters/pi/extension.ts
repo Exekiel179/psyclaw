@@ -95,7 +95,8 @@ import {
   parseSessionMode,
   sessionModePrompt,
 } from "../../session/modes.js";
-import { formatVerifyChecklist, loadVerifyChecklist, markVerifyItem, type VerifyStatus } from "../../verify/checklist.js";
+import { formatVerifyChecklist, isNaturalPlanConfirm, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../../verify/checklist.js";
+import { formatSessionHelp } from "../../session/help.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -1274,13 +1275,73 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       return editor;
     });
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("input", (event, ctx) => {
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("input", async (event, ctx) => {
     if (event.source === "extension") return;
     if (/^\/(?:login|logout)(?:\s|$)/i.test(event.text.trim())) {
       ctx.ui.notify("PsyClaw 已统一隐藏底层登录命令。请使用 /provider 配置、切换或更新模型凭据。", "info");
       return { action: "handled" };
     }
+    if (/^\/help(?:\s|$)/i.test(event.text.trim())) {
+      ctx.ui.notify(formatSessionHelp(), "info");
+      return { action: "handled" };
+    }
+
     const mode = arsModeEditor?.getMode() ?? sessionMode;
+    const trimmed = event.text.trim();
+
+    // Natural-language plan confirm: reply「可以」instead of forcing /plan confirm.
+    if (mode === "analysis" && isNaturalPlanConfirm(trimmed)) {
+      const plan = await readActiveAnalysisPlan(ctx.cwd);
+      if (plan && (plan.status === "awaiting-confirm" || plan.status === "ready" || plan.status === "reviewing")) {
+        const method = plan.confirmedMethod || plan.primaryAnalysis || plan.proposedMethods[0] || "按当前方案执行";
+        let next = plan.status === "awaiting-confirm"
+          ? advanceAnalysisPlan(plan, { type: "confirm", method, backend: "local-script" })
+          : plan;
+        if (next.status === "reviewing" || next.status === "awaiting-confirm") {
+          next = advanceAnalysisPlan(next, { type: "review" });
+        }
+        next = advanceAnalysisPlan(next, { type: "run-now" });
+        next = await writeAnalysisPlan(ctx.cwd, next);
+        ctx.ui.notify(`${formatAnalysisPlanStatus(next)}\n已按自然语言确认并开始执行。`, "info");
+        return {
+          action: "transform",
+          text: [
+            "/skill:analysis-plan",
+            "",
+            `User confirmed with natural language ("${trimmed}"). Execute plan ${next.id} now.`,
+            `Confirmed method: ${next.confirmedMethod ?? method}`,
+            next.approvalMode === "auto" ? "approvalMode=auto: label outputs as 未经人审批." : "Human confirmed this step.",
+            "Before and after analysis, open Panel checklist or /crosscheck; skipping must mark 未经核对.",
+          ].join("\n"),
+        };
+      }
+    }
+
+    const wantsStats = mode === "analysis" && Boolean(resolveStatsIntent(trimmed));
+    const wantsAcademic = mode === "academic" && Boolean(resolveAcademicSoftRoute(trimmed));
+    if ((wantsStats || wantsAcademic) && !(await readActiveProject(ctx.cwd))) {
+      if (!ctx.hasUI) {
+        return {
+          action: "transform",
+          text: [
+            "尚未 /init。请先提醒用户初始化工作区；若用户确认可无仓继续，再处理其请求。",
+            "User request:",
+            trimmed,
+          ].join("\n"),
+        };
+      }
+      const choice = await ctx.ui.select(
+        "尚未 /init。统计/写作建议先建仓，否则交接与核对清单不完整。",
+        ["先执行 /init", "本次继续（稍后 init）", "取消"],
+        { timeout: 120_000 },
+      );
+      if (choice === "取消" || choice === undefined) return { action: "handled" };
+      if (choice === "先执行 /init") {
+        return { action: "transform", text: `/init\n\n（用户选择先初始化，完成后再继续：${trimmed}）` };
+      }
+      ctx.ui.notify("继续本次请求；建议随后 /init。关键结果请做交叉核验。", "warning");
+    }
+
     if (mode === "academic") {
       const match = resolveAcademicSoftRoute(event.text);
       if (!match) return;
@@ -1340,7 +1401,8 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             `工作仓库已初始化：${project.id}`,
             "已创建 data/raw|clean、analysis/、literature/、paper/、psyclaw.md、.psyclaw/",
             "Shift+Tab：chat → analysis → academic",
-            "澄清与分析请切到 analysis；写作审稿请切到 academic。",
+            "Thinking：Ctrl+Shift+T",
+            "澄清与分析请切到 analysis；写作审稿请切到 academic。输入 /help 查看速览。",
           ].join("\n"),
           "info",
         );
@@ -1350,31 +1412,60 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
 
-  pi.registerCommand("verify", {
-    description: "人确认关键字段：/verify list | /verify <id> verified|unverified|flagged",
-    handler: async (args, ctx) => {
-      try {
-        const parts = args.trim().split(/\s+/).filter(Boolean);
-        if (parts.length === 0 || parts[0] === "list") {
-          const checklist = await loadVerifyChecklist(ctx.cwd);
-          ctx.ui.notify(formatVerifyChecklist(checklist), "info");
-          return;
-        }
-        const id = parts[0]!;
-        const status = (parts[1] ?? "verified") as VerifyStatus;
-        if (status !== "verified" && status !== "unverified" && status !== "flagged") {
-          ctx.ui.notify("Usage: /verify list | /verify <id> verified|unverified|flagged [备注]", "info");
-          return;
-        }
-        const notes = parts.slice(2).join(" ") || undefined;
-        const checklist = await markVerifyItem(ctx.cwd, id, status, notes);
-        ctx.ui.notify(formatVerifyChecklist(checklist), "info");
-      } catch (error) {
-        await notifyError(ctx, error);
+  const handleCrosscheck = async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+    try {
+      const parts = args.trim().split(/\s+/).filter(Boolean);
+      if (parts.length === 0 || parts[0] === "list") {
+        ctx.ui.notify(formatVerifyChecklist(await loadVerifyChecklist(ctx.cwd)), "info");
+        return;
       }
-    },
+      if (parts[0] === "skip") {
+        ctx.ui.notify(formatVerifyChecklist(await skipUnverifiedItems(ctx.cwd)), "warning");
+        return;
+      }
+      if (parts[0] === "kind") {
+        const kind = (parts[1] ?? "general") as CrosscheckKind;
+        pi.sendUserMessage(
+          [
+            "交叉核验任务：请作为助手主动提出核对项，不要等用户自己去「申请确认」。",
+            `核验类别：${kind}（citations=引文，format=格式，requirements=研究要求，stats=统计结果，general=综合）。`,
+            "输出可勾选清单，并建议用户打开 /panel 核对页逐项确认；若用户跳过，必须在产物中标注「未经核对」。",
+            "分析前与分析后都要有清单，不能默认跳过。",
+          ].join("\n"),
+          ctx.isIdle() ? {} : { deliverAs: "followUp" },
+        );
+        ctx.ui.notify(`已启动 ${kind} 交叉核验；也可 /panel 打开核对清单。`, "info");
+        return;
+      }
+      const id = parts[0]!;
+      const status = (parts[1] ?? "verified") as VerifyStatus;
+      if (status !== "verified" && status !== "unverified" && status !== "flagged" && status !== "skipped") {
+        ctx.ui.notify("Usage: /crosscheck list | skip | kind <citations|format|requirements|stats> | <id> verified|unverified|flagged|skipped [备注]", "info");
+        return;
+      }
+      const notes = parts.slice(2).join(" ") || undefined;
+      const checklist = await markVerifyItem(ctx.cwd, id, status, notes);
+      ctx.ui.notify(formatVerifyChecklist(checklist), "info");
+    } catch (error) {
+      await notifyError(ctx, error);
+    }
+  };
+
+  pi.registerCommand("crosscheck", {
+    description: "交叉核验：/crosscheck list|skip|kind <类型>|<id> verified|…",
+    handler: async (args, ctx) => handleCrosscheck(args, ctx),
+  });
+  pi.registerCommand("verify", {
+    description: "交叉核验（同 /crosscheck）：模型提出项，人勾选或 skip 标注未经核对",
+    handler: async (args, ctx) => handleCrosscheck(args, ctx),
   });
 
+  pi.registerCommand("help", {
+    description: "三种模式速览与常用命令",
+    handler: async (_args, ctx) => {
+      ctx.ui.notify(formatSessionHelp(), "info");
+    },
+  });
   pi.registerCommand("plan", {
     description: "分析方案：/plan [new|status|list|confirm|review|run|defer|handoff|reject]",
     handler: async (args, ctx) => {
@@ -1382,15 +1473,37 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         const trimmed = args.trim();
         const [cmdRaw, ...rest] = trimmed.split(/\s+/).filter(Boolean);
         const cmd = (cmdRaw ?? "status").toLowerCase();
-        const usage = "Usage: /plan new [目标] | status | list | confirm [方法] | review | run | defer | handoff | reject [原因]";
+        const usage = "Usage: /plan new|status|list|confirm|auto|human|review|run|defer|handoff|reject";
 
         if (cmd === "new") {
           const goal = rest.join(" ").trim() || "从当前对话澄清的分析目标";
           const plan = await writeAnalysisPlan(ctx.cwd, createAnalysisPlan({ goal }));
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已创建。继续澄清/EDA，完成后用 /plan confirm。`, "info");
+          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已创建。模型会按分析项逐一请你选择；回复「可以」即可确认执行。`, "info");
           return;
         }
 
+        if (cmd === "auto") {
+          let plan = await readActiveAnalysisPlan(ctx.cwd);
+          if (!plan) {
+            ctx.ui.notify("没有活跃 Plan。先 /plan new 或在 analysis 模式触发 soft takeover。", "warning");
+            return;
+          }
+          plan = advanceAnalysisPlan(plan, { type: "set-approval-mode", mode: "auto" });
+          plan = await writeAnalysisPlan(ctx.cwd, plan);
+          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已启用 auto：后续结果必须标注「未经人审批」。`, "warning");
+          return;
+        }
+        if (cmd === "human") {
+          let plan = await readActiveAnalysisPlan(ctx.cwd);
+          if (!plan) {
+            ctx.ui.notify("没有活跃 Plan。", "warning");
+            return;
+          }
+          plan = advanceAnalysisPlan(plan, { type: "set-approval-mode", mode: "human" });
+          plan = await writeAnalysisPlan(ctx.cwd, plan);
+          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已恢复人工确认。`, "info");
+          return;
+        }
         if (cmd === "list") {
           const ids = await listAnalysisPlans(ctx.cwd);
           ctx.ui.notify(ids.length > 0 ? `Plans:\n${ids.map((id) => `- ${id}`).join("\n")}` : "尚无 analysis/plans 记录。用 /plan new 开始。", "info");
@@ -1420,7 +1533,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           plan = advanceAnalysisPlan(plan, { type: "confirm", method, backend: "local-script" });
           plan = advanceAnalysisPlan(plan, { type: "review" });
           plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n软确认完成并已审查。接着 /plan run 或 /plan defer。`, "info");
+          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n软确认完成并已审查。回复「可以」或 /plan run 开始执行。`, "info");
           return;
         }
         if (cmd === "review") {
@@ -1661,9 +1774,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             [
               `PsyClaw ARS profile v${PSYCLAW_ARS_PROFILE_VERSION}`,
               `当前模式：${arsModeEditor?.getMode() ?? sessionMode}（Shift+Tab：chat → analysis → academic）`,
-              "Thinking：Ctrl+Shift+Tab",
+              "Thinking：Ctrl+Shift+T",
               `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF} (${ARS_UPSTREAM_COMMIT.slice(0, 12)})`,
-              "入口：Shift+Tab，/ars doctor，/ars start，/ars full <task>，/ars stop，/verify",
+              "入口：Shift+Tab，/ars doctor，/ars start，/ars full <task>，/ars stop，/crosscheck，/help",
               formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)),
             ].join("\n"),
             "info",

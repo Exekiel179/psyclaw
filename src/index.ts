@@ -3,6 +3,7 @@ export * from "./agents/discover.js";
 export * from "./agents/import.js";
 export * from "./agents/recommended-personas.js";
 export * from "./session/modes.js";
+export * from "./session/help.js";
 export * from "./project/workspace.js";
 export * from "./verify/checklist.js";
 export * from "./ars/profile.js";

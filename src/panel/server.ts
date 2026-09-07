@@ -38,7 +38,7 @@ import {
   setLocalSkillEnabled,
   userSkillId,
 } from "../skills/user-skills.js";
-import { loadVerifyChecklist } from "../verify/checklist.js";
+import { loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../verify/checklist.js";
 import { readActiveAnalysisPlan } from "../analysis/plan.js";
 
 const activePanelRuns = new Set<string>();
@@ -997,6 +997,34 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
             items: checklist.items,
           },
         }));
+        return;
+      }
+      if (url.pathname === "/api/crosscheck") {
+        if (request.method === "GET") {
+          const checklist = await loadVerifyChecklist(root);
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/crosscheck/v1", checklist }));
+          return;
+        }
+        if (request.method !== "POST") throw new Error("method not allowed");
+        const body = await readJsonBody(request);
+        if (body.action === "skip") {
+          const checklist = await skipUnverifiedItems(root, typeof body.reason === "string" ? body.reason : undefined);
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/crosscheck/v1", checklist }));
+          return;
+        }
+        const id = String(body.id ?? "").trim();
+        const status = String(body.status ?? "verified") as VerifyStatus;
+        if (!id) throw new Error("id is required");
+        if (status !== "verified" && status !== "unverified" && status !== "flagged" && status !== "skipped") {
+          throw new Error("status must be verified|unverified|flagged|skipped");
+        }
+        const kind = typeof body.kind === "string" ? body.kind as CrosscheckKind : undefined;
+        const notes = typeof body.notes === "string" ? body.notes : undefined;
+        const checklist = await markVerifyItem(root, id, status, notes, kind);
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ schemaVersion: "psyclaw/crosscheck/v1", checklist }));
         return;
       }
       if (url.pathname === "/api/active-provider") {

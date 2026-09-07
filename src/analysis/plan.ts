@@ -29,6 +29,18 @@ export type AnalysisPlanStage =
 
 export type AnalysisExecutionBackend = "local-script" | "mcp" | "undecided";
 
+export type AnalysisApprovalMode = "human" | "auto";
+
+export interface AnalysisPlanChoice {
+  id: string;
+  question: string;
+  /** First option should be a concrete new method; “already enough” may appear last. */
+  options: string[];
+  recommendation?: string;
+  selected?: string;
+  decidedAt?: string;
+}
+
 export interface AnalysisPlanEdaNote {
   at: string;
   summary: string;
@@ -45,8 +57,11 @@ export interface AnalysisPlanRecord extends AnalysisPlanContract {
   questions: string[];
   edaNotes: AnalysisPlanEdaNote[];
   proposedMethods: string[];
+  /** One human (or auto) decision per analysis step — not a single mega-confirm. */
+  analysisChoices: AnalysisPlanChoice[];
   confirmedMethod?: string;
   executionBackend: AnalysisExecutionBackend;
+  approvalMode: AnalysisApprovalMode;
   mcpServer?: string;
   scriptEntrypoint?: string;
   reviewFindings: string[];
@@ -95,7 +110,9 @@ export function createAnalysisPlan(input: {
     questions: [],
     edaNotes: [],
     proposedMethods: [],
+    analysisChoices: [],
     executionBackend: "local-script",
+    approvalMode: "human",
     reviewFindings: [],
     runPreference: "unset",
     createdAt,
@@ -124,7 +141,11 @@ export async function readAnalysisPlan(root: string, id: string): Promise<Analys
     const path = await assertSafeProjectPath(root, `analysis/plans/${id}.json`);
     const value = JSON.parse(await readFile(path, "utf8")) as AnalysisPlanRecord;
     if (value.schemaVersion !== ANALYSIS_PLAN_SCHEMA || typeof value.id !== "string") return null;
-    return value;
+    return {
+      ...value,
+      analysisChoices: Array.isArray(value.analysisChoices) ? value.analysisChoices : [],
+      approvalMode: value.approvalMode === "auto" ? "auto" : "human",
+    };
   } catch {
     return null;
   }
@@ -157,6 +178,9 @@ export function advanceAnalysisPlan(
     | { type: "add-question"; question: string }
     | { type: "add-eda"; summary: string; paths?: string[] }
     | { type: "draft"; primaryOutcome?: string; primaryAnalysis?: string; exploratoryAnalyses?: string[]; proposedMethods?: string[]; missingDataPlan?: string; multiplicityPlan?: string; exclusionCriteria?: string }
+    | { type: "add-choice"; choice: Omit<AnalysisPlanChoice, "selected" | "decidedAt"> }
+    | { type: "decide-choice"; id: string; selected: string }
+    | { type: "set-approval-mode"; mode: AnalysisApprovalMode }
     | { type: "confirm"; method: string; backend?: AnalysisExecutionBackend; mcpServer?: string }
     | { type: "review" }
     | { type: "ready" }
@@ -165,7 +189,12 @@ export function advanceAnalysisPlan(
     | { type: "complete"; scriptEntrypoint?: string }
     | { type: "block"; reason: string },
 ): AnalysisPlanRecord {
-  const next: AnalysisPlanRecord = { ...plan, updatedAt: nowIso() };
+  const next: AnalysisPlanRecord = {
+    ...plan,
+    analysisChoices: [...(plan.analysisChoices ?? [])],
+    approvalMode: plan.approvalMode ?? "human",
+    updatedAt: nowIso(),
+  };
   switch (action.type) {
     case "add-question":
       next.questions = [...plan.questions, action.question.trim()].filter(Boolean);
@@ -184,6 +213,21 @@ export function advanceAnalysisPlan(
       if (action.multiplicityPlan !== undefined) next.multiplicityPlan = action.multiplicityPlan;
       if (action.exclusionCriteria !== undefined) next.exclusionCriteria = action.exclusionCriteria;
       next.status = "awaiting-confirm";
+      break;
+    case "add-choice":
+      next.analysisChoices = [...next.analysisChoices.filter((row) => row.id !== action.choice.id), { ...action.choice }];
+      next.status = "awaiting-confirm";
+      break;
+    case "decide-choice": {
+      next.analysisChoices = next.analysisChoices.map((row) =>
+        row.id === action.id ? { ...row, selected: action.selected.trim(), decidedAt: nowIso() } : row);
+      break;
+    }
+    case "set-approval-mode":
+      next.approvalMode = action.mode;
+      if (action.mode === "auto") {
+        next.notes = [next.notes, "approvalMode=auto：结果须标注「未经人审批」"].filter(Boolean).join("\n");
+      }
       break;
     case "confirm":
       next.confirmedMethod = action.method.trim();
@@ -230,7 +274,17 @@ export function renderAnalysisPlanMarkdown(plan: AnalysisPlanRecord): string {
     `- Goal: ${plan.goal}`,
     `- Confirmatory: ${plan.confirmatory ? "yes" : "no (exploratory OK if disclosed)"}`,
     `- Execution: ${plan.executionBackend}${plan.mcpServer ? ` (${plan.mcpServer})` : ""}`,
+    `- Approval mode: **${plan.approvalMode ?? "human"}**${(plan.approvalMode ?? "human") === "auto" ? "（结果须标注未经人审批）" : ""}`,
     `- Run preference: ${plan.runPreference}`,
+    "",
+    "## Per-analysis choices",
+    "",
+    ...(plan.analysisChoices?.length
+      ? plan.analysisChoices.map((choice) => {
+        const picked = choice.selected ? ` → **${choice.selected}**` : "（待选）";
+        return `- ${choice.id}: ${choice.question}${picked}\n  Options: ${choice.options.join(" | ")}${choice.recommendation ? `\n  Recommend: ${choice.recommendation}` : ""}`;
+      })
+      : ["- (none yet — add one choice per proposed analysis; first option = concrete new method; last may be「已经足够」)"]),
     "",
     "## Data",
     "",
@@ -279,10 +333,12 @@ export function renderAnalysisPlanMarkdown(plan: AnalysisPlanRecord): string {
 }
 
 export function formatAnalysisPlanStatus(plan: AnalysisPlanRecord): string {
+  const pending = (plan.analysisChoices ?? []).filter((row) => !row.selected).length;
   return [
     `分析 Plan \`${plan.id}\` · ${plan.status}/${plan.stage}`,
     `目标：${plan.goal}`,
     `主分析：${plan.confirmedMethod ?? plan.primaryAnalysis ?? "（未确认）"}`,
+    `审批：${plan.approvalMode ?? "human"}${pending > 0 ? ` · 待选分析 ${pending} 项` : ""}`,
     `后端：${plan.executionBackend}${plan.mcpServer ? `/${plan.mcpServer}` : ""} · 执行偏好：${plan.runPreference}`,
     `文件：analysis/plans/${plan.id}.md`,
     plan.reviewFindings.length > 0 ? `审核：${plan.reviewFindings.join("；")}` : "审核：尚未完成或无发现",
