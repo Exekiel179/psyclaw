@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PsyClaw Panel · 学术科研智能体控制台</title>
+  <title>PsyClaw Panel · 科研工作台</title>
   <style>
     :root {
       color-scheme: light;
@@ -60,6 +60,7 @@
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, Monaco, Consolas, monospace;
       --font-serif: "Charter", "Bitstream Charter", Cambria, Georgia, serif;
+      --accent: var(--brand-primary);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -938,7 +939,7 @@
       background: var(--brand-primary-hover);
     }
 
-    /* Interactive Web Console Drawer */
+    /* Chat drawer — light app chrome (not terminal) */
     .console-fab {
       position: fixed;
       bottom: 24px;
@@ -948,20 +949,20 @@
       align-items: center;
       gap: 8px;
       padding: 10px 18px;
-      background: #0f172a;
-      color: #f8fafc;
-      border: 1px solid #334155;
-      border-radius: 999px;
+      background: var(--bg-surface);
+      color: var(--brand-primary);
+      border: 1px solid var(--brand-primary-border);
+      border-radius: var(--radius-lg);
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: var(--shadow-md);
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
     }
     .console-fab:hover {
-      background: #1e293b;
-      transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+      background: var(--brand-primary-light);
+      border-color: var(--brand-primary);
+      transform: translateY(-1px);
     }
     .console-drawer {
       position: fixed;
@@ -971,34 +972,44 @@
       max-width: calc(100vw - 40px);
       height: 560px;
       max-height: calc(100vh - 80px);
-      background: #0f172a;
-      color: #e2e8f0;
-      border: 1px solid #334155;
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
       border-bottom: 0;
-      border-radius: 12px 12px 0 0;
-      box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      box-shadow: var(--shadow-md);
       display: flex;
       flex-direction: column;
       z-index: 1000;
       transform: translateY(105%);
       transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      font-family: var(--font-sans);
     }
     .console-drawer.open {
       transform: translateY(0);
+    }
+    .console-drawer.embedded {
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      transform: none;
     }
     .console-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 12px 16px;
-      border-bottom: 1px solid #1e293b;
-      background: #0b1120;
-      border-radius: 12px 12px 0 0;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+    .console-drawer.embedded .console-header {
+      border-radius: 0;
     }
     .console-title {
       font-size: 13px;
       font-weight: 650;
-      color: #f8fafc;
+      color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -1007,10 +1018,10 @@
       font-size: 10px;
       font-weight: 600;
       padding: 1px 6px;
-      border-radius: 999px;
-      background: #064e3b;
-      color: #34d399;
-      border: 1px solid #047857;
+      border-radius: var(--radius-xs);
+      background: var(--ok-bg);
+      color: var(--ok-text);
+      border: 1px solid var(--ok-border);
     }
     .console-actions {
       display: flex;
@@ -1020,103 +1031,126 @@
     .console-btn-icon {
       background: transparent;
       border: none;
-      color: #94a3b8;
+      color: var(--text-muted);
       cursor: pointer;
       padding: 4px;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       display: flex;
     }
     .console-btn-icon:hover {
-      color: #f8fafc;
-      background: #1e293b;
+      color: var(--text-main);
+      background: var(--bg-surface-subtle);
     }
     .console-quick-chips {
       display: flex;
       align-items: center;
       gap: 6px;
       padding: 8px 14px;
-      background: #141e33;
-      border-bottom: 1px solid #1e293b;
+      background: var(--bg-surface-subtle);
+      border-bottom: 1px solid var(--border-subtle);
       overflow-x: auto;
     }
     .chip {
       font-family: var(--font-mono);
       font-size: 11px;
-      background: #1e293b;
-      color: #38bdf8;
-      border: 1px solid #334155;
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-default);
       padding: 3px 8px;
-      border-radius: 4px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
       white-space: nowrap;
-      transition: all 0.12s ease;
+      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
     }
     .chip:hover {
-      background: #334155;
-      color: #fff;
+      background: var(--brand-primary-light);
+      border-color: var(--brand-primary-border);
+      color: var(--brand-primary);
     }
     .console-log {
       flex: 1;
       overflow-y: auto;
-      padding: 14px 16px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      line-height: 1.6;
+      padding: 16px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.55;
       display: flex;
       flex-direction: column;
       gap: 12px;
+      background: var(--bg-app);
     }
     .log-entry {
       display: flex;
       flex-direction: column;
       gap: 4px;
+      max-width: 92%;
+    }
+    .log-entry.user {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+    .log-entry.agent,
+    .log-entry.sys {
+      align-self: flex-start;
+      align-items: flex-start;
     }
     .log-user {
-      color: #38bdf8;
-      font-weight: 600;
-    }
-    .log-agent {
-      color: #e2e8f0;
-      background: #1e293b;
+      color: #fff;
+      font-weight: 500;
+      background: var(--brand-primary);
       padding: 10px 12px;
-      border-radius: 6px;
-      border-left: 3px solid #2dd4bf;
+      border-radius: 12px 12px 4px 12px;
       white-space: pre-wrap;
       word-break: break-word;
+      box-shadow: var(--shadow-xs);
+    }
+    .log-agent {
+      color: var(--text-main);
+      background: var(--bg-surface);
+      padding: 10px 12px;
+      border-radius: 12px 12px 12px 4px;
+      border: 1px solid var(--border-subtle);
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: var(--shadow-xs);
     }
     .log-sys {
-      color: #94a3b8;
-      font-style: italic;
-      font-size: 11px;
+      color: var(--text-muted);
+      font-style: normal;
+      font-size: 12px;
+      background: transparent;
+      padding: 2px 0;
     }
     .console-input-box {
-      padding: 12px;
-      background: #0b1120;
-      border-top: 1px solid #1e293b;
+      padding: 12px 14px;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
       display: flex;
       gap: 8px;
     }
     .console-input {
       flex: 1;
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: #f8fafc;
-      padding: 8px 12px;
-      font-size: 12.5px;
-      border-radius: 6px;
+      background: var(--bg-surface-subtle);
+      border: 1px solid var(--border-default);
+      color: var(--text-main);
+      padding: 10px 12px;
+      font-size: 13px;
+      border-radius: var(--radius-md);
       outline: none;
-      font-family: var(--font-mono);
+      font-family: var(--font-sans);
     }
     .console-input:focus {
-      border-color: #38bdf8;
+      border-color: var(--brand-primary);
+      background: var(--bg-surface);
+      box-shadow: 0 0 0 3px var(--brand-primary-border);
     }
     .console-send-btn {
       background: var(--brand-primary);
       color: #fff;
       border: none;
       padding: 8px 14px;
-      border-radius: 6px;
-      font-size: 12.5px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       display: flex;
@@ -1125,6 +1159,54 @@
     }
     .console-send-btn:hover {
       background: var(--brand-primary-hover);
+    }
+    .log-agent.streaming::after {
+      content: "▍";
+      animation: blink 1s steps(1) infinite;
+      color: var(--brand-primary);
+      margin-left: 2px;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+    .wake-option-list {
+      display: grid;
+      gap: 8px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+    .wake-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      cursor: pointer;
+      text-align: left;
+    }
+    .wake-option:hover {
+      border-color: var(--brand-primary-border);
+      background: var(--brand-primary-light);
+    }
+    .wake-option.selected {
+      border-color: var(--brand-primary);
+      background: var(--brand-primary-light);
+      box-shadow: 0 0 0 2px var(--brand-primary-border);
+    }
+    .wake-option .wake-mark {
+      font-family: var(--font-mono);
+      color: var(--brand-primary);
+      font-weight: 700;
+      min-width: 1.5rem;
+    }
+    .wake-option .wake-label {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .wake-option .wake-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
     /* Command Palette Modal */
@@ -1514,7 +1596,7 @@
         <div class="page-head">
           <div>
             <h1>交互对话</h1>
-            <p>整页对话视图（不再只依赖右下角抽屉）。打开本页时会把控制台嵌到此处。</p>
+            <p>提问会转入当前 PsyClaw 会话；助手回复经 SSE 同步到此处。模型可调用「唤醒选项」弹窗。</p>
           </div>
         </div>
         <div id="chat-console-host" class="panel section" style="min-height:62vh;padding:0;overflow:hidden;display:flex;flex-direction:column"></div>
@@ -1523,22 +1605,22 @@
   </div>
 </div>
 
-<!-- 悬浮控制台入口 Floating Action Button -->
-<button id="console-fab" class="console-fab" title="打开/折叠 PsyClaw 交互控制台">
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-  <span>PsyClaw 控制台</span>
+<!-- 悬浮对话入口 -->
+<button id="console-fab" class="console-fab" title="打开/折叠对话">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  <span>对话</span>
 </button>
 
-<!-- 抽屉式交互控制台 Console Drawer -->
+<!-- 抽屉式对话 -->
 <div id="console-drawer" class="console-drawer">
   <div class="console-header">
     <div class="console-title">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#38bdf8"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-      <span>科研会话终端</span>
-      <span id="console-status-badge" class="console-status-tag">连线中</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--brand-primary)"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>对话</span>
+      <span id="console-status-badge" class="console-status-tag">已连接</span>
     </div>
     <div class="console-actions">
-      <button id="console-clear-btn" class="console-btn-icon" title="清空终端历史">
+      <button id="console-clear-btn" class="console-btn-icon" title="清空对话">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
       <button id="console-close-btn" class="console-btn-icon" title="最小化">
@@ -1547,7 +1629,6 @@
     </div>
   </div>
 
-  <!-- 快捷指令快速贴入栏 -->
   <div class="console-quick-chips">
     <span class="chip" data-cmd="/plan status">/plan status</span>
     <span class="chip" data-cmd="/verify list">/verify list</span>
@@ -1556,20 +1637,38 @@
     <span class="chip" data-cmd="/agents">/agents 角色</span>
   </div>
 
-  <!-- 终端流式日志输出区域 -->
   <div id="console-log" class="console-log">
-    <div class="log-entry">
-      <div class="log-sys">ψ PsyClaw 交互控制台已就绪。支持直接提问或发送斜杠指令 (/init, /plan, /grill, /review, /verify 等)。</div>
+    <div class="log-entry sys">
+      <div class="log-sys">对话已就绪（SSE）。提问转入当前会话，助手回复会流式同步到此处。支持 /init、/plan、/grill 等指令；模型可弹出「唤醒选项」。</div>
     </div>
   </div>
 
-  <!-- 输入与触发栏 -->
   <div class="console-input-box">
-    <input type="text" id="console-input" class="console-input" placeholder="输入科研指令或研究问题 (Enter 发送)..." autocomplete="off" />
+    <input type="text" id="console-input" class="console-input" placeholder="输入研究问题或指令，Enter 发送…" autocomplete="off" />
     <button id="console-send-btn" class="console-send-btn">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       发送
     </button>
+  </div>
+</div>
+
+<!-- 唤醒选项弹窗 -->
+<div id="wake-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="wake-modal-title">唤醒选项</h3>
+      <button id="wake-modal-close" class="console-btn-icon" style="color:var(--text-muted)" title="取消">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p id="wake-modal-prompt" style="color:var(--text-secondary);margin:0"></p>
+      <div id="wake-option-list" class="wake-option-list"></div>
+    </div>
+    <div class="modal-foot">
+      <button id="wake-cancel-btn" class="button">取消</button>
+      <button id="wake-submit-btn" class="button primary">确认</button>
+    </div>
   </div>
 </div>
 
@@ -1681,7 +1780,7 @@ function mountConsoleInChat() {
   const drawer = $("console-drawer");
   if (!host || !drawer) return;
   host.appendChild(drawer);
-  drawer.classList.add("open");
+  drawer.classList.add("open", "embedded");
   drawer.style.position = "relative";
   drawer.style.inset = "auto";
   drawer.style.width = "100%";
@@ -1689,12 +1788,14 @@ function mountConsoleInChat() {
   drawer.style.minHeight = "58vh";
   drawer.style.boxShadow = "none";
   drawer.style.borderRadius = "0";
+  drawer.style.transform = "none";
 }
 
 function restoreConsoleDrawer() {
   const drawer = $("console-drawer");
   if (!drawer || drawer.parentElement === document.body) return;
   document.body.appendChild(drawer);
+  drawer.classList.remove("embedded");
   drawer.style.position = "";
   drawer.style.inset = "";
   drawer.style.width = "";
@@ -1702,6 +1803,7 @@ function restoreConsoleDrawer() {
   drawer.style.minHeight = "";
   drawer.style.boxShadow = "";
   drawer.style.borderRadius = "";
+  drawer.style.transform = "";
 }
 
 async function loadChecklist() {
@@ -2240,11 +2342,14 @@ document.querySelectorAll(".step-item").forEach(item => {
   });
 });
 
-/* --- 交互控制台 Console Drawer 交互 --- */
+/* --- 交互对话 + SSE + 唤醒选项 --- */
 const consoleDrawer = $("console-drawer");
 const consoleFab = $("console-fab");
 const consoleLog = $("console-log");
 const consoleInput = $("console-input");
+const streamBubbles = new Map();
+let lastLocalUserText = "";
+let wakeState = null;
 
 function openConsole() {
   consoleDrawer.classList.add("open");
@@ -2262,17 +2367,176 @@ function openConsoleWithMessage(text) {
 
 function appendLog(role, text) {
   const entry = document.createElement("div");
-  entry.className = "log-entry";
+  entry.className = `log-entry ${role}`;
   if (role === "user") {
-    entry.innerHTML = `<div class="log-user">❯ ${esc(text)}</div>`;
+    entry.innerHTML = `<div class="log-user">${esc(text)}</div>`;
   } else if (role === "agent") {
     entry.innerHTML = `<div class="log-agent">${renderMarkdown(text)}</div>`;
   } else {
-    entry.innerHTML = `<div class="log-sys">ℹ ${esc(text)}</div>`;
+    entry.innerHTML = `<div class="log-sys">${esc(text)}</div>`;
   }
   consoleLog.appendChild(entry);
   consoleLog.scrollTop = consoleLog.scrollHeight;
+  return entry;
 }
+
+function ensureStreamBubble(messageId) {
+  let entry = streamBubbles.get(messageId);
+  if (entry) return entry;
+  entry = document.createElement("div");
+  entry.className = "log-entry agent";
+  entry.dataset.messageId = messageId;
+  entry.innerHTML = `<div class="log-agent streaming"></div>`;
+  consoleLog.appendChild(entry);
+  streamBubbles.set(messageId, entry);
+  consoleLog.scrollTop = consoleLog.scrollHeight;
+  return entry;
+}
+
+function updateStreamBubble(messageId, text, done) {
+  const entry = ensureStreamBubble(messageId);
+  const bubble = entry.querySelector(".log-agent");
+  if (!bubble) return;
+  bubble.classList.toggle("streaming", !done);
+  bubble.innerHTML = renderMarkdown(text || (done ? "" : "…"));
+  consoleLog.scrollTop = consoleLog.scrollHeight;
+}
+
+function setConsoleStatus(text, ok = true) {
+  const badge = $("console-status-badge");
+  if (!badge) return;
+  badge.textContent = text;
+  badge.style.background = ok ? "var(--ok-bg)" : "var(--warn-bg)";
+  badge.style.color = ok ? "var(--ok-text)" : "var(--warn-text)";
+  badge.style.borderColor = ok ? "var(--ok-border)" : "var(--warn-border)";
+}
+
+function connectAssistantStream() {
+  if (typeof EventSource === "undefined") return;
+  const es = new EventSource("/api/assistant/stream");
+  es.addEventListener("ready", () => setConsoleStatus("已连接", true));
+  es.addEventListener("ping", () => setConsoleStatus("已连接", true));
+  es.addEventListener("user_echo", (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      if (data.text && data.text !== lastLocalUserText) appendLog("user", data.text);
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("assistant_start", (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      ensureStreamBubble(data.messageId || "assistant");
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("assistant_delta", (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      updateStreamBubble(data.messageId || "assistant", data.text || "", false);
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("assistant_end", (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      updateStreamBubble(data.messageId || "assistant", data.text || "", true);
+      streamBubbles.delete(data.messageId || "assistant");
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("agent_settled", () => {
+    for (const [id, entry] of streamBubbles) {
+      entry.querySelector(".log-agent")?.classList.remove("streaming");
+      streamBubbles.delete(id);
+    }
+  });
+  es.addEventListener("wake_options", (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      if (data.prompt) showWakeModal(data.prompt);
+    } catch { /* ignore */ }
+  });
+  es.addEventListener("wake_options_resolved", (ev) => {
+    try {
+      const data = JSON.parse(ev.data);
+      if (wakeState && wakeState.id === data.promptId) hideWakeModal();
+      appendLog("sys", `唤醒选项已关闭（${data.answer?.source || "resolved"}）`);
+      if (data.answer?.source === "panel" || data.answer?.selectedIds?.length) {
+        loadChecklist().catch(() => {});
+      }
+    } catch { /* ignore */ }
+  });
+  es.onerror = () => setConsoleStatus("重连中", false);
+}
+
+function showWakeModal(prompt, { switchChecklist = true } = {}) {
+  const firstOpen = !wakeState || wakeState.id !== prompt.id;
+  wakeState = {
+    id: prompt.id,
+    mode: prompt.mode,
+    allowMultiple: Boolean(prompt.allowMultiple),
+    selected: wakeState && wakeState.id === prompt.id
+      ? wakeState.selected
+      : new Set((prompt.options || []).filter(o => o.checked).map(o => o.id)),
+    options: prompt.options || [],
+  };
+  if (wakeState.mode === "choice" && wakeState.selected.size === 0 && wakeState.options[0]) {
+    wakeState.selected.add(wakeState.options[0].id);
+  }
+  $("wake-modal-title").textContent = prompt.title || "唤醒选项";
+  $("wake-modal-prompt").textContent = prompt.prompt || (prompt.mode === "checklist" ? "勾选需要确认的项目后提交。" : "请选择一项。");
+  const list = $("wake-option-list");
+  list.innerHTML = "";
+  for (const option of wakeState.options) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "wake-option" + (wakeState.selected.has(option.id) ? " selected" : "");
+    btn.dataset.id = option.id;
+    const mark = wakeState.mode === "checklist" || wakeState.allowMultiple
+      ? (wakeState.selected.has(option.id) ? "[x]" : "[ ]")
+      : (wakeState.selected.has(option.id) ? "(•)" : "( )");
+    btn.innerHTML = `<span class="wake-mark">${mark}</span><span><div class="wake-label">${esc(option.label)}</div>${option.description ? `<div class="wake-desc">${esc(option.description)}</div>` : ""}</span>`;
+    btn.addEventListener("click", () => {
+      if (wakeState.mode === "choice" && !wakeState.allowMultiple) {
+        wakeState.selected.clear();
+        wakeState.selected.add(option.id);
+      } else if (wakeState.selected.has(option.id)) {
+        wakeState.selected.delete(option.id);
+      } else {
+        wakeState.selected.add(option.id);
+      }
+      showWakeModal(prompt, { switchChecklist: false });
+    });
+    list.appendChild(btn);
+  }
+  $("wake-modal").classList.remove("hidden");
+  openConsole();
+  if (firstOpen && switchChecklist && prompt.mode === "checklist") setView("checklist");
+}
+
+function hideWakeModal() {
+  $("wake-modal").classList.add("hidden");
+  wakeState = null;
+}
+
+async function submitWake(cancel = false) {
+  if (!wakeState) return;
+  const promptId = wakeState.id;
+  const selectedIds = cancel ? [] : [...wakeState.selected];
+  try {
+    await json("/api/wake-options/respond", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ promptId, selectedIds, cancel: Boolean(cancel) }),
+    });
+    hideWakeModal();
+    appendLog("sys", cancel ? "已取消唤醒选项" : `已提交选择：${selectedIds.join(", ") || "（空）"}`);
+    await loadChecklist().catch(() => {});
+  } catch (err) {
+    appendLog("sys", `[唤醒选项] ${err.message}`);
+  }
+}
+
+$("wake-modal-close")?.addEventListener("click", () => submitWake(true));
+$("wake-cancel-btn")?.addEventListener("click", () => submitWake(true));
+$("wake-submit-btn")?.addEventListener("click", () => submitWake(false));
 
 consoleFab.addEventListener("click", () => {
   if (consoleDrawer.classList.contains("open")) closeConsole();
@@ -2280,13 +2544,15 @@ consoleFab.addEventListener("click", () => {
 });
 $("console-close-btn").addEventListener("click", closeConsole);
 $("console-clear-btn").addEventListener("click", () => {
-  consoleLog.innerHTML = `<div class="log-entry"><div class="log-sys">ψ 终端历史已清空。输入 /help 或提问即可开始。</div></div>`;
+  consoleLog.innerHTML = `<div class="log-entry sys"><div class="log-sys">对话已清空。输入问题或 /help 即可继续。</div></div>`;
+  streamBubbles.clear();
 });
 
 async function sendConsoleMessage(msg) {
   const text = (msg || consoleInput.value).trim();
   if (!text) return;
   consoleInput.value = "";
+  lastLocalUserText = text;
   appendLog("user", text);
 
   try {
@@ -2295,11 +2561,14 @@ async function sendConsoleMessage(msg) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ message: text })
     });
-    appendLog("agent", res.text || res.message || "✓ 执行成功");
+    // Stub ack only — real assistant text arrives via SSE.
+    if (res.text) appendLog("sys", res.text);
   } catch (err) {
     appendLog("sys", `[提示] ${err.message}`);
   }
 }
+
+connectAssistantStream();
 
 $("console-send-btn").addEventListener("click", () => sendConsoleMessage());
 consoleInput.addEventListener("keydown", (e) => {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.10 - 2026-09-07
+
+- Sync CLI assistant replies to Panel via SSE (/api/assistant/stream)
+- Add psyclaw_wake_options (唤醒选项): Panel modal + CLI renderer; checklist can sync verify marks
+- Allow Panel POST /api/crosscheck and /api/wake-options/respond
+
 ## 0.29.9 - 2026-09-07
 
 - Emphasize ARS/Nature/compose/analysis-plan/grill are bundled: never ask the user to install them

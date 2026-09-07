@@ -35,11 +35,12 @@ export function sessionHelpDocument(): SessionHelpDocument {
       { cmd: "/crosscheck", blurb: "交叉核验（也可 /verify）" },
       { cmd: "/grill", blurb: "学术压力测试（academic-grill）" },
       { cmd: "/review", blurb: "多角色模拟同行评审" },
-      { cmd: "/panel", blurb: "科研工作台" },
+      { cmd: "/panel", blurb: "科研工作台（SSE 同步回复；唤醒选项弹窗）" },
       { cmd: "/skill:<name>", blurb: "显式调用；ARS/Nature 等已随包，优先对话 soft-route，勿要求安装" },
       { cmd: "/help", blurb: "打开本页" },
     ],
     notes: [
+      "模型可用工具「唤醒选项」(psyclaw_wake_options) 弹出选择或勾选核对清单；Panel 连线时弹窗，CLI 同步渲染。",
       "ARS、Nature gap-fill（nature-figure 等）、academic-paper-strategist/composer、analysis-plan、academic-grill 已随 npm 包内置：不要让模型去安装或 /plugin install 这些工作流 Skill；需要时用对话（chat/analysis/academic 自然语言）或必要时 `/skill:<name>`。",
       "可选推荐（非工作流核心）：`distill-scholar` / `distill-journal`（https://github.com/Exekiel179/distill-skills）及花叔其它旗舰。",
       "完整白皮书见仓库 docs/使用白皮书.md。",

@@ -32,6 +32,17 @@ import {
   type RecommendationState,
 } from "../../skills/recommended.js";
 import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../tui/skill-manager.js";
+import { WakeOptionsComponent } from "../../tui/wake-options.js";
+import {
+  applyWakeVerifySync,
+  buildWakePrompt,
+  formatWakeResult,
+  labelsFor,
+  waitForPanelWakeAnswer,
+  type WakeOptionsResult,
+} from "../../wake-options/runtime.js";
+import { panelHub } from "../../panel/hub.js";
+import type { WakeOptionsAnswer } from "../../panel/hub.js";
 import {
   enabledLocalSkillPaths,
   enabledLocalPromptPaths,
@@ -2445,6 +2456,151 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         return {
           content: [{ type: "text", text: `Institutional full-text planning failed: ${error instanceof Error ? error.message : String(error)}` }],
           details: { status: "failed" },
+        };
+      }
+    },
+  });
+
+  pi.registerTool({
+    name: "psyclaw_wake_options",
+    label: "唤醒选项",
+    description: "向研究者弹出结构化选择或核对清单勾选（唤醒选项）。当用户在 Panel 中交互时优先弹窗；同时在 CLI 渲染同等选项。适用于：单选/多选决策、核对清单勾选、确认下一步。不要用自由文本「请回复选项编号」替代本工具。",
+    parameters: Type.Object({
+      title: Type.String({ minLength: 1, description: "弹窗标题，例如「选择下一步」或「分析前核对」" }),
+      prompt: Type.Optional(Type.String({ description: "可选说明文字" })),
+      mode: Type.Union([Type.Literal("choice"), Type.Literal("checklist")], {
+        description: "choice=单选弹窗；checklist=可多选勾选（可同步到核对清单）",
+      }),
+      options: Type.Array(Type.Object({
+        id: Type.String({ minLength: 1 }),
+        label: Type.String({ minLength: 1 }),
+        description: Type.Optional(Type.String()),
+        checked: Type.Optional(Type.Boolean()),
+      }), { minItems: 1 }),
+      allowMultiple: Type.Optional(Type.Boolean()),
+      minSelections: Type.Optional(Type.Number()),
+      syncVerify: Type.Optional(Type.Boolean({ description: "checklist 模式下是否写入 .psyclaw/verify-checklist.json（默认 true）" })),
+      timeoutMs: Type.Optional(Type.Number()),
+    }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      try {
+        const wakePrompt = buildWakePrompt({
+          title: params.title,
+          mode: params.mode,
+          options: params.options.map((option) => ({
+            id: option.id,
+            label: option.label,
+            ...(option.description === undefined ? {} : { description: option.description }),
+            ...(option.checked === undefined ? {} : { checked: option.checked }),
+          })),
+          ...(params.prompt === undefined ? {} : { prompt: params.prompt }),
+          ...(params.allowMultiple === undefined ? {} : { allowMultiple: params.allowMultiple }),
+          ...(params.minSelections === undefined ? {} : { minSelections: params.minSelections }),
+          ...(params.syncVerify === undefined ? {} : { syncVerify: params.syncVerify }),
+          ...(params.timeoutMs === undefined ? {} : { timeoutMs: params.timeoutMs }),
+        });
+        const timeoutMs = Math.max(5_000, new Date(wakePrompt.expiresAt).getTime() - Date.now());
+        const panelClients = panelHub.subscriberCount();
+        if (ctx.hasUI) {
+          ctx.ui.notify(
+            panelClients > 0
+              ? `唤醒选项已推送到 Panel（${wakePrompt.title}）；CLI 也可作答`
+              : `唤醒选项：${wakePrompt.title}（Panel 未连接时仅 CLI）`,
+            "info",
+          );
+        }
+
+        const panelPromise = waitForPanelWakeAnswer(wakePrompt, timeoutMs).then((answer) => ({ ...answer, raced: "panel" as const }));
+
+        const cliPromise = (async (): Promise<WakeOptionsAnswer & { raced: "cli" }> => {
+          if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
+            if (panelClients === 0) {
+              return { promptId: wakePrompt.id, selectedIds: [], source: "cancel", raced: "cli" };
+            }
+            await new Promise<void>((resolve) => {
+              if (signal?.aborted) resolve();
+              else signal?.addEventListener("abort", () => resolve(), { once: true });
+            });
+            return { promptId: wakePrompt.id, selectedIds: [], source: "cancel", raced: "cli" };
+          }
+          const uiResult = await ctx.ui.custom((tui, theme, keybindings, done) => new WakeOptionsComponent(
+            wakePrompt.title,
+            wakePrompt.prompt,
+            wakePrompt.mode,
+            wakePrompt.options,
+            Boolean(wakePrompt.allowMultiple),
+            wakePrompt.minSelections ?? 0,
+            tui,
+            theme,
+            keybindings,
+            done,
+          ), { overlay: true });
+          if (!uiResult || (uiResult as { type?: string }).type === "cancel") {
+            return { promptId: wakePrompt.id, selectedIds: [], source: "cancel", raced: "cli" };
+          }
+          const selectedIds = (uiResult as { selectedIds?: string[] }).selectedIds ?? [];
+          return { promptId: wakePrompt.id, selectedIds, source: "cli", raced: "cli" };
+        })();
+
+        const winner = await Promise.race([panelPromise, cliPromise]);
+        // If CLI answered first, close the Panel waiter so the SSE prompt dismisses.
+        if (winner.raced === "cli") {
+          panelHub.resolveWake({
+            promptId: wakePrompt.id,
+            selectedIds: winner.selectedIds,
+            source: winner.source === "cancel" ? "cancel" : "cli",
+          });
+        }
+
+        if (signal?.aborted) {
+          return {
+            content: [{ type: "text", text: formatWakeResult({
+              status: "cancelled",
+              source: "cancel",
+              selectedIds: [],
+              selectedLabels: [],
+              panelClients,
+            }) }],
+            details: { status: "cancelled" },
+            isError: true,
+          };
+        }
+
+        let status: WakeOptionsResult["status"] = "answered";
+        if (winner.source === "timeout") status = "timeout";
+        else if (winner.source === "cancel") status = "cancelled";
+
+        const verifySynced = status === "answered"
+          ? await applyWakeVerifySync(ctx.cwd, wakePrompt, winner.selectedIds)
+          : false;
+
+        const result: WakeOptionsResult = {
+          status,
+          source: winner.source,
+          selectedIds: winner.selectedIds,
+          selectedLabels: labelsFor(wakePrompt, winner.selectedIds),
+          panelClients,
+          verifySynced,
+          ...(winner.notes ? { notes: winner.notes } : {}),
+        };
+
+        if (result.status !== "answered") {
+          return {
+            content: [{ type: "text", text: formatWakeResult(result) }],
+            details: result,
+            isError: true,
+          };
+        }
+        return {
+          content: [{ type: "text", text: formatWakeResult(result) }],
+          details: result,
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `唤醒选项失败：${error instanceof Error ? error.message : String(error)}` }],
+          details: { status: "failed" },
+          isError: true,
         };
       }
     },
