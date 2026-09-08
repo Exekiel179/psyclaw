@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.29.17 - 2026-09-08
+
+- Republish after npm staged 0.29.16 without public listing (same class of delay as 0.29.13→0.29.14)
+- Same changes as 0.29.16: AGENTS.md guardrails, psytrainer-ml catalog, help/panel/verify updates
+
 ## 0.29.16 - 2026-09-08
 
 - Tighten AGENTS.md against agent overreach, over-testing, and over-hardening
