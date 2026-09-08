@@ -5,10 +5,13 @@ import {
   type NodeObservabilityConfig,
 } from "./config.js";
 import type { ObservabilityHandle } from "./node-sdks.js";
+import { readTelemetryPreference, resolveTelemetryEnabled, telemetryPreferenceOptions, type TelemetryPreference } from "./preference.js";
 
 export {
   DEFAULT_POSTHOG_HOST,
   OBS_CONFIG_SCRIPT_ID,
+  browserConfigForPreference,
+  emptyBrowserObservabilityConfig,
   injectBrowserObservabilityConfig,
   observabilityEnabled,
   readBrowserObservabilityConfig,
@@ -16,6 +19,20 @@ export {
   sanitizeAgentEventProperties,
 } from "./config.js";
 export type { BrowserObservabilityConfig, NodeObservabilityConfig, AgentEventPropertyValue } from "./config.js";
+export {
+  DEFAULT_TELEMETRY_PREFERENCE,
+  parseTelemetryPreference,
+  psyclawSettingsPath,
+  readTelemetryEnvOverride,
+  readTelemetryPreference,
+  resolveTelemetryEnabled,
+  shouldShowTelemetryNotice,
+  telemetryPreferenceOptions,
+  writeTelemetryPreference,
+} from "./preference.js";
+export type { TelemetryPreference } from "./preference.js";
+export { maybeShowTelemetryNotice } from "./notice.js";
+export type { TelemetryNoticeChoice } from "./notice.js";
 
 type BootFn = (config: NodeObservabilityConfig) => Promise<ObservabilityHandle>;
 
@@ -28,18 +45,24 @@ async function defaultBoot(config: NodeObservabilityConfig): Promise<Observabili
 }
 
 /**
- * Initialize Sentry and/or PostHog only when the matching env vars are set.
- * Safe to call more than once; the first call wins. With keys unset this
- * returns immediately and never imports an SDK.
+ * Initialize Sentry and/or PostHog when product telemetry is enabled.
+ * Safe to call more than once; the first call wins. Opted-out users and
+ * PSYCLAW_TELEMETRY=0 never import an SDK.
  */
 export async function initNodeObservability(options: {
   env?: NodeJS.ProcessEnv;
   boot?: BootFn;
+  preference?: TelemetryPreference;
+  settingsPath?: string;
 } = {}): Promise<boolean> {
   const env = options.env ?? process.env;
+  const preference = options.preference ?? await readTelemetryPreference(telemetryPreferenceOptions(options.settingsPath));
+  if (!resolveTelemetryEnabled(preference, env)) {
+    return handle !== undefined;
+  }
   const config = readNodeObservabilityConfig(env);
-  // Disabled must not latch the singleton: tests and late opt-in in a child
-  // process still need to be able to boot when keys appear.
+  // Disabled must not latch the singleton: tests and a later enable in the
+  // same process still need to be able to boot.
   if (!observabilityEnabled(config)) {
     return handle !== undefined;
   }

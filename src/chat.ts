@@ -10,6 +10,7 @@ import {
   PSYCLAW_IDENTITY_PROMPT,
 } from "./branding.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
+import { maybeShowTelemetryNotice } from "./observability/index.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
@@ -105,6 +106,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   const manifest = await resolvePsyClawManifest();
   await ensureQuietStartup();
   await ensurePsyClawTheme();
+  await maybeShowTelemetryNotice();
   if (manifest?.piVersion !== undefined) {
     await acknowledgeBundledPiChangelog(manifest.piVersion);
   }

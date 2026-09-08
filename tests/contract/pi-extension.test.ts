@@ -85,6 +85,7 @@ describe("Pi extension contract", () => {
       expect.objectContaining({ name: "loop" }),
       expect.objectContaining({ name: "provider" }),
       expect.objectContaining({ name: "pet" }),
+      expect.objectContaining({ name: "telemetry" }),
       expect.objectContaining({ name: "skill" }),
       expect.objectContaining({ name: "plugin" }),
     ]));

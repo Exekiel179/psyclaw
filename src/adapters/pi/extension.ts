@@ -51,9 +51,11 @@ import {
 import {
   captureAgentError,
   initNodeObservability,
+  readTelemetryPreference,
   shutdownObservability,
   trackAgentEvent,
   trackGateWaiting,
+  writeTelemetryPreference,
 } from "../../observability/index.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
@@ -1534,6 +1536,29 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       }
       await setPetPreference(action === "on");
       ctx.ui.notify(`启动横幅宠物已${action === "on" ? "开启" : "关闭"}，下次启动生效`, "info");
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("telemetry", {
+    description: "查看或关闭匿名产品遥测",
+    handler: async (args, ctx) => {
+      const action = args.trim().toLowerCase() || "status";
+      if (action === "status") {
+        const preference = await readTelemetryPreference();
+        ctx.ui.notify(
+          preference.enabled
+            ? "匿名产品遥测：开启（默认）。采集粗粒度使用与错误，不含研究正文。关闭：/telemetry off"
+            : "匿名产品遥测：已关闭。重新开启：/telemetry on",
+          "info",
+        );
+        return;
+      }
+      if (action !== "on" && action !== "off") {
+        ctx.ui.notify("Usage: /telemetry on|off|status", "error");
+        return;
+      }
+      await writeTelemetryPreference({ enabled: action === "on", noticeAcknowledged: true });
+      ctx.ui.notify(action === "on" ? "已开启匿名产品遥测。下次启动生效。" : "已关闭匿名产品遥测。下次启动不再发送。", "info");
     },
   });
 

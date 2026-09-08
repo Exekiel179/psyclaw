@@ -91,13 +91,19 @@ describe("read-only panel server", () => {
     }
   });
 
-  it("injects empty observability config and serves the snippet without leaking keys", async () => {
+  it("injects empty observability config when telemetry is off and serves the snippet", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-obs-"));
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     const htmlPath = join(root, "panel.html");
+    const settingsPath = join(root, "psyclaw-settings.json");
     await writeFile(
       htmlPath,
       `<!DOCTYPE html><head><script id="psyclaw-obs-config">window.__PSYCLAW_OBS__={"surface":"panel"};</script></head><title>panel</title>`,
+      "utf8",
+    );
+    await writeFile(
+      settingsPath,
+      `${JSON.stringify({ telemetry: { enabled: false, noticeAcknowledged: true } }, null, 2)}\n`,
       "utf8",
     );
     const previous = {
@@ -106,13 +112,15 @@ describe("read-only panel server", () => {
       PUBLIC_SENTRY_DSN: process.env.PUBLIC_SENTRY_DSN,
       POSTHOG_KEY: process.env.POSTHOG_KEY,
       PUBLIC_POSTHOG_KEY: process.env.PUBLIC_POSTHOG_KEY,
+      PSYCLAW_TELEMETRY: process.env.PSYCLAW_TELEMETRY,
     };
     delete process.env.SENTRY_DSN;
     delete process.env.SENTRY_DSN_WEB;
     delete process.env.PUBLIC_SENTRY_DSN;
     delete process.env.POSTHOG_KEY;
     delete process.env.PUBLIC_POSTHOG_KEY;
-    const server = createPanelServer(root, { panelHtmlPath: htmlPath });
+    delete process.env.PSYCLAW_TELEMETRY;
+    const server = createPanelServer(root, { panelHtmlPath: htmlPath, telemetrySettingsPath: settingsPath });
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     const port = typeof address === "object" && address ? address.port : 0;
@@ -121,15 +129,22 @@ describe("read-only panel server", () => {
       expect(html).toContain("psyclaw-obs-config");
       expect(html).toContain('"sentryDsn":""');
       expect(html).toContain('"posthogKey":""');
+      expect(html).toContain('"telemetryEnabled":false');
       expect(html).not.toMatch(/phc_[A-Za-z0-9]+/);
       expect(html).not.toContain("ingest.us.sentry.io");
 
+      await writeFile(
+        settingsPath,
+        `${JSON.stringify({ telemetry: { enabled: true, noticeAcknowledged: true } }, null, 2)}\n`,
+        "utf8",
+      );
       process.env.SENTRY_DSN_WEB = "https://example-public@o0.ingest.example/1";
       process.env.PUBLIC_POSTHOG_KEY = "phc_example_not_live";
       const enabledHtml = await (await fetch(`http://127.0.0.1:${port}/`)).text();
       expect(enabledHtml).toContain("https://example-public@o0.ingest.example/1");
       expect(enabledHtml).toContain("phc_example_not_live");
       expect(enabledHtml).not.toContain("ingest.us.sentry.io");
+      expect(enabledHtml).toContain('"telemetryEnabled":true');
     } finally {
       for (const [name, value] of Object.entries(previous)) {
         if (value === undefined) delete process.env[name];

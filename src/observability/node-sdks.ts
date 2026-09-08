@@ -1,6 +1,6 @@
 /**
- * Loaded only after env keys are confirmed present. Importing this file will
- * pull in Sentry/PostHog; callers must keep that behind the opt-in gate.
+ * Loaded only after telemetry is confirmed enabled. Importing this file will
+ * pull in Sentry/PostHog; callers must keep that behind the preference gate.
  */
 
 import { redactSecrets } from "../core/redact.js";
