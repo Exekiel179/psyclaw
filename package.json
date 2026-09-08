@@ -22,6 +22,7 @@
   "files": [
     "dist/src",
     "dist/apps/panel/index.html",
+    "dist/apps/panel/observability.js",
     "skills",
     "agents",
     "vendor/ars",
@@ -84,7 +85,9 @@
     "@earendil-works/pi-ai": "0.84.4",
     "@earendil-works/pi-coding-agent": "0.84.4",
     "@earendil-works/pi-tui": "0.84.4",
+    "@sentry/node": "^10.73.0",
     "ink": "^7.1.1",
+    "posthog-node": "^5.51.7",
     "react": "^19.2.8",
     "typebox": "1.3.7",
     "yaml": "2.9.0"

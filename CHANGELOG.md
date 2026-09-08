@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Anonymous product telemetry is on by default (coarse usage and errors; no research text or PII). A one-time startup notice explains what is collected and how to turn it off (`psyclaw telemetry off` / `/telemetry off`). `PSYCLAW_TELEMETRY=0` forces the current process off.
+
 ## 0.29.17 - 2026-09-08
 
 - Republish after npm staged 0.29.16 without public listing (same class of delay as 0.29.13→0.29.14)

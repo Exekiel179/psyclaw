@@ -12,6 +12,7 @@ import {
 } from "./branding.js";
 import { ensureAcademicModeKeybindings } from "./ars/keybindings.js";
 import { resolvePsyClawManifest } from "./updates/manifest.js";
+import { maybeShowTelemetryNotice } from "./observability/index.js";
 import { PROVIDER_PRESETS, readMacOsLaunchctlCredential } from "./setup.js";
 import { withBundledWindowsTools } from "./bundled-tools.js";
 import {
@@ -136,6 +137,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   const manifest = await resolvePsyClawManifest();
   await ensureQuietStartup();
   await ensurePsyClawTheme();
+  await maybeShowTelemetryNotice();
   if (manifest?.piVersion !== undefined) {
     await acknowledgeBundledPiChangelog(manifest.piVersion);
   }

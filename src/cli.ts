@@ -26,6 +26,15 @@ import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, renderProductUpdateSummary, c } from "./style/cli-ui.js";
 import { continueSessionArgs, peelContinuouslyWorkFlag } from "./cli-args.js";
+import {
+  captureAgentError,
+  initNodeObservability,
+  maybeShowTelemetryNotice,
+  readTelemetryEnvOverride,
+  readTelemetryPreference,
+  shutdownObservability,
+  writeTelemetryPreference,
+} from "./observability/index.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -184,10 +193,70 @@ async function ensureConfiguredThenChat(
   await launchChat({ args, continuouslyWork });
 }
 
+async function telemetryStatusText(): Promise<string> {
+  const preference = await readTelemetryPreference();
+  const override = readTelemetryEnvOverride();
+  const enabled = override ?? preference.enabled;
+  const lines = [
+    enabled ? "匿名产品遥测：开启（默认）" : "匿名产品遥测：已关闭",
+    "采集：粗粒度产品使用与错误。不含研究正文、论文、对话或个人身份。",
+    `偏好文件：${preference.noticeAcknowledged ? "已阅读启动说明" : "尚未阅读启动说明"}`,
+    override === false
+      ? "当前进程：PSYCLAW_TELEMETRY=0，强制关闭。"
+      : override === true
+        ? "当前进程：PSYCLAW_TELEMETRY=1，强制开启。"
+        : "更改：psyclaw telemetry off  或  psyclaw telemetry on",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+async function dispatchTelemetry(args: string[]): Promise<void> {
+  const action = (args[0] ?? "status").toLowerCase();
+  if (action === "status" || action === "show") {
+    process.stdout.write(await telemetryStatusText());
+    return;
+  }
+  if (action === "off" || action === "disable" || action === "opt-out") {
+    await writeTelemetryPreference({ enabled: false, noticeAcknowledged: true });
+    process.stdout.write("已关闭匿名产品遥测。之后不会再发送 Sentry / PostHog 数据。\n");
+    return;
+  }
+  if (action === "on" || action === "enable" || action === "opt-in") {
+    await writeTelemetryPreference({ enabled: true, noticeAcknowledged: true });
+    process.stdout.write("已开启匿名产品遥测。不含研究正文或个人身份。\n");
+    return;
+  }
+  throw new Error("Usage: psyclaw telemetry [status|on|off]");
+}
+
 async function main(): Promise<void> {
   const peeledLaunch = peelContinuouslyWorkFlag(process.argv.slice(2));
   const args = peeledLaunch.args;
   const continuouslyWork = peeledLaunch.enabled;
+  const peek = args[0];
+  const skipTelemetry =
+    peek === "--help" ||
+    peek === "-h" ||
+    peek === "--version" ||
+    peek === "-v" ||
+    peek === "-V" ||
+    peek === "telemetry";
+  if (!skipTelemetry) {
+    await maybeShowTelemetryNotice();
+    await initNodeObservability();
+  }
+  try {
+    await dispatch(args, { continuouslyWork });
+  } catch (error) {
+    await captureAgentError(error, { phase: "cli", command: peek ?? "default" });
+    throw error;
+  } finally {
+    await shutdownObservability();
+  }
+}
+
+async function dispatch(args: string[], opts: { continuouslyWork: boolean }): Promise<void> {
+  const continuouslyWork = opts.continuouslyWork;
   const command = args.shift();
   const root = process.cwd();
   if (command === "--help" || command === "-h") {
@@ -211,6 +280,10 @@ async function main(): Promise<void> {
   }
   if (command === "chat") {
     await ensureConfiguredThenChat(args, { continuouslyWork });
+    return;
+  }
+  if (command === "telemetry") {
+    await dispatchTelemetry(args);
     return;
   }
   if (command === "setup") {
