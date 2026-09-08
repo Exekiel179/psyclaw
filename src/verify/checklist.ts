@@ -8,15 +8,15 @@ export const VERIFY_CHECKLIST_PATH = ".psyclaw/verify-checklist.json" as const;
 /**
  * Checklist statuses:
  * - unverified: not checked yet
- * - ai-checked: AI finished /crosscheck on the item (does NOT satisfy human gate)
- * - verified: human approved in Panel / wake / `/crosscheck <id> human`
+ * - ai-checked: AI finished a /crosscheck or /verify pass on the item (does NOT satisfy human gate)
+ * - verified: human approved via Panel「核实」or wake-options (internal human-approve; not a user slash)
  * - flagged / skipped: do not satisfy the human gate
  */
 export type VerifyStatus = "unverified" | "ai-checked" | "verified" | "flagged" | "skipped";
 
 export type VerifyMarkSource = "ai" | "human";
 
-/** Cross-check domains the model proposes and AI checks via /crosscheck; humans must approve. */
+/** Domains for process/substantive AI passes; humans approve separately via Panel/wake. */
 export type CrosscheckKind = "citations" | "format" | "requirements" | "stats" | "general";
 
 export type VerifyPhase = "pre-analysis" | "post-analysis" | "general";
@@ -160,7 +160,7 @@ export async function createVerifyItems(
 
 /**
  * Resolve the status that will be persisted.
- * AI `/crosscheck <id> verified` becomes `ai-checked` so human approval remains mandatory.
+ * AI-originated `verified` marks become `ai-checked` so human approval remains mandatory.
  */
 export function resolveVerifyMark(
   requested: VerifyStatus | "human",
@@ -237,7 +237,7 @@ function itemPhase(item: VerifyItem): VerifyPhase {
   return item.phase ?? "general";
 }
 
-function isHumanVerified(item: VerifyItem): boolean {
+export function isHumanVerified(item: VerifyItem): boolean {
   return item.status === "verified" && item.approvedBy !== "ai";
 }
 
@@ -264,9 +264,9 @@ export function evaluateHumanVerifyGate(
     checklist,
     pending,
     message: [
-      `人审硬门禁（${scopeLabel}）：须先由 AI /crosscheck，再由人在 Panel「核实」或 /crosscheck <id> human。`,
+      `人审硬门禁（${scopeLabel}）：须先完成 AI /crosscheck 与/或 /verify，再由人在 Panel「核实」或唤醒选项中批准。`,
       `未过人审：${pendingText}`,
-      "跳过/AI 已核不算通过。打开 /panel → 核对清单。",
+      "跳过/AI 已核不算通过。人审不经斜杠命令，由收尾门禁自动要求。",
     ].join("\n"),
   };
 }
@@ -295,10 +295,9 @@ export function formatVerifyChecklist(checklist: VerifyChecklist): string {
     const who = item.approvedBy ? ` · ${item.approvedBy}` : "";
     lines.push(`${mark} ${item.id}${kind}${phase}${who}: ${item.label}${item.notes ? ` — ${item.notes}` : ""}`);
   }
-  lines.push("用法：/crosscheck list | /crosscheck kind <citations|format|requirements|stats>");
-  lines.push("AI 记核：/crosscheck <id> verified|ai-checked|flagged [备注]（记为 AI 已核，不替代人审）");
-  lines.push("人审通过：Panel「核实」或 /crosscheck <id> human [备注]");
-  lines.push("也可：/crosscheck skip（标未经核对；不解除 analysis/academic 人审门禁）");
+  lines.push("过程核对：/crosscheck [焦点]（数据、引文真实性、格式要求；可多视角合并）");
+  lines.push("实质验证：/verify [焦点]（结果是否成立、引文/方法是否合理）");
+  lines.push("人审：Panel「核实」或唤醒选项（收尾门禁自动要求；非斜杠命令）");
   return lines.join("\n");
 }
 

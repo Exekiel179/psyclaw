@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.7.9",
+  "documentVersion": "0.8.0",
   "syncedAt": "2026-09-08",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
@@ -157,6 +157,15 @@
       "description": "蒸馏目标期刊/会议的写作风格。硬门槛：本地至少 3 篇全文；建议 8–12 篇。",
       "sourceRef": "https://github.com/Exekiel179/distill-skills",
       "installHint": "Install only distill-journal/. Prepare ≥3 target-venue full texts under literature/pdfs or a user path before distilling."
+    },
+    {
+      "id": "psytrainer-ml",
+      "name": "PsyTrainer ML",
+      "kind": "skill",
+      "stage": "机器学习",
+      "description": "用自然语言配置和运行 PsyTrainer 表格模型训练与批量预测，并解读模型结果。仅显式调用；预测只加载可信本地 model.pkl。",
+      "sourceRef": "https://github.com/Exekiel179/psytrainer-ml-skill",
+      "installHint": "Skill 名 psytrainer-ml。克隆 https://github.com/Exekiel179/psytrainer-ml-skill 到目标目录后，在安装阶段装依赖：macOS/Linux 用 `python3 scripts/install_runtime.py --wheel <PsyTrainer.whl>`；Windows 用 `scripts\\install_runtime.cmd --wheel D:\\wheels\\PsyTrainer-*.whl` 或 `install_runtime.ps1`（支持 glob / PSYTRAINER_WHEEL / py 启动器）。创建 .venv 并写 runtime.json；任务中禁止再 pip install。不要嵌套进 psyclaw 源码树。"
     }
   ],
   "plugins": [
@@ -233,6 +242,20 @@
       "status": "review-required",
       "requiresApproval": true,
       "blockedReason": "Install manifest and content hash must pass validation before activation."
+    },
+    {
+      "id": "psytrainer-ml",
+      "sourceKind": "github",
+      "sourceUrl": "https://github.com/Exekiel179/psytrainer-ml-skill.git",
+      "ref": "16afe7ad5cf6fcd6d0fe259c4ee1fc10c0cce388",
+      "skillPath": ".",
+      "skillName": "psytrainer-ml",
+      "license": "MIT",
+      "target": ".psyclaw/imports/recommended/psytrainer-ml",
+      "dependencies": ["Python 3.10+ (Windows: py launcher)", "scripts/install_runtime.py|.ps1|.cmd", "PsyTrainer wheel via --wheel or PSYTRAINER_WHEEL", "pandas", "numpy", "joblib"],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "After clone, run install_runtime (py/ps1/cmd) with the PsyTrainer wheel at install time on the target OS; prediction still requires trusted local model.pkl paths."
     }
   ]
 }

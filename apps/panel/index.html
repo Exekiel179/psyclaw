@@ -102,15 +102,19 @@
     .brand-mark {
       display: grid;
       place-items: center;
-      width: 28px;
-      height: 28px;
-      background: linear-gradient(135deg, #0f172a 0%, #0d766e 100%);
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #a855f7 100%);
       color: #ffffff;
       border-radius: var(--radius-sm);
-      font-weight: 700;
-      font-size: 16px;
-      line-height: 1;
-      box-shadow: var(--shadow-xs);
+      box-shadow: 0 2px 10px rgba(129, 140, 248, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      flex-shrink: 0;
+    }
+    .brand-mark svg {
+      width: 17px;
+      height: 17px;
+      fill: currentColor;
     }
     .brand-title {
       font-weight: 650;
@@ -123,18 +127,43 @@
     }
     .brand-badge {
       font-size: 10.5px;
-      font-weight: 550;
-      color: var(--brand-primary);
-      background: var(--brand-primary-light);
-      border: 1px solid var(--brand-primary-border);
-      padding: 1px 6px;
+      font-weight: 600;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%);
+      color: #6366f1;
+      border: 1px solid rgba(129, 140, 248, 0.3);
+      padding: 1px 7px;
       border-radius: 999px;
       letter-spacing: 0.02em;
     }
     .topbar-meta {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+    }
+    .github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 550;
+      color: var(--text-secondary);
+      background: var(--bg-surface-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .github-link:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text-main);
+      border-color: rgba(129, 140, 248, 0.4);
+      box-shadow: 0 1px 4px rgba(129, 140, 248, 0.15);
+    }
+    .github-link svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
     }
     .local-badge {
       display: inline-flex;
@@ -593,15 +622,32 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
+      grid-template-columns: minmax(480px, 1.25fr) 180px minmax(0, 1.6fr);
       height: calc(100vh - 130px);
       overflow: hidden;
       background: var(--bg-surface);
+      transition: grid-template-columns 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .workspace.chat-collapsed {
+      grid-template-columns: 46px 180px minmax(0, 1fr);
+    }
+    /* 当未打开具体文件时，对话框自动铺满工作台主区域 */
+    .workspace.no-file-open {
+      grid-template-columns: minmax(0, 1fr) 180px 0px;
+    }
+    .workspace.no-file-open .viewer {
+      display: none !important;
+    }
+    .workspace.no-file-open.chat-collapsed {
+      grid-template-columns: 46px minmax(0, 1fr) 0px;
+    }
+    .workspace.no-file-open.chat-collapsed .viewer {
+      display: none !important;
     }
     .tree {
       border-right: 1px solid var(--border-subtle);
       overflow-y: auto;
-      padding: 12px 8px;
+      padding: 10px 6px;
       background: #fafbfc;
     }
     .tree-section {
@@ -1132,40 +1178,45 @@
       background: var(--brand-primary-hover);
     }
 
-    /* In-page chat: Modern Codex / Gemini style */
+    /* In-page chat: Modern Codex / Gemini style inside workspace */
     .console-drawer {
       position: relative;
       width: 100%;
       height: 100%;
-      min-height: 72vh;
+      min-height: 0;
       flex: 1;
       background: var(--bg-surface);
       color: var(--text-main);
-      border: none;
+      border-right: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
       font-family: var(--font-sans);
+      overflow: hidden;
+      transition: width 0.2s ease;
     }
     .console-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 20px;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--border-subtle);
       background: var(--bg-surface);
+      min-height: 48px;
     }
     .console-title {
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 650;
       color: var(--text-main);
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 8px;
+      overflow: hidden;
+      white-space: nowrap;
     }
     .console-status-tag {
-      font-size: 10.5px;
+      font-size: 10px;
       font-weight: 600;
-      padding: 1px 7px;
+      padding: 1px 6px;
       border-radius: 999px;
       background: var(--ok-bg);
       color: var(--ok-text);
@@ -1177,7 +1228,8 @@
     .console-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      flex-shrink: 0;
     }
     .console-btn-icon {
       background: transparent;
@@ -1194,6 +1246,50 @@
     .console-btn-icon:hover {
       color: var(--text-main);
       background: var(--bg-surface-subtle);
+    }
+
+    /* Collapsed state for workspace chat drawer */
+    .workspace.chat-collapsed .console-header {
+      padding: 10px 6px;
+      justify-content: center;
+    }
+    .workspace.chat-collapsed .console-title span,
+    .workspace.chat-collapsed .console-status-tag,
+    .workspace.chat-collapsed #console-clear-btn,
+    .workspace.chat-collapsed .console-log,
+    .workspace.chat-collapsed .console-quick-chips,
+    .workspace.chat-collapsed .console-input-wrap {
+      display: none !important;
+    }
+    .workspace.chat-collapsed #chat-collapse-btn svg {
+      transform: rotate(180deg);
+    }
+    .workspace.chat-collapsed .console-collapsed-bar {
+      display: flex !important;
+    }
+
+    .console-collapsed-bar {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+      gap: 16px;
+      height: 100%;
+      cursor: pointer;
+      background: var(--bg-surface-subtle);
+    }
+    .console-collapsed-bar:hover {
+      background: var(--bg-surface-hover);
+    }
+    .console-vertical-label {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: 0.12em;
+      font-size: 11px;
+      font-weight: 650;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      user-select: none;
     }
 
     .console-log {
@@ -1249,17 +1345,21 @@
 
     /* Agent Message: Codex/Gemini open conversational layout */
     .agent-avatar {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #0d766e 0%, #0284c7 100%);
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #a855f7 100%);
       color: #ffffff;
       display: grid;
       place-items: center;
-      font-weight: 700;
-      font-size: 15px;
       flex-shrink: 0;
-      box-shadow: 0 2px 4px rgba(13, 118, 110, 0.2);
+      box-shadow: 0 2px 8px rgba(129, 140, 248, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .agent-avatar svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
     }
     .agent-content-wrap {
       flex: 1;
@@ -1392,6 +1492,38 @@
       border: 1px solid var(--border-subtle);
       padding: 1px 5px;
       border-radius: 4px;
+    }
+
+    /* Antigravity-like clickable file jump pill in chat */
+    .file-jump-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1.5px 7px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, rgba(129, 140, 248, 0.08) 100%);
+      color: #4338ca;
+      border: 1px solid rgba(129, 140, 248, 0.3);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 550;
+      text-decoration: none;
+      cursor: pointer;
+      vertical-align: baseline;
+      transition: all 0.15s ease;
+    }
+    .file-jump-pill:hover {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(129, 140, 248, 0.18) 100%);
+      border-color: #6366f1;
+      color: #312e81;
+      box-shadow: 0 1px 3px rgba(99, 102, 241, 0.15);
+      transform: translateY(-0.5px);
+    }
+    .file-jump-pill svg {
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
+      stroke-width: 2.2;
     }
 
     /* Shimmering Pulsing Dots for Streaming */
@@ -1659,6 +1791,8 @@
       .nav button { width: auto; white-space: nowrap; }
       .main { padding: 16px; }
       .workspace { grid-template-columns: 1fr; height: auto; }
+      .workspace.chat-collapsed { grid-template-columns: 1fr; }
+      .console-drawer { min-height: 360px; border-right: 0; border-bottom: 1px solid var(--border-subtle); }
       .tree { max-height: 260px; border-right: 0; border-bottom: 1px solid var(--border-subtle); }
       .viewer { min-height: 480px; }
       .provider-grid, .cost-metrics { grid-template-columns: 1fr; }
@@ -1671,7 +1805,9 @@
   <!-- 顶栏 Header -->
   <header class="topbar">
     <div class="brand">
-      <span class="brand-mark">ψ</span>
+      <span class="brand-mark" title="PsyClaw Academic AI">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M12 2c-3.3 0-6 2.7-6 6v3c0 3.3 2.7 6 6 6s6-2.7 6-6V8c0-3.3-2.7-6-6-6zM4 9h4M16 9h4M9 22h6"/></svg>
+      </span>
       <div class="brand-title">
         PsyClaw Panel
         <span class="brand-badge">Academic Studio</span>
@@ -1692,6 +1828,10 @@
           /crosscheck
         </button>
       </div>
+      <a href="https://github.com/Exekiel179/psyclaw" target="_blank" rel="noopener noreferrer" class="github-link" title="前往 PsyClaw GitHub 仓库">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span>GitHub</span>
+      </a>
       <div class="local-badge">
         <span class="pulse-dot"></span>
         安全沙盒 · 本地隔离
@@ -1700,7 +1840,7 @@
   </header>
 
   <!-- 主体工作区 Layout -->
-  <div class="layout">
+  <div class="layout nav-collapsed">
     <!-- 侧边导航栏 Sidebar -->
     <nav class="nav" id="workbench-nav" aria-label="Panel 导航">
       <div class="nav-group">
@@ -1710,29 +1850,25 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
         </div>
-        <button class="active" data-view="project" title="项目文件">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span class="nav-btn-text">项目文件</span>
+        <button class="active" data-view="project" title="工作台与对话">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>
+          <span class="nav-btn-text">工作台与对话</span>
         </button>
         <button data-view="ecosystem" title="能力生态">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
           <span class="nav-btn-text">能力生态</span>
         </button>
         <button data-view="provider" title="模型与成本">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           <span class="nav-btn-text">模型与成本</span>
         </button>
         <button data-view="help" title="使用速览">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           <span class="nav-btn-text">使用速览</span>
         </button>
         <button data-view="checklist" title="核对清单">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           <span class="nav-btn-text">核对清单</span>
-        </button>
-        <button data-view="chat" title="对话">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span class="nav-btn-text">对话</span>
         </button>
       </div>
       <div class="nav-footer">
@@ -1743,13 +1879,12 @@
 
     <!-- 主面板内容区 Main -->
     <main class="main">
-      <!-- 视图 1：项目文件 -->
+      <!-- 视图 1：项目工作台 (默认主界面) -->
       <section id="view-project" class="view active">
-        <!-- 科研全流程导航条 Pipeline Stepper -->
-        <div class="pipeline-stepper" id="pipeline-stepper">
-          <span class="stepper-label">ARS 科研流水线:</span>
-          <div class="step-item" data-stage="intake" title="探索性学术追问与目标澄清 (notes/goal.md)">
-            <span>① 选题与入口</span>
+        <!-- 科研全流程阶段导航条 Pipeline Stepper -->
+        <div class="pipeline-stepper" aria-label="科研流程阶段">
+          <div class="step-item active" data-stage="intake" title="研究问题与范式目标 (notes/goal.md)">
+            <span>① 课题界定</span>
           </div>
           <span class="step-arrow">➔</span>
           <div class="step-item" data-stage="evidence" title="证据溯源与文献账本 (notes/evidence.jsonl, claims.jsonl)">
@@ -1779,7 +1914,85 @@
             刷新文档
           </button>
         </div>
-        <div class="panel workspace">
+        <div class="panel workspace no-file-open" id="project-workspace">
+          <!-- 智能体交互对话抽屉（平时折叠，点击展开） -->
+          <div id="console-drawer" class="console-drawer">
+            <div class="console-header">
+              <div class="console-title">
+                <span class="agent-avatar" style="width:24px;height:24px;">
+                  <svg viewBox="0 0 24 24"><path d="M12 2v20M12 2c-3.3 0-6 2.7-6 6v3c0 3.3 2.7 6 6 6s6-2.7 6-6V8c0-3.3-2.7-6-6-6zM4 9h4M16 9h4M9 22h6"/></svg>
+                </span>
+                <span>智能体对话</span>
+                <span id="console-status-badge" class="console-status-tag">
+                  <span class="pulse-dot" style="width:5px;height:5px;"></span>
+                  已连接
+                </span>
+              </div>
+              <div class="console-actions">
+                <button id="console-clear-btn" class="console-btn-icon" title="清空对话记录">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+                <button id="chat-collapse-btn" class="console-btn-icon" title="收起/展开对话侧栏" aria-label="收起/展开对话侧栏">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform 0.2s ease;"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- 折叠时竖条提示区，点击可直接展开 -->
+            <div class="console-collapsed-bar" id="console-collapsed-bar" title="点击展开智能体对话">
+              <span class="agent-avatar" style="width:24px;height:24px;">
+                <svg viewBox="0 0 24 24"><path d="M12 2v20M12 2c-3.3 0-6 2.7-6 6v3c0 3.3 2.7 6 6 6s6-2.7 6-6V8c0-3.3-2.7-6-6-6zM4 9h4M16 9h4M9 22h6"/></svg>
+              </span>
+              <span class="console-vertical-label">AI 对话</span>
+            </div>
+
+            <div id="console-log" class="console-log">
+              <div class="log-entry sys">
+                <div class="log-sys">
+                  💡 <strong>对话已就绪</strong>：与 PsyClaw 智能体安全连接。支持 <code>/init</code>、<code>/plan</code>、<code>/grill</code>、<code>/crosscheck</code>（AI 核验）等指令。
+                </div>
+              </div>
+            </div>
+
+            <div class="console-quick-chips">
+              <span class="chip" data-cmd="/plan status">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                /plan status
+              </span>
+              <span class="chip" data-cmd="/crosscheck list">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg>
+                /crosscheck
+              </span>
+              <span class="chip" data-cmd="/grill">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
+                /grill 压力追问
+              </span>
+              <span class="chip" data-cmd="/review">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                /review
+              </span>
+              <span class="chip" data-cmd="/agents">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                /agents
+              </span>
+            </div>
+
+            <div class="console-input-wrap">
+              <div class="console-input-container">
+                <div class="console-input-box">
+                  <textarea id="console-input" class="console-textarea" placeholder="向智能体提问或输入指令（Enter 发送）…" rows="1"></textarea>
+                  <button id="console-send-btn" class="console-send-btn" title="发送消息 (Enter)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </div>
+                <div class="console-input-footer">
+                  <span>支持 Markdown 与学术指令</span>
+                  <span>PsyClaw 本地隔离环境</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <aside id="file-tree" class="tree">
             <div class="empty">读取项目文档中...</div>
           </aside>
@@ -1794,6 +2007,9 @@
                 <button id="viewer-copy-btn" class="button small" title="复制当前文档内容">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                   复制
+                </button>
+                <button id="viewer-close-btn" class="console-btn-icon" title="关闭文件，展开对话视图" style="padding:4px;color:var(--text-muted);">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
             </div>
@@ -1979,80 +2195,6 @@
           </table>
         </div>
       </section>
-
-      <section id="view-chat" class="view">
-        <div class="page-head" style="margin-bottom: 12px;">
-          <div>
-            <h1>交互对话</h1>
-            <p>提问将接入当前 PsyClaw 会话；助手回复经 SSE 流式同步，支持学术指令与「唤醒选项」决策。</p>
-          </div>
-        </div>
-        <div id="chat-console-host" class="panel section" style="min-height:74vh;padding:0;overflow:hidden;display:flex;flex-direction:column;border-radius:var(--radius-md);">
-          <div id="console-drawer" class="console-drawer">
-            <div class="console-header">
-              <div class="console-title">
-                <span class="agent-avatar" style="width:24px;height:24px;font-size:12px">ψ</span>
-                <span>PsyClaw Research Assistant</span>
-                <span id="console-status-badge" class="console-status-tag">
-                  <span class="pulse-dot" style="width:5px;height:5px;"></span>
-                  已连接
-                </span>
-              </div>
-              <div class="console-actions">
-                <button id="console-clear-btn" class="console-btn-icon" title="清空对话记录">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div id="console-log" class="console-log">
-              <div class="log-entry sys">
-                <div class="log-sys">
-                  💡 <strong>对话已就绪</strong>：与 PsyClaw 智能体安全连接。支持 <code>/init</code>、<code>/plan</code>、<code>/grill</code>、<code>/crosscheck</code>（AI 核验）等指令。
-                </div>
-              </div>
-            </div>
-
-            <div class="console-quick-chips">
-              <span class="chip" data-cmd="/plan status">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-                /plan status
-              </span>
-              <span class="chip" data-cmd="/crosscheck list">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg>
-                /crosscheck list
-              </span>
-              <span class="chip" data-cmd="/grill">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
-                /grill 压力追问
-              </span>
-              <span class="chip" data-cmd="/review">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
-                /review 评审
-              </span>
-              <span class="chip" data-cmd="/agents">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                /agents 角色
-              </span>
-            </div>
-
-            <div class="console-input-wrap">
-              <div class="console-input-container">
-                <div class="console-input-box">
-                  <textarea id="console-input" class="console-textarea" placeholder="输入研究问题或指令（Enter 发送，Shift+Enter 换行）…" rows="1"></textarea>
-                  <button id="console-send-btn" class="console-send-btn" title="发送消息 (Enter)">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  </button>
-                </div>
-                <div class="console-input-footer">
-                  <span>支持 Markdown 与学术指令</span>
-                  <span>PsyClaw 本地隔离环境</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   </div>
 </div>
@@ -2141,6 +2283,12 @@ async function json(url, options) {
 }
 
 function setView(view) {
+  if (view === "chat") {
+    // 对话框直接位于第一个界面（工作台），自动切换到项目视图并展开对话
+    setView("project");
+    expandChat();
+    return;
+  }
   state.view = view;
   if (location.hash.replace(/^#/, "") !== view) {
     history.replaceState(null, "", `#${view}`);
@@ -2155,7 +2303,6 @@ function setView(view) {
   if (view === "provider") loadProvider();
   if (view === "checklist") loadChecklist();
   if (view === "help") loadHelp();
-  if (view === "chat") queueMicrotask(() => $("console-input")?.focus());
 }
 
 async function loadHelp() {
@@ -2246,15 +2393,33 @@ document.querySelectorAll(".nav button[data-view]").forEach(button => {
   button.addEventListener("click", () => setView(button.dataset.view));
 });
 
+function renderFileJumpPill(path) {
+  const cleanPath = esc(path);
+  const fileName = esc(path.split("/").at(-1));
+  return `<button type="button" class="file-jump-pill" data-jump-file="${cleanPath}" title="点击在工作台查看 ${cleanPath}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>${fileName}</span></button>`;
+}
+
 function inlineMarkdown(text) {
   let value = esc(text);
+  // 解析反引号中的文件路径，如 `notes/goal.md`、`paper/draft.md`
+  value = value.replace(/`((?:notes|paper|docs|outputs|analysis|\.psyclaw)\/[a-zA-Z0-9_\-./]+|\b[a-zA-Z0-9_\-]+\.(?:md|json|jsonl|txt|py|r|tex)\b)`/g, (_, path) => renderFileJumpPill(path));
   value = value.replace(/`([^`]+)`/g, "<code>$1</code>")
                .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
                .replace(/\*([^*]+)\*/g, "<em>$1</em>");
-  value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, target) =>
-    /^https?:\/\//i.test(target)
-      ? `<a href="${esc(target)}" target="_blank" rel="noreferrer" style="color:var(--brand-accent);text-decoration:none;border-bottom:1px dashed currentColor">${label}</a>`
-      : label
+  // 解析 Markdown 链接，区分网页链接与本地文件相对路径
+  value = value.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, target) => {
+    if (/^https?:\/\//i.test(target)) {
+      return `<a href="${esc(target)}" target="_blank" rel="noreferrer" style="color:var(--brand-accent);text-decoration:none;border-bottom:1px dashed currentColor">${label}</a>`;
+    }
+    // 本地文件相对链接
+    if (/\.(md|json|jsonl|txt|py|r|tex)$/i.test(target) || /^(notes|paper|docs|outputs|analysis|\.psyclaw)\//.test(target)) {
+      return renderFileJumpPill(target.replace(/^\.\//, ""));
+    }
+    return label;
+  });
+  // 识别未被标签包裹的独立文件相对路径
+  value = value.replace(/(^|[\s(（])((?:notes|paper|docs|outputs|analysis|\.psyclaw)\/[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)(?=[)\s，。！？,!?）]|$)/g,
+    (_, prefix, path) => `${prefix}${renderFileJumpPill(path)}`
   );
   return value;
 }
@@ -2391,8 +2556,24 @@ function selectTree(button) {
   document.querySelectorAll(".tree-item").forEach(item => item.classList.toggle("active", item === button));
 }
 
+function closeFile() {
+  const ws = $("project-workspace");
+  if (ws) ws.classList.add("no-file-open");
+  selectTree(null);
+  state.currentContent = "";
+  $("viewer-path").textContent = "选择左侧文件";
+  $("viewer-kind").textContent = "未打开";
+  $("viewer-body").className = "viewer-body empty";
+  $("viewer-body").textContent = "请在文件树或对话中选择文件进行查看";
+}
+
 async function openFile(path, button) {
-  selectTree(button);
+  const ws = $("project-workspace");
+  if (ws) {
+    ws.classList.remove("no-file-open");
+  }
+  const btn = button || document.querySelector(`[data-file="${path}"]`);
+  selectTree(btn);
   $("viewer-path").textContent = path;
   $("viewer-kind").textContent = "读取中";
   $("viewer-body").className = "viewer-body empty";
@@ -2428,12 +2609,16 @@ $("viewer-copy-btn").addEventListener("click", async () => {
   }
 });
 
+// 关闭文件预览按钮，恢复对话框铺满状态
+$("viewer-close-btn")?.addEventListener("click", () => {
+  closeFile();
+});
+
 async function loadProject() {
   const files = await json("/api/project-files");
   state.files = files.files || [];
   renderTree();
-  const goal = document.querySelector('[data-file="notes/goal.md"]') || document.querySelector("[data-file]");
-  if (goal) goal.click();
+  // 默认不自动打开文件，让对话框铺满工作台主区域；用户点击文件树或对话中文件链接时再展示
 }
 
 async function loadEcosystem() {
@@ -2745,8 +2930,25 @@ const streamBubbles = new Map();
 let lastLocalUserText = "";
 let wakeState = null;
 
+function expandChat() {
+  const ws = $("project-workspace");
+  if (ws && ws.classList.contains("chat-collapsed")) {
+    ws.classList.remove("chat-collapsed");
+    localStorage.setItem("psyclaw_chat_collapsed", "false");
+  }
+}
+
+function collapseChat() {
+  const ws = $("project-workspace");
+  if (ws && !ws.classList.contains("chat-collapsed")) {
+    ws.classList.add("chat-collapsed");
+    localStorage.setItem("psyclaw_chat_collapsed", "true");
+  }
+}
+
 function openConsole() {
-  setView("chat");
+  setView("project");
+  expandChat();
   queueMicrotask(() => consoleInput?.focus());
 }
 
@@ -2754,6 +2956,8 @@ function openConsoleWithMessage(text) {
   openConsole();
   appendLog("sys", text);
 }
+
+const PSYCLAW_AVATAR_SVG = `<svg viewBox="0 0 24 24"><path d="M12 2v20M12 2c-3.3 0-6 2.7-6 6v3c0 3.3 2.7 6 6 6s6-2.7 6-6V8c0-3.3-2.7-6-6-6zM4 9h4M16 9h4M9 22h6"/></svg>`;
 
 function appendLog(role, text) {
   const entry = document.createElement("div");
@@ -2766,7 +2970,7 @@ function appendLog(role, text) {
     `;
   } else if (role === "agent") {
     entry.innerHTML = `
-      <div class="agent-avatar">ψ</div>
+      <div class="agent-avatar">${PSYCLAW_AVATAR_SVG}</div>
       <div class="agent-content-wrap">
         <div class="agent-meta">
           <span>PsyClaw Assistant</span>
@@ -2790,7 +2994,7 @@ function ensureStreamBubble(messageId) {
   entry.className = "log-entry agent";
   entry.dataset.messageId = messageId;
   entry.innerHTML = `
-    <div class="agent-avatar">ψ</div>
+    <div class="agent-avatar">${PSYCLAW_AVATAR_SVG}</div>
     <div class="agent-content-wrap">
       <div class="agent-meta">
         <span>PsyClaw Assistant</span>
@@ -3081,14 +3285,28 @@ document.querySelectorAll(".chip").forEach(chip => {
   });
 });
 
-/* --- 侧边栏折叠与展开交互 --- */
+/* --- 侧边栏与工作台对话框折叠交互 --- */
 const layoutEl = document.querySelector(".layout");
 const navToggleBtn = $("nav-toggle-btn");
+const chatCollapseBtn = $("chat-collapse-btn");
+const consoleCollapsedBar = $("console-collapsed-bar");
+const workspaceEl = $("project-workspace");
 
-function initNavCollapse() {
-  const saved = localStorage.getItem("psyclaw_nav_collapsed");
-  if (saved === "true") {
+function initWorkbenchCollapse() {
+  const savedNav = localStorage.getItem("psyclaw_nav_collapsed");
+  // 平时默认折叠成图标；除非用户主动展开（存为 "false"）
+  if (savedNav !== "false") {
     layoutEl?.classList.add("nav-collapsed");
+  } else {
+    layoutEl?.classList.remove("nav-collapsed");
+  }
+
+  // 对话框折叠态记忆
+  const savedChat = localStorage.getItem("psyclaw_chat_collapsed");
+  if (savedChat === "true") {
+    workspaceEl?.classList.add("chat-collapsed");
+  } else {
+    workspaceEl?.classList.remove("chat-collapsed");
   }
 }
 
@@ -3098,7 +3316,29 @@ navToggleBtn?.addEventListener("click", () => {
   localStorage.setItem("psyclaw_nav_collapsed", isCollapsed ? "true" : "false");
 });
 
-initNavCollapse();
+chatCollapseBtn?.addEventListener("click", () => {
+  if (!workspaceEl) return;
+  const isCollapsed = workspaceEl.classList.toggle("chat-collapsed");
+  localStorage.setItem("psyclaw_chat_collapsed", isCollapsed ? "true" : "false");
+});
+
+consoleCollapsedBar?.addEventListener("click", () => {
+  expandChat();
+  queueMicrotask(() => consoleInput?.focus());
+});
+
+// 全局监听对话框中的文件跳转胶囊 (.file-jump-pill) 点击
+document.addEventListener("click", (e) => {
+  const pill = e.target.closest(".file-jump-pill");
+  if (!pill) return;
+  const targetPath = pill.dataset.jumpFile;
+  if (targetPath) {
+    e.preventDefault();
+    openFile(targetPath);
+  }
+});
+
+initWorkbenchCollapse();
 
 /* --- 顶栏快捷命令 Quick Actions --- */
 const initModal = $("init-modal");

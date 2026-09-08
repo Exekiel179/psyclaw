@@ -323,9 +323,9 @@ export function renderAnalysisPlanMarkdown(plan: AnalysisPlanRecord): string {
     "## Next",
     "",
     plan.status === "ready" || plan.status === "deferred"
-      ? "- Choose `/plan run` (now) or `/plan defer` (later), then execute."
+      ? "- Ask the researcher to run now or defer, then execute with local scripts."
       : plan.status === "completed"
-        ? "- Update `analysis/HANDOFF.md` before switching to academic."
+        ? "- Run `/handoff` (after Panel verify) before switching to academic."
         : "- Continue the current stage; do not jump to academic/ARS.",
     "",
   ];

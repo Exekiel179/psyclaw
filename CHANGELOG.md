@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.16 - 2026-09-08
+
+- Tighten AGENTS.md against agent overreach, over-testing, and over-hardening
+- Recommend psytrainer-ml with install-time cross-platform runtime (Windows/macOS/Linux)
+- Update help/panel/verify copy and recommended skill catalog
+
 ## 0.29.15 - 2026-09-08
 
 - Recommend Kimi WebBridge as an installable external tool (recommended catalog 0.7.9)

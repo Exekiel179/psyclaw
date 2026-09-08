@@ -634,8 +634,8 @@ async function recommendedSkills(): Promise<unknown> {
         ...catalog,
         items: (catalog.items ?? []).filter((item) => item.kind === "skill").map((item) => ({
           ...item,
-          slashCommand: `/skill enable ${String(item.id ?? "")}`,
-          installCommand: `/skill install ${String(item.id ?? "")}`,
+          slashCommand: `/skill`,
+          installCommand: `/skill`,
         })),
         plugins: (catalog.plugins ?? []).filter((item) => item.kind === "plugin").map((item) => ({
           ...item,
@@ -659,7 +659,7 @@ async function recommendedMcps(): Promise<unknown> {
   for (const path of candidates) {
     try {
       const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>> };
-      return { ...catalog, items: (catalog.items ?? []).map((item) => ({ ...item, slashCommand: `/mcp enable ${String(item.id ?? "")}`, installCommand: `/mcp install ${String(item.id ?? "")}` })) };
+      return { ...catalog, items: (catalog.items ?? []).map((item) => ({ ...item, slashCommand: `/mcp`, installCommand: `/mcp` })) };
     } catch { /* try package layout */ }
   }
   return { schemaVersion: "psyclaw/recommended-mcp/v1", documentVersion: "0.1.0", items: [] };
@@ -1104,7 +1104,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         }
         const kind = typeof body.kind === "string" ? body.kind as CrosscheckKind : undefined;
         const notes = typeof body.notes === "string" ? body.notes : undefined;
-        // Panel clicks are human approvals; AI marks go through /crosscheck in-session.
+        // Panel clicks are human approvals (internal human-approve). AI process/substance passes use /crosscheck and /verify.
         const checklist = await markVerifyItem(root, id, status, notes, kind, { source: "human" });
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ schemaVersion: "psyclaw/crosscheck/v1", checklist }));

@@ -47,10 +47,10 @@ export function sessionModePrompt(mode: PsyClawSessionMode): string {
       "Pipeline: clarify → review → plan → review → analyze → AI /crosscheck → human Panel verify → analysis report → hand off to academic.",
       "Write under data/clean, analysis/scripts|configs|results|plans, and analysis/HANDOFF.md. Never overwrite data/raw (or legacy .psyclaw/data/raw).",
       "Default: write local reproducible analysis scripts under analysis/scripts/ with mature libraries. Use MCP only for special backends (SPSS/Mplus/MNE/Stata) or when the user asks. Do not invent numerical results.",
-      "After analysis (and before /plan handoff), run AI `/crosscheck` (alias `/verify`), then require human marks via Panel「核实」or `/crosscheck <id> human`. AI-checked and skipped do not pass the gate.",
+      "After analysis (and before /handoff), run AI `/crosscheck` (process: data, citation existence, format) and `/verify` (substance: results hold, citation/method reasonableness). Human approval is forced by the completion gate via Panel「核实」or wake-options — not a user slash. AI-checked and skipped do not pass the gate.",
       "Do not claim analysis complete, write final HANDOFF as done, or invite academic mode until the human verify gate passes.",
       "When proposing more analyses, never close with「已经足够」as prose — offer a concrete new method first and put「已经足够」only as a selectable last option.",
-      "Prefer natural-language confirmation (「可以」); /plan auto skips method approval with mandatory 未经人审批 disclosure — that is not the same as the post-analysis human verify gate.",
+      "Prefer natural-language confirmation (「可以」). That is not the same as the post-analysis human verify gate.",
       analysisSoftRoutePrompt(),
     ].join("\n");
   }
@@ -58,7 +58,7 @@ export function sessionModePrompt(mode: PsyClawSessionMode): string {
     "## PsyClaw mode: academic",
     "ARS research → write → review → revise pipeline. Prefer psyclaw_ars_multi_agent for Stage 3 seats.",
     "Consume analysis/HANDOFF.md and analysis/results when present; do not recompute statistics in this mode—switch to analysis if numbers are missing.",
-    "Manuscripts go to paper/. Before claiming the full text is done or ready to export/submit: AI `/crosscheck`, then mandatory human Panel verify (or `/crosscheck <id> human`). Soft mid-draft warnings are fine; finalization is a hard human gate.",
+    "Manuscripts go to paper/. Before claiming the full text is done or ready to export/submit: AI `/crosscheck` + `/verify`, then mandatory human Panel/wake verify (automatic gate; not a slash). Soft mid-draft warnings are fine; finalization is a hard human gate.",
     "Priority: produce the manuscript; second, keep key claims human-verified before finalization.",
     academicSoftRoutePrompt(),
   ].join("\n");

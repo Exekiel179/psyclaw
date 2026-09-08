@@ -1,12 +1,11 @@
 import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { appendApproval, approvalInputDigest, asProject, assertResearchDecision, bootstrapProject, projectPaths, resolveResearchDecision, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview, writeHandoff } from "../../index.js";
+import { appendApproval, approvalInputDigest, assertResearchDecision, bootstrapProject, resolveResearchDecision, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview } from "../../index.js";
 import type { ResearchDecisionImpact } from "../../research/decision.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
-import { customPersonaPlan, parseAgentsRequest } from "../../orchestration/personas.js";
-import { elevatedEffects, formatEffects, hasElevatedEffects, normalizeEffects, toolsForEffects } from "../../orchestration/effects.js";
-import { agentManagerRows, loadSelectablePersonas } from "../../agents/recommended-personas.js";
+import { formatEffects, hasElevatedEffects, normalizeEffects, toolsForEffects } from "../../orchestration/effects.js";
+import { agentManagerRows } from "../../agents/recommended-personas.js";
 import type { Plan } from "../../orchestration/contracts.js";
 import { atomicWriteFile } from "../../project/jsonl.js";
 import { applyCreation, previewCreation, runArsMultiAgentBridge, type ArsPanelRequest, type CreationKind, type CreationRequest } from "../../index.js";
@@ -17,7 +16,7 @@ import { join } from "node:path";
 import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { PROVIDER_PRESETS, providerCredentialSource, saveProviderConfig } from "../../setup.js";
 import { dirname } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import {
   coreSkillNames,
   enabledRecommendedSkillPaths,
@@ -53,7 +52,6 @@ import {
   setLocalSkillEnabled,
   setLocalSkillsEnabled,
   skillNamesInPaths,
-  installLocalSkill,
   userSkillId,
 } from "../../skills/user-skills.js";
 import {
@@ -69,12 +67,8 @@ import {
   type SecretInputResult,
 } from "../../tui/provider-picker.js";
 import {
-  ARS_REPOSITORY_URL,
   ARS_UPSTREAM_COMMIT,
   ARS_UPSTREAM_REF,
-  PSYCLAW_ARS_PROFILE_VERSION,
-  detectNatureArsFillers,
-  formatNatureArsFillerStatus,
   isArsPiActive,
   isArsPiTurn,
   psyclawArsPatch,
@@ -90,7 +84,6 @@ import {
   advanceAnalysisPlan,
   createAnalysisPlan,
   formatAnalysisPlanStatus,
-  listAnalysisPlans,
   readActiveAnalysisPlan,
   syncHandoffFromAnalysisPlan,
   writeAnalysisPlan,
@@ -112,51 +105,19 @@ import {
   continuouslyWorkWarningText,
   isContinuouslyWorkEnabled,
 } from "../../session/continuously-work.js";
-import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../../verify/checklist.js";
+import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, ensureDefaultVerifyChecklist, loadVerifyChecklist } from "../../verify/checklist.js";
 import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js";
 import { openResearchWorkbench } from "../../panel/workbench.js";
 
-const PARADIGMS = new Set<ResearchParadigm>([
-  "survey-observational",
-  "qualitative-thematic",
-  "experimental",
-  "quasi-experimental",
-  "longitudinal-panel",
-  "meta-analysis",
-  "ethnographic",
-  "historical-documentary",
-  "policy-legal",
-  "mixed-methods",
-]);
-
+/** Codex-style slash surface: bare command, or command + trailing free text. No subcommand trees. */
 function parseInitArgs(args: string): { goal?: string; paradigm?: ResearchParadigm } {
-  const trimmed = args.trim();
-  if (!trimmed) return {};
-  const match = trimmed.match(/^--paradigm(?:=|\s+)(\S+)(?:\s+([\s\S]*))?$/i);
-  if (trimmed.startsWith("--")) {
-    const paradigm = match?.[1] as ResearchParadigm | undefined;
-    const goal = match?.[2]?.trim();
-    if (!match || !paradigm) {
-      throw new Error("Usage: /init [--paradigm survey-observational] [optional goal]");
-    }
-    if (!PARADIGMS.has(paradigm)) throw new Error(`Unsupported paradigm: ${paradigm}`);
-    return { paradigm, ...(goal ? { goal } : {}) };
-  }
-  return { paradigm: "survey-observational", goal: trimmed };
+  const goal = args.trim();
+  if (!goal) return {};
+  return { paradigm: "survey-observational", goal };
 }
 
 async function notifyError(ctx: ExtensionCommandContext, error: unknown): Promise<void> {
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
-}
-
-async function runPluginCommand(args: string[]): Promise<void> {
-  const entry = fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"));
-  const modulePath = join(dirname(entry), "package-manager-cli.js");
-  const { handlePackageCommand } = await import(pathToFileURL(modulePath).href) as {
-    handlePackageCommand(commandArgs: string[]): Promise<boolean>;
-  };
-  const handled = await handlePackageCommand(args);
-  if (!handled) throw new Error(`不支持的 Plugin 操作：${args[0] ?? ""}`);
 }
 
 const activeAgentRuns = new Set<string>();
@@ -737,7 +698,7 @@ function agentManagerItems(rows: Awaited<ReturnType<typeof agentManagerRows>>): 
       `类别：${row.stage}`,
       `角色：${row.role}`,
       `来源：${row.source === "bundled" ? "内置 Subagent（类似 Claude Explore/Plan）" : "项目 .psyclaw/agents/custom"}`,
-      `运行：/agents --agent ${row.id} <只读研究任务>`,
+      `运行：/agents <只读研究任务>`,
     ],
   }));
 }
@@ -747,11 +708,11 @@ async function openAgentManager(ctx: ExtensionCommandContext, rows: Awaited<Retu
     new SkillManagerComponent(agentManagerItems(rows), tui, theme, keybindings, done, {
       title: "Subagent（对齐 Claude Code）",
       itemLabel: "Subagent",
-      footer: "↑/↓ 移动 · Enter 查看用法 · Esc 关闭 · 运行: /agents --agent <id> <任务>",
+      footer: "↑/↓ 移动 · Enter 查看用法 · Esc 关闭 · 运行: /agents <任务>",
       enterAction: "details",
       toggleEnabled: false,
       enabledText: "已可选用",
-      lockedMessage: "内置 Subagent 始终可用。运行：/agents --agent <id> <只读研究任务>",
+      lockedMessage: "内置 Subagent 始终可用。运行：/agents <只读研究任务>",
     })
   ));
 }
@@ -780,18 +741,9 @@ async function installRecommendedPlugin(ctx: ExtensionCommandContext, row: Plugi
   ctx.ui.notify(`${row.name} 已安装到项目目录（仅当前项目）。请执行 /reload 载入 Plugin。`, "info");
 }
 
-async function showPluginManager(args: string, ctx: ExtensionCommandContext): Promise<void> {
-  const [verb, id] = args.trim().split(/\s+/).filter(Boolean);
-  if (verb && !["status", "install"].includes(verb)) throw new Error("直接运行 /plugin 打开 Plugin 管理页");
-  if (verb === "install" && !id) throw new Error("直接运行 /plugin，在列表中选择要安装的 Plugin");
+async function showPluginManager(ctx: ExtensionCommandContext): Promise<void> {
   const rows = await pluginManagerRows(ctx);
-  if (verb === "install") {
-    const row = rows.find((candidate) => candidate.id === id);
-    if (!row) throw new Error(`未找到推荐 Plugin: ${id}`);
-    await installRecommendedPlugin(ctx, row);
-    return;
-  }
-  if (!ctx.hasUI || typeof ctx.ui.custom !== "function" || verb === "status") {
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
     ctx.ui.notify(rows.map((row) => `${row.installed ? "[on]" : "[off]"} ${row.id} — ${row.name}${row.scope ? `（${row.scope === "project" ? "项目" : "系统"}）` : ""}`).join("\n"), "info");
     return;
   }
@@ -842,44 +794,9 @@ async function queueModelMcpInstall(pi: ExtensionAPI, ctx: ExtensionCommandConte
   ctx.ui.notify(`已将 ${row.name} 的下载、安装和配置任务交给当前模型。模型完成并确认可启动后，请执行 /reload。`, "info");
 }
 
-async function showMcpManager(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext, runtime: RuntimeMcpRegistry): Promise<void> {
-  const [verb, id] = args.trim().split(/\s+/).filter(Boolean);
-  if (verb && !["status", "enable", "disable", "enable-all", "disable-all", "install"].includes(verb)) {
-    throw new Error("Usage: /mcp [status|enable <id>|disable <id>|enable-all|disable-all|install <id>]");
-  }
-  if ((verb === "enable" || verb === "disable" || verb === "install") && !id) {
-    throw new Error(`Usage: /mcp ${verb} <id>`);
-  }
+async function showMcpManager(pi: ExtensionAPI, ctx: ExtensionCommandContext, runtime: RuntimeMcpRegistry): Promise<void> {
   const catalog = await recommendedItems("mcp");
-  if (verb === "install") {
-    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
-    const row = rows.find((candidate) => candidate.id === id);
-    if (!row) throw new Error(`未找到推荐 MCP: ${id}`);
-    if (row.source !== "recommended") throw new Error(`MCP ${id} 已是用户配置，无需再次安装`);
-    await queueModelMcpInstall(pi, ctx, row, catalog.installPrep.find((candidate) => candidate.id === row.id));
-    return;
-  }
-  if (verb === "enable-all" || verb === "disable-all") {
-    const enabled = verb === "enable-all";
-    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
-    for (const row of rows) {
-      if (row.source === "user" && row.userEntry) await setUserMcpEnabled(row.userEntry, enabled);
-      else await setRecommendedMcpEnabled(ctx.cwd, row.id, enabled);
-    }
-    ctx.ui.notify(`已批量${enabled ? "开启" : "关闭"}全部 MCP 配置；重启后重新检查运行时可用性`, "info");
-    return;
-  }
-  if (verb === "enable" || verb === "disable") {
-    const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
-    const row = rows.find((candidate) => candidate.id === id);
-    if (!row) throw new Error(`未找到 MCP: ${id}`);
-    if (row.source === "user" && row.userEntry) await setUserMcpEnabled(row.userEntry, verb === "enable");
-    else await setRecommendedMcpEnabled(ctx.cwd, row.id, verb === "enable");
-    ctx.ui.notify(`MCP ${id} 已${verb === "enable" ? "开启" : "关闭"}；重启后重新检查安装、信任和工具策略`, "info");
-    return;
-  }
-
-  if (!ctx.hasUI || typeof ctx.ui.custom !== "function" || verb === "status") {
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
     const rows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
     ctx.ui.notify(rows.map((row) => `${row.enabled ? "[on]" : "[off]"} ${row.id} — ${row.name}${row.source === "user" ? "（用户配置）" : ""}`).join("\n"), "info");
     return;
@@ -957,60 +874,8 @@ async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandCon
   ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型，目标为${skillScopeLabel(scope)}。安装完成后请在 /skill 中启用，再执行 /reload。`, "info");
 }
 
-async function showSkillManager(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
-  const action = args.trim().split(/\s+/).filter(Boolean);
-  const verb = action[0];
-  const id = action[1];
-  if (verb && !["status", "enable", "disable", "enable-all", "disable-all", "install"].includes(verb)) {
-    throw new Error("Usage: /skill [status|enable <id>|disable <id>|enable-all|disable-all]");
-  }
-  if ((verb === "enable" || verb === "disable" || verb === "install") && !id) {
-    throw new Error(`Usage: /skill ${verb} <id>`);
-  }
-  if (verb === "install") {
-    const row = (await skillManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd))).find((candidate) => candidate.id === normalizeRecommendedSkillId(id!));
-    if (!row) throw new Error(`未找到推荐 Skill: ${id}`);
-    await queueModelSkillInstall(pi, ctx, row);
-    return;
-  }
-  if (verb === "enable-all" || verb === "disable-all") {
-    const enabled = verb === "enable-all";
-    const state = await readRecommendationState(ctx.cwd);
-    const rows = await skillManagerRows(ctx.cwd, state);
-    const managed = rows.filter((row) => row.source === "recommended" && row.installed && !row.blocked);
-    const locals = rows.filter((row) => row.source === "local");
-    const failed: string[] = [];
-    for (const row of managed) {
-      try { await setRecommendedSkillEnabled(ctx.cwd, row.id, enabled); }
-      catch { if (enabled) failed.push(row.name); }
-    }
-    if (locals.length > 0) {
-      await setLocalSkillsEnabled(ctx.cwd, locals.map((row) => row.name), enabled);
-    }
-    ctx.ui.notify(
-      enabled && failed.length > 0
-        ? `已批量启用（${failed.join("、")} 启用失败）。请运行 /reload 重新加载。`
-        : `已批量${enabled ? "启用" : "停用"}可管理的 Skill。请运行 /reload 重新加载。`,
-      enabled && failed.length > 0 ? "warning" : "info",
-    );
-    return;
-  }
-  if (verb === "enable" || verb === "disable") {
-    const requested = normalizeRecommendedSkillId(id!);
-    const state = await readRecommendationState(ctx.cwd);
-    const rows = await skillManagerRows(ctx.cwd, state);
-    const row = rows.find((candidate) => candidate.id === requested || candidate.name === requested || candidate.id === userSkillId(requested));
-    if (!row) throw new Error(`未找到 Skill: ${id}`);
-    if (row.source === "local") {
-      await setLocalSkillEnabled(ctx.cwd, row.name, verb === "enable");
-    } else {
-      await setRecommendedSkillEnabled(ctx.cwd, row.id, verb === "enable");
-    }
-    ctx.ui.notify(`${verb === "enable" ? "已启用" : "已停用"} ${row.name}。请运行 /reload 重新加载。`, "info");
-    return;
-  }
-
-  if (!ctx.hasUI || typeof ctx.ui.custom !== "function" || verb === "status") {
+async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
     const state = await readRecommendationState(ctx.cwd);
     const rows = await skillManagerRows(ctx.cwd, state);
     const lines = [
@@ -1180,16 +1045,6 @@ const WORKFLOW_RUNNERS = {
   "writing-review": runWritingReview,
   "expert-review": runExpertReview,
 } as const;
-
-function natureFillersFromCommandContext(ctx: {
-  getSystemPromptOptions?: () => { skills?: Array<{ name?: string }> };
-  getSystemPrompt?: () => string;
-}): ReturnType<typeof detectNatureArsFillers> {
-  return detectNatureArsFillers({
-    skills: ctx.getSystemPromptOptions?.()?.skills,
-    systemPrompt: ctx.getSystemPrompt?.(),
-  });
-}
 
 export default function psyclawExtension(pi: ExtensionAPI): void {
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
@@ -1446,71 +1301,81 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
 
   const handleCrosscheck = async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
     try {
-      const parts = args.trim().split(/\s+/).filter(Boolean);
-      if (parts.length === 0 || parts[0] === "list") {
-        ctx.ui.notify(formatVerifyChecklist(await loadVerifyChecklist(ctx.cwd)), "info");
-        return;
-      }
-      if (parts[0] === "skip") {
+      await ensureDefaultVerifyChecklist(ctx.cwd);
+      const focus = args.trim();
+      if (!focus) {
         ctx.ui.notify(
-          `${formatVerifyChecklist(await skipUnverifiedItems(ctx.cwd))}\n注意：skip 不解除 analysis/academic 人审硬门禁。`,
-          "warning",
-        );
-        return;
-      }
-      if (parts[0] === "kind") {
-        const kind = (parts[1] ?? "general") as CrosscheckKind;
-        pi.sendUserMessage(
           [
-            "交叉核验任务：请作为助手主动提出核对项并执行字段核查，不要等用户自己去「申请确认」。",
-            `核验类别：${kind}（citations=引文，format=格式，requirements=研究要求，stats=统计结果，general=综合）。`,
-            "核查完成后用 /crosscheck <id> verified 记为 AI 已核（ai-checked），不得自称已过人审。",
-            "analysis / academic 模式下，全文或分析收尾前必须请人在 Panel「核实」或 /crosscheck <id> human；跳过不算通过。",
-            "分析前与分析后都要有清单，不能默认跳过。",
+            formatVerifyChecklist(await loadVerifyChecklist(ctx.cwd)),
+            "/crosscheck：过程性核对（数据、引文是否真实存在、格式/报告要求等）。",
+            "人审不经斜杠命令：收尾门禁会要求 Panel「核实」或唤醒选项。",
           ].join("\n"),
-          ctx.isIdle() ? {} : { deliverAs: "followUp" },
-        );
-        ctx.ui.notify(`已启动 ${kind} 交叉核验；人审请打开 /panel → 核对清单。`, "info");
-        return;
-      }
-      const id = parts[0]!;
-      const statusRaw = (parts[1] ?? "verified").toLowerCase();
-      const allowed = new Set(["verified", "ai-checked", "unverified", "flagged", "skipped", "human"]);
-      if (!allowed.has(statusRaw)) {
-        ctx.ui.notify(
-          "Usage: /crosscheck list | skip | kind <citations|format|requirements|stats> | <id> verified|ai-checked|human|unverified|flagged|skipped [备注]",
           "info",
         );
         return;
       }
-      const notes = parts.slice(2).join(" ") || undefined;
-      const source = statusRaw === "human" ? "human" as const : "ai" as const;
-      const checklist = await markVerifyItem(
-        ctx.cwd,
-        id,
-        statusRaw as VerifyStatus | "human",
-        notes,
-        undefined,
-        { source },
+      pi.sendUserMessage(
+        [
+          "/crosscheck — 过程性交叉核对（AI）。",
+          `焦点：${focus}`,
+          "范围重点：",
+          "1) 数据与表：字段、N、表内数值与脚本/输出是否过程一致；",
+          "2) 引文真实性：DOI/题录能否解析，是否指向真实文献（存在性，不在此阶段裁决引用是否“该不该引”）；",
+          "3) 格式与报告要求：APA/三线表/必备报告字段、清单项是否齐；",
+          "4) 过程产物：脚本入口、中间文件、可复现痕迹是否齐全。",
+          "执行方式：派出至少两个独立审查视角（例如：数据一致性；引文存在性；格式/报告合同），各自给出发现后再合并为一份报告；标出一致项与冲突项。",
+          "不得自称已过人审。人审由系统在交接/定稿门禁自动要求，经 Panel「核实」或唤醒选项完成。",
+        ].join("\n"),
+        ctx.isIdle() ? {} : { deliverAs: "followUp" },
       );
-      const tip = statusRaw === "human" || (statusRaw === "verified" && source === "human")
-        ? "已记为人审通过。"
-        : statusRaw === "verified" || statusRaw === "ai-checked"
-          ? "已记为 AI 已核；analysis/academic 收尾前仍须人在 Panel 点「核实」或 /crosscheck <id> human。"
-          : undefined;
-      ctx.ui.notify(tip ? `${formatVerifyChecklist(checklist)}\n${tip}` : formatVerifyChecklist(checklist), "info");
+      ctx.ui.notify(`已启动过程性 /crosscheck（焦点：${focus}）。人审由收尾门禁自动要求。`, "info");
+    } catch (error) {
+      await notifyError(ctx, error);
+    }
+  };
+
+  const handleVerify = async (args: string, ctx: ExtensionCommandContext): Promise<void> => {
+    try {
+      await ensureDefaultVerifyChecklist(ctx.cwd);
+      const focus = args.trim();
+      if (!focus) {
+        ctx.ui.notify(
+          [
+            formatVerifyChecklist(await loadVerifyChecklist(ctx.cwd)),
+            "/verify：整体性验证（分析结果是否属实/成立、引文是否合理、方法是否合理）。",
+            "人审不经斜杠命令：Panel「核实」或唤醒选项。",
+          ].join("\n"),
+          "info",
+        );
+        return;
+      }
+      pi.sendUserMessage(
+        [
+          "/verify — 整体性实质验证（AI）。",
+          `焦点：${focus}`,
+          "范围重点：",
+          "1) 分析结果是否属实、是否成立：效应方向/量级、不确定性、与脚本输出是否支持正文主张；",
+          "2) 引文是否合理：是否支撑该主张、有无断章取义或装饰性引用（不仅是 DOI 能否解析）；",
+          "3) 方法是否合理：设计、估计目标、检验/模型选择与研究问题是否匹配；",
+          "4) 解释边界：相关≠因果、探索/确证区分、过度声称。",
+          "给出可核对的判断（成立 / 存疑 / 不成立）及依据；不得自称已过人审。",
+          "人审由交接/定稿门禁自动要求，经 Panel「核实」或唤醒选项完成。",
+        ].join("\n"),
+        ctx.isIdle() ? {} : { deliverAs: "followUp" },
+      );
+      ctx.ui.notify(`已启动整体性 /verify（焦点：${focus}）。人审由收尾门禁自动要求。`, "info");
     } catch (error) {
       await notifyError(ctx, error);
     }
   };
 
   pi.registerCommand("crosscheck", {
-    description: "AI 交叉核验 + 人审：/crosscheck list|skip|kind|<id> verified|human|…",
+    description: "过程性 AI 核对：数据/引文真实性/格式要求；可附带焦点",
     handler: async (args, ctx) => handleCrosscheck(args, ctx),
   });
   pi.registerCommand("verify", {
-    description: "同 /crosscheck；AI 核查后 analysis/academic 须人审",
-    handler: async (args, ctx) => handleCrosscheck(args, ctx),
+    description: "整体性 AI 验证：结果是否成立、引文与方法是否合理；可附带焦点",
+    handler: async (args, ctx) => handleVerify(args, ctx),
   });
 
   pi.registerCommand("help", {
@@ -1530,158 +1395,61 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     },
   });
   pi.registerCommand("plan", {
-    description: "分析方案：/plan [new|status|list|confirm|review|run|defer|handoff|reject]",
+    description: "分析方案：单独查看状态，或附带目标文本新建方案",
     handler: async (args, ctx) => {
       try {
-        const trimmed = args.trim();
-        const [cmdRaw, ...rest] = trimmed.split(/\s+/).filter(Boolean);
-        const cmd = (cmdRaw ?? "status").toLowerCase();
-        const usage = "Usage: /plan new|status|list|confirm|auto|human|review|run|defer|handoff|reject";
-
-        if (cmd === "new") {
-          const goal = rest.join(" ").trim() || "从当前对话澄清的分析目标";
+        const goal = args.trim();
+        if (goal) {
           const plan = await writeAnalysisPlan(ctx.cwd, createAnalysisPlan({ goal }));
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已创建。模型会按分析项逐一请你选择；回复「可以」即可确认执行。`, "info");
-          return;
-        }
-
-        if (cmd === "auto") {
-          let plan = await readActiveAnalysisPlan(ctx.cwd);
-          if (!plan) {
-            ctx.ui.notify("没有活跃 Plan。先 /plan new 或在 analysis 模式触发 soft takeover。", "warning");
-            return;
-          }
-          plan = advanceAnalysisPlan(plan, { type: "set-approval-mode", mode: "auto" });
-          plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已启用 auto：后续结果必须标注「未经人审批」。`, "warning");
-          return;
-        }
-        if (cmd === "human") {
-          let plan = await readActiveAnalysisPlan(ctx.cwd);
-          if (!plan) {
-            ctx.ui.notify("没有活跃 Plan。", "warning");
-            return;
-          }
-          plan = advanceAnalysisPlan(plan, { type: "set-approval-mode", mode: "human" });
-          plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已恢复人工确认。`, "info");
-          return;
-        }
-        if (cmd === "list") {
-          const ids = await listAnalysisPlans(ctx.cwd);
-          ctx.ui.notify(ids.length > 0 ? `Plans:\n${ids.map((id) => `- ${id}`).join("\n")}` : "尚无 analysis/plans 记录。用 /plan new 开始。", "info");
-          return;
-        }
-
-        let plan = await readActiveAnalysisPlan(ctx.cwd);
-        if (!plan && cmd === "status") {
-          ctx.ui.notify("没有活跃分析 Plan。用 /plan new [目标] 创建，或在 analysis 模式用自然语言触发 soft takeover。", "info");
-          return;
-        }
-        if (!plan) {
-          ctx.ui.notify(`没有活跃分析 Plan。\n${usage}`, "warning");
-          return;
-        }
-
-        if (cmd === "status" || cmd === "show") {
-          ctx.ui.notify(formatAnalysisPlanStatus(plan), "info");
-          return;
-        }
-        if (cmd === "confirm") {
-          const method = rest.join(" ").trim() || plan.primaryAnalysis || plan.proposedMethods[0] || "";
-          if (!method) {
-            ctx.ui.notify("请指定方法：/plan confirm <主分析方法>", "warning");
-            return;
-          }
-          plan = advanceAnalysisPlan(plan, { type: "confirm", method, backend: "local-script" });
-          plan = advanceAnalysisPlan(plan, { type: "review" });
-          plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n软确认完成并已审查。回复「可以」或 /plan run 开始执行。`, "info");
-          return;
-        }
-        if (cmd === "review") {
-          plan = advanceAnalysisPlan(plan, { type: "review" });
-          plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(formatAnalysisPlanStatus(plan), "info");
-          return;
-        }
-        if (cmd === "run") {
-          plan = advanceAnalysisPlan(plan, { type: "run-now" });
-          plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已标记立即执行：编写/运行 analysis/scripts/ 下的可复现脚本（特殊后端再用 MCP）。`, "info");
+          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已按目标创建。用自然语言确认方法（如「可以」）；完成后用 /handoff 交接。`, "info");
           pi.sendUserMessage(
             [
               "/skill:analysis-plan",
               "",
-              `Active plan ${plan.id} is marked running. Execute the confirmed method now with local reproducible scripts under analysis/scripts/.`,
-              `Confirmed method: ${plan.confirmedMethod ?? plan.primaryAnalysis ?? "(see plan file)"}`,
-              "Do not invent numbers. After results, update analysis/HANDOFF.md via /plan handoff.",
+              `Active plan ${plan.id} created for goal: ${goal}`,
+              "Clarify methods with the researcher; prefer natural-language confirmation. Do not invent numbers.",
             ].join("\n"),
             ctx.isIdle() ? {} : { deliverAs: "followUp" },
           );
           return;
         }
-        if (cmd === "defer") {
-          plan = advanceAnalysisPlan(plan, { type: "defer" });
-          plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已推迟执行；稍后用 /plan run 继续。`, "info");
+        const plan = await readActiveAnalysisPlan(ctx.cwd);
+        if (!plan) {
+          ctx.ui.notify("没有活跃分析 Plan。用 /plan <目标> 创建，或在 analysis 模式用自然语言触发 soft takeover。", "info");
           return;
         }
-        if (cmd === "handoff") {
-          const gate = await assertHumanVerifyGate(ctx.cwd, "analysis-complete");
-          if (!gate.ok) {
-            ctx.ui.notify(gate.message, "error");
-            return;
-          }
-          const path = await syncHandoffFromAnalysisPlan(ctx.cwd, plan);
-          if (plan.status === "running") {
-            plan = advanceAnalysisPlan(
-              plan,
-              plan.scriptEntrypoint
-                ? { type: "complete", scriptEntrypoint: plan.scriptEntrypoint }
-                : { type: "complete" },
-            );
-            plan = await writeAnalysisPlan(ctx.cwd, plan);
-          }
-          ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已写入 ${path}。可切到 academic 模式。`, "info");
-          return;
-        }
-        if (cmd === "reject") {
-          const reason = rest.join(" ").trim() || "researcher rejected the proposal";
-          plan = advanceAnalysisPlan(plan, { type: "block", reason });
-          plan = await writeAnalysisPlan(ctx.cwd, plan);
-          ctx.ui.notify(formatAnalysisPlanStatus(plan), "warning");
-          return;
-        }
-
-        ctx.ui.notify(usage, "info");
+        ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n确认与执行请用自然语言；交接用 /handoff。`, "info");
       } catch (error) {
         await notifyError(ctx, error);
       }
     },
   });
 
-
-  if (developerCommands) pi.registerCommand("handoff", {
-    description: "（开发）写入机器可读交接检查点",
+  pi.registerCommand("handoff", {
+    description: "人审通过后写入 analysis/HANDOFF.md 交接",
     handler: async (_args, ctx) => {
       try {
-        const paths = projectPaths(ctx.cwd);
-        const project = await import("node:fs/promises").then(({ readFile }) =>
-          readFile(paths.project, "utf8").then((text) => asProject(JSON.parse(text))),
-        );
-        await writeHandoff(ctx.cwd, {
-          projectId: project.id,
-          runId: `run_${Date.now()}`,
-          goal: project.goal,
-          completed: ["project bootstrap"],
-          verified: ["project.json exists"],
-          blocked: ["evidence ledger has not been reviewed"],
-          nextSteps: ["import a local source and create Claim-Evidence links"],
-          verificationCommands: ["pnpm typecheck", "pnpm test"],
-          generatedAt: new Date().toISOString(),
-        });
-        ctx.ui.notify("Wrote .psyclaw/notes/HANDOFF.md and handoff.json", "info");
+        const gate = await assertHumanVerifyGate(ctx.cwd, "analysis-complete");
+        if (!gate.ok) {
+          ctx.ui.notify(gate.message, "error");
+          return;
+        }
+        let plan = await readActiveAnalysisPlan(ctx.cwd);
+        if (!plan) {
+          ctx.ui.notify("没有活跃分析 Plan，无法交接。先 /plan <目标> 或在 analysis 模式推进。", "warning");
+          return;
+        }
+        const path = await syncHandoffFromAnalysisPlan(ctx.cwd, plan);
+        if (plan.status === "running") {
+          plan = advanceAnalysisPlan(
+            plan,
+            plan.scriptEntrypoint
+              ? { type: "complete", scriptEntrypoint: plan.scriptEntrypoint }
+              : { type: "complete" },
+          );
+          plan = await writeAnalysisPlan(ctx.cwd, plan);
+        }
+        ctx.ui.notify(`${formatAnalysisPlanStatus(plan)}\n已写入 ${path}。可切到 academic 模式。`, "info");
       } catch (error) {
         await notifyError(ctx, error);
       }
@@ -1794,81 +1562,50 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
 
   for (const kind of ["skill", "hook", "rule", "subagent"] as const) {
     if (!legacyTestApi) pi.registerCommand(`create-${kind}`, {
-      description: `预览并创建项目级 ${kind}`,
+      description: `预览并创建项目级 ${kind}（附带名称与需求文本）`,
       handler: async (args, ctx) => {
-        if (!args.trim()) {
-          ctx.ui.notify(`Usage: /create-${kind} <name and requirements>`, "info");
+        const requirements = args.trim();
+        if (!requirements) {
+          ctx.ui.notify(`请使用 /create-${kind} <名称与需求描述>`, "info");
           return;
         }
-        pi.sendUserMessage(creationCommandPrompt(kind, args.trim()), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+        pi.sendUserMessage(creationCommandPrompt(kind, requirements), ctx.isIdle() ? {} : { deliverAs: "followUp" });
       },
     });
   }
 
   if (!legacyTestApi) pi.registerCommand("skill", {
-    description: "管理和安装 Skill",
-    handler: async (args, ctx) => {
-      const [name, ...rest] = args.trim().split(/\s+/).filter(Boolean);
-      if (!name) {
-        try { await showSkillManager(pi, "", ctx); } catch (error) { await notifyError(ctx, error); }
-        return;
-      }
-      if (name === "install") {
-        const source = rest.join(" ").trim();
-        if (!source) {
-          ctx.ui.notify("Usage: /skill install <local-directory>", "info");
-          return;
-        }
-        try {
-          const installed = await installLocalSkill(source, ctx.cwd);
-          ctx.ui.notify(`已安装本地 Skill ${installed.name}：${installed.target}。请执行 /reload。`, "info");
-        } catch (error) {
-          await notifyError(ctx, error);
-        }
-        return;
-      }
-      if (["status", "enable", "disable", "enable-all", "disable-all"].includes(name)) {
-        try { await showSkillManager(pi, args, ctx); } catch (error) { await notifyError(ctx, error); }
-        return;
-      }
-      ctx.ui.notify("Usage: /skill [status|enable <id>|disable <id>|enable-all|disable-all|install <local-directory>]", "info");
+    description: "打开 Skill 管理页",
+    handler: async (_args, ctx) => {
+      try { await showSkillManager(pi, ctx); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
   if (!legacyTestApi) pi.registerCommand("ars", {
-    description: "切换 academic mode，或管理 doctor/start/full/stop",
+    description: "学术模式：单独开启，或附带任务文本启动完整流程",
     handler: async (args, ctx) => {
       try {
-        const [action, ...rest] = args.trim().split(/\s+/).filter(Boolean);
-        // Bare /ars → sticky academic mode (same as Shift+Tab on). No profile popup.
-        if (!action) {
+        const trailing = args.trim();
+        if (!trailing) {
           if (!ctx.hasUI) {
-            ctx.ui.notify("当前环境无编辑器；请改用 Shift+Tab 或 /ars start。", "info");
+            ctx.ui.notify("当前环境无编辑器；请改用 Shift+Tab 切换 academic。", "info");
             return;
           }
           arsUiContext = ctx;
           applySessionMode("academic");
           return;
         }
-        if (action === "status") {
-          ctx.ui.notify(
-            [
-              `PsyClaw ARS profile v${PSYCLAW_ARS_PROFILE_VERSION}`,
-              `当前模式：${arsModeEditor?.getMode() ?? sessionMode}（Shift+Tab：chat → analysis → academic）`,
-              "Thinking：Ctrl+Shift+T",
-              `来源：${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF} (${ARS_UPSTREAM_COMMIT.slice(0, 12)})`,
-              "入口：Shift+Tab，/ars doctor，/ars start，/ars full <task>，/ars stop，/crosscheck，/help",
-              formatNatureArsFillerStatus(natureFillersFromCommandContext(ctx)),
-            ].join("\n"),
-            "info",
-          );
+        const lower = trailing.toLowerCase();
+        if (lower === "stop") {
+          arsUiContext = ctx;
+          applySessionMode("chat");
+          if (ctx.hasUI && isArsModeEditorText(ctx.ui.getEditorText?.() ?? "")) {
+            ctx.ui.setEditorText("");
+          }
+          ctx.ui.notify("已回到 chat 模式", "info");
           return;
         }
-        if (action === "install") {
-          ctx.ui.notify("ARS 与 Nature/compose 技能已内置：Shift+Tab 切到 academic。", "info");
-          return;
-        }
-        if (action === "doctor") {
+        if (lower === "doctor") {
           const activeTools = typeof pi.getActiveTools === "function" ? pi.getActiveTools() : [];
           const commands = typeof pi.getCommands === "function"
             ? pi.getCommands().map((command: { name: string }) => command.name)
@@ -1891,32 +1628,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           }
           return;
         }
-        if (action === "start") {
-          arsUiContext = ctx;
-          applySessionMode("academic");
-          ctx.ui.notify("academic mode 已开启（Shift+Tab 可切换）", "info");
-          return;
-        }
-        if (action === "stop") {
-          arsUiContext = ctx;
-          applySessionMode("chat");
-          if (ctx.hasUI && isArsModeEditorText(ctx.ui.getEditorText?.() ?? "")) {
-            ctx.ui.setEditorText("");
-          }
-          ctx.ui.notify("已回到 chat 模式", "info");
-          return;
-        }
-        const upstreamCommand = action === "full"
-          ? `/ars-full${rest.length > 0 ? ` ${rest.join(" ")}` : ""}`
-          : undefined;
-        if (!upstreamCommand) {
-          ctx.ui.notify("Usage: /ars [status|doctor|start|full <task>|stop] 或按 Shift+Tab 切换 academic mode", "info");
-          return;
-        }
-        // A queued prompt does not get a fresh system prompt in Pi. Wait so the
-        // upstream wrapper can activate ARS and inject its compatibility note.
-        if (action === "full" && !ctx.isIdle()) await ctx.waitForIdle();
-        pi.sendUserMessage(upstreamCommand, {
+        // Any other trailing text is the academic full-pipeline task.
+        if (!ctx.isIdle()) await ctx.waitForIdle();
+        pi.sendUserMessage(`/ars-full ${trailing}`, {
           ...(!ctx.isIdle() ? { deliverAs: "followUp" as const } : {}),
           expandPromptTemplates: true,
         });
@@ -1927,49 +1641,16 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("plugin", {
-    description: "浏览推荐并管理 Plugin / Extension",
-    handler: async (args, ctx) => {
-      try {
-        const [action, ...rest] = args.trim().split(/\s+/).filter(Boolean);
-        if (!action) {
-          await showPluginManager("", ctx);
-          return;
-        }
-        if (action === "status") {
-          await showPluginManager("status", ctx);
-          return;
-        }
-        if (!["list", "install", "remove"].includes(action)) {
-          throw new Error("直接运行 /plugin 打开 Plugin 管理页");
-        }
-        if (action !== "list" && rest.length === 0) {
-          await showPluginManager("", ctx);
-          return;
-        }
-        if (action === "install" && rest.length === 1) {
-          const recommended = (await pluginManagerRows(ctx)).some((row) => row.id === rest[0]);
-          if (recommended) {
-            await showPluginManager(`install ${rest[0]}`, ctx);
-            return;
-          }
-        }
-        if (action !== "list") {
-          const approved = await ctx.ui.confirm(
-            `${action === "install" ? "安装" : "移除"} Plugin？`,
-            `${rest.join(" ")}\nPlugin 与宿主进程同权限，操作完成后需要重启 PsyClaw。`,
-          );
-          if (!approved) return;
-        }
-        await runPluginCommand([action, ...rest]);
-        if (action !== "list") ctx.ui.notify("Plugin 配置已更新，请执行 /reload。", "info");
-      } catch (error) { await notifyError(ctx, error); }
+    description: "打开 Plugin 推荐与管理页",
+    handler: async (_args, ctx) => {
+      try { await showPluginManager(ctx); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
   if (!legacyTestApi) pi.registerCommand("mcp", {
     description: "打开 MCP 安装与配置管理页",
-    handler: async (args, ctx) => {
-      try { await showMcpManager(pi, args, ctx, runtimeMcps); } catch (error) { await notifyError(ctx, error); }
+    handler: async (_args, ctx) => {
+      try { await showMcpManager(pi, ctx, runtimeMcps); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
@@ -2009,7 +1690,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           if (!selectedProvider) return;
           requested = selectedProvider;
         }
-        if (!/^[A-Za-z0-9._:-]+$/.test(requested)) throw new Error("Usage: /provider <provider-id>");
+        if (!/^[A-Za-z0-9._:-]+$/.test(requested)) throw new Error("请使用 /provider 打开选择，或 /provider <provider-id>");
         const preset = PROVIDER_PRESETS.find((item) => item.id === requested);
         let models = providers.get(requested) ?? [];
         const modelChoices = models.length > 0 ? models : (preset?.models ?? []);
@@ -2059,7 +1740,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("pet", {
-    description: "开启或关闭启动横幅宠物",
+    description: "启动横幅宠物：单独查看状态，或附带 on/off",
     handler: async (args, ctx) => {
       const action = args.trim().toLowerCase() || "status";
       if (action === "status") {
@@ -2067,7 +1748,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         return;
       }
       if (action !== "on" && action !== "off") {
-        ctx.ui.notify("Usage: /pet on|off|status", "error");
+        ctx.ui.notify("请使用 /pet，或 /pet on|off", "error");
         return;
       }
       await setPetPreference(action === "on");
@@ -2773,26 +2454,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   // destructive/developer commands gated, but do not hide the bounded agent
   // runner behind PSYCLAW_DEVELOPER_COMMANDS in published builds.
   if (!legacyTestApi) pi.registerCommand("agents", {
-    description: "浏览或运行 Subagent（对齐 Claude Code）",
+    description: "浏览 Subagent，或附带任务文本运行",
     handler: async (args, ctx) => {
-      const trimmed = args.trim();
-      if (!trimmed || trimmed === "status" || trimmed === "list") {
-        try { await showAgentManager(ctx, trimmed === "status" || trimmed === "list"); }
-        catch (error) { await notifyError(ctx, error); }
-        return;
-      }
-      const requested = parseAgentsRequest(args);
-      const objective = requested.objective;
+      const objective = args.trim();
       if (!objective) {
-        ctx.ui.notify("Usage: /agents [--agent <id>|--agents <id,...>] <task>\n无任务时直接运行 /agents 打开 Subagent 管理页。", "info");
+        try { await showAgentManager(ctx, false); }
+        catch (error) { await notifyError(ctx, error); }
         return;
       }
       if (objective.length > 4_000) {
         ctx.ui.notify("Agent task is too long; split it into smaller bounded tasks", "error");
         return;
       }
-      // Do not let the runner create a partial `.psyclaw/runs` tree outside
-      // an explicitly initialized `/init` research project.
       try {
         await readProject(ctx.cwd);
       } catch {
@@ -2806,60 +2479,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       activeAgentRuns.add(ctx.cwd);
       try {
         const runId = `pi_agent_${Date.now()}`;
-        let plan: Plan = researchTaskPlan(runId, objective);
-        if (requested.ids.length > 0) {
-          const available = await loadSelectablePersonas(ctx.cwd);
-          const byId = new Map(available.map((persona) => [persona.id, persona]));
-          const selected = requested.ids.map((id) => byId.get(id));
-          const missing = requested.ids.filter((_id, index) => !selected[index]);
-          if (missing.length > 0) throw new Error(`Unknown or invalid subagent: ${missing.join(", ")}. Run /agents to list bundled and custom subagents.`);
-          const personas = selected.filter((persona): persona is NonNullable<typeof persona> => persona !== undefined);
-          const unionEffects = normalizeEffects(personas.flatMap((persona) => persona.allowedEffects));
-          const elevated = elevatedEffects(unionEffects);
-          if (elevated.length > 0) {
-            if (!ctx.hasUI || typeof ctx.ui.confirm !== "function") {
-              throw new Error(`Subagent effects [${formatEffects(elevated)}] require interactive confirmation`);
-            }
-            const approved = await ctx.ui.confirm(
-              "批准 Subagent 提升权限？",
-              `将启用：${formatEffects(elevated)}\n对应工具：${toolsForEffects(unionEffects).join(", ")}\n任务：${objective.slice(0, 400)}\n\n凭据读取、绕过门禁与外部发布仍被禁止。`,
-            );
-            if (!approved) {
-              ctx.ui.notify("已取消：未批准提升权限，未启动 Subagent。", "warning");
-              return;
-            }
-          }
-          plan = customPersonaPlan(runId, objective, personas);
-          await mkdir(join(ctx.cwd, ".psyclaw", "plans"), { recursive: true });
-          await atomicWriteFile(join(ctx.cwd, ".psyclaw", "plans", `${runId}.json`), `${JSON.stringify(plan, null, 2)}\n`);
-          const eventLog = new RunEventLog(ctx.cwd, runId);
-          const result = await runPlanWithPi(plan, {
-            cwd: ctx.cwd,
-            agentDir: join(ctx.cwd, ".psyclaw", "pi-agent"),
-            ...(ctx.model?.provider === undefined ? {} : { provider: ctx.model.provider }),
-            ...(ctx.model?.id === undefined ? {} : { model: ctx.model.id }),
-            env: providerEnvironment(ctx.model?.provider),
-            ...(elevated.length === 0 ? { tools: [] as const } : {}),
-            allowWrites: unionEffects.includes("write"),
-            allowNetwork: unionEffects.includes("network"),
-            allowDestructive: unionEffects.includes("destructive"),
-            root: ctx.cwd,
-            pauseRequested: async () => {
-              try { await import("node:fs/promises").then(({ access }) => access(join(ctx.cwd, ".psyclaw", "runs", `${runId}.pause`))); return true; }
-              catch { return false; }
-            },
-            onEvent: async (event) => { await eventLog.append(event); },
-          });
-          pi.appendEntry("psyclaw:agent-run", {
-            runId,
-            status: result.status,
-            diagnostics: result.diagnostics,
-            effects: unionEffects,
-            recordedAt: new Date().toISOString(),
-          });
-          ctx.ui.notify(`Agent run ${result.status}: ${result.diagnostics.join("; ") || "verified"}`, result.status === "completed" ? "info" : "warning");
-          return;
-        }
+        const plan: Plan = researchTaskPlan(runId, objective);
         await mkdir(join(ctx.cwd, ".psyclaw", "plans"), { recursive: true });
         await atomicWriteFile(join(ctx.cwd, ".psyclaw", "plans", `${runId}.json`), `${JSON.stringify(plan, null, 2)}\n`);
         const eventLog = new RunEventLog(ctx.cwd, runId);

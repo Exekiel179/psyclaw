@@ -65,8 +65,6 @@ export function customPersonaPlan(runId: string, objective: string, personas: re
 }
 
 export function parseAgentsRequest(input: string): { ids: string[]; objective: string } {
-  const trimmed = input.trim();
-  const match = trimmed.match(/^--agents?\s+(\S+)\s+([\s\S]+)$/);
-  if (!match) return { ids: [], objective: trimmed };
-  return { ids: [...new Set(match[1]!.split(",").map((id) => id.trim()).filter(Boolean))], objective: match[2]!.trim() };
+  // Codex-style: entire trailing text is the task. Agent selection is via /agents UI.
+  return { ids: [], objective: input.trim() };
 }

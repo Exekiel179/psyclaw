@@ -123,7 +123,7 @@ export async function agentManagerRows(root: string): Promise<AgentManagerRow[]>
   return [...bundledRows, ...customRows.filter((row) => !seen.has(row.id))];
 }
 
-/** Resolve selectable personas for `/agents --agent` (bundled + custom). */
+/** Resolve selectable personas for `/agents` (bundled + custom). */
 export async function loadSelectablePersonas(root: string): Promise<CustomPersona[]> {
   const custom = await loadCustomPersonas(root);
   const byId = new Map(custom.map((persona) => [persona.id, persona]));
@@ -169,7 +169,7 @@ export async function recommendedAgentsForPanel(root: string): Promise<{
       installed: true,
       enabled: true,
       locked: row.source === "bundled",
-      slashCommand: `/agents --agent ${row.id} <bounded read-only research task>`,
+      slashCommand: `/agents <bounded read-only research task>`,
     })),
   };
 }
