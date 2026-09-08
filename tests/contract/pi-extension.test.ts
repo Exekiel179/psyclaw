@@ -19,7 +19,7 @@ describe("Pi extension contract", () => {
     // research surface: /verify and /model stay reachable for the CLI/simple
     // hosts, while UI-gated research commands (agents/grill/...) are not
     // registered at all.
-    expect([...commands.keys()]).toEqual(["init", "crosscheck", "verify", "help", "plan", "model"]);
+    expect([...commands.keys()]).toEqual(["init", "crosscheck", "verify", "help", "plan", "handoff", "model"]);
   });
 
   it("registers the full research command surface on a modern Pi API", () => {
@@ -30,7 +30,7 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     expect(commands).toEqual([
-      "init", "crosscheck", "verify", "help", "plan", "grill", "brainstorm", "review", "loop",
+      "init", "crosscheck", "verify", "help", "plan", "handoff", "grill", "brainstorm", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
       "skill", "ars", "plugin", "mcp", "provider", "pet", "agents",
     ]);
@@ -48,16 +48,17 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     const notifications: string[] = [];
-    await initHandler?.("--paradigm qualitative-thematic A bounded goal", {
+    await initHandler?.("A bounded goal", {
       cwd: root,
       ui: { notify: (message: string) => notifications.push(message) },
     });
     const project = JSON.parse(await readFile(join(root, ".psyclaw", "project.json"), "utf8"));
-    expect(project.paradigm).toBe("qualitative-thematic");
+    expect(project.paradigm).toBe("survey-observational");
+    expect(project.goal).toBe("A bounded goal");
     expect(notifications[0]).toContain("工作仓库已初始化");
   });
 
-  it("allows paradigm-only init without a goal string", async () => {
+  it("allows bare init without a goal string", async () => {
     const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-invalid-"));
     let initHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     const api = {
@@ -67,7 +68,7 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     const notifications: string[] = [];
-    await initHandler?.("--paradigm survey-observational", {
+    await initHandler?.("", {
       cwd: root,
       ui: { notify: (message: string) => notifications.push(message) },
     });
@@ -163,6 +164,43 @@ describe("Pi extension contract", () => {
     expect(messages[0]?.text).toContain("生成式 AI 使用与大学生批判性思维");
     expect(messages[0]?.options).toEqual({ deliverAs: "followUp" });
     expect(notifications[0]).toContain("已启动学术追问");
+  });
+
+  it("exposes /crosscheck as process AI review and /verify as substance AI review", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-verify-"));
+    await bootstrapProject({ root, goal: "verify split", paradigm: "survey-observational" });
+    let crosscheckHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    let verifyHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const messages: string[] = [];
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "crosscheck") crosscheckHandler = options.handler;
+        if (name === "verify") verifyHandler = options.handler;
+      },
+      registerTool() {},
+      sendUserMessage(text: string) { messages.push(text); },
+    } as any;
+    extension(api);
+
+    const processNotes: string[] = [];
+    await crosscheckHandler?.("tables and DOIs", {
+      cwd: root,
+      isIdle: () => true,
+      ui: { notify: (message: string) => processNotes.push(message) },
+    });
+    expect(messages[0]).toContain("过程性交叉核对");
+    expect(messages[0]).toContain("引文真实性");
+    expect(processNotes[0]).toContain("过程性 /crosscheck");
+
+    const substanceNotes: string[] = [];
+    await verifyHandler?.("primary effect claims", {
+      cwd: root,
+      isIdle: () => true,
+      ui: { notify: (message: string) => substanceNotes.push(message) },
+    });
+    expect(messages[1]).toContain("整体性实质验证");
+    expect(messages[1]).toContain("分析结果是否属实");
+    expect(substanceNotes[0]).toContain("整体性 /verify");
   });
 
   it("opens the MCP manager as a custom page and preserves status fallback", async () => {

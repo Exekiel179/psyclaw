@@ -39,7 +39,11 @@ describe("PsyClaw project capability creation", () => {
     const personas = await loadCustomPersonas(root);
     const plan = customPersonaPlan("run", "Review this study", personas);
     expect(plan.tasks[0]).toMatchObject({ id: "methods-critic", allowedEffects: ["read"], ownedPaths: [], outputs: [] });
-    expect(parseAgentsRequest("--agents methods-critic,methods-critic Review this study")).toEqual({ ids: ["methods-critic"], objective: "Review this study" });
+    expect(parseAgentsRequest("--agents methods-critic,methods-critic Review this study")).toEqual({
+      ids: [],
+      objective: "--agents methods-critic,methods-critic Review this study",
+    });
+    expect(parseAgentsRequest("Review this study")).toEqual({ ids: [], objective: "Review this study" });
     await import("node:fs/promises").then(({ writeFile }) => writeFile(join(root, ".psyclaw/agents/custom/broken.md"), "---\ninvalid: [\n---\n"));
     expect((await loadCustomPersonas(root)).map((persona) => persona.id)).toEqual(["methods-critic"]);
   });

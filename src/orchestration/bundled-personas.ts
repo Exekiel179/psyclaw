@@ -12,7 +12,7 @@ export interface BundledPersonaDefinition {
   instructions: string;
 }
 
-/** Built-in read-only research subagents (Claude-style), selectable via `/agents --agent`. */
+/** Built-in read-only research subagents (Claude-style), selectable via `/agents`. */
 export const BUNDLED_PERSONAS: readonly BundledPersonaDefinition[] = [
   {
     id: "landscape-mapper",

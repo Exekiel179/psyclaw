@@ -44,9 +44,9 @@ export function analysisSoftRoutePrompt(): string {
     "## Analysis soft-route (stats plan)",
     "While analysis mode is active, clear statistical / data-analysis intents soft-takeover into `/skill:analysis-plan` without waiting for an explicit slash from the user.",
     "Stages: clarify + light EDA → **per-analysis choices** (first option = concrete new method; 「已经足够」only as last option) → soft confirm via natural language「可以」→ pre-check → execute → post-check → handoff.",
-    "Optional `/plan auto` skips human approval but every result must disclose 未经人审批.",
+    "Optional natural-language auto-approval may skip method approval but every result must disclose 未经人审批.",
     "Do not merge this with academic/ARS planning. After an accepted/completed plan (and results), update `analysis/HANDOFF.md` before switching to academic.",
     "Explicit `/skill:` or `/plan` always wins over soft routing. Academic writing intents belong in academic mode.",
-    "Initiate `/crosscheck` (AI field check; alias `/verify`) before and after analysis. Then require human approval in Panel or `/crosscheck <id> human` before handoff. AI-checked/skipped do not pass. Panel is the primary human gate for analysis/academic completion.",
+    "Initiate `/crosscheck` (process: data, citation existence, format; multi-view merge) and `/verify` (substance: results hold, citation/method reasonableness). Human approval is forced by the completion gate via Panel or wake-options — never ask the user to type a human-approve slash. AI-checked/skipped do not pass.",
   ].join("\n");
 }

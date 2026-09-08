@@ -4,7 +4,7 @@ PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、
 
 PsyClaw 自有代码使用 MIT 许可证；随 npm 包内置的 Academic Research Skills 位于 `vendor/ars`，保持上游署名并单独遵循 CC BY-NC 4.0，仅限非商业用途。
 
-当前版本：`0.29.15`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.29.16`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -21,19 +21,19 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.29.15
+npm install -g psyclaw@0.29.16
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.29.15 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.29.16 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.29.15 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.29.16 --registry=https://registry.npmmirror.com
 ```
 
 或安装脚本：
@@ -99,18 +99,18 @@ psyclaw evidence add notes\source.md --level user
 | 导出会话 | 使用 Pi 内置的 `/export` |
 | 打开科研面板 | 在对话中输入 `/panel` |
 | 查看或切换 Provider | 在对话中输入 `/provider` 或 `/provider <id>` |
-| 管理启动横幅宠物 | `/pet status`、`/pet on`、`/pet off`（默认关闭） |
-| 安装本地 Skill | `/skill install <本地目录>` |
-| 管理或安装 Skill | `/skill` 或 `/skill install <本地目录>` |
-| 创建项目能力 | `/create-skill`、`/create-hook`、`/create-rule`、`/create-subagent`（均先预览并确认） |
-| 运行自定义只读角色 | `/agents --agent <id> <task>` 或 `/agents --agents <id,...> <task>`（最多四个隔离 worker） |
+| 管理启动横幅宠物 | `/pet`、`/pet on`、`/pet off`（默认关闭） |
+| 管理 Skill | `/skill`（在管理页启用/安装） |
+| 创建项目能力 | `/create-skill`、`/create-hook`、`/create-rule`、`/create-subagent`（附带需求文本） |
+| 运行只读 Subagent | `/agents` 浏览，或 `/agents <task>` 运行 |
 | 调用已加载 Skill | `/skill:<name>` |
-| 使用模式 | `Shift+Tab`：`chat` → `analysis` → `academic`；thinking 用 `Ctrl+Shift+Tab` |
-| 搭建仓库 | `/init`（只建目录 + `psyclaw.md`） |
-| 人确认关键字段 | `/verify list` 或 `/verify <id> verified` |
-| 使用 PsyClaw ARS | 切到 `academic`；也可用 `/ars doctor` / `/ars full <task>` |
+| 使用模式 | `Shift+Tab`：`chat` → `analysis` → `academic`；thinking 用 `Ctrl+Shift+T` |
+| 搭建仓库 | `/init` 或 `/init <研究目标>` |
+| 分析方案 / 交接 | `/plan`、`/plan <目标>`；人审后 `/handoff` |
+| AI 过程核对 / 实质验证 | `/crosscheck [焦点]`；`/verify [焦点]`。人审由收尾门禁自动要求（Panel/唤醒选项） |
+| 使用 PsyClaw ARS | `/ars` 开学术模式，或 `/ars <任务>`；`/ars doctor`、`/ars stop` |
 | 管理 Plugin | `/plugin`；终端使用 `psyclaw plugin install|remove|list` |
-| 调用已配置 MCP | 模型通过 `psyclaw_mcp` 自动发现并调用 `.psyclaw/mcp/*.json` 中启用的服务器 |
+| 调用已配置 MCP | `/mcp` 管理；模型通过 `psyclaw_mcp` 调用已启用服务器 |
 
 `psyclaw update` 会更新 PsyClaw 整包，并同时安装该版本锁定的内置运行时。在源码仓库中运行时，命令会停止并提示通过 Git 更新，不会覆盖本地修改。
 仅查看更新计划而不执行时，使用 `psyclaw update --check`。旧的 `--yes` 参数仍兼容，但不再需要。
