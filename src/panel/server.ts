@@ -40,6 +40,8 @@ import {
 } from "../skills/user-skills.js";
 import { loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../verify/checklist.js";
 import { readActiveAnalysisPlan } from "../analysis/plan.js";
+import { browserConfigForPreference, injectBrowserObservabilityConfig } from "../observability/config.js";
+import { readTelemetryPreference, telemetryPreferenceOptions, writeTelemetryPreference } from "../observability/preference.js";
 
 interface RecommendationState { schemaVersion: "psyclaw/recommendation-state/v1"; skills: string[]; mcp: string[]; skillScopes?: Record<string, RecommendedSkillScope>; }
 
@@ -436,6 +438,21 @@ function publicInstallPlan(plan: ReturnType<typeof planAgentInstall>): Record<st
   return publicFields;
 }
 
+async function readObservabilityScript(panelHtmlPath: string): Promise<string | undefined> {
+  const candidates = [
+    join(dirname(panelHtmlPath), "observability.js"),
+    join(dirname(panelHtmlPath), "..", "shared", "observability.js"),
+  ];
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, "utf8");
+    } catch {
+      /* try the next known package path */
+    }
+  }
+  return undefined;
+}
+
 interface PanelPluginRecord {
   source: string;
   scope: "project" | "user";
@@ -458,6 +475,8 @@ export interface PanelServerOptions {
   installPlugin?: (source: string, scope: "project" | "user") => Promise<void>;
   /** Read Pi's configured packages without duplicating its package registry. */
   listPlugins?: () => PanelPluginRecord[];
+  /** Override `~/.psyclaw/agent/psyclaw-settings.json` (tests). */
+  telemetrySettingsPath?: string;
 }
 
 function pluginSourceIdentity(source: string): string {
@@ -817,6 +836,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       "/api/assistant",
       "/api/crosscheck",
       "/api/wake-options/respond",
+      "/api/telemetry",
     ];
     if (request.method !== "GET" && request.method !== "HEAD" && !(request.method === "POST" && panelWriteRoutes.includes(url.pathname))) {
       response.writeHead(405, { "content-type": "application/json", allow: "GET, HEAD" });
@@ -1811,8 +1831,60 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         response.end(JSON.stringify({ schemaVersion: "psyclaw/provider-config-receipt/v1", ok: true, provider: id, modelCount: models.length, apiKeyStored: Boolean(apiKey?.trim()) }));
         return;
       }
+      if (url.pathname === "/api/telemetry") {
+        if (request.method === "GET" || request.method === "HEAD") {
+          const preference = await readTelemetryPreference(telemetryPreferenceOptions(options.telemetrySettingsPath));
+          const config = browserConfigForPreference(process.env, preference, "panel");
+          response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+          response.end(JSON.stringify({
+            schemaVersion: "psyclaw/telemetry-preference/v1",
+            enabled: config.telemetryEnabled,
+            noticeAcknowledged: preference.noticeAcknowledged,
+            showNotice: config.showTelemetryNotice,
+          }));
+          return;
+        }
+        const body = await readJsonBody(request);
+        const action = String(body.action ?? "").trim();
+        if (action === "ack") {
+          const next = await writeTelemetryPreference({ noticeAcknowledged: true }, telemetryPreferenceOptions(options.telemetrySettingsPath));
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/telemetry-preference/v1", ok: true, enabled: next.enabled, noticeAcknowledged: true }));
+          return;
+        }
+        if (action === "disable" || action === "off") {
+          const next = await writeTelemetryPreference({ enabled: false, noticeAcknowledged: true }, telemetryPreferenceOptions(options.telemetrySettingsPath));
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/telemetry-preference/v1", ok: true, enabled: next.enabled, noticeAcknowledged: true }));
+          return;
+        }
+        if (action === "enable" || action === "on") {
+          const next = await writeTelemetryPreference({ enabled: true, noticeAcknowledged: true }, telemetryPreferenceOptions(options.telemetrySettingsPath));
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/telemetry-preference/v1", ok: true, enabled: next.enabled, noticeAcknowledged: true }));
+          return;
+        }
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: "action must be ack, disable, or enable" }));
+        return;
+      }
+      if (url.pathname === "/observability.js") {
+        const script = await readObservabilityScript(panelHtmlPath);
+        if (script === undefined) {
+          response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          response.end("not found");
+          return;
+        }
+        response.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" });
+        response.end(script);
+        return;
+      }
       if (url.pathname === "/" || url.pathname === "/index.html") {
-        const html = await readFile(panelHtmlPath, "utf8");
+        const preference = await readTelemetryPreference(telemetryPreferenceOptions(options.telemetrySettingsPath));
+        const html = injectBrowserObservabilityConfig(
+          await readFile(panelHtmlPath, "utf8"),
+          browserConfigForPreference(process.env, preference, "panel"),
+        );
         response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         response.end(html);
         return;

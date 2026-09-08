@@ -32,7 +32,7 @@ describe("Pi extension contract", () => {
     expect(commands).toEqual([
       "init", "crosscheck", "verify", "help", "plan", "handoff", "grill", "brainstorm", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
-      "skill", "ars", "plugin", "mcp", "provider", "pet", "agents",
+      "skill", "ars", "plugin", "mcp", "provider", "pet", "telemetry", "agents",
     ]);
     expect(commands).not.toContain("run");
     expect(commands).not.toContain("brief");
@@ -107,6 +107,7 @@ describe("Pi extension contract", () => {
       expect.objectContaining({ name: "loop" }),
       expect.objectContaining({ name: "provider" }),
       expect.objectContaining({ name: "pet" }),
+      expect.objectContaining({ name: "telemetry" }),
       expect.objectContaining({ name: "skill" }),
       expect.objectContaining({ name: "plugin" }),
     ]));

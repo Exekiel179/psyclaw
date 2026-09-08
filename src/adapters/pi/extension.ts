@@ -108,6 +108,14 @@ import {
 import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, ensureDefaultVerifyChecklist, loadVerifyChecklist } from "../../verify/checklist.js";
 import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js";
 import { openResearchWorkbench } from "../../panel/workbench.js";
+import {
+  captureAgentError,
+  initNodeObservability,
+  readTelemetryPreference,
+  shutdownObservability,
+  trackGateWaiting,
+  writeTelemetryPreference,
+} from "../../observability/index.js";
 
 /** Codex-style slash surface: bare command, or command + trailing free text. No subcommand trees. */
 function parseInitArgs(args: string): { goal?: string; paradigm?: ResearchParadigm } {
@@ -117,6 +125,7 @@ function parseInitArgs(args: string): { goal?: string; paradigm?: ResearchParadi
 }
 
 async function notifyError(ctx: ExtensionCommandContext, error: unknown): Promise<void> {
+  await captureAgentError(error, { phase: "extension" });
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 }
 
@@ -1047,6 +1056,7 @@ const WORKFLOW_RUNNERS = {
 } as const;
 
 export default function psyclawExtension(pi: ExtensionAPI): void {
+  void initNodeObservability();
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
   const runtimeMcps = new RuntimeMcpRegistry();
@@ -1099,7 +1109,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       promptPaths: await enabledLocalPromptPaths(event.cwd),
     };
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => runtimeMcps.close());
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => {
+    runtimeMcps.close();
+    void shutdownObservability();
+  });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", async (event, ctx) => {
     if (!(await readActiveProject(ctx?.cwd ?? process.cwd()))) return;
     const prompt = userRulesPrompt(await loadUserRules(ctx?.cwd ?? process.cwd()));
@@ -1253,6 +1266,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     const summary = toolApprovalSummary(event.toolName, event.input);
     if (requiresSeparateOperationConfirmation(event.toolName, event.input)) {
       if (!ctx.hasUI) return { block: true, terminate: true, reason: "外部发布需要用户在交互界面中明确确认" };
+      void trackGateWaiting("tool_approval");
       const choice = await ctx.ui.select(`确认外部操作\n${summary}`, ["确认执行", "取消"], { timeout: 120_000 });
       const approved = choice === "确认执行";
       await appendApproval(ctx.cwd, {
@@ -1753,6 +1767,29 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       }
       await setPetPreference(action === "on");
       ctx.ui.notify(`启动横幅宠物已${action === "on" ? "开启" : "关闭"}，下次启动生效`, "info");
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("telemetry", {
+    description: "查看或关闭匿名产品遥测",
+    handler: async (args, ctx) => {
+      const action = args.trim().toLowerCase() || "status";
+      if (action === "status") {
+        const preference = await readTelemetryPreference();
+        ctx.ui.notify(
+          preference.enabled
+            ? "匿名产品遥测：开启（默认）。采集粗粒度使用与错误，不含研究正文。关闭：/telemetry off"
+            : "匿名产品遥测：已关闭。重新开启：/telemetry on",
+          "info",
+        );
+        return;
+      }
+      if (action !== "on" && action !== "off") {
+        ctx.ui.notify("Usage: /telemetry on|off|status", "error");
+        return;
+      }
+      await writeTelemetryPreference({ enabled: action === "on", noticeAcknowledged: true });
+      ctx.ui.notify(action === "on" ? "已开启匿名产品遥测。下次启动生效。" : "已关闭匿名产品遥测。下次启动不再发送。", "info");
     },
   });
 

@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>PsyClaw Panel · 科研工作台</title>
+  <script id="psyclaw-obs-config">window.__PSYCLAW_OBS__={"surface":"panel","sentryDsn":"","posthogKey":"","posthogHost":"","release":""};</script>
+  <script src="/observability.js" defer></script>
   <style>
     :root {
       color-scheme: light;
@@ -1090,6 +1092,26 @@
       text-align: center;
     }
     .hidden { display: none !important; }
+    .telemetry-notice {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 10px 20px;
+      background: var(--brand-primary-light);
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 13px;
+      color: var(--text-main);
+    }
+    .telemetry-notice.hidden { display: none !important; }
+    .telemetry-notice p {
+      margin: 0;
+      color: var(--text-muted);
+      max-width: 72ch;
+      line-height: 1.5;
+    }
+    .telemetry-notice strong { color: var(--text-main); }
+    .telemetry-notice .toolbar { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
     /* Pipeline Stepper */
     .pipeline-stepper {
@@ -1838,6 +1860,10 @@
       </div>
     </div>
   </header>
+  <div id="telemetry-notice" class="telemetry-notice hidden" role="status">
+    <p><strong>匿名产品遥测默认开启。</strong> 用于改进 PsyClaw 的粗粒度使用与错误信息；不含研究正文、论文或个人身份。可随时关闭。</p>
+    <div class="toolbar"><button type="button" class="button" id="telemetry-ack">知道了</button><button type="button" class="button" id="telemetry-off">关闭遥测</button></div>
+  </div>
 
   <!-- 主体工作区 Layout -->
   <div class="layout nav-collapsed">
@@ -3403,6 +3429,22 @@ loadProject().catch(error => {
   $("viewer-body").textContent = `加载失败: ${error.message}`;
 });
 loadProjectStatus();
+
+(function initTelemetryNotice(){
+  const obs = window.__PSYCLAW_OBS__ || {};
+  const banner = $("telemetry-notice");
+  if (!banner) return;
+  if (obs.showTelemetryNotice) banner.classList.remove("hidden");
+  $("telemetry-ack")?.addEventListener("click", async () => {
+    try { await json("/api/telemetry", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "ack" }) }); } catch {}
+    banner.classList.add("hidden");
+  });
+  $("telemetry-off")?.addEventListener("click", async () => {
+    try { await json("/api/telemetry", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "disable" }) }); } catch {}
+    banner.classList.add("hidden");
+    location.reload();
+  });
+})();
 
 const initialView = decodeURIComponent((location.hash || "").replace(/^#/, "").trim());
 const knownViews = new Set(["project", "ecosystem", "provider", "checklist", "chat", "help"]);
