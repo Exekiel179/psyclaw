@@ -11,6 +11,7 @@ import { projectPaths } from "../project/paths.js";
 import { JsonlMemoryStore } from "../memory/store.js";
 import type { Plan, TaskNode, WorkerReport } from "./contracts.js";
 import { nextReadyBatch, validatePlan, type PlanDiagnostic } from "./scheduler.js";
+import { captureAgentError, trackAgentEvent } from "../observability/index.js";
 
 /**
  * The planner boundary intentionally has no tool or filesystem capability.
@@ -659,11 +660,32 @@ export class BoundedOrchestrator {
 export const Orchestrator = BoundedOrchestrator;
 
 export async function runPlan(plan: unknown, options: OrchestratorOptions): Promise<OrchestrationResult> {
-  return new BoundedOrchestrator(options).run(plan);
+  return observeOrchestration("orchestrator", () => new BoundedOrchestrator(options).run(plan));
 }
 
 export async function resumePlan(plan: unknown, options: OrchestratorOptions): Promise<OrchestrationResult> {
-  return new BoundedOrchestrator(options).resume(plan);
+  return observeOrchestration("orchestrator_resume", () => new BoundedOrchestrator(options).resume(plan));
+}
+
+async function observeOrchestration(
+  phase: string,
+  run: () => Promise<OrchestrationResult>,
+): Promise<OrchestrationResult> {
+  const startedAt = Date.now();
+  void trackAgentEvent("research_run_started", { phase, status: "started" });
+  try {
+    const result = await run();
+    void trackAgentEvent("research_run_finished", {
+      phase,
+      status: result.status,
+      duration_ms: Date.now() - startedAt,
+    });
+    return result;
+  } catch (error) {
+    void captureAgentError(error, { phase });
+    void trackAgentEvent("research_run_finished", { phase, status: "error", duration_ms: Date.now() - startedAt });
+    throw error;
+  }
 }
 
 export interface CompletionAcceptance {

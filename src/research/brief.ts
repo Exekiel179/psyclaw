@@ -8,6 +8,7 @@ import type { GateResult, Handoff } from "../core/contracts.js";
 import { writeHandoff } from "../project/bootstrap.js";
 import { atomicWriteFile } from "../project/jsonl.js";
 import { RunEventLog } from "../panel/events.js";
+import { trackAgentEvent } from "../observability/index.js";
 
 export interface BriefResult {
   runId: string;
@@ -20,6 +21,8 @@ export interface BriefResult {
 }
 
 export async function runOfflineBrief(root: string): Promise<BriefResult> {
+  const startedAt = Date.now();
+  void trackAgentEvent("research_run_started", { phase: "brief", status: "started" });
   const paths = projectPaths(root);
   const runId = `run_${randomUUID().replaceAll("-", "")}`;
   const project = await readProject(root);
@@ -90,5 +93,7 @@ export async function runOfflineBrief(root: string): Promise<BriefResult> {
     verificationCommands: ["pnpm typecheck", "pnpm test"],
     generatedAt: new Date().toISOString(),
   });
-  return { runId, verdict: blocked.length === 0 ? "pass" : "blocked", gates, ...(briefPath ? { briefPath } : {}), manifestPath, verdictPath, handoff };
+  const result: BriefResult = { runId, verdict: blocked.length === 0 ? "pass" : "blocked", gates, ...(briefPath ? { briefPath } : {}), manifestPath, verdictPath, handoff };
+  void trackAgentEvent("research_run_finished", { phase: "brief", status: result.verdict, duration_ms: Date.now() - startedAt });
+  return result;
 }

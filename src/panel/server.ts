@@ -37,6 +37,8 @@ import {
   setLocalSkillEnabled,
   userSkillId,
 } from "../skills/user-skills.js";
+import { browserConfigForPreference, injectBrowserObservabilityConfig } from "../observability/config.js";
+import { readTelemetryPreference, telemetryPreferenceOptions, writeTelemetryPreference } from "../observability/preference.js";
 
 const activePanelRuns = new Set<string>();
 
@@ -429,6 +431,21 @@ function publicInstallPlan(plan: ReturnType<typeof planAgentInstall>): Record<st
   return publicFields;
 }
 
+async function readObservabilityScript(panelHtmlPath: string): Promise<string | undefined> {
+  const candidates = [
+    join(dirname(panelHtmlPath), "observability.js"),
+    join(dirname(panelHtmlPath), "..", "shared", "observability.js"),
+  ];
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, "utf8");
+    } catch {
+      /* try the next known package path */
+    }
+  }
+  return undefined;
+}
+
 export interface PanelServerOptions {
   /** Absolute or cwd-relative path to the panel HTML file. */
   panelHtmlPath?: string;
@@ -436,6 +453,8 @@ export interface PanelServerOptions {
   assistant?: (message: string) => Promise<{ text: string }>;
   /** Queue an approved installation task into the current PsyClaw model session. */
   installSkill?: (task: string) => Promise<void>;
+  /** Override `~/.psyclaw/agent/psyclaw-settings.json` (tests). */
+  telemetrySettingsPath?: string;
 }
 
 function panelSkillInstallTask(root: string, item: Record<string, unknown>, scope: RecommendedSkillScope): string {
@@ -767,7 +786,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
     // The panel is intentionally limited to ecosystem management and Provider
     // configuration. Project files, runs, evidence and manuscripts are read
     // only projections; legacy mutation routes remain unavailable over HTTP.
-    const panelWriteRoutes = ["/api/provider-config", "/api/recommendation-state", "/api/install/execute", "/api/active-provider"];
+    const panelWriteRoutes = ["/api/provider-config", "/api/recommendation-state", "/api/install/execute", "/api/active-provider", "/api/telemetry"];
     // Kept false for source compatibility with the legacy handler below; the
     // method gate above makes pause/resume unreachable from the panel API.
     const runAction = false;
@@ -1611,8 +1630,60 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         response.end(JSON.stringify({ schemaVersion: "psyclaw/provider-config-receipt/v1", ok: true, provider: id, modelCount: models.length, apiKeyStored: Boolean(apiKey?.trim()) }));
         return;
       }
+      if (url.pathname === "/api/telemetry") {
+        if (request.method === "GET" || request.method === "HEAD") {
+          const preference = await readTelemetryPreference(telemetryPreferenceOptions(options.telemetrySettingsPath));
+          const config = browserConfigForPreference(process.env, preference, "panel");
+          response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+          response.end(JSON.stringify({
+            schemaVersion: "psyclaw/telemetry-preference/v1",
+            enabled: config.telemetryEnabled,
+            noticeAcknowledged: preference.noticeAcknowledged,
+            showNotice: config.showTelemetryNotice,
+          }));
+          return;
+        }
+        const body = await readJsonBody(request);
+        const action = String(body.action ?? "").trim();
+        if (action === "ack") {
+          const next = await writeTelemetryPreference({ noticeAcknowledged: true }, telemetryPreferenceOptions(options.telemetrySettingsPath));
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/telemetry-preference/v1", ok: true, enabled: next.enabled, noticeAcknowledged: true }));
+          return;
+        }
+        if (action === "disable" || action === "off") {
+          const next = await writeTelemetryPreference({ enabled: false, noticeAcknowledged: true }, telemetryPreferenceOptions(options.telemetrySettingsPath));
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/telemetry-preference/v1", ok: true, enabled: next.enabled, noticeAcknowledged: true }));
+          return;
+        }
+        if (action === "enable" || action === "on") {
+          const next = await writeTelemetryPreference({ enabled: true, noticeAcknowledged: true }, telemetryPreferenceOptions(options.telemetrySettingsPath));
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/telemetry-preference/v1", ok: true, enabled: next.enabled, noticeAcknowledged: true }));
+          return;
+        }
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: "action must be ack, disable, or enable" }));
+        return;
+      }
+      if (url.pathname === "/observability.js") {
+        const script = await readObservabilityScript(panelHtmlPath);
+        if (script === undefined) {
+          response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          response.end("not found");
+          return;
+        }
+        response.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" });
+        response.end(script);
+        return;
+      }
       if (url.pathname === "/" || url.pathname === "/index.html") {
-        const html = await readFile(panelHtmlPath, "utf8");
+        const preference = await readTelemetryPreference(telemetryPreferenceOptions(options.telemetrySettingsPath));
+        const html = injectBrowserObservabilityConfig(
+          await readFile(panelHtmlPath, "utf8"),
+          browserConfigForPreference(process.env, preference, "panel"),
+        );
         response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         response.end(html);
         return;

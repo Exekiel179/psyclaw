@@ -48,6 +48,15 @@ import {
   type ProviderPickerResult,
   type SecretInputResult,
 } from "../../tui/provider-picker.js";
+import {
+  captureAgentError,
+  initNodeObservability,
+  readTelemetryPreference,
+  shutdownObservability,
+  trackAgentEvent,
+  trackGateWaiting,
+  writeTelemetryPreference,
+} from "../../observability/index.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -79,6 +88,7 @@ function parseInitArgs(args: string): { goal: string; paradigm: ResearchParadigm
 }
 
 async function notifyError(ctx: ExtensionCommandContext, error: unknown): Promise<void> {
+  await captureAgentError(error, { phase: "extension" });
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 }
 
@@ -324,6 +334,7 @@ async function reviewPrimaryDocuments(ctx: Pick<ExtensionCommandContext, "hasUI"
   }
   activeApprovalDialogs.add(ctx.cwd);
   try {
+    void trackGateWaiting("plan_approval");
     for (const document of PRIMARY_PLAN_DOCUMENTS) {
       const choice = await ctx.ui.select(
         `审批${document.title}：${document.path}`,
@@ -350,6 +361,7 @@ async function approveRunNodes(ctx: ExtensionCommandContext, runId: string, mode
       await appendApproval(ctx.cwd, { kind: "step", nodeId: node.id, decision: "auto-approved", actor: "auto", runId, summary: node.summary });
       continue;
     }
+    void trackGateWaiting("run_approval");
     const options = node.required ? ["批准", "拒绝并停止"] : ["批准", "本次跳过", "拒绝并停止"];
     const choice = await ctx.ui.select(`${node.title}\n${node.summary}`, options, { timeout: 120_000 });
     const decision = choice === "批准" ? "approved" : choice === "本次跳过" ? "skipped" : "rejected";
@@ -1047,6 +1059,7 @@ const WORKFLOW_RUNNERS = {
 } as const;
 
 export default function psyclawExtension(pi: ExtensionAPI): void {
+  void initNodeObservability();
   const developerCommands = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const legacyTestApi = typeof pi.registerTool !== "function";
   const runtimeMcps = new RuntimeMcpRegistry();
@@ -1063,7 +1076,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       promptPaths: await enabledLocalPromptPaths(event.cwd),
     };
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => runtimeMcps.close());
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => {
+    runtimeMcps.close();
+    void shutdownObservability();
+  });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
     const run = await readControlledRun(ctx.cwd);
     if (!run || !toolNeedsApproval(event.toolName, event.input)) return;
@@ -1082,6 +1098,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       return blockedReason ? { block: true, terminate: true, reason: blockedReason } : undefined;
     }
     if (!ctx.hasUI) return { block: true, terminate: true, reason: "该步骤需要人在环路审批，但当前没有交互界面" };
+    void trackGateWaiting("tool_approval");
     const choice = await ctx.ui.select(`审批执行步骤\n${summary}`, ["批准本次执行", "拒绝并停止"], { timeout: 120_000 });
     const approved = choice === "批准本次执行";
     await appendApproval(ctx.cwd, {
@@ -1184,6 +1201,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           return;
         }
         await activateControlledRun(ctx.cwd, runId, project.id, objective, selectedSkills, parsed.mode);
+        void trackAgentEvent("research_run_started", {
+          phase: "controlled_run",
+          status: "started",
+          mode: parsed.mode,
+          skill_count: selectedSkills.length,
+        });
         pi.appendEntry("psyclaw:controlled-run", { runId, projectId: project.id, objective, selectedSkills, mode: parsed.mode, activatedAt: new Date().toISOString() });
         pi.sendUserMessage(controlledRunRequest(objective, selectedSkills, parsed.mode), ctx.isIdle() ? {} : { deliverAs: "followUp" });
         ctx.ui.notify(`${parsed.mode === "auto" ? "自动" : "人在环路"}研究流程已启动${selectedSkills.length > 0 ? `；本次使用 Skill：${selectedSkills.join(", ")}` : "；使用默认 Skill"}。`, "info");
@@ -1513,6 +1536,29 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       }
       await setPetPreference(action === "on");
       ctx.ui.notify(`启动横幅宠物已${action === "on" ? "开启" : "关闭"}，下次启动生效`, "info");
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("telemetry", {
+    description: "查看或关闭匿名产品遥测",
+    handler: async (args, ctx) => {
+      const action = args.trim().toLowerCase() || "status";
+      if (action === "status") {
+        const preference = await readTelemetryPreference();
+        ctx.ui.notify(
+          preference.enabled
+            ? "匿名产品遥测：开启（默认）。采集粗粒度使用与错误，不含研究正文。关闭：/telemetry off"
+            : "匿名产品遥测：已关闭。重新开启：/telemetry on",
+          "info",
+        );
+        return;
+      }
+      if (action !== "on" && action !== "off") {
+        ctx.ui.notify("Usage: /telemetry on|off|status", "error");
+        return;
+      }
+      await writeTelemetryPreference({ enabled: action === "on", noticeAcknowledged: true });
+      ctx.ui.notify(action === "on" ? "已开启匿名产品遥测。下次启动生效。" : "已关闭匿名产品遥测。下次启动不再发送。", "info");
     },
   });
 
