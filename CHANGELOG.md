@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.18 - 2026-09-09
+
+- Anonymous product telemetry default-on (Sentry + PostHog) with one-time notice and easy opt-out (`psyclaw telemetry on|off`)
+- Panel preference-aware observability injection; website visitors stay opt-in empty
+- Docs: docs/telemetry.md
+
 ## Unreleased
 
 - Anonymous product telemetry is on by default (coarse usage and errors; no research text or PII). A one-time startup notice explains what is collected and how to turn it off (`psyclaw telemetry off` / `/telemetry off`). `PSYCLAW_TELEMETRY=0` forces the current process off.
