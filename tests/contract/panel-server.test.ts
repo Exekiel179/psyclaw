@@ -90,4 +90,52 @@ describe("read-only panel server", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
+
+  it("injects empty observability config and serves the snippet without leaking keys", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-obs-"));
+    await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    const htmlPath = join(root, "panel.html");
+    await writeFile(
+      htmlPath,
+      `<!DOCTYPE html><head><script id="psyclaw-obs-config">window.__PSYCLAW_OBS__={"surface":"panel"};</script></head><title>panel</title>`,
+      "utf8",
+    );
+    const previous = {
+      SENTRY_DSN: process.env.SENTRY_DSN,
+      SENTRY_DSN_WEB: process.env.SENTRY_DSN_WEB,
+      PUBLIC_SENTRY_DSN: process.env.PUBLIC_SENTRY_DSN,
+      POSTHOG_KEY: process.env.POSTHOG_KEY,
+      PUBLIC_POSTHOG_KEY: process.env.PUBLIC_POSTHOG_KEY,
+    };
+    delete process.env.SENTRY_DSN;
+    delete process.env.SENTRY_DSN_WEB;
+    delete process.env.PUBLIC_SENTRY_DSN;
+    delete process.env.POSTHOG_KEY;
+    delete process.env.PUBLIC_POSTHOG_KEY;
+    const server = createPanelServer(root, { panelHtmlPath: htmlPath });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    try {
+      const html = await (await fetch(`http://127.0.0.1:${port}/`)).text();
+      expect(html).toContain("psyclaw-obs-config");
+      expect(html).toContain('"sentryDsn":""');
+      expect(html).toContain('"posthogKey":""');
+      expect(html).not.toMatch(/phc_[A-Za-z0-9]+/);
+      expect(html).not.toContain("ingest.us.sentry.io");
+
+      process.env.SENTRY_DSN_WEB = "https://example-public@o0.ingest.example/1";
+      process.env.PUBLIC_POSTHOG_KEY = "phc_example_not_live";
+      const enabledHtml = await (await fetch(`http://127.0.0.1:${port}/`)).text();
+      expect(enabledHtml).toContain("https://example-public@o0.ingest.example/1");
+      expect(enabledHtml).toContain("phc_example_not_live");
+      expect(enabledHtml).not.toContain("ingest.us.sentry.io");
+    } finally {
+      for (const [name, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 });

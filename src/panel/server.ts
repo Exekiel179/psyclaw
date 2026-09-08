@@ -37,6 +37,7 @@ import {
   setLocalSkillEnabled,
   userSkillId,
 } from "../skills/user-skills.js";
+import { injectBrowserObservabilityConfig, readBrowserObservabilityConfig } from "../observability/config.js";
 
 const activePanelRuns = new Set<string>();
 
@@ -427,6 +428,21 @@ function publicInstallPlan(plan: ReturnType<typeof planAgentInstall>): Record<st
   // read-only browser and would disclose a local filesystem path.
   const { projectRoot: _projectRoot, ...publicFields } = plan;
   return publicFields;
+}
+
+async function readObservabilityScript(panelHtmlPath: string): Promise<string | undefined> {
+  const candidates = [
+    join(dirname(panelHtmlPath), "observability.js"),
+    join(dirname(panelHtmlPath), "..", "shared", "observability.js"),
+  ];
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, "utf8");
+    } catch {
+      /* try the next known package path */
+    }
+  }
+  return undefined;
 }
 
 export interface PanelServerOptions {
@@ -1611,8 +1627,22 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         response.end(JSON.stringify({ schemaVersion: "psyclaw/provider-config-receipt/v1", ok: true, provider: id, modelCount: models.length, apiKeyStored: Boolean(apiKey?.trim()) }));
         return;
       }
+      if (url.pathname === "/observability.js") {
+        const script = await readObservabilityScript(panelHtmlPath);
+        if (script === undefined) {
+          response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+          response.end("not found");
+          return;
+        }
+        response.writeHead(200, { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" });
+        response.end(script);
+        return;
+      }
       if (url.pathname === "/" || url.pathname === "/index.html") {
-        const html = await readFile(panelHtmlPath, "utf8");
+        const html = injectBrowserObservabilityConfig(
+          await readFile(panelHtmlPath, "utf8"),
+          readBrowserObservabilityConfig(process.env, "panel"),
+        );
         response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         response.end(html);
         return;

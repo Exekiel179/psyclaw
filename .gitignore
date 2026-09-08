@@ -10,6 +10,7 @@ __pycache__/
 # Credentials and local overrides must never enter version control.
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 *credentials*

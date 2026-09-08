@@ -144,6 +144,7 @@ node -e 'const fs=require("node:fs"),os=require("node:os"),path=require("node:pa
 - [架构蓝图](docs/架构蓝图.md)
 - [评测框架](docs/评测框架.md)
 - [文档与交付物规范](docs/文档规范.md)
+- [遥测（Sentry / PostHog，默认关闭）](docs/telemetry.md)
 
 ## 边界
 
@@ -151,5 +152,6 @@ node -e 'const fs=require("node:fs"),os=require("node:os"),path=require("node:pa
 - 统计计算委托 Python/R、SPSS/Stata/Mplus 或受信任 MCP；输出必须保存脚本、输入指纹和环境信息。
 - Skill、Plugin 和 MCP 默认只发现、不执行；启用前需要来源、版本/ref、哈希、许可证和依赖状态。
 - 没有可定位证据的事实性 Claim 必须是 `uncertain` 或被阻断；没有审批记录的副作用不能被当作完成。
+- 遥测默认关闭。Sentry / PostHog 只在设置 `SENTRY_DSN`、`SENTRY_DSN_WEB`、`POSTHOG_KEY` 或 `PUBLIC_POSTHOG_KEY` 后初始化，详见 [docs/telemetry.md](docs/telemetry.md)。
 
 许可证：MIT。

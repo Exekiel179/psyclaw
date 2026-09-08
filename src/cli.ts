@@ -27,6 +27,7 @@ import { appendJsonlIfMissing } from "./project/jsonl.js";
 import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, c } from "./style/cli-ui.js";
+import { captureAgentError, initNodeObservability, shutdownObservability } from "./observability/index.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -156,6 +157,20 @@ async function ensureConfiguredThenChat(args: string[]): Promise<void> {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  const peek = args[0];
+  const skipTelemetry = peek === "--help" || peek === "-h" || peek === "--version" || peek === "-v" || peek === "-V";
+  if (!skipTelemetry) await initNodeObservability();
+  try {
+    await dispatch(args);
+  } catch (error) {
+    await captureAgentError(error, { phase: "cli", command: peek ?? "default" });
+    throw error;
+  } finally {
+    await shutdownObservability();
+  }
+}
+
+async function dispatch(args: string[]): Promise<void> {
   const command = args.shift();
   const root = process.cwd();
   if (command === "--help" || command === "-h") {
