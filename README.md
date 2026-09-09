@@ -4,7 +4,7 @@ PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、
 
 PsyClaw 自有代码使用 MIT 许可证；随 npm 包内置的 Academic Research Skills 位于 `vendor/ars`，保持上游署名并单独遵循 CC BY-NC 4.0，仅限非商业用途。
 
-当前版本：`0.30.1`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.30.2`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -21,19 +21,19 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.30.1
+npm install -g psyclaw@0.30.2
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.30.1 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.30.2 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.30.1 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.30.2 --registry=https://registry.npmmirror.com
 ```
 
 或安装脚本：
@@ -46,7 +46,7 @@ PSYCLAW_CN=1 curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
 ```powershell
 # Windows PowerShell
 irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
-# 可选：$env:PSYCLAW_CN = "1"；$env:PSYCLAW_VERSION = "0.30.1"
+# 可选：$env:PSYCLAW_CN = "1"；$env:PSYCLAW_VERSION = "0.30.2"
 ```
 
 检测到国内 npm registry（如 npmmirror）、`PSYCLAW_CN=1` 或 `PSYCLAW_GITHUB_MIRROR` 时，内置路径统一走国内可用路由：
@@ -108,7 +108,7 @@ psyclaw evidence add notes\source.md --level user
 | 打开科研面板 | 在对话中输入 `/panel` |
 | 查看或切换 Provider | 在对话中输入 `/provider` 或 `/provider <id>` |
 | 管理启动横幅宠物 | `/pet`、`/pet on`、`/pet off`（默认关闭） |
-| 管理 Skill | `/skill`（在管理页启用/安装） |
+| 管理 Skill | `/skill`（未安装→安装并默认启用；已启用→停用） |
 | 创建项目能力 | `/create-skill`、`/create-hook`、`/create-rule`、`/create-subagent`（附带需求文本） |
 | 运行只读 Subagent | `/agents` 浏览，或 `/agents <task>` 运行 |
 | 调用已加载 Skill | `/skill:<name>` |
@@ -189,13 +189,25 @@ rm -rf ~/.psyclaw
 
 ## 文档
 
-- [PsyClaw v0.30.1 使用白皮书](docs/PsyClaw使用白皮书_v0.30.1.md)
+### 使用（面向研究者）
+
+- [使用白皮书](docs/使用白皮书.md)（当前版同步说明；带版本号的副本见 `docs/PsyClaw使用白皮书_v*.md`）
+- [PsyClaw ARS 模式与保护边界](docs/PsyClaw-ARS模式.md)
+- [遥测（匿名产品遥测，默认开启，可关闭）](docs/telemetry.md)
+- [文档与交付物规范](docs/文档规范.md)（研究项目内目录约定）
+
+### 开发（面向贡献者 / 维护者）
+
+下列文件是仓库与实现契约，**不是**日常使用说明；贡献或改核心前再读：
+
 - [项目范围与里程碑](docs/开工纪要.md)
 - [架构蓝图](docs/架构蓝图.md)
 - [评测框架](docs/评测框架.md)
-- [PsyClaw ARS 模式与保护边界](docs/PsyClaw-ARS模式.md)
-- [文档与交付物规范](docs/文档规范.md)
-- [遥测（匿名产品遥测，默认开启，可关闭）](docs/telemetry.md)
+- [技能与生态准入清单](docs/技能与生态准入清单.md)
+- [威胁模型](docs/威胁模型.md)
+- [AGENTS.md](AGENTS.md)（贡献行为约束）
+
+历史审计、分模块测评报告、会话复盘等仍在 `docs/` 下，按文件名识别；勿与使用白皮书混读。
 
 ## 边界
 

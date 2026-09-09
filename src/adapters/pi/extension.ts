@@ -384,6 +384,8 @@ interface McpManagerRow {
   name: string;
   description: string;
   sourceRef?: string;
+  /** True when a project/user MCP config file already exists for this id. */
+  installed: boolean;
   enabled: boolean;
   details: string[];
   source: "recommended" | "user";
@@ -566,17 +568,21 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
 
 async function mcpManagerRows(root: string, state: RecommendationState, runtime: RuntimeMcpRegistry): Promise<McpManagerRow[]> {
   const { items, installPrep } = await recommendedItems("mcp");
+  const userEntries = await runtime.listUserConfigs(root);
+  const configuredIds = new Set(userEntries.map((entry) => entry.id));
   const recommendedRows: McpManagerRow[] = items.map((item) => {
     const id = String(item.id ?? "");
     const plan = installPrep.find((candidate) => candidate.id === id);
     const dependencies = Array.isArray(plan?.dependencies)
       ? plan.dependencies.filter((value): value is string => typeof value === "string")
       : [];
+    const installed = configuredIds.has(id);
     return {
       id,
       name: String(item.name ?? id),
       description: String(item.description ?? ""),
       ...(typeof item.sourceRef === "string" ? { sourceRef: item.sourceRef } : {}),
+      installed,
       enabled: state.mcp.includes(id),
       source: "recommended" as const,
       details: [
@@ -589,10 +595,11 @@ async function mcpManagerRows(root: string, state: RecommendationState, runtime:
   // Merge user-configured MCP servers (`.psyclaw/mcp/*.json` and
   // `~/.psyclaw/mcp/*.json`) so the management page shows them too, even when
   // disabled.  User rows win over a same-id recommended row.
-  const userRows: McpManagerRow[] = (await runtime.listUserConfigs(root)).map((entry) => ({
+  const userRows: McpManagerRow[] = userEntries.map((entry) => ({
     id: entry.id,
     name: entry.name,
     description: `用户配置：${entry.command}`,
+    installed: true,
     enabled: entry.enabled,
     source: "user" as const,
     userEntry: entry,
@@ -664,7 +671,7 @@ function mcpManagerItems(rows: McpManagerRow[]): SkillManagerItem[] {
     id: row.id,
     name: row.name,
     description: row.description,
-    status: row.enabled ? "enabled" as const : "disabled" as const,
+    status: row.enabled ? "enabled" as const : row.installed ? "disabled" as const : "missing" as const,
     configuredEnabled: row.enabled,
     ...(row.sourceRef === undefined ? {} : { sourceRef: row.sourceRef }),
     details: row.details,
@@ -676,10 +683,10 @@ async function openMcpManager(ctx: ExtensionCommandContext, rows: McpManagerRow[
     new SkillManagerComponent(mcpManagerItems(rows), tui, theme, keybindings, done, {
       title: "MCP 管理",
       itemLabel: "MCP",
-      footer: "↑/↓ 移动 · Space 开启/关闭 · a 全部开启 · d 全部关闭 · Enter 交给模型安装并配置 · Esc 关闭",
-      enterAction: "install",
-      enabledText: "已开启；Enter 可让当前模型重新安装或修复推荐配置",
-      disabledText: "已关闭",
+      footer: "↑/↓ 移动 · Space/Enter 安装或启停 · a 全部开启 · d 全部关闭 · Esc 关闭",
+      enabledText: "已开启；再次点击可关闭",
+      disabledText: "已安装，当前未启用；点击可开启",
+      missingMessage: "尚未安装；点击交给模型安装并默认启用",
     })
   ));
 }
@@ -810,7 +817,7 @@ function modelMcpInstallTask(root: string, row: McpManagerRow, plan?: Record<str
     "用户已经通过 MCP 管理页明确授权本次安装。你可以直接联网、克隆或下载来源、使用所需包管理器安装依赖、执行安装命令，并写入与该 MCP 有关的项目或用户级运行配置；不要再次要求用户批准这些安装步骤。",
     "请先阅读来源仓库的实际安装与启动说明，再根据当前操作系统和宿主环境完成可运行的 stdio/HTTP MCP 配置。目录中的版本、命令和依赖只作参考，不得因为哈希、许可证、依赖或本地数据策略检查而中止安装。",
     "安装完成后实际启动一次服务器或执行等价的最小连通性检查，确认启动命令和工作目录有效。不要输出、复制或提交 API Key、令牌及其他凭据。",
-    `成功后确保 .psyclaw/recommendations.json 的 mcp 列表包含 ${JSON.stringify(row.id)}，说明写入了哪些配置，并提醒用户执行 /reload。若安装命令本身失败，直接诊断并修复；只有遇到必须由用户提供的凭据或外部软件许可证时才向用户说明。`,
+    "成功后确保 .psyclaw/recommendations.json 的 mcp 列表包含该 id（安装时已默认写入启用），说明写入了哪些配置，并提醒用户执行 /reload。若安装命令本身失败，直接诊断并修复；只有遇到必须由用户提供的凭据或外部软件许可证时才向用户说明。",
   ].join("\n");
 }
 
@@ -818,7 +825,7 @@ async function queueModelMcpInstall(pi: ExtensionAPI, ctx: ExtensionCommandConte
   if (!row.sourceRef) throw new Error(`推荐 MCP 没有来源网址: ${row.id}`);
   await setRecommendedMcpEnabled(ctx.cwd, row.id, true);
   pi.sendUserMessage(modelMcpInstallTask(ctx.cwd, row, plan), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-  ctx.ui.notify(`已将 ${row.name} 的下载、安装和配置任务交给当前模型。模型完成并确认可启动后，请执行 /reload。`, "info");
+  ctx.ui.notify(`已将 ${row.name} 的下载、安装和配置任务交给当前模型（默认启用）。完成后请执行 /reload。`, "info");
 }
 
 async function showMcpManager(pi: ExtensionAPI, ctx: ExtensionCommandContext, runtime: RuntimeMcpRegistry): Promise<void> {
@@ -872,7 +879,7 @@ function modelSkillInstallTask(root: string, row: SkillManagerRow, scope: Recomm
       ? "这是多 Skill 套件：目标目录自身无需 SKILL.md，但其子目录必须包含一个或多个有效 SKILL.md。保留套件内共享目录和相对路径，不得包含 .git、符号链接或凭据。"
       : "目标目录最终必须直接包含有效 SKILL.md（YAML frontmatter 至少包含 name 和 description），不得包含 .git、符号链接、凭据或二进制大文件。",
     "如果仓库包含多个 Skill，只安装与此推荐项相符的部分；如果它不是 Skill 或无法合理适配，停止并说明原因，不要伪造 SKILL.md。",
-    "安装完成后检查目标目录结构，并提醒用户执行 /skill 启用该项，再执行 /reload。",
+    "安装完成后检查目标目录结构。该项已在推荐状态中默认启用；完成后执行 /reload 即可加载，无需再手动启用。",
   ].join("\n");
 }
 
@@ -885,20 +892,32 @@ async function chooseSkillScope(ctx: ExtensionCommandContext): Promise<Recommend
   return undefined;
 }
 
+async function markRecommendedSkillDesired(
+  root: string,
+  requestedId: string,
+  scope: RecommendedSkillScope,
+): Promise<void> {
+  const id = normalizeRecommendedSkillId(requestedId);
+  const state = await readRecommendationState(root);
+  const current = new Set(state.skills);
+  current.add(id);
+  state.skills = [...current];
+  state.skillScopes = { ...(state.skillScopes ?? {}), [id]: scope };
+  await saveRecommendationState(root, state);
+}
+
 async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandContext, row: SkillManagerRow): Promise<void> {
   if (!row.sourceRef) throw new Error(`推荐 Skill 没有来源网址: ${row.id}`);
   const scope = await chooseSkillScope(ctx);
   if (!scope) return;
   const approved = await ctx.ui.confirm(
     "交给当前模型安装 Skill？",
-    `${row.name}\n来源：${row.sourceRef}\n安装位置：${skillScopeLabel(scope)}\n目标目录：${recommendedSkillTarget(ctx.cwd, row.id, scope)}\n模型将检查仓库并使用文件与命令工具完成安装。`,
+    `${row.name}\n来源：${row.sourceRef}\n安装位置：${skillScopeLabel(scope)}\n目标目录：${recommendedSkillTarget(ctx.cwd, row.id, scope)}\n模型将检查仓库并使用文件与命令工具完成安装；安装后默认启用。`,
   );
   if (!approved) return;
-  const state = await readRecommendationState(ctx.cwd);
-  state.skillScopes = { ...(state.skillScopes ?? {}), [row.id]: scope };
-  await saveRecommendationState(ctx.cwd, state);
+  await markRecommendedSkillDesired(ctx.cwd, row.id, scope);
   pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型，目标为${skillScopeLabel(scope)}。安装完成后请在 /skill 中启用，再执行 /reload。`, "info");
+  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型（默认启用），目标为${skillScopeLabel(scope)}。完成后请执行 /reload。`, "info");
 }
 
 async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {

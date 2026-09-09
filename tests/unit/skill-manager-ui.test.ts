@@ -41,7 +41,7 @@ function createMcpComponent() {
       id: "paper-search-mcp",
       name: "Paper Search MCP",
       description: "Search papers",
-      status: "disabled",
+      status: "missing",
       details: ["传输：stdio · 风险：network"],
     }],
     { requestRender: vi.fn() } as never,
@@ -56,8 +56,8 @@ function createMcpComponent() {
     {
       title: "MCP 管理",
       itemLabel: "MCP",
-      enterAction: "install",
-      disabledText: "项目配置已关闭",
+      missingMessage: "尚未安装",
+      disabledText: "已安装，当前未启用",
     },
   );
   return { component, actions };
@@ -89,13 +89,28 @@ describe("SkillManagerComponent", () => {
     expect(actions).toEqual([{ type: "toggle", id: "enabled", enabled: false }]);
   });
 
-  it("opens the install flow for missing Skills with Enter", () => {
+  it("opens the install flow for missing Skills with Enter or Space", () => {
     const { component, actions } = createComponent();
     component.handleInput("DOWN");
     component.handleInput("DOWN");
     component.handleInput("DOWN");
     component.handleInput("ENTER");
     expect(actions).toEqual([{ type: "install", id: "missing" }]);
+  });
+
+  it("disables an enabled Skill with Enter", () => {
+    const { component, actions } = createComponent();
+    component.handleInput("DOWN");
+    component.handleInput("ENTER");
+    expect(actions).toEqual([{ type: "toggle", id: "enabled", enabled: false }]);
+  });
+
+  it("enables a disabled Skill with Enter", () => {
+    const { component, actions } = createComponent();
+    component.handleInput("DOWN");
+    component.handleInput("DOWN");
+    component.handleInput("ENTER");
+    expect(actions).toEqual([{ type: "toggle", id: "disabled", enabled: true }]);
   });
 
   it("shows blocked reasons without emitting an action", () => {
@@ -128,10 +143,32 @@ describe("SkillManagerComponent", () => {
     const { component, actions } = createMcpComponent();
     const text = component.render(100).join("\n");
     expect(text).toContain("MCP 管理");
-    expect(text).toContain("项目配置已关闭");
+    expect(text).toContain("尚未安装");
     expect(text).toContain("传输：stdio · 风险：network");
     component.handleInput("ENTER");
     expect(actions).toEqual([{ type: "install", id: "paper-search-mcp" }]);
+  });
+
+  it("toggles an enabled MCP off instead of reinstalling", () => {
+    const actions: SkillManagerAction[] = [];
+    const component = new SkillManagerComponent(
+      [{
+        id: "paper-search-mcp",
+        name: "Paper Search MCP",
+        description: "Search papers",
+        status: "enabled",
+        details: ["传输：stdio · 风险：network"],
+      }],
+      { requestRender: vi.fn() } as never,
+      { bold: (text: string) => text, fg: (_color: string, text: string) => text } as never,
+      {
+        matches: (data: string, binding: string) => binding === "tui.select.confirm" && data === "ENTER",
+      } as never,
+      (action) => actions.push(action),
+      { title: "MCP 管理", itemLabel: "MCP" },
+    );
+    component.handleInput("ENTER");
+    expect(actions).toEqual([{ type: "toggle", id: "paper-search-mcp", enabled: false }]);
   });
 
   it("allows a previously enabled MCP to be disabled after its preflight becomes blocked", () => {

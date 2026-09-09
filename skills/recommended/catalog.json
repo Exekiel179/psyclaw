@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.8.0",
-  "syncedAt": "2026-09-08",
+  "documentVersion": "0.8.1",
+  "syncedAt": "2026-09-09",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
@@ -65,6 +65,15 @@
       "stage": "全文获取",
       "description": "按开放来源、官方接口和用户授权会话尝试获取论文全文。",
       "sourceRef": "https://github.com/Rimagination/scansci-pdf"
+    },
+    {
+      "id": "paper2local",
+      "name": "paper2local",
+      "kind": "skill",
+      "stage": "全文获取",
+      "description": "把 DOI / URL / arXiv 等已选文献下载到本地目录（PsyClaw 默认 literature/pdfs）。无 Zotero、无 MinerU、仅标准库下载。",
+      "sourceRef": "https://github.com/Exekiel179/paper2local",
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md + scripts/）。不要安装 Timisic/paper2zotero-skill 全量依赖栈。"
     },
     {
       "id": "scholarbridge",

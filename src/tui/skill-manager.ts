@@ -109,7 +109,7 @@ export class SkillManagerComponent {
       if (selected.reason) lines.push(this.theme.fg("warning", truncateToWidth(`原因：${selected.reason}`, contentWidth)));
     }
     if (this.notice) lines.push("", this.theme.fg("warning", truncateToWidth(this.notice, contentWidth)));
-    lines.push("", this.theme.fg("dim", this.options.footer ?? "↑/↓ 移动 · Space 启用/停用 · a 全部启用 · d 全部停用 · Enter 查看/安装 · Esc 关闭"));
+    lines.push("", this.theme.fg("dim", this.options.footer ?? "↑/↓ 移动 · Space/Enter 安装或启停 · a 全部启用 · d 全部停用 · Esc 关闭"));
     return lines;
   }
 
@@ -147,29 +147,49 @@ export class SkillManagerComponent {
     }
 
     const item = this.items[this.selectedIndex]!;
-    if (matchesKey(data, Key.space)) {
+    // Space and Enter share primary semantics: missing → install; enabled →
+    // disable; disabled → enable. Plugins may force Enter to install-only.
+    if (matchesKey(data, Key.space) || this.keybindings.matches(data, "tui.select.confirm")) {
+      const isEnter = this.keybindings.matches(data, "tui.select.confirm");
       if (this.options.toggleEnabled === false) {
+        if (isEnter && (item.status === "missing" || this.options.enterAction === "install")) {
+          this.done({ type: "install", id: item.id });
+          return;
+        }
+        if (this.options.enterAction === "details") {
+          this.notice = this.options.lockedMessage
+            ?? item.reason
+            ?? (item.sourceRef ? `固定来源：${item.sourceRef}` : `查看 ${this.options.itemLabel ?? "项目"} 详情。`);
+          this.tui.requestRender();
+          return;
+        }
         this.notice = `此处只管理推荐安装；${this.options.itemLabel ?? "项目"}的启停与移除由其原生管理器处理。`;
         this.tui.requestRender();
         return;
       }
-      if (item.status === "core") this.notice = this.options.lockedMessage ?? "核心 Skill 始终启用，不能在这里停用。";
-      else if (item.status === "blocked" && item.configuredEnabled === true) this.done({ type: "toggle", id: item.id, enabled: false });
-      else if (item.status === "blocked") this.notice = item.reason ?? `该 ${this.options.itemLabel ?? "Skill"} 未通过来源、许可或依赖预检。`;
-      else if (item.status === "missing") this.notice = this.options.missingMessage ?? "按 Enter 查看固定来源并确认安装。";
-      else this.done({ type: "toggle", id: item.id, enabled: item.status === "disabled" });
-      this.tui.requestRender();
-      return;
-    }
-    if (this.keybindings.matches(data, "tui.select.confirm")) {
-      if (item.status === "missing" || this.options.enterAction === "install") {
+      if (item.status === "core") {
+        this.notice = this.options.lockedMessage ?? (isEnter
+          ? "这是 PsyClaw 核心 Skill，始终加载且不会被同名第三方 Skill 覆盖。"
+          : "核心 Skill 始终启用，不能在这里停用。");
+        this.tui.requestRender();
+        return;
+      }
+      if (item.status === "missing") {
         this.done({ type: "install", id: item.id });
         return;
       }
-      if (item.status === "blocked") this.notice = item.reason ?? `该 ${this.options.itemLabel ?? "Skill"} 未通过来源、许可或依赖预检。`;
-      else if (item.status === "core") this.notice = this.options.lockedMessage ?? "这是 PsyClaw 核心 Skill，始终加载且不会被同名第三方 Skill 覆盖。";
-      else this.notice = item.sourceRef ? `固定来源：${item.sourceRef}` : "该 Skill 没有可显示的来源信息。";
-      this.tui.requestRender();
+      if (item.status === "blocked" && item.configuredEnabled === true) {
+        this.done({ type: "toggle", id: item.id, enabled: false });
+        return;
+      }
+      if (item.status === "blocked") {
+        this.notice = item.reason ?? `该 ${this.options.itemLabel ?? "Skill"} 未通过来源、许可或依赖预检。`;
+        this.tui.requestRender();
+        return;
+      }
+      // Installed: enabled → disable, disabled → enable.
+      this.done({ type: "toggle", id: item.id, enabled: item.status === "disabled" });
+      return;
     }
   }
 }

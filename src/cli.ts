@@ -252,7 +252,8 @@ async function main(): Promise<void> {
     peek === "telemetry";
   if (!skipTelemetry) {
     await maybeShowTelemetryNotice();
-    await initNodeObservability();
+    // Do not block first-run wizard / chat behind Sentry/PostHog SDK import.
+    void initNodeObservability();
   }
   try {
     await dispatch(args, { continuouslyWork });
