@@ -6,6 +6,7 @@ import { PSYCLAW_VERSION } from "../branding.js";
 import { denyByDefault } from "./contracts.js";
 import type { Approval, Integration, ToolCall, ToolDescriptor } from "./contracts.js";
 import type { Effect, ToolReceipt } from "../core/contracts.js";
+import { resolveWindowsSpawn } from "../platform/windows-spawn.js";
 
 /** Host-side policy for one discovered tool. Server metadata never supplies this policy. */
 export interface McpToolPolicy {
@@ -76,7 +77,8 @@ export type McpSpawn = (
  * cannot leak into a tool subprocess unless the caller names it explicitly.
  */
 const defaultSpawn: McpSpawn = (command, args, options) => {
-  const child = nodeSpawn(command, args, {
+  const resolved = resolveWindowsSpawn(command, args);
+  const child = nodeSpawn(resolved.command, resolved.args, {
     env: options.env ?? {},
     stdio: ["pipe", "pipe", "pipe"],
     shell: false,

@@ -51,7 +51,7 @@ export function sessionHelpDocument(): SessionHelpDocument {
       { group: "研究", cmd: "/handoff", blurb: "人审通过后写入 analysis/HANDOFF.md" },
       { group: "研究", cmd: "/crosscheck [焦点]", blurb: "过程性 AI 核对：数据/引文真实性/格式" },
       { group: "研究", cmd: "/verify [焦点]", blurb: "整体性 AI 验证：结果成立性、引文与方法合理性" },
-      { group: "研究", cmd: "/brainstorm [主题]", blurb: "研究方向头脑风暴" },
+      { group: "研究", cmd: "/brainstorm [主题]", blurb: "研究方向头脑风暴（不加压）" },
       { group: "研究", cmd: "/grill [主题]", blurb: "逐题学术压力测试" },
       { group: "研究", cmd: "/review [说明]", blurb: "多角色模拟同行评审" },
       { group: "研究", cmd: "/loop [目标|stop]", blurb: "有界推进；附带 stop 请求停止" },

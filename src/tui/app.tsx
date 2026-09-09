@@ -6,11 +6,16 @@ import { importAgentSkills } from "../agents/import.js";
 import { planAgentInstall, runInstall } from "../install/installer.js";
 import { agentTableLines } from "./model.js";
 import { PSYCLAW_ACCENT, PSYCLAW_ERROR, PSYCLAW_OK } from "../branding.js";
+import { useWindowsPackageManagerShell } from "../platform/windows-spawn.js";
 
 function spawnRunner(command: string): Promise<{ exitCode: number }> {
   const [bin, ...args] = command.split(/\s+/).filter(Boolean);
   return new Promise((resolve) => {
-    const child = spawn(bin!, args, { stdio: "ignore", shell: false });
+    const child = spawn(bin!, args, {
+      stdio: "ignore",
+      shell: useWindowsPackageManagerShell(),
+      windowsHide: true,
+    });
     child.on("error", () => resolve({ exitCode: 1 }));
     child.on("close", (code) => resolve({ exitCode: code ?? 1 }));
   });

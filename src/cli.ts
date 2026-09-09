@@ -35,6 +35,7 @@ import {
   shutdownObservability,
   writeTelemetryPreference,
 } from "./observability/index.js";
+import { useWindowsPackageManagerShell } from "./platform/windows-spawn.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -75,7 +76,13 @@ function installEnvironment(): NodeJS.ProcessEnv {
 function spawnCommand(command: string, inherit: boolean): Promise<{ exitCode: number }> {
   const [bin, ...rest] = command.split(/\s+/).filter(Boolean);
   return new Promise((resolve) => {
-    const child = spawn(bin!, rest, { stdio: inherit ? "inherit" : "ignore", shell: false, env: installEnvironment() });
+    const child = spawn(bin!, rest, {
+      stdio: inherit ? "inherit" : "ignore",
+      // Windows needs a shell so npm/pipx resolve through their `.cmd` shims.
+      shell: useWindowsPackageManagerShell(),
+      env: installEnvironment(),
+      windowsHide: true,
+    });
     child.on("error", () => resolve({ exitCode: 1 }));
     child.on("close", (code) => resolve({ exitCode: code ?? 1 }));
   });
@@ -94,8 +101,9 @@ function runPackageManager(command: string, cwd: string): Promise<{ exitCode: nu
     const child = spawn(bin!, rest, {
       cwd,
       stdio: "inherit",
-      shell: process.platform === "win32",
+      shell: useWindowsPackageManagerShell(),
       env: installEnvironment(),
+      windowsHide: true,
     });
     child.on("error", () => resolve({ exitCode: 1 }));
     child.on("close", (code) => resolve({ exitCode: code ?? 1 }));
@@ -107,8 +115,9 @@ function readGlobalPsyClawVersion(): Promise<string | undefined> {
   return new Promise((resolve) => {
     const child = spawn("npm", ["list", "-g", "psyclaw", "--depth=0", "--json"], {
       stdio: ["ignore", "pipe", "ignore"],
-      shell: process.platform === "win32",
+      shell: useWindowsPackageManagerShell(),
       env: installEnvironment(),
+      windowsHide: true,
     });
     let out = "";
     child.stdout?.on("data", (chunk: Buffer | string) => {

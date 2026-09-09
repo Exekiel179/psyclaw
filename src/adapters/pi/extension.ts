@@ -280,6 +280,22 @@ function academicGrillRequest(subject: string, mode: "init" | "review"): string 
   ].join("\n");
 }
 
+/** Lightweight ideation path — never routes through academic-grill / /grill. */
+function academicBrainstormRequest(subject: string): string {
+  return [
+    "这是 /brainstorm，不是 /grill：不要加载 academic-grill Skill，不要进入逐题压力测试或研究规格访谈。",
+    subject
+      ? `头脑风暴主题：${subject}`
+      : "根据当前对话与项目材料确定头脑风暴主题；已有信息不要重复询问。",
+    "请完成一次选题向的头脑风暴：",
+    "1. 提出 2-4 个有理论意义、可由现有或可获取材料回答的研究方向 / 研究问题 / 假设。",
+    "2. 简要比较各自的价值、可行性、数据需求与推断边界。",
+    "3. 明确推荐其中一个，并说明推荐理由与主要取舍。",
+    "4. 最多再问 1-2 个真正影响选题的澄清问题（可一次给出）；不要展开完整的设计/测量/估计量审讯。",
+    "不要执行分析、不要写论文、不要伪造文献或结果。若用户接下来需要严格压力测试，请提示他们另用 /grill。",
+  ].join("\n");
+}
+
 /** Initialized project context; replaces the removed `/run` controlled-run gate. */
 interface ActiveProjectContext {
   projectId: string;
@@ -1495,15 +1511,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("brainstorm", {
-    description: "显式启动研究方向头脑风暴（逐题澄清）",
+    description: "研究方向头脑风暴：提出并比较可选问题，不做压力测试",
     handler: async (args, ctx) => {
       const subject = args.trim();
-      pi.sendUserMessage([
-        "使用 academic-grill Skill 的头脑风暴入口，先提出 2-4 个有理论意义、可回答的研究方向，比较价值、可行性与边界并推荐一个。",
-        "随后按研究者需要逐题澄清，每轮只问一个实质问题，同时给出推荐答案和主要取舍；不要直接替用户执行完整研究或写论文。",
-        subject ? `本次头脑风暴主题：${subject}` : "请根据当前对话和项目材料确定头脑风暴主题；已有信息不要重复询问。",
-      ].join("\n"), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-      ctx.ui.notify("已启动研究方向头脑风暴。完成后可用 /grill 继续严格压力测试。", "info");
+      pi.sendUserMessage(academicBrainstormRequest(subject), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+      ctx.ui.notify("已启动研究方向头脑风暴（不经过 /grill）。若要严格压力测试，请另开 /grill。", "info");
     },
   });
 

@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { mkdir, readFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -10,8 +8,7 @@ import { ARS_REVIEW_SEATS, type ArsPanelRequest, type ArsPanelResult, type ArsRe
 import { arsReviewDispatchBatches } from "./panel-plan.js";
 import { arsRoot, buildArsPanelProvenance, executeArsReviewSeat, executeArsSynthesis, type ArsExecutorOptions } from "./pi-panel-executor.js";
 import { runArsReReview, type ArsReReviewAdapters } from "./re-review.js";
-
-const execFileAsync = promisify(execFile);
+import { execPython } from "../platform/python.js";
 
 function hash(bytes: Buffer | string): string { return createHash("sha256").update(bytes).digest("hex"); }
 const SENSITIVE_INPUT = /(?:^|[\\/])(?:\.env(?:\..*)?|\.npmrc|\.netrc|credentials?|secrets?|tokens?|id_rsa|id_ed25519)(?:$|[\\/.])/i;
@@ -65,8 +62,8 @@ async function defaultFinalizeCarrier(args: {
   artifactRef: string;
 }): Promise<string> {
   const provenanceCarrier = join(args.runRoot, "panel-provenance-carrier.json");
-  await execFileAsync("python3", [join(arsRoot(), "scripts", "review_panel_provenance.py"), "build-carrier", args.provenancePath, "--artifact-ref", args.artifactRef, "--output", provenanceCarrier], { cwd: arsRoot(), timeout: 60_000 });
-  await execFileAsync("python3", [join(arsRoot(), "scripts", "review_panel_provenance.py"), "validate-carrier", provenanceCarrier, "--artifact-root", args.runRoot], { cwd: arsRoot(), timeout: 60_000 });
+  await execPython([join(arsRoot(), "scripts", "review_panel_provenance.py"), "build-carrier", args.provenancePath, "--artifact-ref", args.artifactRef, "--output", provenanceCarrier], { cwd: arsRoot(), timeout: 60_000 });
+  await execPython([join(arsRoot(), "scripts", "review_panel_provenance.py"), "validate-carrier", provenanceCarrier, "--artifact-root", args.runRoot], { cwd: arsRoot(), timeout: 60_000 });
   return provenanceCarrier;
 }
 
