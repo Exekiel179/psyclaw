@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.29.20 - 2026-09-09
+
+- Add official draw.io MCP (jgraph/@drawio/mcp@1.5.0) to the recommended MCP catalog for research diagrams
+
 ## 0.29.19 - 2026-09-09
 
 - Panel recommended Skill/MCP/Plugin install queues through the model session with 正在安装 state, confirms, and prerequisite install for Journal Frontier Radar (Kimi WebBridge)

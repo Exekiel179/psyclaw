@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-mcp/v1",
-  "documentVersion": "0.3.2",
+  "documentVersion": "0.3.3",
   "sourceDocument": "学术AI_Skill分享资料.pdf + curated research MCP review",
   "sourceRef": "user-curated",
   "items": [
@@ -93,6 +93,17 @@
       "status": "discover-only"
     },
     {
+      "id": "drawio-mcp",
+      "name": "draw.io MCP",
+      "stage": "研究示意图",
+      "description": "官方 draw.io（diagrams.net）MCP：把 XML / CSV / Mermaid 打开到浏览器编辑器，便于研究框架图、流程图与概念图。stdio 包 @drawio/mcp；另有托管端点 https://mcp.draw.io/mcp（需 MCP Apps 宿主）。",
+      "sourceRef": "https://github.com/jgraph/drawio-mcp",
+      "transport": "stdio",
+      "risk": "browser-open",
+      "writeEffects": false,
+      "status": "discover-only"
+    },
+    {
       "id": "playwright-mcp",
       "name": "Playwright MCP",
       "stage": "机构全文",
@@ -135,6 +146,7 @@
     {"id":"zotero-mcp","sourceKind":"github","ref":"d57892db395c38d7782f037bc9fc8222e6a429ae","license":"unknown","command":"git clone https://github.com/richardjlyon/zotero-mcp .psyclaw/mcp-src/zotero-mcp && git -C .psyclaw/mcp-src/zotero-mcp checkout d57892db395c38d7782f037bc9fc8222e6a429ae","target":".psyclaw/mcp/zotero-mcp.json","dependencies":["Git","Zotero local library","Zotero API/token only if explicitly configured"],"status":"blocked","requiresApproval":true,"blockedReason":"License is not verified and local-library write effects require a separate trust decision."},
     {"id":"academic-mcp","sourceKind":"github","ref":"main","license":"MIT","command":"git clone https://github.com/veale/academic-mcp .psyclaw/mcp-src/academic-mcp && git -C .psyclaw/mcp-src/academic-mcp checkout main","target":".psyclaw/mcp/academic-mcp.json","dependencies":["Git","Zotero/OpenAlex/Semantic Scholar configuration per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Immutable commit and external API terms require preflight."},
     {"id":"scholar-mcp","sourceKind":"github","ref":"f94eac6a49c6d35a83f35148375eebfa08459e9b","license":"MIT","command":"git clone https://github.com/pvliesdonk/scholar-mcp .psyclaw/mcp-src/scholar-mcp && git -C .psyclaw/mcp-src/scholar-mcp checkout f94eac6a49c6d35a83f35148375eebfa08459e9b","target":".psyclaw/mcp/scholar-mcp.json","dependencies":["Git","provider/API configuration per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify executable entrypoint and API terms before registration."},
+    {"id":"drawio-mcp","sourceKind":"npm","ref":"1.5.0","license":"Apache-2.0","command":"npx -y @drawio/mcp@1.5.0","target":".psyclaw/mcp/drawio-mcp.json","dependencies":["Node.js >=18","npm","browser to open app.diagrams.net (or DRAWIO_BASE_URL)"],"status":"review-required","requiresApproval":true,"blockedReason":"Confirm stdio config opens diagrams in the browser; optional DRAWIO_BASE_URL for self-hosted draw.io. Hosted MCP Apps endpoint https://mcp.draw.io/mcp is a separate path."},
     {"id":"playwright-mcp","sourceKind":"github","ref":"7e0457a7cbf88823bf0146d12c46ae12c6818247","license":"Apache-2.0","command":"npx -y @playwright/mcp@latest","target":".psyclaw/mcp/playwright-mcp.json","dependencies":["Node.js >=18","npm or pnpm","optional browser extension for existing login session"],"status":"review-required","requiresApproval":true,"blockedReason":"Pin npm package version before execution; browser navigation/download remains separately approved."},
     {"id":"mne-mcp","sourceKind":"github","ref":"627142cb5beebe1a210a8e0fb1e15afbec8b8010","license":"MIT","command":"uvx --from mne-mcp==0.3.0 mne-mcp","target":".psyclaw/mcp/mne-mcp.json","dependencies":["Python >=3.10","uv","MNE-Python data dependencies"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify PyPI artifact hash and local-data write policy before registration."},
     {"id":"spss-mcp","sourceKind":"github","ref":"fb4f020189b28b8acfb23a710875a7f9ae4e1e62","license":"MIT","command":"git clone https://github.com/Exekiel179/SPSS-MCP .psyclaw/mcp-src/spss-mcp && git -C .psyclaw/mcp-src/spss-mcp checkout fb4f020189b28b8acfb23a710875a7f9ae4e1e62","target":".psyclaw/mcp/spss-mcp.json","dependencies":["Git","IBM SPSS Statistics","Python runtime per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify repository entrypoint and SPSS license/runtime before registration."}
