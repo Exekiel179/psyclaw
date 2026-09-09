@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -9,8 +7,8 @@ import { assertSafeProjectPath } from "../project/paths.js";
 import { ARS_UPSTREAM_COMMIT, ARS_UPSTREAM_REF } from "./profile.js";
 import type { ArsPanelRequest, ArsPanelResult } from "./contracts.js";
 import { arsRoot, type ArsExecutorOptions } from "./pi-panel-executor.js";
+import { execPython } from "../platform/python.js";
 
-const execFileAsync = promisify(execFile);
 function rawHash(value: Buffer | string): string { return createHash("sha256").update(value).digest("hex"); }
 function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -51,7 +49,7 @@ function entry(item: { relative: string; sha256: string }): Record<string, unkno
 function absent(): Record<string, unknown> { return { present: false }; }
 async function defaultValidateSchema(schema: string, artifact: string): Promise<void> {
   const program = "import json,sys; from jsonschema import Draft202012Validator; s=json.load(open(sys.argv[1])); v=json.load(open(sys.argv[2])); e=list(Draft202012Validator(s).iter_errors(v)); print('\\n'.join(x.message for x in e)); sys.exit(3 if e else 0)";
-  try { await execFileAsync("python3", ["-c", program, schema, artifact], { cwd: arsRoot(), timeout: 60_000, maxBuffer: 2 * 1024 * 1024 }); }
+  try { await execPython(["-c", program, schema, artifact], { cwd: arsRoot(), timeout: 60_000, maxBuffer: 2 * 1024 * 1024 }); }
   catch (error) { const e = error as { stdout?: string; stderr?: string }; throw new Error(`ARS re-review schema validation failed: ${(e.stdout || e.stderr || String(error)).slice(0, 2000)}`); }
 }
 
@@ -83,7 +81,7 @@ function defaultCreateClient(options: Omit<ArsExecutorOptions, "runRoot">): ArsR
 export const defaultArsReReviewAdapters: ArsReReviewAdapters = {
   createClient: defaultCreateClient,
   validateSchema: defaultValidateSchema,
-  runChecker: async (args) => execFileAsync("python3", args, { cwd: arsRoot(), timeout: 60_000, maxBuffer: 4 * 1024 * 1024 }),
+  runChecker: async (args) => execPython(args, { cwd: arsRoot(), timeout: 60_000, maxBuffer: 4 * 1024 * 1024 }),
 };
 
 export type ArsReReviewOptions = Omit<ArsExecutorOptions, "runRoot"> & {

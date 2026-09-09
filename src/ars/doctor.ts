@@ -1,12 +1,13 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { ARS_REPOSITORY_URL, ARS_UPSTREAM_COMMIT, ARS_UPSTREAM_REF } from "./profile.js";
+import { execPython, resolvePython } from "../platform/python.js";
 
 const execFileAsync = promisify(execFile);
 
 async function probe(command: string, args: string[]): Promise<string | undefined> {
   try {
-    const result = await execFileAsync(command, args, { timeout: 3000, encoding: "utf8" });
+    const result = await execFileAsync(command, args, { timeout: 3000, encoding: "utf8", windowsHide: true });
     const line = (result.stdout || result.stderr).trim().split("\n")[0];
     return line || "available";
   } catch {
@@ -39,8 +40,20 @@ export async function buildArsDoctorReport(input: ArsDoctorInput): Promise<strin
   const hasAnalysisHooks = true; // PsyClaw ships declarative analysis hooks + /create-hook
   const hasToolCallGate = input.projectActive === true;
 
-  const python = await probe("python3", ["--version"]);
-  const pyyaml = await probe("python3", ["-c", "import yaml; print(f'PyYAML {yaml.__version__}')"]);
+  const pythonInvocation = await resolvePython();
+  const python = pythonInvocation
+    ? await probe(pythonInvocation.command, [...pythonInvocation.prefixArgs, "--version"])
+    : undefined;
+  const pyyaml = pythonInvocation
+    ? await (async () => {
+        try {
+          const result = await execPython(["-c", "import yaml; print(f'PyYAML {yaml.__version__}')"], { timeout: 3000 });
+          return (result.stdout || result.stderr).trim().split("\n")[0] || "available";
+        } catch {
+          return undefined;
+        }
+      })()
+    : undefined;
   const pandoc = await probe("pandoc", ["--version"]);
 
   const orchestration = hasMultiAgentTool || hasAgentsCommand
@@ -62,12 +75,16 @@ export async function buildArsDoctorReport(input: ArsDoctorInput): Promise<strin
     "Claude Code PreToolUse：Pi 不加载 Claude hooks.json；写入范围以 PsyClaw 门禁与提示约束为准，不冒充 Claude hook",
   ].join("\n   ");
 
+  const pythonLabel = pythonInvocation
+    ? `${python} ✓（${[pythonInvocation.command, ...pythonInvocation.prefixArgs].join(" ").trim()}）`
+    : "未安装（需要 python3 / py -3 / python）";
+
   const lines = [
     "ARS Pi doctor（PsyClaw）",
     "──────────────────────────────────────────────────────────────",
     `Repository:    ${input.repositoryRoot}`,
     `               （上游 ${ARS_REPOSITORY_URL} @ ${ARS_UPSTREAM_REF} / ${ARS_UPSTREAM_COMMIT.slice(0, 12)}）`,
-    `Python:        ${python ? `${python} ✓` : "未安装"}`,
+    `Python:        ${pythonLabel}`,
     `PyYAML:        ${pyyaml ? `${pyyaml} ✓` : "未安装"}`,
     `Pandoc:        ${pandoc ? `${pandoc} ✓` : "未安装（DOCX/Markdown 转换可能受限）"}`,
     "PDF 引擎:      不预检 Tectonic；仅在你明确要求导出 PDF 时再按需安装",
@@ -134,6 +151,13 @@ export async function ensurePdfEngineForExport(): Promise<EnsurePdfEngineResult>
       engine: "none",
       status: "missing",
       detail: "未找到 PDF 引擎。可安装 tectonic，或 apt/yum 安装 texlive-xetex 后再导出。",
+    };
+  }
+  if (process.platform === "win32") {
+    return {
+      engine: "none",
+      status: "missing",
+      detail: "未找到 PDF 引擎。Windows 可安装 MiKTeX / TeX Live（提供 xelatex），或用 scoop/choco/winget 安装 tectonic 后再导出。",
     };
   }
   return {

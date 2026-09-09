@@ -1,6 +1,4 @@
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { promisify } from "node:util";
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,8 +7,7 @@ import { sha256Text } from "../core/hash.js";
 import { atomicWriteFile } from "../project/jsonl.js";
 import type { ArsReviewSeat, ArsSeatResult } from "./contracts.js";
 import { ARS_REVIEW_AGENT_FILES, ARS_REVIEW_ROLES } from "./panel-plan.js";
-
-const execFileAsync = promisify(execFile);
+import { execPython } from "../platform/python.js";
 
 export interface ArsExecutorOptions { root: string; runRoot: string; provider?: string; model?: string; env?: Record<string, string>; agentDir?: string; timeoutMs?: number }
 
@@ -79,7 +76,7 @@ export function buildArsPhase2Prompt(input: {
 
 async function validatePhase(contract: string, role: string, p1: string, p2: string | undefined, manuscript: string, metadata: string): Promise<void> {
   const args = [join(arsRoot(), "scripts", "check_phase_conformance.py"), "--contract", contract, "--role", role, "--phase1", p1, ...(p2 ? ["--phase2", p2] : ["--phase1-only"]), "--manuscript", manuscript, "--metadata", metadata];
-  try { await execFileAsync("python3", args, { cwd: arsRoot(), timeout: 60_000, maxBuffer: 2 * 1024 * 1024 }); }
+  try { await execPython(args, { cwd: arsRoot(), timeout: 60_000, maxBuffer: 2 * 1024 * 1024 }); }
   catch (error) { const e = error as { stdout?: string; stderr?: string }; throw new Error(`ARS phase conformance failed: ${(e.stderr || e.stdout || String(error)).slice(0, 2000)}`); }
 }
 
@@ -121,7 +118,7 @@ export async function executeArsSynthesis(seats: readonly ArsSeatResult[], contr
     const synthesisPath = join(options.runRoot, "synthesis.md");
     await atomicWriteFile(synthesisPath, synthesis);
     const args = [join(arsRoot(), "scripts", "check_panel_synthesis.py"), "--contract", contractPath, ...seats.flatMap((seat) => ["--report", join(options.runRoot, `${seat.seat}.phase2.md`)]), "--roles", seats.map((seat) => seat.role).join(","), "--synthesis", synthesisPath];
-    try { await execFileAsync("python3", args, { cwd: arsRoot(), timeout: 60_000, maxBuffer: 2 * 1024 * 1024 }); }
+    try { await execPython(args, { cwd: arsRoot(), timeout: 60_000, maxBuffer: 2 * 1024 * 1024 }); }
     catch (error) { const e = error as { stdout?: string; stderr?: string }; throw new Error(`ARS synthesis validation failed: ${(e.stderr || e.stdout || String(error)).slice(0, 2000)}`); }
     return synthesis;
   } finally { await client.stop(); }
@@ -133,7 +130,7 @@ export async function buildArsPanelProvenance(seats: readonly ArsSeatResult[], c
   const outputPath = join(runRoot, "panel-provenance.json");
   const input = { schema_version: "review-panel-provenance-input/1.0", panel_id: panelId, mode: "reviewer_full", contract_id: "reviewer/reviewer_full/v2", contract_sha256: contractSha256, seats: seats.map((seat) => ({ seat_id: seat.seat, role_id: seat.role, context_id: seat.contextId, peer_outputs_visible: false, actor_type: "model", model_family: seat.modelFamily, provider: seat.provider, human_reviewer_id: null })) };
   await atomicWriteFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
-  try { await execFileAsync("python3", [join(arsRoot(), "scripts", "review_panel_provenance.py"), "build", inputPath, "--output", outputPath], { cwd: arsRoot(), timeout: 60_000 }); }
+  try { await execPython([join(arsRoot(), "scripts", "review_panel_provenance.py"), "build", inputPath, "--output", outputPath], { cwd: arsRoot(), timeout: 60_000 }); }
   catch (error) { throw new Error(`ARS provenance build failed: ${String(error)}`); }
   return outputPath;
 }

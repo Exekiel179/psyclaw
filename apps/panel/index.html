@@ -559,7 +559,8 @@
       border-radius: 14px;
       border: 1px solid var(--border-subtle);
       background: var(--bg-surface);
-      max-width: 78ch;
+      max-width: 100%;
+      box-sizing: border-box;
       line-height: 1.65;
       color: var(--text-main);
       font-size: 13.5px;
@@ -1985,28 +1986,6 @@
     <main class="main">
       <!-- 视图 1：项目工作台 (默认主界面) -->
       <section id="view-project" class="view active">
-        <!-- 科研全流程阶段导航条 Pipeline Stepper -->
-        <div class="pipeline-stepper" aria-label="科研流程阶段">
-          <div class="step-item active" data-stage="intake" title="研究问题与范式目标 (notes/goal.md)">
-            <span>① 课题界定</span>
-          </div>
-          <span class="step-arrow">➔</span>
-          <div class="step-item" data-stage="evidence" title="证据溯源与文献账本 (notes/evidence.jsonl, claims.jsonl)">
-            <span>② 证据账本</span>
-          </div>
-          <span class="step-arrow">➔</span>
-          <div class="step-item" data-stage="plan" title="统计分析方案与 EDA (analysis/plans/)">
-            <span>③ 统计方案</span>
-          </div>
-          <span class="step-arrow">➔</span>
-          <div class="step-item" data-stage="manuscript" title="论文撰写与图表编排 (paper/, outputs/)">
-            <span>④ 手稿编排</span>
-          </div>
-          <span class="step-arrow">➔</span>
-          <div class="step-item" data-stage="review" title="多角色同行盲审与交叉核验 (notes/review.md)">
-            <span>⑤ 严苛审稿</span>
-          </div>
-        </div>
 
         <div class="page-head">
           <div>
@@ -2058,28 +2037,6 @@
               </div>
             </div>
 
-            <div class="console-quick-chips">
-              <span class="chip" data-cmd="/plan status">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-                /plan status
-              </span>
-              <span class="chip" data-cmd="/crosscheck list">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg>
-                /crosscheck
-              </span>
-              <span class="chip" data-cmd="/grill">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg>
-                /grill 压力追问
-              </span>
-              <span class="chip" data-cmd="/review">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
-                /review
-              </span>
-              <span class="chip" data-cmd="/agents">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                /agents
-              </span>
-            </div>
 
             <div class="console-input-wrap">
               <div class="console-input-container">
@@ -2912,6 +2869,11 @@ async function loadProvider() {
     `).join("");
     if (active.provider && providers.includes(active.provider)) {
       $("provider-select").value = active.provider;
+    } else {
+      const firstConfigured = state.models.find(m => m.configured);
+      if (firstConfigured && providers.includes(firstConfigured.provider)) {
+        $("provider-select").value = firstConfigured.provider;
+      }
     }
     updateModels();
     renderCost();
@@ -2925,16 +2887,18 @@ function updateProviderStatusBadge(active, models) {
   const badge = $("provider-status-badge");
   const label = $("provider-status-label");
   if (!badge || !label) return;
-  const provider = active?.provider;
-  const model = active?.model;
-  const providerConfigured = Boolean(provider) && (models || []).some(entry =>
-    entry.provider === provider && entry.configured
+  const configuredModels = (models || []).filter(entry => entry.configured);
+  const provider = active?.provider || configuredModels[0]?.provider;
+  const model = active?.model || configuredModels[0]?.version || configuredModels[0]?.name;
+  const providerConfigured = Boolean(provider) && (
+    configuredModels.some(entry => entry.provider === provider) ||
+    configuredModels.length > 0
   );
-  const ready = Boolean(provider && model && providerConfigured);
+  const ready = Boolean(provider && providerConfigured);
   badge.classList.toggle("warn", !ready);
   label.textContent = ready ? "模型已配置" : "未配置模型";
   badge.title = ready
-    ? `当前默认：${provider}/${model}（点击打开模型与成本）`
+    ? `当前默认：${provider}/${model || "默认"}（点击打开模型与成本）`
     : "尚未配置可用模型或凭据（点击打开模型与成本）";
 }
 
@@ -3002,8 +2966,16 @@ $("configure-provider").addEventListener("click", async () => {
         ...(key ? { apiKey: key } : {})
       })
     });
+    if (!state.active?.provider) {
+      await json("/api/active-provider", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: model.provider, model: $("model-select").value })
+      }).catch(() => {});
+    }
     $("provider-key").value = "";
     feedback.textContent = "✓ 凭据配置已安全保存，重启会话后生效。";
+    await refreshProviderStatus();
     setTimeout(() => { feedback.textContent = ""; }, 3000);
   } catch (error) {
     feedback.textContent = `保存失败: ${error.message}`;

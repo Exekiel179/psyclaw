@@ -72,7 +72,7 @@ export function formatCliUsage(): string {
     cmd("/handoff", "", c.white("人审通过后写入分析交接")),
     cmd("/crosscheck", "[focus]", c.white("过程性 AI 核对：数据/引文真实性/格式")),
     cmd("/verify", "[focus]", c.white("整体性 AI 验证：结果成立性、引文与方法")),
-    cmd("/brainstorm", "[subject]", c.white("研究方向头脑风暴与问题澄清")),
+    cmd("/brainstorm", "[subject]", c.white("研究方向头脑风暴（不加压）")),
     cmd("/grill", "[subject]", c.white("逐题压力测试研究方案")),
     cmd("/review", "[note]", c.white("多角色模拟同行评审")),
     cmd("/panel", "[help]", c.white("打开科研工作台")),

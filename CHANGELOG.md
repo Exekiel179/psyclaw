@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.21 - 2026-09-09
+
+- Fix whitepaper panel layout to 100% width
+- Remove obsolete pipeline stepper and quick slash action chips
+- Fix model configuration detection across auth/models/env/yaml sources
+
 ## 0.29.20 - 2026-09-09
 
 - Add official draw.io MCP (jgraph/@drawio/mcp@1.5.0) to the recommended MCP catalog for research diagrams

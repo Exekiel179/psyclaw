@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
 import { lstat, mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -575,17 +576,113 @@ async function panelCatalog(root: string): Promise<unknown> {
       },
     };
   });
-  const spec = deepSeekProviderSpec();
-  const envForProvider = (provider: string): string | undefined => ({
+  // 1. Read stored keys from auth.json in getAgentDir() and ~/.pi/agent/auth.json
+  const authProviders = new Set<string>();
+  for (const dir of [getAgentDir(), join(homedir(), ".pi", "agent"), join(homedir(), ".codex")]) {
+    try {
+      const raw = await readFile(join(dir, "auth.json"), "utf8");
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (parsed && typeof parsed === "object") {
+        for (const [key, val] of Object.entries(parsed)) {
+          if (val) {
+            authProviders.add(key.toLowerCase());
+            authProviders.add(key);
+          }
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 2. Read stored providers from models.json in getAgentDir() and ~/.pi/agent/models.json
+  const modelsProviders = new Set<string>();
+  for (const dir of [getAgentDir(), join(homedir(), ".pi", "agent")]) {
+    try {
+      const raw = await readFile(join(dir, "models.json"), "utf8");
+      const parsed = JSON.parse(raw) as { providers?: Record<string, unknown> };
+      if (parsed?.providers && typeof parsed.providers === "object") {
+        for (const key of Object.keys(parsed.providers)) {
+          modelsProviders.add(key.toLowerCase());
+          modelsProviders.add(key);
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 3. Read .psyclaw/.env or ~/.psyclaw/.env
+  const dotEnvVars: Record<string, string> = {};
+  for (const envFile of [join(root, ".psyclaw", ".env"), join(homedir(), ".psyclaw", ".env")]) {
+    try {
+      const raw = await readFile(envFile, "utf8");
+      for (const line of raw.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx > 0) {
+          const k = trimmed.slice(0, eqIdx).trim();
+          const v = trimmed.slice(eqIdx + 1).trim();
+          if (k && v) dotEnvVars[k] = v;
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 4. Read .psyclaw/config.yaml or ~/.psyclaw/config.yaml for configured provider
+  let configYamlProvider: string | undefined;
+  for (const yamlFile of [join(root, ".psyclaw", "config.yaml"), join(homedir(), ".psyclaw", "config.yaml")]) {
+    try {
+      const raw = await readFile(yamlFile, "utf8");
+      const match = raw.match(/^provider:\s*([^\s#]+)/m);
+      if (match && match[1]) {
+        configYamlProvider = match[1].trim();
+        break;
+      }
+    } catch { /* ignore */ }
+  }
+
+  const knownEnvForProvider: Record<string, string> = {
     deepseek: "DEEPSEEK_API_KEY",
     openai: "OPENAI_API_KEY",
     anthropic: "ANTHROPIC_API_KEY",
     google: "GEMINI_API_KEY",
-  }[provider] ?? PROVIDER_PRESETS.find((preset) => preset.id === provider)?.apiKeyEnv);
-  const configured = (provider: string): boolean => {
-    const envName = envForProvider(provider);
-    return envName === undefined ? false : Boolean(process.env[envName]);
+    gemini: "GEMINI_API_KEY",
+    opencode: "OPENCODE_API_KEY",
+    "opencode-go": "OPENCODE_API_KEY",
+    moonshotai: "MOONSHOT_API_KEY",
+    "moonshotai-cn": "MOONSHOT_API_KEY",
+    minimax: "MINIMAX_API_KEY",
+    "minimax-cn": "MINIMAX_API_KEY",
+    zai: "ZAI_API_KEY",
+    "zai-coding-cn": "ZAI_API_KEY",
+    qwen: "DASHSCOPE_API_KEY",
+    dashscope: "DASHSCOPE_API_KEY",
+    alibaba: "DASHSCOPE_API_KEY",
+    groq: "GROQ_API_KEY",
+    mistral: "MISTRAL_API_KEY",
+    together: "TOGETHER_API_KEY",
+    openrouter: "OPENROUTER_API_KEY",
+    xai: "XAI_API_KEY",
   };
+
+  const envForProvider = (provider: string): string | undefined => (
+    knownEnvForProvider[provider] ??
+    knownEnvForProvider[provider.toLowerCase()] ??
+    PROVIDER_PRESETS.find((preset) => preset.id === provider)?.apiKeyEnv ??
+    `${provider.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`
+  );
+
+  const configured = (provider: string): boolean => {
+    if (provider === "ollama") return true;
+    const lower = provider.toLowerCase();
+    if (authProviders.has(provider) || authProviders.has(lower)) return true;
+    if (modelsProviders.has(provider) || modelsProviders.has(lower)) return true;
+    if (configYamlProvider && (configYamlProvider === provider || configYamlProvider.toLowerCase() === lower)) return true;
+    const envName = envForProvider(provider);
+    if (envName && (Boolean(process.env[envName]) || Boolean(dotEnvVars[envName]))) return true;
+    const genericEnv = `${provider.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`;
+    if (Boolean(process.env[genericEnv]) || Boolean(dotEnvVars[genericEnv])) return true;
+    return false;
+  };
+  const spec = deepSeekProviderSpec();
   const helperModels = spec.models.map((model) => ({
     id: `${spec.id}/${model.id}`,
     kind: "model" as const,
@@ -1208,11 +1305,42 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       if (url.pathname === "/api/active-provider") {
         if (request.method === "GET") {
           const settings = await readAgentSettings();
+          let provider = typeof settings.defaultProvider === "string" ? settings.defaultProvider : undefined;
+          let model = typeof settings.defaultModel === "string" ? settings.defaultModel : undefined;
+          if (!provider || !model) {
+            try {
+              const piSettings = JSON.parse(await readFile(join(homedir(), ".pi", "agent", "settings.json"), "utf8")) as Record<string, unknown>;
+              if (!provider && typeof piSettings.defaultProvider === "string") provider = piSettings.defaultProvider;
+              if (!model && typeof piSettings.defaultModel === "string") model = piSettings.defaultModel;
+            } catch { /* ignore */ }
+          }
+          if (!provider || !model) {
+            for (const yamlFile of [join(root, ".psyclaw", "config.yaml"), join(homedir(), ".psyclaw", "config.yaml")]) {
+              try {
+                const raw = await readFile(yamlFile, "utf8");
+                const pMatch = raw.match(/^provider:\s*([^\s#]+)/m);
+                const mMatch = raw.match(/^model:\s*([^\s#]+)/m);
+                if (!provider && pMatch?.[1]) provider = pMatch[1].trim();
+                if (!model && mMatch?.[1]) model = mMatch[1].trim();
+                if (provider && model) break;
+              } catch { /* ignore */ }
+            }
+          }
+          if (!provider) {
+            try {
+              const catalog = await panelCatalog(root) as { models: Array<{ provider: string; configured: boolean; version?: string; id: string }> };
+              const firstConfigured = catalog.models.find((m) => m.configured);
+              if (firstConfigured) {
+                provider = firstConfigured.provider;
+                if (!model) model = firstConfigured.version || firstConfigured.id.split("/").slice(1).join("/");
+              }
+            } catch { /* ignore */ }
+          }
           response.writeHead(200, { "content-type": "application/json" });
           response.end(JSON.stringify({
             schemaVersion: "psyclaw/active-provider/v1",
-            provider: typeof settings.defaultProvider === "string" ? settings.defaultProvider : undefined,
-            model: typeof settings.defaultModel === "string" ? settings.defaultModel : undefined,
+            provider,
+            model,
           }));
           return;
         }
