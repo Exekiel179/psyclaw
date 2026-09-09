@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.30.2 - 2026-09-09
+
+- Defer telemetry SDK boot so first-run config is not blocked
+- /skill and /mcp: install auto-enables; click toggles enable or disable
+- Recommend paper2local for lightweight local PDF download
+- README: split user vs developer docs
+
 ## 0.30.1 - 2026-09-09
 
 - Plan human ritual: per-node soft confirm; execute requires typing「我已审阅并批准本方案」
