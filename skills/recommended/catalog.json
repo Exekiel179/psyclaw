@@ -103,8 +103,10 @@
       "name": "Journal Frontier Radar",
       "kind": "skill",
       "stage": "文献前沿",
-      "description": "基于期刊文章清单开展可追溯的前沿追踪、主题映射、关键词分析和未解决问题发现。",
+      "description": "基于期刊文章清单开展可追溯的前沿追踪、主题映射、关键词分析和未解决问题发现。前置依赖：Kimi WebBridge（须先安装并 `kimi-webbridge status` 确认 extension_connected）。",
       "sourceRef": "https://github.com/kingfly51/journal-frontier-radar",
+      "prerequisites": ["kimi-webbridge"],
+      "requiresExternalTools": ["kimi-webbridge"],
       "installHint": "安装仓库中的 skills/journal-frontier-radar 完整目录，包含 SKILL.md 及其脚本。启用前须先安装推荐外部工具 Kimi WebBridge（官方 daemon + Chrome/Edge 扩展），并用 `kimi-webbridge status` 确认 extension_connected: true；不要把本机 Downloads 解压扩展当 PsyClaw Plugin 安装。"
     },
     {
@@ -204,7 +206,7 @@
       "kind": "external-tool",
       "installable": true,
       "stage": "浏览器桥接",
-      "description": "月之暗面官方本机浏览器桥：daemon（127.0.0.1:10086）+ Chrome/Edge 扩展。让 Agent 操作用户真实浏览器与登录态，供 Journal Frontier Radar 等文献调研 Skill 联网检索；不是 PsyClaw Plugin，也不是可 clone 进 .psyclaw 的 Skill 包。",
+      "description": "月之暗面官方本机浏览器桥：daemon（127.0.0.1:10086）+ Chrome/Edge 扩展。让 Agent 操作用户真实浏览器与登录态；Journal Frontier Radar 的前置依赖。不是 PsyClaw Plugin，也不是可 clone 进 .psyclaw 的 Skill 包。",
       "sourceRef": "https://www.kimi.com/zh-cn/features/webbridge",
       "installHint": "按官网安装，不要把 Downloads 解压扩展当 PsyClaw Plugin。1) macOS/Linux 执行 `curl -fsSL https://cdn.kimi.com/webbridge/install.sh | bash`（Windows 按官网指引）；2) 从 Chrome Web Store 或 Edge Add-ons 安装 Kimi WebBridge 扩展并保持浏览器运行；商店不可用时才从官网下载后手动「加载已解压的扩展程序」；3) 运行 `kimi-webbridge status`，确认 extension_connected: true；4) 安装脚本若写入宿主 Skill 目录（常见为 ~/.claude/skills/kimi-webbridge），保留即可，供 Agent 调用本机 daemon。完成后报告 daemon 路径、扩展连接状态与验证命令输出。"
     },

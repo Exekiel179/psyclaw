@@ -97,6 +97,8 @@ import { ArsModeEditor, ARS_MODE_STATUS, isArsModeEditorText } from "../../ars/m
 import {
   MODE_STATUS,
   type PsyClawSessionMode,
+  detectChatModeMismatch,
+  formatChatModeMismatchNotice,
   nextSessionMode,
   parseSessionMode,
   sessionModePrompt,
@@ -1188,6 +1190,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
 
     const mode = arsModeEditor?.getMode() ?? sessionMode;
     const trimmed = event.text.trim();
+
+    // Chat must not soft-takeover; when intent fits analysis/academic, remind only.
+    if (mode === "chat") {
+      const mismatch = detectChatModeMismatch(trimmed);
+      if (mismatch) {
+        ctx.ui.notify(mismatch.notify, "warning");
+        return {
+          action: "transform",
+          text: formatChatModeMismatchNotice(mismatch, trimmed),
+        };
+      }
+    }
 
     // Natural-language plan confirm: reply「可以」instead of forcing /plan confirm.
     if (mode === "analysis" && isNaturalPlanConfirm(trimmed)) {

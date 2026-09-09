@@ -178,6 +178,22 @@
       padding: 3px 9px;
       border-radius: 999px;
       border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .local-badge:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-default);
+      color: var(--text-main);
+    }
+    .local-badge.warn {
+      color: #92400e;
+      background: #fffbeb;
+      border-color: #fcd34d;
+    }
+    .local-badge.warn .pulse-dot {
+      background: #f59e0b;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
     }
     .pulse-dot {
       width: 6px;
@@ -537,33 +553,109 @@
       color: var(--text-secondary);
       line-height: 1.4;
     }
-    .help-notes {
+    .help-whitepaper {
       margin: 0;
-      padding: 14px 16px;
-      list-style: none;
-      display: grid;
-      gap: 8px;
+      padding: 18px 20px 22px;
       border-radius: 14px;
       border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      max-width: 78ch;
+      line-height: 1.65;
+      color: var(--text-main);
+      font-size: 13.5px;
+    }
+    .help-whitepaper h1 { font-size: 1.45rem; margin: 0 0 0.75em; }
+    .help-whitepaper h2 { font-size: 1.2rem; margin: 1.4em 0 0.55em; }
+    .help-whitepaper h3 { font-size: 1.05rem; margin: 1.2em 0 0.45em; }
+    .help-whitepaper p { margin: 0 0 0.85em; color: var(--text-secondary); }
+    .help-whitepaper ul, .help-whitepaper ol { margin: 0 0 0.9em; padding-left: 1.35em; color: var(--text-secondary); }
+    .help-whitepaper li { margin: 0.25em 0; }
+    .help-whitepaper code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
       background: var(--bg-surface-subtle);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
     }
-    .help-notes li {
-      position: relative;
-      padding-left: 14px;
+    .help-whitepaper pre {
+      overflow: auto;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--bg-surface-subtle);
+      border: 1px solid var(--border-subtle);
+      font-size: 12px;
+    }
+    .help-whitepaper a { color: var(--brand-accent); }
+    .help-whitepaper blockquote {
+      margin: 0 0 0.9em;
+      padding: 0.35em 0 0.35em 0.9em;
+      border-left: 3px solid var(--brand-primary-border);
       color: var(--text-muted);
-      font-size: 12.5px;
-      line-height: 1.55;
     }
-    .help-notes li::before {
-      content: "";
+    .checklist-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      min-height: 140px;
+      padding: 28px 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+      background: var(--bg-surface-subtle);
+      border-radius: 10px;
+    }
+    .checklist-empty strong {
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .slash-ac {
       position: absolute;
       left: 0;
-      top: 0.55em;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--brand-primary);
-      opacity: 0.55;
+      right: 0;
+      bottom: calc(100% + 6px);
+      max-height: 220px;
+      overflow: auto;
+      margin: 0;
+      padding: 4px;
+      list-style: none;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: 10px;
+      box-shadow: var(--shadow-md, 0 8px 24px rgba(15, 23, 42, 0.12));
+      z-index: 40;
+    }
+    .slash-ac li {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 12.5px;
+    }
+    .slash-ac li:hover,
+    .slash-ac li.active {
+      background: var(--brand-primary-light);
+    }
+    .slash-ac code {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--brand-primary);
+      white-space: nowrap;
+    }
+    .slash-ac span {
+      color: var(--text-muted);
+      font-size: 11.5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
     }
     @media (max-width: 960px) {
       .help-grid, .help-cmd-list { grid-template-columns: 1fr; }
@@ -1836,28 +1928,14 @@
       </div>
     </div>
     <div class="topbar-meta">
-      <div class="topbar-cmds">
-        <button id="cmd-init-btn" class="topbar-btn primary" title="初始化或配置社科研究工作区 (/init)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/></svg>
-          /init 项目
-        </button>
-        <button id="cmd-plan-btn" class="topbar-btn" title="查看或确认统计分析方案 (/plan)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-          /plan 方案
-        </button>
-        <button id="cmd-verify-btn" class="topbar-btn" title="AI 核查清单；人审在此核实 (/crosscheck)">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          /crosscheck
-        </button>
-      </div>
       <a href="https://github.com/Exekiel179/psyclaw" target="_blank" rel="noopener noreferrer" class="github-link" title="前往 PsyClaw GitHub 仓库">
         <svg viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
         <span>GitHub</span>
       </a>
-      <div class="local-badge">
+      <button type="button" id="provider-status-badge" class="local-badge warn" title="查看模型与 Provider 配置">
         <span class="pulse-dot"></span>
-        安全沙盒 · 本地隔离
-      </div>
+        <span id="provider-status-label">检测模型配置…</span>
+      </button>
     </div>
   </header>
   <div id="telemetry-notice" class="telemetry-notice hidden" role="status">
@@ -2005,8 +2083,9 @@
 
             <div class="console-input-wrap">
               <div class="console-input-container">
-                <div class="console-input-box">
+                <div class="console-input-box" style="position:relative">
                   <textarea id="console-input" class="console-textarea" placeholder="向智能体提问或输入指令（Enter 发送）…" rows="1"></textarea>
+                  <ul id="slash-ac" class="slash-ac hidden" role="listbox" aria-label="斜杠命令"></ul>
                   <button id="console-send-btn" class="console-send-btn" title="发送消息 (Enter)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
@@ -2067,6 +2146,7 @@
           <div class="segmented" aria-label="能力类型">
             <button class="active" data-eco-kind="all">全部类型</button>
             <button data-eco-kind="skill">Skill</button>
+            <button data-eco-kind="external">外部工具</button>
             <button data-eco-kind="plugin">Plugin</button>
             <button data-eco-kind="mcp">MCP</button>
             <button data-eco-kind="agent">Agent</button>
@@ -2148,7 +2228,6 @@
                 <label for="provider-key">API Key（留空不覆盖已有凭据）</label>
                 <input id="provider-key" type="password" autocomplete="off" placeholder="输入当前 Provider 的专属 Key">
               </div>
-              <p class="cost-note" style="margin:0">凭据委托 Pi 官方加密存储，不会在日志中明文打印。</p>
               <button id="configure-provider" class="button" style="margin-top:4px">
                 保存当前 Provider 配置
               </button>
@@ -2180,7 +2259,7 @@
         <div class="help-hero">
           <div>
             <h1 id="help-title">使用速览</h1>
-            <p id="help-subtitle">三种模式 · AI 交叉核验 · 内置学术工作流</p>
+            <p id="help-subtitle">三种模式 · 白皮书全文 · 内置学术工作流</p>
           </div>
           <div id="help-thinking" class="help-kbd">加载中…</div>
         </div>
@@ -2194,8 +2273,8 @@
           <div id="help-commands" class="help-commands"></div>
         </div>
         <div class="help-block">
-          <h2>说明</h2>
-          <ul id="help-notes" class="help-notes"></ul>
+          <h2>使用白皮书</h2>
+          <div id="help-whitepaper" class="help-whitepaper">正在加载白皮书…</div>
         </div>
       </section>
 
@@ -2203,7 +2282,6 @@
         <div class="page-head">
           <div>
             <h1>交叉核验清单</h1>
-            <p>AI 用 <code>/crosscheck</code> 核查字段；<strong>analysis / academic 收尾必须在此点「核实」</strong>（或终端 <code>/crosscheck &lt;id&gt; human</code>）。AI 已核与跳过都不算通过。</p>
           </div>
           <div style="display:flex;gap:8px">
             <button id="refresh-checklist" class="button">刷新</button>
@@ -2245,42 +2323,6 @@
   </div>
 </div>
 
-<!-- /init 项目向导模态框 -->
-<div id="init-modal" class="modal-overlay hidden">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3>🚀 初始化研究项目 (/init)</h3>
-      <button id="init-modal-close" class="console-btn-icon" style="color:var(--text-muted)">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
-    <div class="modal-body">
-      <div class="field">
-        <label for="init-paradigm">研究范式 (Paradigm)</label>
-        <select id="init-paradigm" class="select">
-          <option value="survey-observational">survey-observational (问卷与实证观察研究)</option>
-          <option value="experimental">experimental (随机受控实验 / 心理学实验室)</option>
-          <option value="quasi-experimental">quasi-experimental (准实验 / 双重差分 / 断点回归)</option>
-          <option value="qualitative-thematic">qualitative-thematic (质性扎根理论与主题分析)</option>
-          <option value="meta-analysis">meta-analysis (元分析 / 效应量合并)</option>
-          <option value="longitudinal-panel">longitudinal-panel (追踪面板数据)</option>
-          <option value="mixed-methods">mixed-methods (混合研究方法)</option>
-          <option value="policy-legal">policy-legal (政策制度与法学文本分析)</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="init-goal">研究问题与目标 (Research Goal)</label>
-        <textarea id="init-goal" class="textarea" rows="3" placeholder="例如：探究社交媒体主动使用与大学生学业倦怠之间的中介效应机制..."></textarea>
-      </div>
-      <div id="init-preview-cmd" style="font-family:var(--font-mono);font-size:11.5px;background:var(--bg-surface-subtle);padding:8px 10px;border-radius:4px;border:1px solid var(--border-subtle);color:var(--text-secondary)">
-        /init --paradigm survey-observational
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button id="init-cancel-btn" class="button">取消</button>
-      <button id="init-submit-btn" class="button primary">提交并生成指令</button>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -2289,11 +2331,13 @@ const state = {
   files: [],
   eco: [],
   ecoKind: "all",
+  installing: {},
   models: [],
   active: {},
   usage: null,
   currency: "cny",
-  currentContent: ""
+  currentContent: "",
+  slashCommands: null
 };
 
 const $ = id => document.getElementById(id);
@@ -2335,7 +2379,7 @@ async function loadHelp() {
   try {
     const doc = await json("/api/help");
     $("help-title").textContent = doc.title || "使用速览";
-    $("help-subtitle").textContent = doc.subtitle || "";
+    $("help-subtitle").textContent = doc.subtitle || "三种模式 · 白皮书全文 · 内置学术工作流";
     $("help-thinking").textContent = doc.thinking || "";
     $("help-modes").innerHTML = (doc.modes || []).map(mode => `
       <article class="help-mode-card">
@@ -2361,16 +2405,27 @@ async function loadHelp() {
         </div>
       </div>
     `).join("");
-    $("help-notes").innerHTML = (doc.notes || []).map(note => `<li>${esc(note)}</li>`).join("");
+    if (Array.isArray(doc.commands)) {
+      state.slashCommands = doc.commands.map(row => ({
+        cmd: String(row.cmd || "").replace(/\s*\[.*$/, "").trim() || String(row.cmd || ""),
+        blurb: row.blurb || "",
+      })).filter(row => row.cmd.startsWith("/"));
+    }
   } catch (error) {
     $("help-thinking").textContent = `加载失败: ${error.message}`;
+  }
+  try {
+    const paper = await json("/api/docs/whitepaper");
+    $("help-whitepaper").innerHTML = renderMarkdown(paper.markdown || "");
+  } catch (error) {
+    $("help-whitepaper").innerHTML = `<p style="color:var(--bad-text)">白皮书加载失败：${esc(error.message)}</p>`;
   }
 }
 
 async function loadChecklist() {
   const body = $("checklist-body");
   if (!body) return;
-  body.innerHTML = `<tr><td colspan="6" class="empty">正在读取核对清单...</td></tr>`;
+  body.innerHTML = `<tr><td colspan="6"><div class="checklist-empty">正在读取核对清单...</div></td></tr>`;
   try {
     const data = await json("/api/crosscheck");
     const items = data.checklist?.items || [];
@@ -2388,7 +2443,7 @@ async function loadChecklist() {
           <button class="button" data-check-id="${esc(item.id)}" data-check-status="skipped">跳过</button>
         </td>
       </tr>`;
-    }).join("") || `<tr><td colspan="6" class="empty">清单为空</td></tr>`;
+    }).join("") || `<tr><td colspan="6"><div class="checklist-empty"><strong>清单为空</strong><span>暂无交叉核验项；可在对话中发起 /crosscheck</span></div></td></tr>`;
     body.querySelectorAll("[data-check-id]").forEach(btn => {
       btn.addEventListener("click", async () => {
         await json("/api/crosscheck", {
@@ -2400,7 +2455,7 @@ async function loadChecklist() {
       });
     });
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="6" class="empty">加载失败: ${esc(error.message)}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6"><div class="checklist-empty" style="color:var(--bad-text)">加载失败: ${esc(error.message)}</div></td></tr>`;
   }
 }
 
@@ -2673,20 +2728,42 @@ async function loadEcosystem() {
   }
 }
 
+function itemPrereqs(item) {
+  const a = Array.isArray(item.prerequisites) ? item.prerequisites : [];
+  const b = Array.isArray(item.requiresExternalTools) ? item.requiresExternalTools : [];
+  return [...new Set([...a, ...b].map(value => String(value)).filter(Boolean))];
+}
+
+function kindLabel(kind) {
+  if (kind === "core") return "Core Skill";
+  if (kind === "local") return "用户 Skill";
+  if (kind === "agent") return "Subagent";
+  if (kind === "external") return "外部工具";
+  if (kind === "skill") return "Skill";
+  if (kind === "plugin") return "Plugin";
+  if (kind === "mcp") return "MCP";
+  return String(kind || "").toUpperCase();
+}
+
 function renderEcosystem() {
   const query = $("eco-search").value.trim().toLowerCase();
   const sourceKind = $("eco-kind").value;
   const status = $("eco-status").value;
   const primaryKind = state.ecoKind;
-  const primaryMatches = item => primaryKind === "all" || (primaryKind === "skill" ? (item.kind === "skill" || item.kind === "core" || item.kind === "local") : item.kind === primaryKind);
+  const primaryMatches = item => primaryKind === "all"
+    || (primaryKind === "skill" ? (item.kind === "skill" || item.kind === "core" || item.kind === "local" || item.kind === "external") : item.kind === primaryKind);
   const items = state.eco.filter(item =>
     primaryMatches(item) &&
     (sourceKind === "all" || item.kind === sourceKind) &&
     (status === "all" || (status === "enabled" ? item.enabled : !item.enabled)) &&
-    `${item.name} ${item.description || ""}`.toLowerCase().includes(query)
+    `${item.name} ${item.description || ""} ${itemPrereqs(item).join(" ")}`.toLowerCase().includes(query)
   );
 
-  $("ecosystem-body").innerHTML = items.map(item => `
+  $("ecosystem-body").innerHTML = items.map(item => {
+    const prereqs = itemPrereqs(item);
+    const busy = Boolean(state.installing[item.id]);
+    const installLabel = busy ? "正在安装…" : item.kind === "plugin" && item.installed ? "重新安装" : item.kind === "core" ? "启用" : "安装";
+    return `
     <tr>
       <td>
         <div class="name">${esc(item.name)}</div>
@@ -2695,10 +2772,11 @@ function renderEcosystem() {
           ${item.kind === "plugin" && item.scope ? ` · ${item.scope === "project" ? "当前项目" : "所有项目"}${item.filtered ? " · 已限定资源" : ""}` : ""}
           ${item.kind === "agent" && item.slashCommand ? ` · <code style="font-family:var(--font-mono);font-size:11px">${esc(item.slashCommand)}</code>` : ""}
         </div>
+        ${prereqs.length ? `<div class="subtle" style="margin-top:4px;color:var(--text-muted)">前置依赖：${prereqs.map(id => `<code style="font-family:var(--font-mono);font-size:11px">${esc(id)}</code>`).join("、")}</div>` : ""}
       </td>
       <td>
         <span class="tag" style="background:#f1f5f9;font-weight:600">
-          ${esc(item.kind === "core" ? "Core Skill" : item.kind === "local" ? "用户 Skill" : item.kind === "agent" ? "Subagent" : item.kind.toUpperCase())}
+          ${esc(kindLabel(item.kind))}
         </span>
       </td>
       <td>
@@ -2708,21 +2786,22 @@ function renderEcosystem() {
       </td>
       <td>
         <span class="tag ${item.enabled ? "ok" : item.configured ? "warn" : ""}">
-          ${item.locked ? "内置可用" : item.enabled ? (item.kind === "plugin" ? "已安装" : "已启用") : item.kind === "plugin" && item.configured ? "配置存在，文件缺失" : item.kind === "external" ? "可安装外部工具" : "未启用"}
+          ${busy ? "正在安装…" : item.locked ? "内置可用" : item.enabled ? (item.kind === "plugin" ? "已安装" : "已启用") : item.kind === "plugin" && item.configured ? "配置存在，文件缺失" : item.kind === "external" ? "可安装外部工具" : "未启用"}
         </span>
       </td>
       <td style="text-align:right">
         ${item.locked || item.kind === "agent" ? "—" :
           item.kind === "plugin" && item.local ? "—" :
-          item.kind === "plugin" ? `<button class="button small ${item.installed ? "" : "primary"}" onclick="installCapability('plugin','${esc(item.id)}')">${item.installed ? "重新安装" : "安装"}</button>` :
-          item.kind === "external" ? `<button class="button small primary" onclick="installCapability('external','${esc(item.id)}')">安装</button>` :
+          item.kind === "plugin" ? `<button class="button small ${item.installed ? "" : "primary"}" ${busy ? "disabled" : ""} onclick="installCapability('plugin','${esc(item.id)}')">${installLabel}</button>` :
+          item.kind === "external" ? `<button class="button small primary" ${busy ? "disabled" : ""} onclick="installCapability('external','${esc(item.id)}')">${installLabel}</button>` :
           item.enabled ? `<button class="button small" onclick="toggleCapability('${item.kind}','${esc(item.id)}',false)">停用</button>` :
           item.kind === "local" ? `<button class="button small primary" onclick="toggleCapability('local','${esc(item.id)}',true)">启用</button>` :
-          `<button class="button small primary" onclick="installCapability('${item.kind}','${esc(item.id)}')">${item.kind === "core" ? "启用" : "安装"}</button>`
+          `<button class="button small primary" ${busy ? "disabled" : ""} onclick="installCapability('${item.kind}','${esc(item.id)}')">${installLabel}</button>`
         }
       </td>
     </tr>
-  `).join("") || '<tr><td colspan="5" class="empty" style="min-height:100px">未找到匹配的能力项</td></tr>';
+  `;
+  }).join("") || '<tr><td colspan="5" class="empty" style="min-height:100px">未找到匹配的能力项</td></tr>';
 }
 
 async function toggleCapability(kind, id, enabled) {
@@ -2743,17 +2822,53 @@ async function installCapability(kind, id) {
     await toggleCapability(kind, id, true);
     return;
   }
+  if (state.installing[id]) return;
+  const item = state.eco.find(entry => entry.id === id && (kind === "skill" ? entry.kind === "skill" : entry.kind === kind));
+  const prereqs = kind === "skill" ? itemPrereqs(item || {}) : [];
   const scope = kind === "skill" || kind === "plugin"
     ? (confirm("安装到系统全局还是当前项目？\n确定：全局所有项目可用；取消：仅当前项目。") ? "user" : "project")
     : undefined;
-  if (!confirm(`确认安装 ${id}？${kind === "external" ? "系统将按官方可信来源安装并进行完整性验证。" : "安装完成后需要执行 /reload 生效。"}`)) return;
-  const result = await json("/api/install/execute", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ kind, id, scope, approved: true, actor: "researcher" })
-  });
-  alert(result.message || (result.ok ? "安装任务已提交并处理。" : "安装未能完成。"));
-  await loadEcosystem();
+  let confirmText = `确认安装「${item?.name || id}」？`;
+  if (kind === "external") {
+    confirmText += "\n\n系统将按官方可信来源安装；任务会交给当前 PsyClaw 对话中的模型执行。请保持终端会话打开。";
+  } else if (kind === "mcp" || kind === "skill") {
+    if (prereqs.length) {
+      confirmText += `\n\n前置依赖也将一并排队安装：${prereqs.join("、")}。\n安装任务会交给当前 PsyClaw 对话中的模型执行；请保持终端会话打开，完成后执行 /reload。`;
+    } else {
+      confirmText += "\n\n安装任务会交给当前 PsyClaw 对话中的模型执行；请保持终端会话打开，完成后执行 /reload。";
+    }
+  } else {
+    confirmText += "\n\n安装完成后需要执行 /reload 生效。";
+  }
+  if (!confirm(confirmText)) return;
+
+  state.installing[id] = true;
+  for (const prereqId of prereqs) state.installing[prereqId] = true;
+  renderEcosystem();
+  const messages = [];
+  try {
+    for (const prereqId of prereqs) {
+      const result = await json("/api/install/execute", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "external", id: prereqId, approved: true, actor: "researcher" })
+      });
+      messages.push(result.message || `前置 ${prereqId} 已提交`);
+    }
+    const result = await json("/api/install/execute", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind, id, scope, approved: true, actor: "researcher" })
+    });
+    messages.push(result.message || (result.ok ? "安装任务已提交。" : "安装未能完成。"));
+    alert(messages.join("\n\n") || "安装任务已提交。");
+  } catch (error) {
+    alert(`安装失败：${error && error.message ? error.message : String(error)}`);
+  } finally {
+    delete state.installing[id];
+    for (const prereqId of prereqs) delete state.installing[prereqId];
+    await loadEcosystem();
+  }
 }
 
 [$("eco-search"), $("eco-kind"), $("eco-status")].forEach(control => {
@@ -2800,10 +2915,46 @@ async function loadProvider() {
     }
     updateModels();
     renderCost();
+    updateProviderStatusBadge(active, state.models);
   } catch (error) {
     $("provider-feedback").textContent = `加载配置失败: ${error.message}`;
   }
 }
+
+function updateProviderStatusBadge(active, models) {
+  const badge = $("provider-status-badge");
+  const label = $("provider-status-label");
+  if (!badge || !label) return;
+  const provider = active?.provider;
+  const model = active?.model;
+  const providerConfigured = Boolean(provider) && (models || []).some(entry =>
+    entry.provider === provider && entry.configured
+  );
+  const ready = Boolean(provider && model && providerConfigured);
+  badge.classList.toggle("warn", !ready);
+  label.textContent = ready ? "模型已配置" : "未配置模型";
+  badge.title = ready
+    ? `当前默认：${provider}/${model}（点击打开模型与成本）`
+    : "尚未配置可用模型或凭据（点击打开模型与成本）";
+}
+
+async function refreshProviderStatus() {
+  try {
+    const [catalog, active] = await Promise.all([
+      json("/api/catalog"),
+      json("/api/active-provider"),
+    ]);
+    state.models = catalog.models || state.models;
+    state.active = active || {};
+    updateProviderStatusBadge(active, state.models);
+  } catch {
+    updateProviderStatusBadge({}, []);
+  }
+}
+
+$("provider-status-badge")?.addEventListener("click", () => setView("provider"));
+refreshProviderStatus();
+setInterval(refreshProviderStatus, 30_000);
 
 function currentModel() {
   return providerModels($("provider-select").value).find(
@@ -2823,6 +2974,7 @@ $("save-provider").addEventListener("click", async () => {
       body: JSON.stringify({ provider: $("provider-select").value, model: $("model-select").value })
     });
     feedback.textContent = "✓ 默认模型设置已保存，重启会话后生效。";
+    await refreshProviderStatus();
     setTimeout(() => { feedback.textContent = ""; }, 3000);
   } catch (error) {
     feedback.textContent = `保存失败: ${error.message}`;
@@ -3239,8 +3391,6 @@ function autoResizeConsoleInput() {
   consoleInput.style.height = `${nextHeight}px`;
 }
 
-consoleInput.addEventListener("input", autoResizeConsoleInput);
-
 // 代码块全局点击复制事件代理
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest(".code-copy-btn");
@@ -3293,12 +3443,154 @@ async function sendConsoleMessage(msg) {
 connectAssistantStream();
 
 $("console-send-btn").addEventListener("click", () => sendConsoleMessage());
+
+const DEFAULT_SLASH_COMMANDS = [
+  { cmd: "/init", blurb: "初始化项目" },
+  { cmd: "/plan", blurb: "分析方案" },
+  { cmd: "/crosscheck", blurb: "过程性核对" },
+  { cmd: "/verify", blurb: "实质性验证" },
+  { cmd: "/handoff", blurb: "写入交接" },
+  { cmd: "/provider", blurb: "模型 Provider" },
+  { cmd: "/mcp", blurb: "MCP 管理" },
+  { cmd: "/skill", blurb: "Skill 管理" },
+  { cmd: "/plugin", blurb: "Plugin 管理" },
+  { cmd: "/panel", blurb: "打开工作台" },
+  { cmd: "/reload", blurb: "热更新能力" },
+  { cmd: "/telemetry", blurb: "遥测偏好" },
+  { cmd: "/help", blurb: "使用速览" },
+  { cmd: "/review", blurb: "模拟审稿" },
+  { cmd: "/brainstorm", blurb: "头脑风暴" },
+  { cmd: "/grill", blurb: "学术压力测试" },
+  { cmd: "/ars", blurb: "学术流程" },
+];
+
+const slashAc = {
+  open: false,
+  index: 0,
+  items: [],
+  el: $("slash-ac"),
+};
+
+function slashCommandList() {
+  return (state.slashCommands && state.slashCommands.length) ? state.slashCommands : DEFAULT_SLASH_COMMANDS;
+}
+
+function detectSlashQuery(value, caret) {
+  const before = String(value || "").slice(0, caret ?? String(value || "").length);
+  const match = before.match(/(?:^|\s)(\/[^\s]*)$/);
+  if (!match) return null;
+  return { query: match[1], start: before.length - match[1].length };
+}
+
+function closeSlashAc() {
+  slashAc.open = false;
+  slashAc.index = 0;
+  slashAc.items = [];
+  if (slashAc.el) {
+    slashAc.el.classList.add("hidden");
+    slashAc.el.innerHTML = "";
+  }
+}
+
+function renderSlashAc() {
+  if (!slashAc.el) return;
+  if (!slashAc.open || !slashAc.items.length) {
+    closeSlashAc();
+    return;
+  }
+  slashAc.el.classList.remove("hidden");
+  slashAc.el.innerHTML = slashAc.items.map((item, index) => `
+    <li class="${index === slashAc.index ? "active" : ""}" data-slash-index="${index}" role="option">
+      <code>${esc(item.cmd)}</code><span>${esc(item.blurb || "")}</span>
+    </li>
+  `).join("");
+}
+
+function updateSlashAc() {
+  if (!consoleInput) return;
+  const detected = detectSlashQuery(consoleInput.value, consoleInput.selectionStart);
+  if (!detected) {
+    closeSlashAc();
+    return;
+  }
+  const q = detected.query.toLowerCase();
+  slashAc.items = slashCommandList().filter(item => item.cmd.toLowerCase().startsWith(q)).slice(0, 12);
+  slashAc.open = slashAc.items.length > 0;
+  slashAc.index = Math.min(slashAc.index, Math.max(slashAc.items.length - 1, 0));
+  renderSlashAc();
+}
+
+function applySlashAc(index = slashAc.index) {
+  const item = slashAc.items[index];
+  if (!item || !consoleInput) return;
+  const detected = detectSlashQuery(consoleInput.value, consoleInput.selectionStart);
+  if (!detected) return;
+  const before = consoleInput.value.slice(0, detected.start);
+  const after = consoleInput.value.slice(consoleInput.selectionStart);
+  consoleInput.value = `${before}${item.cmd}${after.startsWith(" ") ? after : ` ${after}`}`;
+  const caret = before.length + item.cmd.length + 1;
+  consoleInput.setSelectionRange(caret, caret);
+  closeSlashAc();
+  autoResizeConsoleInput();
+  consoleInput.focus();
+}
+
+slashAc.el?.addEventListener("mousedown", (e) => {
+  const li = e.target.closest("[data-slash-index]");
+  if (!li) return;
+  e.preventDefault();
+  applySlashAc(Number(li.dataset.slashIndex));
+});
+
+consoleInput.addEventListener("input", () => {
+  autoResizeConsoleInput();
+  updateSlashAc();
+});
+
 consoleInput.addEventListener("keydown", (e) => {
+  if (slashAc.open) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      slashAc.index = (slashAc.index + 1) % slashAc.items.length;
+      renderSlashAc();
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      slashAc.index = (slashAc.index - 1 + slashAc.items.length) % slashAc.items.length;
+      renderSlashAc();
+      return;
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      applySlashAc();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeSlashAc();
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      applySlashAc();
+      return;
+    }
+  }
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     sendConsoleMessage();
   }
 });
+
+json("/api/help").then(doc => {
+  if (Array.isArray(doc.commands)) {
+    state.slashCommands = doc.commands.map(row => ({
+      cmd: String(row.cmd || "").replace(/\s*\[.*$/, "").trim() || String(row.cmd || ""),
+      blurb: row.blurb || "",
+    })).filter(row => row.cmd.startsWith("/"));
+  }
+}).catch(() => {});
 
 document.querySelectorAll(".chip").forEach(chip => {
   chip.addEventListener("click", () => {
@@ -3366,61 +3658,14 @@ document.addEventListener("click", (e) => {
 
 initWorkbenchCollapse();
 
-/* --- 顶栏快捷命令 Quick Actions --- */
-const initModal = $("init-modal");
-const initParadigm = $("init-paradigm");
-const initGoal = $("init-goal");
-const initPreviewCmd = $("init-preview-cmd");
-
-function updateInitPreview() {
-  const paradigm = initParadigm.value;
-  const goal = initGoal.value.trim();
-  initPreviewCmd.textContent = `/init --paradigm ${paradigm}${goal ? ` "${goal}"` : ""}`;
-}
-
-initParadigm.addEventListener("change", updateInitPreview);
-initGoal.addEventListener("input", updateInitPreview);
-
-$("cmd-init-btn").addEventListener("click", () => {
-  updateInitPreview();
-  initModal.classList.remove("hidden");
-});
-$("init-modal-close").addEventListener("click", () => initModal.classList.add("hidden"));
-$("init-cancel-btn").addEventListener("click", () => initModal.classList.add("hidden"));
-
-$("init-submit-btn").addEventListener("click", async () => {
-  const cmd = initPreviewCmd.textContent.trim();
-  initModal.classList.add("hidden");
-  openConsole();
-  await sendConsoleMessage(cmd);
-  loadProject();
-});
-
-$("cmd-plan-btn").addEventListener("click", async () => {
-  openConsole();
-  await sendConsoleMessage("/plan status");
-});
-
-$("cmd-verify-btn").addEventListener("click", async () => {
-  setView("checklist");
-  await loadChecklist();
-  openConsole();
-  await sendConsoleMessage("/crosscheck list");
-});
-
-/* --- 加载项目状态并更新 Stepper 状态 --- */
+/* --- 项目状态（更新 Stepper） --- */
 async function loadProjectStatus() {
   try {
     const status = await json("/api/project-status");
-    if (!status.initialized) {
-      $("cmd-init-btn").classList.add("primary");
-    } else {
-      $("cmd-init-btn").classList.remove("primary");
-      if (status.activePlan) {
-        document.querySelectorAll(".step-item").forEach(item => {
-          if (item.dataset.stage === "plan") item.classList.add("active");
-        });
-      }
+    if (status.initialized && status.activePlan) {
+      document.querySelectorAll(".step-item").forEach(item => {
+        if (item.dataset.stage === "plan") item.classList.add("active");
+      });
     }
   } catch { /* ignore */ }
 }

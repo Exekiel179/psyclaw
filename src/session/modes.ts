@@ -1,5 +1,5 @@
-import { analysisSoftRoutePrompt } from "../analysis/stats-router.js";
-import { academicSoftRoutePrompt } from "../ars/academic-router.js";
+import { analysisSoftRoutePrompt, resolveStatsIntent } from "../analysis/stats-router.js";
+import { academicSoftRoutePrompt, resolveAcademicSoftRoute } from "../ars/academic-router.js";
 
 /** PsyClaw session modes cycled by Shift+Tab. */
 export type PsyClawSessionMode = "chat" | "analysis" | "academic";
@@ -31,13 +31,59 @@ export function parseSessionMode(value: unknown): PsyClawSessionMode | undefined
   return undefined;
 }
 
+export type ModeMismatchTarget = "analysis" | "academic";
+
+export interface ModeMismatchReminder {
+  target: ModeMismatchTarget;
+  /** Short TUI notify text. */
+  notify: string;
+}
+
+/**
+ * Detect when chat-mode input clearly belongs in analysis/academic.
+ * Never auto-switches; callers must remind and leave mode unchanged.
+ */
+export function detectChatModeMismatch(text: string): ModeMismatchReminder | null {
+  if (resolveStatsIntent(text)) {
+    return {
+      target: "analysis",
+      notify: "当前是 chat 模式，但请求像是数据分析。请按 Shift+Tab 切到 analysis 后再继续（不会自动切换）。",
+    };
+  }
+  if (resolveAcademicSoftRoute(text)) {
+    return {
+      target: "academic",
+      notify: "当前是 chat 模式，但请求像是文献/写作/审稿。请按 Shift+Tab 切到 academic 后再继续（不会自动切换）。",
+    };
+  }
+  return null;
+}
+
+/** Transform user text so the model must surface the mode reminder in its reply. */
+export function formatChatModeMismatchNotice(mismatch: ModeMismatchReminder, userText: string): string {
+  const targetLabel = mismatch.target === "analysis" ? "analysis（数据分析）" : "academic（文献/写作/审稿）";
+  return [
+    "[PsyClaw mode notice — mandatory]",
+    `The user is in chat mode, but this request fits ${targetLabel}.`,
+    `You MUST open your reply with an explicit reminder to press Shift+Tab until the footer shows "${mismatch.target}".`,
+    "Do not auto-switch modes. Do not run analysis-plan or academic soft-route takeover while still in chat.",
+    mismatch.target === "analysis"
+      ? "You may briefly discuss options, but do not start a structured analysis workflow as if analysis mode were active."
+      : "You may briefly discuss options, but do not load ARS/Nature/compose skills as if academic mode were active.",
+    "",
+    "User request:",
+    userText.trim(),
+  ].join("\n");
+}
+
 /** Mode-specific guidance appended while that sticky mode is active. */
 export function sessionModePrompt(mode: PsyClawSessionMode): string {
   if (mode === "chat") {
     return [
       "## PsyClaw mode: chat",
       "Plain assistant on the Pi harness. Do not force research workflows, /init, or ARS stages.",
-      "If the user wants structured research, suggest Shift+Tab to analysis or academic, or /init to scaffold the project tree.",
+      "If the user expresses data-analysis or academic writing/review intent while in chat, you MUST remind them to press Shift+Tab to analysis or academic. Never silently treat chat as those modes. Never auto-switch.",
+      "For a new project workspace, suggest /init. Soft-route takeover only happens after the user switches mode.",
     ].join("\n");
   }
   if (mode === "analysis") {

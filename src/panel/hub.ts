@@ -80,6 +80,18 @@ export class PanelHub {
     };
   }
 
+  /** Force-end all SSE clients so `http.Server.close()` is not blocked by keep-alive streams. */
+  disconnectAll(): void {
+    for (const client of [...this.clients]) {
+      this.clients.delete(client);
+      try {
+        client.end();
+      } catch {
+        /* already closed */
+      }
+    }
+  }
+
   broadcast(event: PanelHubEvent): void {
     const name = event.type;
     const payload = `event: ${name}\ndata: ${JSON.stringify(event)}\n\n`;

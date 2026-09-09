@@ -65,6 +65,9 @@ export async function openResearchWorkbench(
       installSkill: async (task) => {
         host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
       },
+      installMcp: async (task) => {
+        host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
+      },
       installExternalTool: async (task) => {
         host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
       },
@@ -94,5 +97,16 @@ export async function closeResearchWorkbench(): Promise<void> {
   server = undefined;
   workbenchUrl = undefined;
   if (!current) return;
-  await new Promise<void>((resolve) => current.close(() => resolve()));
+  // SSE keep-alive clients otherwise keep server.close() pending forever.
+  panelHub.disconnectAll();
+  await new Promise<void>((resolve) => {
+    const failsafe = setTimeout(() => {
+      current.closeAllConnections();
+      resolve();
+    }, 1_000);
+    current.close(() => {
+      clearTimeout(failsafe);
+      resolve();
+    });
+  });
 }
