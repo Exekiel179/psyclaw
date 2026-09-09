@@ -5,7 +5,7 @@ import { lookupOaPdfUrl } from "../core/doi.js";
 import { atomicWriteFile, readJsonl } from "../project/jsonl.js";
 import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
 
-export type ReferenceFulltextStatus = "downloaded" | "manual-download-required" | "download-failed";
+export type ReferenceFulltextStatus = "downloaded" | "manual-download-required" | "download-failed" | "approval-required";
 
 export interface ReferenceFulltextRecord {
   schemaVersion: "psyclaw/reference-fulltext/v1";
@@ -59,6 +59,54 @@ async function isPdf(root: string, relativePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Probe OA availability without downloading. Use after the researcher approves download. */
+export async function probeOpenAccessPdf(
+  root: string,
+  doi: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ReferenceFulltextRecord> {
+  const normalized = normalizedDoi(doi);
+  if (!/^10\.\d{4,9}\/\S+$/i.test(normalized)) throw new Error(`Invalid DOI: ${doi}`);
+  const checkedAt = new Date().toISOString();
+  const doiUrl = `https://doi.org/${normalized}`;
+  const localPath = referencePdfPath(normalized);
+  await mkdir(projectPaths(root).literaturePdfs, { recursive: true });
+
+  if (await isPdf(root, localPath)) {
+    const record: ReferenceFulltextRecord = { schemaVersion: "psyclaw/reference-fulltext/v1", doi: normalized, doiUrl, status: "downloaded", localPath, checkedAt };
+    await saveRecord(root, record);
+    return record;
+  }
+
+  const lookup = await lookupOaPdfUrl(normalized, fetchFn);
+  if (!lookup.oaPdfUrl || !/^https?:\/\//i.test(lookup.oaPdfUrl)) {
+    const record: ReferenceFulltextRecord = {
+      schemaVersion: "psyclaw/reference-fulltext/v1",
+      doi: normalized,
+      doiUrl,
+      status: "manual-download-required",
+      localPath,
+      reason: "No verified open-access PDF was found. Use lawful personal or institutional access; PsyClaw will not bypass a paywall.",
+      checkedAt,
+    };
+    await saveRecord(root, record);
+    return record;
+  }
+
+  const record: ReferenceFulltextRecord = {
+    schemaVersion: "psyclaw/reference-fulltext/v1",
+    doi: normalized,
+    doiUrl,
+    status: "approval-required",
+    localPath,
+    sourceUrl: lookup.oaPdfUrl,
+    reason: "Open-access PDF is available. Ask the researcher before downloading.",
+    checkedAt,
+  };
+  await saveRecord(root, record);
+  return record;
 }
 
 /** Download only a verified open-access location. Paywalled items stay as a DOI link and an exact local target. */

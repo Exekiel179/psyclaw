@@ -206,6 +206,10 @@ export function formatAcademicSoftRouteInvocation(
     `Academic soft-route (${match.reason}). Load and follow this skill now; do not ask the user to retype /skill:${match.skill}.`,
     modeLine,
     followLine,
+    "Pace with human checkpoints: split work into nodes (e.g. lit-review method → what will be shown → then execute). Confirm each node before the next heavy stage.",
+    "If the user request is vague without a crisp research question, remind them to use /grill. If they seem short on ideas, remind them to use /brainstorm.",
+    "Do not auto-start /crosscheck or /verify; ask first and wait for explicit agreement.",
+    "Before downloading any open-access PDF, ask the user; if download fails or OA is unavailable, explain and provide the DOI link.",
     "User request:",
     userText.trim(),
   ].filter((line) => line !== undefined && line !== "").join("\n");
@@ -231,5 +235,7 @@ export function academicSoftRoutePrompt(): string {
     "Invoke the chosen skill via `/skill:<name>` (or the host skill tool) so the user can see it, then follow that skill. Do not ask the user to type the slash command when the intent is clear.",
     "Skills outside this allowlist must NOT be auto-selected. If another skill is needed, tell the user to run `/skill:<name>` explicitly (or `/skill` to manage installs).",
     "Explicit user `/skill:` or `/ars-*` always wins over soft routing.",
+    "When intent is vague, prefer reminding `/grill` (pressure-test) or `/brainstorm` (ideation) over silently launching a full pipeline.",
+    "Prefer more, smaller human-confirmable nodes over racing through lit-review + writing + verify in one pass.",
   ].join("\n");
 }

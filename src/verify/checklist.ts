@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { atomicWriteFile } from "../project/jsonl.js";
 import { assertSafeProjectPath } from "../project/paths.js";
+import { PLAN_RITUAL_PHRASE } from "../analysis/plan.js";
+
+export { PLAN_RITUAL_PHRASE };
 
 export const VERIFY_CHECKLIST_SCHEMA = "psyclaw/verify-checklist/v1" as const;
 export const VERIFY_CHECKLIST_PATH = ".psyclaw/verify-checklist.json" as const;
@@ -301,6 +304,13 @@ export function formatVerifyChecklist(checklist: VerifyChecklist): string {
   return lines.join("\n");
 }
 
+/** Soft per-node / mid-plan acknowledge — does NOT authorize script execution. */
 export function isNaturalPlanConfirm(text: string): boolean {
-  return /^(可以|确认|同意|好的|行|ok|okay|yes|y|继续|开始执行)([。.!！\s].*)?$/i.test(text.trim());
+  return /^(可以|确认|同意|好的|行|ok|okay|yes|y|继续)([。.!！\s].*)?$/i.test(text.trim());
+}
+
+/** Exact typed ritual required before running an analysis plan under human approval. */
+export function isPlanRitualConfirm(text: string): boolean {
+  const trimmed = text.trim().replace(/[。.!！]+$/u, "");
+  return trimmed === PLAN_RITUAL_PHRASE || trimmed.includes(PLAN_RITUAL_PHRASE);
 }

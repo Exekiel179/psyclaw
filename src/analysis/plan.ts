@@ -31,6 +31,9 @@ export type AnalysisExecutionBackend = "local-script" | "mcp" | "undecided";
 
 export type AnalysisApprovalMode = "human" | "auto";
 
+/** Typed sentence required before execute when approvalMode=human. */
+export const PLAN_RITUAL_PHRASE = "我已审阅并批准本方案" as const;
+
 export interface AnalysisPlanChoice {
   id: string;
   question: string;
@@ -39,6 +42,11 @@ export interface AnalysisPlanChoice {
   recommendation?: string;
   selected?: string;
   decidedAt?: string;
+}
+
+export interface AnalysisPlanRitualApproval {
+  text: string;
+  at: string;
 }
 
 export interface AnalysisPlanEdaNote {
@@ -62,6 +70,8 @@ export interface AnalysisPlanRecord extends AnalysisPlanContract {
   confirmedMethod?: string;
   executionBackend: AnalysisExecutionBackend;
   approvalMode: AnalysisApprovalMode;
+  /** Overall plan ritual — required before run-now when approvalMode=human. */
+  ritualApproval?: AnalysisPlanRitualApproval;
   mcpServer?: string;
   scriptEntrypoint?: string;
   reviewFindings: string[];
@@ -145,6 +155,9 @@ export async function readAnalysisPlan(root: string, id: string): Promise<Analys
       ...value,
       analysisChoices: Array.isArray(value.analysisChoices) ? value.analysisChoices : [],
       approvalMode: value.approvalMode === "auto" ? "auto" : "human",
+      ...(value.ritualApproval && typeof value.ritualApproval.text === "string" && typeof value.ritualApproval.at === "string"
+        ? { ritualApproval: value.ritualApproval }
+        : {}),
     };
   } catch {
     return null;
@@ -182,6 +195,7 @@ export function advanceAnalysisPlan(
     | { type: "decide-choice"; id: string; selected: string }
     | { type: "set-approval-mode"; mode: AnalysisApprovalMode }
     | { type: "confirm"; method: string; backend?: AnalysisExecutionBackend; mcpServer?: string }
+    | { type: "ritual-approve"; text: string }
     | { type: "review" }
     | { type: "ready" }
     | { type: "run-now" }
@@ -193,6 +207,7 @@ export function advanceAnalysisPlan(
     ...plan,
     analysisChoices: [...(plan.analysisChoices ?? [])],
     approvalMode: plan.approvalMode ?? "human",
+    ...(plan.ritualApproval ? { ritualApproval: plan.ritualApproval } : {}),
     updatedAt: nowIso(),
   };
   switch (action.type) {
@@ -236,6 +251,15 @@ export function advanceAnalysisPlan(
       if (action.mcpServer) next.mcpServer = action.mcpServer;
       next.status = "reviewing";
       break;
+    case "ritual-approve": {
+      const text = action.text.trim();
+      next.ritualApproval = { text, at: nowIso() };
+      next.notes = [next.notes, `仪式批准：${text}`].filter(Boolean).join("\n");
+      if (next.status === "awaiting-confirm" || next.status === "drafting") {
+        next.status = "reviewing";
+      }
+      break;
+    }
     case "review": {
       const result = validateAnalysisPlan(next);
       next.reviewFindings = result.findings.map((finding) => `${finding.severity}: ${finding.message}`);
@@ -245,10 +269,25 @@ export function advanceAnalysisPlan(
     case "ready":
       next.status = "ready";
       break;
-    case "run-now":
+    case "run-now": {
+      const pendingChoices = next.analysisChoices.filter((row) => !row.selected);
+      if ((next.approvalMode ?? "human") === "human" && pendingChoices.length > 0) {
+        next.status = "awaiting-confirm";
+        next.notes = [next.notes, `执行被拒：尚有 ${pendingChoices.length} 项子分析未确认`].filter(Boolean).join("\n");
+        break;
+      }
+      if ((next.approvalMode ?? "human") === "human" && !next.ritualApproval) {
+        next.status = next.status === "running" ? "ready" : next.status === "clarifying" ? "awaiting-confirm" : next.status;
+        if (next.status === "reviewing" || next.status === "ready" || next.status === "awaiting-confirm") {
+          next.status = "ready";
+        }
+        next.notes = [next.notes, `执行被拒：须完整输入「${PLAN_RITUAL_PHRASE}」`].filter(Boolean).join("\n");
+        break;
+      }
       next.runPreference = "now";
       next.status = "running";
       break;
+    }
     case "defer":
       next.runPreference = "later";
       next.status = "deferred";
@@ -275,6 +314,7 @@ export function renderAnalysisPlanMarkdown(plan: AnalysisPlanRecord): string {
     `- Confirmatory: ${plan.confirmatory ? "yes" : "no (exploratory OK if disclosed)"}`,
     `- Execution: ${plan.executionBackend}${plan.mcpServer ? ` (${plan.mcpServer})` : ""}`,
     `- Approval mode: **${plan.approvalMode ?? "human"}**${(plan.approvalMode ?? "human") === "auto" ? "（结果须标注未经人审批）" : ""}`,
+    `- Ritual approval: ${plan.ritualApproval ? `yes @ ${plan.ritualApproval.at}` : `pending — type「${PLAN_RITUAL_PHRASE}」`}`,
     `- Run preference: ${plan.runPreference}`,
     "",
     "## Per-analysis choices",
@@ -334,11 +374,17 @@ export function renderAnalysisPlanMarkdown(plan: AnalysisPlanRecord): string {
 
 export function formatAnalysisPlanStatus(plan: AnalysisPlanRecord): string {
   const pending = (plan.analysisChoices ?? []).filter((row) => !row.selected).length;
+  const ritual = plan.ritualApproval
+    ? `仪式批准：已记录 @ ${plan.ritualApproval.at}`
+    : (plan.approvalMode ?? "human") === "auto"
+      ? "仪式批准：auto（结果须标注未经人审批）"
+      : `仪式批准：待输入「${PLAN_RITUAL_PHRASE}」`;
   return [
     `分析 Plan \`${plan.id}\` · ${plan.status}/${plan.stage}`,
     `目标：${plan.goal}`,
     `主分析：${plan.confirmedMethod ?? plan.primaryAnalysis ?? "（未确认）"}`,
     `审批：${plan.approvalMode ?? "human"}${pending > 0 ? ` · 待选分析 ${pending} 项` : ""}`,
+    ritual,
     `后端：${plan.executionBackend}${plan.mcpServer ? `/${plan.mcpServer}` : ""} · 执行偏好：${plan.runPreference}`,
     `文件：analysis/plans/${plan.id}.md`,
     plan.reviewFindings.length > 0 ? `审核：${plan.reviewFindings.join("；")}` : "审核：尚未完成或无发现",

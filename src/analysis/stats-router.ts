@@ -32,7 +32,10 @@ export function formatAnalysisPlanTakeover(userText: string): string {
     "Do not start academic/ARS writing. Do not invent numerical results.",
     "Default execution backend: write reproducible scripts under analysis/scripts/ using mature libraries (pandas/pingouin/statsmodels/scipy or R equivalents).",
     "Use MCP only when the user needs a special backend (SPSS/Mplus/MNE/Stata) or explicitly asks.",
-    "Persist structured state with /plan (new|status|confirm|review|run|defer|handoff); soft confirm ≠ ARS checkpoint ≠ awaiting-human.",
+    "Per-analysis choice cards are mandatory. Soft「可以」settles only the current card.",
+    "Overall execute authorization requires the typed ritual: 我已审阅并批准本方案 (unless /plan auto).",
+    "Do not auto-start /crosscheck or /verify — ask first.",
+    "Persist structured state with /plan (new|status|confirm|review|run|defer|handoff).",
     "User request:",
     userText.trim(),
   ].join("\n");
@@ -43,10 +46,10 @@ export function analysisSoftRoutePrompt(): string {
   return [
     "## Analysis soft-route (stats plan)",
     "While analysis mode is active, clear statistical / data-analysis intents soft-takeover into `/skill:analysis-plan` without waiting for an explicit slash from the user.",
-    "Stages: clarify + light EDA → **per-analysis choices** (first option = concrete new method; 「已经足够」only as last option) → soft confirm via natural language「可以」→ pre-check → execute → post-check → handoff.",
-    "Optional natural-language auto-approval may skip method approval but every result must disclose 未经人审批.",
+    "Stages: clarify + light EDA → **per-analysis choices** (first option = concrete new method; 「已经足够」only as last option) → soft「可以」per card → overall typed ritual「我已审阅并批准本方案」→ execute → ask before /crosscheck|/verify → handoff.",
+    "Optional `/plan auto` skips ritual but every result must disclose 未经人审批.",
     "Do not merge this with academic/ARS planning. After an accepted/completed plan (and results), update `analysis/HANDOFF.md` before switching to academic.",
     "Explicit `/skill:` or `/plan` always wins over soft routing. Academic writing intents belong in academic mode.",
-    "Initiate `/crosscheck` (process: data, citation existence, format; multi-view merge) and `/verify` (substance: results hold, citation/method reasonableness). Human approval is forced by the completion gate via Panel or wake-options — never ask the user to type a human-approve slash. AI-checked/skipped do not pass.",
+    "Never auto-initiate `/crosscheck` or `/verify`. Propose the block, wait for explicit user agreement, then run. Final human Panel/wake approval still gates completion.",
   ].join("\n");
 }
