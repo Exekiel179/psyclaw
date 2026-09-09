@@ -423,6 +423,74 @@ async function applySettingsPatches(settingsManagerPath) {
   return applied;
 }
 
+export const FOOTER_PATCHES = [
+  {
+    old: `        else {
+            contextPercentStr = contextPercentDisplay;
+        }
+        statsParts.push(contextPercentStr);
+        if (areExperimentalFeaturesEnabled()) {`,
+    next: `        else {
+            contextPercentStr = contextPercentDisplay;
+        }
+        statsParts.push(contextPercentStr);
+        const modeStatus = this.footerData.getExtensionStatuses().get("mode");
+        if (modeStatus) {
+            statsParts.push(sanitizeStatusText(modeStatus));
+        }
+        if (areExperimentalFeaturesEnabled()) {`,
+  },
+  {
+    old: `        // Add extension statuses on a single line, sorted by key alphabetically
+        const extensionStatuses = this.footerData.getExtensionStatuses();
+        if (extensionStatuses.size > 0) {
+            const sortedStatuses = Array.from(extensionStatuses.entries())
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([, text]) => sanitizeStatusText(text));
+            const statusLine = sortedStatuses.join(" ");
+            // Truncate to terminal width with dim ellipsis for consistency with footer style
+            lines.push(truncateToWidth(statusLine, width, theme.fg("dim", "...")));
+        }`,
+    next: `        // Add extension statuses on a single line, sorted by key alphabetically
+        const extensionStatuses = this.footerData.getExtensionStatuses();
+        if (extensionStatuses.size > 0) {
+            const sortedStatuses = Array.from(extensionStatuses.entries())
+                .filter(([key]) => key !== "mode")
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([, text]) => sanitizeStatusText(text));
+            if (sortedStatuses.length > 0) {
+                const statusLine = sortedStatuses.join(" ");
+                // Truncate to terminal width with dim ellipsis for consistency with footer style
+                lines.push(truncateToWidth(statusLine, width, theme.fg("dim", "...")));
+            }
+        }`,
+  },
+];
+
+export function applyFooterPatchesToContent(content) {
+  let patched = content;
+  let appliedCount = 0;
+  const isCrlf = content.includes("\r\n");
+  for (const { old, next } of FOOTER_PATCHES) {
+    const targetOld = isCrlf ? old.replace(/\r?\n/g, "\r\n") : old;
+    const targetNext = isCrlf ? next.replace(/\r?\n/g, "\r\n") : next;
+    if (patched.includes(targetOld)) {
+      patched = patched.replace(targetOld, targetNext);
+      appliedCount++;
+    }
+  }
+  return { content: patched, applied: appliedCount > 0, appliedCount };
+}
+
+async function applyFooterPatches(footerPath) {
+  const content = await readFile(footerPath, "utf8");
+  const result = applyFooterPatchesToContent(content);
+  if (result.applied) {
+    await atomicReplace(footerPath, result.content, true);
+  }
+  return result.appliedCount;
+}
+
 const MANAGED_TOOL_DOWNLOAD_GUARD = `    // PsyClaw supplies Node-based find/grep fallbacks. Keep PATH tools when
     // present, but never fetch optional binaries from GitHub during startup.
     return undefined;`;
@@ -448,16 +516,18 @@ export async function rebrandPiRuntime(options = {}) {
   const settingsManagerPath = join(pkgDir, "dist", "core", "settings-manager.js");
   const slashCommandsPath = join(pkgDir, "dist", "core", "slash-commands.js");
   const toolsManagerPath = join(pkgDir, "dist", "utils", "tools-manager.js");
+  const footerPath = join(pkgDir, "dist", "modes", "interactive", "components", "footer.js");
 
   const pkgResult = await patchPackageJson(pkgPath);
   const applied = await applyModePatches(modePath);
   const settingsApplied = await applySettingsPatches(settingsManagerPath);
+  const footerApplied = await applyFooterPatches(footerPath);
   const commandApplied = await applySlashCommandPatches(slashCommandsPath);
   const managedToolsRestored = await restoreManagedToolManager(toolsManagerPath);
 
   if (!options.quiet) {
     process.stdout.write(
-      `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} · ${commandApplied.length > 0 ? `hidden ${commandApplied.length} Pi command(s)` : "Pi commands already filtered"} · ${managedToolsRestored ? "restored managed-tool downloads" : "managed-tool downloads unchanged"} (${pkgDir})\n`,
+      `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} · ${footerApplied > 0 ? `patched ${footerApplied} footer component(s)` : "footer already patched"} · ${commandApplied.length > 0 ? `hidden ${commandApplied.length} Pi command(s)` : "Pi commands already filtered"} · ${managedToolsRestored ? "restored managed-tool downloads" : "managed-tool downloads unchanged"} (${pkgDir})\n`,
     );
     if (applied.length > 0) {
       for (const label of applied) {
@@ -468,6 +538,9 @@ export async function rebrandPiRuntime(options = {}) {
       for (const label of settingsApplied) {
         process.stdout.write(`  - ${label}…\n`);
       }
+    }
+    if (footerApplied > 0) {
+      process.stdout.write(`  - mode status inline with context auto indicator…\n`);
     }
     if (commandApplied.length > 0) {
       for (const label of commandApplied) {

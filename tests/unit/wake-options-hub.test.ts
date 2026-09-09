@@ -87,4 +87,39 @@ describe("panel hub + wake-options", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
+
+  it("disconnectAll ends SSE so server.close is not blocked", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-sse-close-"));
+    const htmlPath = join(root, "panel.html");
+    await writeFile(htmlPath, "<!DOCTYPE html><title>panel</title>", "utf8");
+    const hub = new PanelHub();
+    const server = createPanelServer(root, { panelHtmlPath: htmlPath, hub });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+
+    try {
+      const streamRes = await fetch(`http://127.0.0.1:${port}/api/assistant/stream`);
+      expect(streamRes.status).toBe(200);
+      const reader = streamRes.body?.getReader();
+      expect(reader).toBeDefined();
+      await reader!.read();
+      expect(hub.subscriberCount()).toBeGreaterThan(0);
+
+      hub.disconnectAll();
+      expect(hub.subscriberCount()).toBe(0);
+
+      await Promise.race([
+        new Promise<void>((resolve) => server.close(() => resolve())),
+        new Promise<void>((_, reject) => setTimeout(() => reject(new Error("server.close hung")), 2_000)),
+      ]);
+    } finally {
+      try {
+        hub.disconnectAll();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      } catch {
+        /* already closed */
+      }
+    }
+  });
 });

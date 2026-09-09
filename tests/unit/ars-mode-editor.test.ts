@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MODE_STATUS, nextSessionMode, sessionModePrompt } from "../../src/session/modes.js";
+import {
+  MODE_STATUS,
+  detectChatModeMismatch,
+  formatChatModeMismatchNotice,
+  nextSessionMode,
+  sessionModePrompt,
+} from "../../src/session/modes.js";
 import { ARS_MODE_STATUS, enterArsModeEditorText, isArsModeEditorText } from "../../src/ars/mode-editor.js";
 import { defaultVerifyChecklist, formatVerifyChecklist } from "../../src/verify/checklist.js";
 
@@ -15,6 +21,26 @@ describe("session modes", () => {
   it("exposes mode prompts for soft pipeline", () => {
     expect(sessionModePrompt("analysis")).toContain("Priority: get runnable analysis results");
     expect(sessionModePrompt("academic")).toContain("psyclaw_ars_multi_agent");
+    expect(sessionModePrompt("chat")).toContain("MUST remind");
+  });
+
+  it("detects chat-mode analysis/academic mismatches without switching", () => {
+    const stats = detectChatModeMismatch("我想分析数据");
+    expect(stats?.target).toBe("analysis");
+    expect(stats?.notify).toContain("Shift+Tab");
+    expect(stats?.notify).toContain("analysis");
+
+    const academic = detectChatModeMismatch("帮我写论文终稿");
+    expect(academic?.target).toBe("academic");
+
+    expect(detectChatModeMismatch("今天天气怎么样")).toBeNull();
+    expect(detectChatModeMismatch("/plan status")).toBeNull();
+
+    const notice = formatChatModeMismatchNotice(stats!, "我想分析数据");
+    expect(notice).toContain("mandatory");
+    expect(notice).toContain("Shift+Tab");
+    expect(notice).toContain("我想分析数据");
+    expect(notice).not.toContain("/skill:analysis-plan");
   });
 });
 

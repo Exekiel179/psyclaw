@@ -168,4 +168,97 @@ describe("read-only panel server", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
+
+  it("queues skill and mcp installs through the model channel and records recommendation state", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-install-"));
+    await bootstrapProject({ root, goal: "Install", paradigm: "survey-observational" });
+    const htmlPath = join(root, "panel.html");
+    await writeFile(htmlPath, "<!DOCTYPE html><title>panel</title>", "utf8");
+    const queued: string[] = [];
+    const server = createPanelServer(root, {
+      panelHtmlPath: htmlPath,
+      installSkill: async (task) => { queued.push(`skill:${task}`); },
+      installMcp: async (task) => { queued.push(`mcp:${task}`); },
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    const base = `http://127.0.0.1:${port}`;
+    try {
+      const skills = (await (await fetch(`${base}/api/recommended-skills`)).json()) as { items: Array<{ id: string }> };
+      const mcps = (await (await fetch(`${base}/api/recommended-mcps`)).json()) as { items: Array<{ id: string }> };
+      const skillId = skills.items[0]?.id;
+      const mcpId = mcps.items[0]?.id;
+      expect(skillId).toBeTruthy();
+      expect(mcpId).toBeTruthy();
+
+      const skillRes = await fetch(`${base}/api/install/execute`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "skill", id: skillId, scope: "project", approved: true, actor: "researcher" }),
+      });
+      expect(skillRes.status).toBe(202);
+      expect(await skillRes.json()).toMatchObject({ ok: true, queued: true, id: skillId });
+      expect(queued.some((item) => item.startsWith("skill:") && item.includes(String(skillId)))).toBe(true);
+
+      const mcpRes = await fetch(`${base}/api/install/execute`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "mcp", id: mcpId, approved: true, actor: "researcher" }),
+      });
+      expect(mcpRes.status).toBe(202);
+      expect(await mcpRes.json()).toMatchObject({ ok: true, queued: true, id: mcpId });
+      expect(queued.some((item) => item.startsWith("mcp:") && item.includes(String(mcpId)))).toBe(true);
+
+      const enabled = (await (await fetch(`${base}/api/enabled-capabilities`)).json()) as {
+        skills: Array<{ id: string }>;
+        mcp: Array<{ id: string }>;
+      };
+      expect(enabled.skills.map((item) => item.id)).toContain(skillId);
+      expect(enabled.mcp.map((item) => item.id)).toContain(mcpId);
+
+      const unavailable = createPanelServer(root, { panelHtmlPath: htmlPath });
+      await new Promise<void>((resolve) => unavailable.listen(0, "127.0.0.1", resolve));
+      const unavailablePort = (() => {
+        const addr = unavailable.address();
+        return typeof addr === "object" && addr ? addr.port : 0;
+      })();
+      try {
+        const blocked = await fetch(`http://127.0.0.1:${unavailablePort}/api/install/execute`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kind: "mcp", id: mcpId, approved: true, actor: "researcher" }),
+        });
+        expect(blocked.status).toBe(503);
+      } finally {
+        await new Promise<void>((resolve) => unavailable.close(() => resolve()));
+      }
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it("serves the panel whitepaper markdown from package docs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-whitepaper-"));
+    await bootstrapProject({ root, goal: "Docs", paradigm: "survey-observational" });
+    const htmlPath = join(root, "panel.html");
+    await writeFile(htmlPath, "<!DOCTYPE html><title>panel</title>", "utf8");
+    const server = createPanelServer(root, { panelHtmlPath: htmlPath });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    const port = typeof address === "object" && address ? address.port : 0;
+    const base = `http://127.0.0.1:${port}`;
+    try {
+      const res = await fetch(`${base}/api/docs/whitepaper`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { schemaVersion: string; markdown: string; source: string };
+      expect(body.schemaVersion).toBe("psyclaw/panel-whitepaper/v1");
+      expect(typeof body.markdown).toBe("string");
+      expect(body.markdown.length).toBeGreaterThan(20);
+      expect(body.markdown).toMatch(/PsyClaw|白皮书/);
+      expect(body.source).toMatch(/\.md$/);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 });

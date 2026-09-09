@@ -1,8 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
-import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { lstat, mkdir, readFile, readdir, realpath, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { listRuns, projectRunSnapshot } from "./projection.js";
@@ -469,6 +468,8 @@ export interface PanelServerOptions {
   hub?: PanelHub;
   /** Queue an approved installation task into the current PsyClaw model session. */
   installSkill?: (task: string) => Promise<void>;
+  /** Queue an approved MCP install/configure task into the current PsyClaw model session. */
+  installMcp?: (task: string) => Promise<void>;
   /** Queue an explicitly requested external-tool installation task. */
   installExternalTool?: (task: string) => Promise<void>;
   /** Install a Plugin through Pi's native package manager. */
@@ -508,6 +509,29 @@ function panelExternalToolInstallTask(root: string, item: Record<string, unknown
     String(item.installHint ?? "读取官方最新安装说明，选择适合当前操作系统的安装方式。"),
     "用户已在 Panel 中明确点击安装。读取官方安装说明，执行安装并验证版本或最小命令；不要读取或输出凭据。",
     "这是外部工具，不要将它宣称为来源仓库提供的 Skill 或 Plugin。完成后用自然语言报告实际安装位置、版本和验证结果。",
+  ].join("\n");
+}
+
+function panelMcpInstallTask(root: string, item: Record<string, unknown>, prep?: Record<string, unknown>): string {
+  const id = String(item.id ?? "");
+  const name = String(item.name ?? id);
+  const sourceRef = String(item.sourceRef ?? "");
+  const suggestedCommand = typeof prep?.command === "string" && prep.command.trim()
+    ? prep.command.trim()
+    : "请根据来源仓库的最新安装说明确定";
+  const suggestedTarget = typeof prep?.target === "string" && prep.target.trim()
+    ? prep.target.trim()
+    : `.psyclaw/mcp/${id}.json`;
+  return [
+    `安装并配置推荐 MCP：${name} (${id})。`,
+    `来源网址：${sourceRef || "未提供；请停止并告知用户"}`,
+    `当前项目：${root}`,
+    `目录中的参考命令：${suggestedCommand}`,
+    `建议的项目配置记录：${suggestedTarget}`,
+    "用户已经通过 Panel 推荐页明确授权本次安装。你可以直接联网、克隆或下载来源、使用所需包管理器安装依赖、执行安装命令，并写入与该 MCP 有关的项目或用户级运行配置；不要再次要求用户批准这些安装步骤。",
+    "请先阅读来源仓库的实际安装与启动说明，再根据当前操作系统和宿主环境完成可运行的 stdio/HTTP MCP 配置。目录中的版本、命令和依赖只作参考，不得因为哈希、许可证、依赖或本地数据策略检查而中止安装。",
+    "安装完成后实际启动一次服务器或执行等价的最小连通性检查，确认启动命令和工作目录有效。不要输出、复制或提交 API Key、令牌及其他凭据。",
+    `成功后确保 .psyclaw/recommendations.json 的 mcp 列表包含 ${JSON.stringify(id)}，说明写入了哪些配置，并提醒用户执行 /reload。若安装命令本身失败，直接诊断并修复；只有遇到必须由用户提供的凭据或外部软件许可证时才向用户说明。`,
   ].join("\n");
 }
 
@@ -638,6 +662,57 @@ async function panelCatalog(root: string): Promise<unknown> {
   return { schemaVersion: "psyclaw/panel-catalog/v1", agents, models };
 }
 
+function packageRootCandidates(): string[] {
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  return [
+    join(moduleDir, "..", "..", ".."),
+    join(moduleDir, "..", "..", "..", ".."),
+    join(moduleDir, "..", ".."),
+    process.cwd(),
+  ];
+}
+
+function isAllowlistedDocsRelative(rel: string): boolean {
+  const normalized = rel.split(sep).join("/");
+  if (!normalized || normalized.startsWith("../") || normalized.includes("/../") || normalized.startsWith("/") || normalized.includes("\0")) {
+    return false;
+  }
+  return normalized === "docs" || normalized.startsWith("docs/")
+    || normalized.startsWith("research-materials/whitepaper/");
+}
+
+/** Read Panel help whitepaper from package docs/, following a single .md link when present. */
+async function readPanelWhitepaper(): Promise<{ markdown: string; source: string }> {
+  const stubRel = join("docs", "使用白皮书.md");
+  for (const root of packageRootCandidates()) {
+    const stubPath = join(root, stubRel);
+    try {
+      const rootReal = await realpath(root);
+      const stubReal = await realpath(stubPath);
+      const stubFromRoot = relative(rootReal, stubReal).split(sep).join("/");
+      if (stubFromRoot !== "docs/使用白皮书.md") continue;
+      const stub = await readFile(stubReal, "utf8");
+      const linkMatch = stub.match(/\[[^\]]*\]\(([^)\s]+\.md)\)/);
+      if (linkMatch?.[1]) {
+        const targetPath = resolve(dirname(stubReal), linkMatch[1]);
+        try {
+          const targetReal = await realpath(targetPath);
+          const rel = relative(rootReal, targetReal).split(sep).join("/");
+          if (isAllowlistedDocsRelative(rel)) {
+            return { markdown: await readFile(targetReal, "utf8"), source: rel };
+          }
+        } catch {
+          /* linked file missing — fall through to stub */
+        }
+      }
+      return { markdown: stub, source: stubFromRoot };
+    } catch {
+      /* try next package root */
+    }
+  }
+  throw new Error("whitepaper not found");
+}
+
 async function recommendedSkills(): Promise<unknown> {
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
@@ -712,21 +787,6 @@ async function findRecommendedItem(kind: "skill" | "mcp", id: string): Promise<{
   if (!item) return undefined;
   const prep = (catalog.installPrep ?? []).find((candidate) => candidate.id === id);
   return { item, ...(prep === undefined ? {} : { prep }) };
-}
-
-function runShellCommand(command: string, cwd: string): Promise<{ exitCode: number; output: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(command, { shell: true, cwd, stdio: ["ignore", "pipe", "pipe"] });
-    let output = "";
-    const append = (chunk: Buffer): void => {
-      output += String(chunk);
-      if (output.length > 24_000) output = output.slice(-24_000);
-    };
-    child.stdout?.on("data", append);
-    child.stderr?.on("data", append);
-    child.on("error", (error) => resolve({ exitCode: 1, output: `spawn error: ${error.message}` }));
-    child.on("close", (code) => resolve({ exitCode: code ?? 1, output }));
-  });
 }
 
 const USER_HOOK_ID = /^u-[a-z0-9][a-z0-9._-]{0,40}$/i;
@@ -983,6 +1043,21 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-help/v1", ...sessionHelpDocument() }));
         return;
       }
+      if (url.pathname === "/api/docs/whitepaper") {
+        try {
+          const doc = await readPanelWhitepaper();
+          response.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+          response.end(JSON.stringify({
+            schemaVersion: "psyclaw/panel-whitepaper/v1",
+            source: doc.source,
+            markdown: doc.markdown,
+          }));
+        } catch {
+          response.writeHead(404, { "content-type": "application/json" });
+          response.end(JSON.stringify({ error: "whitepaper not found" }));
+        }
+        return;
+      }
       if (url.pathname === "/api/files") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-files/v1", files: await listProjectFiles(root) }));
@@ -1191,6 +1266,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           }
           await options.installSkill(panelSkillInstallTask(root, found.item, scope));
           const state = await readRecommendationState(root);
+          state.skills = [...new Set([...state.skills, id])];
           state.skillScopes = { ...(state.skillScopes ?? {}), [id]: scope };
           await writeRecommendationState(root, state);
           response.writeHead(202, { "content-type": "application/json" });
@@ -1201,7 +1277,31 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
             id,
             scope,
             reloadHint: "/reload",
-            message: "安装任务已交给当前模型；模型完成后请启用 Skill 并执行 /reload。",
+            message: "安装任务已交给当前 PsyClaw 对话中的模型；请回到终端会话查看进度。模型完成后执行 /reload。",
+          }));
+          return;
+        }
+        if (kind === "mcp") {
+          if (options.installMcp === undefined) {
+            response.writeHead(503, { "content-type": "application/json" });
+            response.end(JSON.stringify({ error: "MCP 安装需要当前模型通道；请在 PsyClaw 对话中执行 /panel 后再安装。", reasonCode: "panel.mcp-installer-unavailable" }));
+            return;
+          }
+          const sourceRef = String(found.item.sourceRef ?? "").trim();
+          if (!sourceRef) throw new Error("MCP source is missing");
+          await options.installMcp(panelMcpInstallTask(root, found.item, found.prep));
+          const state = await readRecommendationState(root);
+          state.mcp = [...new Set([...state.mcp, id])];
+          await writeRecommendationState(root, state);
+          response.writeHead(202, { "content-type": "application/json" });
+          response.end(JSON.stringify({
+            schemaVersion: "psyclaw/model-install-task/v1",
+            ok: true,
+            queued: true,
+            id,
+            reloadHint: "/reload",
+            message: "安装与配置任务已交给当前 PsyClaw 对话中的模型；请回到终端会话查看进度。模型完成后执行 /reload。",
+            ...(typeof found.prep?.blockedReason === "string" ? { blockedReason: found.prep.blockedReason } : {}),
           }));
           return;
         }
@@ -1230,61 +1330,8 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           response.end(JSON.stringify({ schemaVersion: "psyclaw/external-tool-install-task/v1", ok: true, queued: true, id, message: "安装任务已交给当前模型；完成后会报告版本与验证结果。" }));
           return;
         }
-        const shellCommand = typeof found.prep?.command === "string" && found.prep.command.trim() ? found.prep.command.trim() : undefined;
-        if (!shellCommand) {
-          response.writeHead(400, { "content-type": "application/json" });
-          response.end(JSON.stringify({ error: "no install command is available for this item", blockedReason: found.prep?.blockedReason ?? null }));
-          return;
-        }
-        const command = shellCommand;
-        const startedAt = new Date().toISOString();
-        const runId = `panel_${randomUUID().replaceAll("-", "")}`;
-        const idempotencyKey = `panel:install:${sha256Text(`${kind}\u0000${id}\u0000${actor}`).slice(0, 24)}`;
-        const receipt: Record<string, unknown> = {
-          schemaVersion: "psyclaw/tool-receipt/v1",
-          runId,
-          taskId: `install:${kind}:${id}`,
-          tool: "panel.install.execute",
-          effect: "write",
-          approval: "approved",
-          idempotencyKey,
-          ok: false,
-          command,
-          startedAt,
-        };
-        let exitCode: number;
-        let output: string;
-        ({ exitCode, output } = await runShellCommand(command, root));
-        receipt.ok = exitCode === 0;
-        receipt.exitCode = exitCode;
-        receipt.finishedAt = new Date().toISOString();
-        const receiptPath = await assertSafeProjectPath(root, `.psyclaw/manifests/${runId}.receipt.json`);
-        await atomicWriteFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-        if (receipt.ok) {
-          const state = await readRecommendationState(root);
-          state.mcp = [...new Set([...state.mcp, id])];
-          await writeRecommendationState(root, state);
-        }
-        await appendJsonlIfMissing(projectPaths(root).audit, {
-          schemaVersion: "psyclaw/audit-event/v1",
-          at: new Date().toISOString(),
-          actor,
-          action: `panel.install.${kind}`,
-          targetId: id,
-          ok: receipt.ok,
-          runId,
-          idempotencyKey,
-        }, (item) => item.runId);
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({
-          schemaVersion: "psyclaw/install-execution-receipt/v1",
-          ok: receipt.ok,
-          exitCode,
-          command,
-          output: output.slice(-2000),
-          reloadHint: "/reload",
-          ...(typeof found.prep?.blockedReason === "string" ? { blockedReason: found.prep.blockedReason } : {}),
-        }));
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: `unsupported install kind: ${String(kind)}` }));
         return;
       }
       if (url.pathname === "/api/recommendation-state") {

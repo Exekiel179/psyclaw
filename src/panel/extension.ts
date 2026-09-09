@@ -71,7 +71,10 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
       panelHub.broadcast({ type: "agent_settled" });
     });
 
-    pi.on("session_shutdown", async () => {
+    pi.on("session_shutdown", async (event) => {
+      // /reload tears down and rebuilds the extension runner; keep the loopback
+      // workbench (and its SSE clients) alive so reload does not hang on close.
+      if (event.reason === "reload") return;
       await closeResearchWorkbench();
     });
   }

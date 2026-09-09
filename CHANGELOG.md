@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.19 - 2026-09-09
+
+- Panel recommended Skill/MCP/Plugin install queues through the model session with 正在安装 state, confirms, and prerequisite install for Journal Frontier Radar (Kimi WebBridge)
+- Show Kimi WebBridge under Skill and 外部工具 tabs; render usage whitepaper in Panel help; trim topbar sandbox/crosscheck chrome; slash autocomplete in chat
+- Ship docs whitepaper files in the npm package for Panel
+
 ## 0.29.18 - 2026-09-09
 
 - Anonymous product telemetry default-on (Sentry + PostHog) with one-time notice and easy opt-out (`psyclaw telemetry on|off`)
