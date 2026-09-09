@@ -12,7 +12,7 @@ import { discoverAgents } from "../agents/discover.js";
 import { KNOWN_AGENTS } from "../agents/catalog.js";
 import { planAgentInstall } from "../install/installer.js";
 import { deepSeekProviderSpec, PiModelGateway, type ModelDescriptor } from "../adapters/pi/model.js";
-import { PROVIDER_PRESETS, saveProviderConfig } from "../setup.js";
+import { PROVIDER_PRESETS, decideProviderKeyPrompt, providerCredentialSource, saveProviderConfig } from "../setup.js";
 import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
 import { readManuscript } from "../project/manuscript.js";
 import { appendJsonlIfMissing, atomicWriteFile, readJsonl } from "../project/jsonl.js";
@@ -474,7 +474,7 @@ function panelSkillInstallTask(root: string, item: Record<string, unknown>, scop
   ].join("\n");
 }
 
-/** Metadata-only catalog for the optional panel. No install or credential read. */
+/** Metadata-only catalog for the optional panel. No install, and no credential values — only presence. */
 async function panelCatalog(root: string): Promise<unknown> {
   const scans = await discoverAgents();
   const byId = new Map(scans.map((scan) => [scan.id, scan]));
@@ -521,10 +521,26 @@ async function panelCatalog(root: string): Promise<unknown> {
     anthropic: "ANTHROPIC_API_KEY",
     google: "GEMINI_API_KEY",
   }[provider] ?? PROVIDER_PRESETS.find((preset) => preset.id === provider)?.apiKeyEnv);
-  const configured = (provider: string): boolean => {
-    const envName = envForProvider(provider);
-    return envName === undefined ? false : Boolean(process.env[envName]);
-  };
+  let registered: readonly ModelDescriptor[] = [];
+  try {
+    // Pi's runtime is the source of truth for user/provider model catalogs. It
+    // is explicitly cache-only here so opening the panel never triggers a
+    // network refresh or an authentication flow.
+    const gateway = await PiModelGateway.create({ allowModelNetwork: false, refreshOnCreate: false });
+    registered = gateway.list();
+  } catch {
+    registered = [];
+  }
+  const providersToCheck = new Set<string>([spec.id, ...PROVIDER_PRESETS.map((preset) => preset.id), ...registered.map((model) => model.provider)]);
+  const configuredProviders = new Set<string>();
+  await Promise.all([...providersToCheck].map(async (provider) => {
+    const preset = PROVIDER_PRESETS.find((item) => item.id === provider);
+    const present = preset
+      ? (await providerCredentialSource(preset)) !== "missing"
+      : Boolean(envForProvider(provider) && process.env[envForProvider(provider)!]?.trim());
+    if (present) configuredProviders.add(provider);
+  }));
+  const configured = (provider: string): boolean => configuredProviders.has(provider);
   const helperModels = spec.models.map((model) => ({
     id: `${spec.id}/${model.id}`,
     kind: "model" as const,
@@ -557,16 +573,6 @@ async function panelCatalog(root: string): Promise<unknown> {
     apiKeyEnv: preset.apiKeyEnv,
     configSource: "preset" as const,
   })));
-  let registered: readonly ModelDescriptor[] = [];
-  try {
-    // Pi's runtime is the source of truth for user/provider model catalogs. It
-    // is explicitly cache-only here so opening the panel never triggers a
-    // network refresh or an authentication flow.
-    const gateway = await PiModelGateway.create({ allowModelNetwork: false, refreshOnCreate: false });
-    registered = gateway.list();
-  } catch {
-    registered = [];
-  }
   const registeredModels = registered.map((model) => {
     const apiKeyEnv = envForProvider(model.provider);
     return {
@@ -1615,8 +1621,17 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         const models = Array.isArray(body.models)
           ? body.models.filter((value): value is string => typeof value === "string").map((value) => ({ id: value.trim(), name: value.trim() })).filter((value) => value.id)
           : (modelId ? [{ id: modelId, name: modelId }] : (preset?.models ?? []));
-        const apiKey = typeof body.apiKey === "string" ? body.apiKey : undefined;
+        const submittedKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
         if (!id || !name || !baseUrl || models.length === 0) throw new Error("id, name, baseUrl and at least one model are required");
+        const credential = preset
+          ? await providerCredentialSource(preset)
+          : (process.env[apiKeyEnv]?.trim() ? "process-env" : "missing");
+        const decision = decideProviderKeyPrompt(submittedKey, credential, apiKeyEnv);
+        if (decision.kind === "need-key") {
+          response.writeHead(400, { "content-type": "application/json" });
+          response.end(JSON.stringify({ error: decision.message, reasonCode: "missing_api_key" }));
+          return;
+        }
         const result = await saveProviderConfig({
           id,
           name,
@@ -1624,10 +1639,17 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           api,
           apiKeyEnv,
           models,
-          ...(apiKey === undefined ? {} : { apiKey }),
+          ...(decision.kind === "proceed" && decision.apiKey ? { apiKey: decision.apiKey } : {}),
         });
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ schemaVersion: "psyclaw/provider-config-receipt/v1", ok: true, provider: id, modelCount: models.length, apiKeyStored: Boolean(apiKey?.trim()) }));
+        response.end(JSON.stringify({
+          schemaVersion: "psyclaw/provider-config-receipt/v1",
+          ok: true,
+          provider: id,
+          modelCount: models.length,
+          apiKeyStored: Boolean(decision.kind === "proceed" && decision.apiKey),
+          path: result.path,
+        }));
         return;
       }
       if (url.pathname === "/api/telemetry") {
