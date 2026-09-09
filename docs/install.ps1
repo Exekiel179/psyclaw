@@ -8,7 +8,7 @@
 #   $env:PSYCLAW_CN = "1"  # use npmmirror; Windows already ships fd/rg in the package
 
 $ErrorActionPreference = "Stop"
-$Version = if ($env:PSYCLAW_VERSION) { $env:PSYCLAW_VERSION.TrimStart("v") } else { "0.29.20" }
+$Version = if ($env:PSYCLAW_VERSION) { $env:PSYCLAW_VERSION.TrimStart("v") } else { "0.30.0" }
 if ($env:PSYCLAW_CN -eq "1" -or $env:PSYCLAW_CN -eq "true") {
   $Registry = if ($env:PSYCLAW_REGISTRY) { $env:PSYCLAW_REGISTRY } else { "https://registry.npmmirror.com" }
   $env:PSYCLAW_CN = "1"
