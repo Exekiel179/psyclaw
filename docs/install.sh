@@ -4,12 +4,12 @@
 #   curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
 #
 # Optional environment variables:
-#   PSYCLAW_VERSION=0.29.4
+#   PSYCLAW_VERSION=0.30.1
 #   PSYCLAW_REGISTRY=https://registry.npmjs.org
 #   PSYCLAW_CN=1   # use npmmirror + enable GitHub mirrors for first-launch fd/rg
 set -eu
 
-VERSION="${PSYCLAW_VERSION:-0.29.4}"
+VERSION="${PSYCLAW_VERSION:-0.30.1}"
 VERSION="${VERSION#v}"
 if [ "${PSYCLAW_CN:-}" = "1" ] || [ "${PSYCLAW_CN:-}" = "true" ]; then
   REGISTRY="${PSYCLAW_REGISTRY:-https://registry.npmmirror.com}"

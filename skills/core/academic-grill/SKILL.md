@@ -1,6 +1,6 @@
 ---
 name: academic-grill
-description: Stress-test an academic research question, proposal, study design, analysis plan, manuscript claim, review protocol, or AI research project through a one-question-at-a-time interview until its consequential decisions, evidence boundaries, and reporting commitments are explicit. Use when the user invokes /grill or asks for rigorous academic questioning. Do not use for /brainstorm — brainstorm is a separate lightweight ideation path.
+description: Stress-test an academic research question, proposal, study design, analysis plan, manuscript claim, review protocol, or AI research project through a one-question-at-a-time interview until its consequential decisions, evidence boundaries, and reporting commitments are explicit. Use when the user invokes /grill or asks for rigorous academic questioning. For open-ended ideation without pressure-testing, use /brainstorm instead.
 license: MIT
 ---
 

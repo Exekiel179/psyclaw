@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.30.1 - 2026-09-09
+
+- Plan human ritual: per-node soft confirm; execute requires typing「我已审阅并批准本方案」
+- Do not auto-start /crosscheck or /verify; ask first to save tokens
+- Skip re-/init when canonical workspace + psyclaw.md already exists across sessions
+- Prefer OA fulltext after explicit approval; explain failures and missing OA
+- Academic pacing: smaller nodes; remind /grill when vague and /brainstorm when short on ideas
+- Soften /brainstorm copy (drop “not grill” framing)
+- Sync usage whitepaper to v0.30.1
+
 ## 0.30.0 - 2026-09-09
 
 - Minor line bump: Windows-first install/runtime hardening and clearer research command paths

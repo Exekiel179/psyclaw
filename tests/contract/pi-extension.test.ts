@@ -134,13 +134,14 @@ describe("Pi extension contract", () => {
     });
 
     expect(messages).toHaveLength(1);
-    expect(messages[0]?.text).toContain("这是 /brainstorm，不是 /grill");
+    expect(messages[0]?.text).toContain("这是 /brainstorm");
+    expect(messages[0]?.text).not.toContain("不是 /grill");
     expect(messages[0]?.text).toContain("不要加载 academic-grill");
     expect(messages[0]?.text).not.toContain("先调用 psyclaw_skill");
     expect(messages[0]?.text).toContain("头脑风暴主题：生成式 AI 与大学生批判性思维");
     expect(messages[0]?.options).toEqual({});
     expect(notifications[0]).toContain("已启动研究方向头脑风暴");
-    expect(notifications[0]).toContain("不经过 /grill");
+    expect(notifications[0]).not.toContain("不经过 /grill");
   });
 
   it("starts the academic grill with the requested subject", async () => {

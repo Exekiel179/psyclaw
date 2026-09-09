@@ -51,13 +51,17 @@ describe("stats intent router", () => {
     expect(text).toContain("跑一下回归分析");
     expect(text).toContain("reproducible scripts");
     expect(text).toContain("/plan");
+    expect(text).toContain("我已审阅并批准本方案");
   });
 
   it("embeds soft-route contract in analysis mode prompt only", () => {
     expect(sessionModePrompt("analysis")).toContain("Analysis soft-route");
     expect(sessionModePrompt("analysis")).toContain("/plan");
+    expect(sessionModePrompt("analysis")).toContain("我已审阅并批准本方案");
     expect(analysisSoftRoutePrompt()).toContain("analysis-plan");
     expect(sessionModePrompt("academic")).not.toContain("Analysis soft-route");
+    expect(sessionModePrompt("academic")).toContain("/grill");
+    expect(sessionModePrompt("academic")).toContain("/brainstorm");
     expect(sessionModePrompt("chat")).not.toContain("Analysis soft-route");
   });
 });
@@ -90,13 +94,22 @@ describe("analysis plan store", () => {
     expect(plan.status).toBe("ready");
     expect(plan.confirmedMethod).toBe("Welch t-test");
 
+    const blocked = advanceAnalysisPlan(plan, { type: "run-now" });
+    expect(blocked.status).toBe("ready");
+    expect(blocked.notes).toMatch(/我已审阅并批准本方案/);
+
+    plan = advanceAnalysisPlan(plan, { type: "ritual-approve", text: "我已审阅并批准本方案" });
+    plan = advanceAnalysisPlan(plan, { type: "run-now" });
+    expect(plan.status).toBe("running");
+    expect(plan.ritualApproval?.text).toBe("我已审阅并批准本方案");
+
+    plan = advanceAnalysisPlan({ ...plan, status: "ready", runPreference: "unset" }, { type: "defer" });
+    plan = await writeAnalysisPlan(root, plan);
+    expect(plan.status).toBe("deferred");
+
     const active = await readActiveAnalysisPlan(root);
     expect(active?.id).toBe(plan.id);
     expect(formatAnalysisPlanStatus(plan)).toContain(plan.id);
-
-    plan = advanceAnalysisPlan(plan, { type: "defer" });
-    plan = await writeAnalysisPlan(root, plan);
-    expect(plan.status).toBe("deferred");
 
     const md = await readFile(join(root, "analysis", "plans", `${plan.id}.md`), "utf8");
     expect(md).toContain("Welch t-test");

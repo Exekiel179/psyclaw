@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bootstrapProject, writeHandoff } from "../../src/project/bootstrap.js";
+import { bootstrapProject, writeHandoff, hasCanonicalWorkspace, ensureProjectBinding } from "../../src/project/bootstrap.js";
 import { assertSafeProjectPath, projectPaths } from "../../src/project/paths.js";
 
 async function tempProject(): Promise<string> {
@@ -47,5 +47,20 @@ describe("project bootstrap 0.29", () => {
     const root = await tempProject();
     await expect(assertSafeProjectPath(root, "data/raw/new.csv")).rejects.toThrow("Protected");
     await expect(assertSafeProjectPath(root, ".psyclaw/data/raw/new.csv")).rejects.toThrow("Protected");
+  });
+
+  it("reuses canonical workspace across sessions without re-init error", async () => {
+    const root = await tempProject();
+    const first = await bootstrapProject({
+      root,
+      projectId: "project-reuse",
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    expect(await hasCanonicalWorkspace(root)).toBe(true);
+    const second = await bootstrapProject({ root, goal: "新目标" });
+    expect(second.id).toBe(first.id);
+    const rebound = await ensureProjectBinding({ root });
+    expect(rebound.project.id).toBe(first.id);
+    expect(rebound.created).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 {
   "name": "psyclaw",
-  "version": "0.30.0",
+  "version": "0.30.1",
   "description": "A standalone, evidence-grounded social-science research agent with research contracts, evidence gates, and recoverable workflows",
   "type": "module",
   "license": "MIT",
@@ -32,7 +32,7 @@
     "scripts/psyclaw.mjs",
     "scripts/rebrand-pi.mjs",
     "docs/使用白皮书.md",
-    "docs/PsyClaw使用白皮书_v0.29.15.md"
+    "docs/PsyClaw使用白皮书_v0.30.1.md"
   ],
   "engines": {
     "node": ">=22.19.0"

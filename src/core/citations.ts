@@ -3,7 +3,7 @@ import { readJsonl, appendJsonlIfMissing } from "../project/jsonl.js";
 import { assertSafeProjectPath } from "../project/paths.js";
 import { referenceFromVerification, upsertReference, type ReferenceRecord } from "./references.js";
 import { verifyDoi, type DoiVerification } from "./doi.js";
-import { archiveOpenAccessPdf, type ReferenceFulltextRecord } from "../literature/archive.js";
+import { archiveOpenAccessPdf, probeOpenAccessPdf, type ReferenceFulltextRecord } from "../literature/archive.js";
 
 /**
  * Citation-usage ledger (.psyclaw/citations.jsonl).
@@ -35,6 +35,8 @@ export interface RecordCitationInput {
   context: string;
   section?: string;
   claimId?: string;
+  /** When true, download OA PDF after verify. Default false — ask the researcher first. */
+  downloadOa?: boolean;
 }
 
 export async function citationsPath(root: string): Promise<string> {
@@ -48,8 +50,7 @@ export async function listCitationUses(root: string): Promise<CitationUseRecord[
 /**
  * Record one citation use: verify the DOI (real network unless a verifier is
  * injected), archive the reference when verifiable, then append the use with
- * its reason. The use is always recorded (with `verified` reflecting the
- * verification outcome) so the citation reason is never lost.
+ * its reason. OA fulltext download runs only when `downloadOa: true`.
  */
 export async function recordCitationUse(
   root: string,
@@ -68,7 +69,9 @@ export async function recordCitationUse(
   let fulltext: ReferenceFulltextRecord | null = null;
   if (reference !== null) {
     await upsertReference(root, reference);
-    fulltext = await archiveOpenAccessPdf(root, doi).catch(() => null);
+    fulltext = input.downloadOa === true
+      ? await archiveOpenAccessPdf(root, doi).catch(() => null)
+      : await probeOpenAccessPdf(root, doi).catch(() => null);
   }
 
   const surname = (reference?.authors[0]?.split(/\s+/).at(-1) ?? doi.split("/")[0] ?? doi).slice(0, 40);

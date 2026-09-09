@@ -1,6 +1,6 @@
 import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { appendApproval, approvalInputDigest, assertResearchDecision, bootstrapProject, resolveResearchDecision, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview } from "../../index.js";
+import { appendApproval, approvalInputDigest, assertResearchDecision, bootstrapProject, ensureProjectBinding, hasCanonicalWorkspace, resolveResearchDecision, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview } from "../../index.js";
 import type { ResearchDecisionImpact } from "../../research/decision.js";
 import type { ResearchParadigm } from "../../core/contracts.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
@@ -107,7 +107,7 @@ import {
   continuouslyWorkWarningText,
   isContinuouslyWorkEnabled,
 } from "../../session/continuously-work.js";
-import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, ensureDefaultVerifyChecklist, loadVerifyChecklist } from "../../verify/checklist.js";
+import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, isPlanRitualConfirm, PLAN_RITUAL_PHRASE, ensureDefaultVerifyChecklist, loadVerifyChecklist } from "../../verify/checklist.js";
 import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js";
 import { openResearchWorkbench } from "../../panel/workbench.js";
 import {
@@ -280,10 +280,10 @@ function academicGrillRequest(subject: string, mode: "init" | "review"): string 
   ].join("\n");
 }
 
-/** Lightweight ideation path — never routes through academic-grill / /grill. */
+/** Lightweight ideation path for research directions. */
 function academicBrainstormRequest(subject: string): string {
   return [
-    "这是 /brainstorm，不是 /grill：不要加载 academic-grill Skill，不要进入逐题压力测试或研究规格访谈。",
+    "这是 /brainstorm：做选题向头脑风暴。不要加载 academic-grill，不要进入逐题压力测试或研究规格访谈。",
     subject
       ? `头脑风暴主题：${subject}`
       : "根据当前对话与项目材料确定头脑风暴主题；已有信息不要重复询问。",
@@ -292,7 +292,7 @@ function academicBrainstormRequest(subject: string): string {
     "2. 简要比较各自的价值、可行性、数据需求与推断边界。",
     "3. 明确推荐其中一个，并说明推荐理由与主要取舍。",
     "4. 最多再问 1-2 个真正影响选题的澄清问题（可一次给出）；不要展开完整的设计/测量/估计量审讯。",
-    "不要执行分析、不要写论文、不要伪造文献或结果。若用户接下来需要严格压力测试，请提示他们另用 /grill。",
+    "不要执行分析、不要写论文、不要伪造文献或结果。",
   ].join("\n");
 }
 
@@ -305,7 +305,7 @@ interface ActiveProjectContext {
 
 async function readActiveProject(root: string): Promise<ActiveProjectContext | null> {
   try {
-    const project = await readProject(root);
+    const { project } = await ensureProjectBinding({ root });
     return {
       projectId: project.id,
       runId: `project_${project.id}`,
@@ -1219,29 +1219,78 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       }
     }
 
-    // Natural-language plan confirm: reply「可以」instead of forcing /plan confirm.
-    if (mode === "analysis" && isNaturalPlanConfirm(trimmed)) {
+    // Plan confirmations: soft「可以」= per-node / method acknowledge; ritual phrase = authorize execute.
+    if (mode === "analysis" && (isPlanRitualConfirm(trimmed) || isNaturalPlanConfirm(trimmed))) {
       const plan = await readActiveAnalysisPlan(ctx.cwd);
       if (plan && (plan.status === "awaiting-confirm" || plan.status === "ready" || plan.status === "reviewing")) {
         const method = plan.confirmedMethod || plan.primaryAnalysis || plan.proposedMethods[0] || "按当前方案执行";
+        const pendingChoices = (plan.analysisChoices ?? []).filter((row) => !row.selected);
+        const ritual = isPlanRitualConfirm(trimmed);
+
+        if (!ritual) {
+          // Soft acknowledge only — never jump to run-now.
+          let next = plan.status === "awaiting-confirm" && !plan.confirmedMethod
+            ? advanceAnalysisPlan(plan, { type: "confirm", method, backend: "local-script" })
+            : plan;
+          next = await writeAnalysisPlan(ctx.cwd, next);
+          const needChoices = pendingChoices.length > 0
+            ? `仍有 ${pendingChoices.length} 项子分析待选；请先逐项确认。`
+            : `方法已记下。要开始执行，请完整输入：「${PLAN_RITUAL_PHRASE}」`;
+          ctx.ui.notify(`${formatAnalysisPlanStatus(next)}\n${needChoices}`, "info");
+          return {
+            action: "transform",
+            text: [
+              "/skill:analysis-plan",
+              "",
+              `User soft-acknowledged ("${trimmed}"). Do NOT run scripts yet.`,
+              `Confirmed method so far: ${next.confirmedMethod ?? method}`,
+              pendingChoices.length > 0
+                ? `Pending per-analysis choices: ${pendingChoices.map((row) => row.id).join(", ")}. Present the next undecided choice card and wait.`
+                : `All listed choices are decided (or none yet). Ask the user to type exactly: ${PLAN_RITUAL_PHRASE}`,
+              "Do not start /crosscheck or /verify until the user explicitly agrees to open that block.",
+            ].join("\n"),
+          };
+        }
+
+        if (pendingChoices.length > 0) {
+          ctx.ui.notify(
+            `${formatAnalysisPlanStatus(plan)}\n仪式句已收到，但还有 ${pendingChoices.length} 项子分析未确认，请先逐项选完。`,
+            "warning",
+          );
+          return {
+            action: "transform",
+            text: [
+              "/skill:analysis-plan",
+              "",
+              `User typed the ritual phrase but ${pendingChoices.length} analysis choice(s) remain undecided.`,
+              "Present the next undecided choice card and wait. Do not execute.",
+            ].join("\n"),
+          };
+        }
+
         let next = plan.status === "awaiting-confirm"
           ? advanceAnalysisPlan(plan, { type: "confirm", method, backend: "local-script" })
           : plan;
+        next = advanceAnalysisPlan(next, { type: "ritual-approve", text: PLAN_RITUAL_PHRASE });
         if (next.status === "reviewing" || next.status === "awaiting-confirm") {
           next = advanceAnalysisPlan(next, { type: "review" });
         }
         next = advanceAnalysisPlan(next, { type: "run-now" });
         next = await writeAnalysisPlan(ctx.cwd, next);
-        ctx.ui.notify(`${formatAnalysisPlanStatus(next)}\n已按自然语言确认并开始执行。`, "info");
+        if (next.status !== "running") {
+          ctx.ui.notify(`${formatAnalysisPlanStatus(next)}\n未能进入执行（检查子项确认与仪式批准）。`, "warning");
+          return { action: "handled" };
+        }
+        ctx.ui.notify(`${formatAnalysisPlanStatus(next)}\n已记录仪式批准并开始执行。`, "info");
         return {
           action: "transform",
           text: [
             "/skill:analysis-plan",
             "",
-            `User confirmed with natural language ("${trimmed}"). Execute plan ${next.id} now.`,
+            `User completed plan ritual ("${PLAN_RITUAL_PHRASE}"). Execute plan ${next.id} now.`,
             `Confirmed method: ${next.confirmedMethod ?? method}`,
-            next.approvalMode === "auto" ? "approvalMode=auto: label outputs as 未经人审批." : "Human confirmed this step.",
-            "Before and after analysis, open Panel checklist or /crosscheck; skipping must mark 未经核对.",
+            next.approvalMode === "auto" ? "approvalMode=auto: label outputs as 未经人审批." : "Human ritual approval recorded.",
+            "Do NOT auto-start /crosscheck or /verify. After scripts finish, ask whether to open those blocks; only proceed if the user agrees.",
           ].join("\n"),
         };
       }
@@ -1250,7 +1299,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     const wantsStats = mode === "analysis" && Boolean(resolveStatsIntent(trimmed));
     const wantsAcademic = mode === "academic" && Boolean(resolveAcademicSoftRoute(trimmed));
     if ((wantsStats || wantsAcademic) && !(await readActiveProject(ctx.cwd))) {
-      if (!ctx.hasUI) {
+      if (await hasCanonicalWorkspace(ctx.cwd)) {
+        // Heal binding silently — prior /init layout already present.
+        await ensureProjectBinding({ root: ctx.cwd }).catch(() => undefined);
+      } else if (!ctx.hasUI) {
         return {
           action: "transform",
           text: [
@@ -1259,17 +1311,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             trimmed,
           ].join("\n"),
         };
+      } else {
+        const choice = await ctx.ui.select(
+          "尚未 /init。统计/写作建议先建仓，否则交接与核对清单不完整。",
+          ["先执行 /init", "本次继续（稍后 init）", "取消"],
+          { timeout: 120_000 },
+        );
+        if (choice === "取消" || choice === undefined) return { action: "handled" };
+        if (choice === "先执行 /init") {
+          return { action: "transform", text: `/init\n\n（用户选择先初始化，完成后再继续：${trimmed}）` };
+        }
+        ctx.ui.notify("继续本次请求；建议随后 /init。关键结果请做交叉核验。", "warning");
       }
-      const choice = await ctx.ui.select(
-        "尚未 /init。统计/写作建议先建仓，否则交接与核对清单不完整。",
-        ["先执行 /init", "本次继续（稍后 init）", "取消"],
-        { timeout: 120_000 },
-      );
-      if (choice === "取消" || choice === undefined) return { action: "handled" };
-      if (choice === "先执行 /init") {
-        return { action: "transform", text: `/init\n\n（用户选择先初始化，完成后再继续：${trimmed}）` };
-      }
-      ctx.ui.notify("继续本次请求；建议随后 /init。关键结果请做交叉核验。", "warning");
     }
 
     if (mode === "academic") {
@@ -1326,7 +1379,20 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     handler: async (args, ctx) => {
       try {
         const parsed = parseInitArgs(args);
+        const already = await hasCanonicalWorkspace(ctx.cwd);
+        const hadProject = Boolean(await readActiveProject(ctx.cwd).catch(() => null));
         const project = await bootstrapProject({ root: ctx.cwd, ...parsed });
+        if (already || hadProject) {
+          ctx.ui.notify(
+            [
+              `已检测到既有工作区，无需重新建仓：${project.id}`,
+              "规范目录与 psyclaw.md 已存在；跨会话可直接继续 analysis / academic。",
+              "Shift+Tab：chat → analysis → academic · 输入 /help 查看速览。",
+            ].join("\n"),
+            "info",
+          );
+          return;
+        }
         ctx.ui.notify(
           [
             `工作仓库已初始化：${project.id}`,
@@ -1368,11 +1434,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           "3) 格式与报告要求：APA/三线表/必备报告字段、清单项是否齐；",
           "4) 过程产物：脚本入口、中间文件、可复现痕迹是否齐全。",
           "执行方式：派出至少两个独立审查视角（例如：数据一致性；引文存在性；格式/报告合同），各自给出发现后再合并为一份报告；标出一致项与冲突项。",
-          "不得自称已过人审。人审由系统在交接/定稿门禁自动要求，经 Panel「核实」或唤醒选项完成。",
+          "不得自称已过人审。不要在用户未明确同意前自动启动本核对。人审由系统在交接/定稿门禁自动要求，经 Panel「核实」或唤醒选项完成。",
         ].join("\n"),
         ctx.isIdle() ? {} : { deliverAs: "followUp" },
       );
-      ctx.ui.notify(`已启动过程性 /crosscheck（焦点：${focus}）。人审由收尾门禁自动要求。`, "info");
+      ctx.ui.notify(`已启动过程性 /crosscheck（焦点：${focus}）。大段核对应先征得用户同意。`, "info");
     } catch (error) {
       await notifyError(ctx, error);
     }
@@ -1511,11 +1577,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("brainstorm", {
-    description: "研究方向头脑风暴：提出并比较可选问题，不做压力测试",
+    description: "研究方向头脑风暴：提出并比较可选问题",
     handler: async (args, ctx) => {
       const subject = args.trim();
       pi.sendUserMessage(academicBrainstormRequest(subject), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-      ctx.ui.notify("已启动研究方向头脑风暴（不经过 /grill）。若要严格压力测试，请另开 /grill。", "info");
+      ctx.ui.notify("已启动研究方向头脑风暴。", "info");
     },
   });
 
@@ -2448,6 +2514,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       reason: Type.String({ description: "One-line reason this source is cited at this position (e.g. 支持：社会支持缓冲压力假说)" }),
       context: Type.String({ description: "The sentence/context in the manuscript where the citation appears" }),
       section: Type.Optional(Type.String({ description: "Manuscript section, e.g. 1 引言" })),
+      downloadOa: Type.Optional(Type.Boolean({ description: "Set true only after the researcher explicitly approved downloading the open-access PDF" })),
     }),
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
@@ -2463,8 +2530,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           reason: params.reason,
           context: params.context,
           ...(params.section === undefined || !params.section.trim() ? {} : { section: params.section }),
+          ...(params.downloadOa === true ? { downloadOa: true } : {}),
         });
         const ref = result.reference;
+        const fulltextNext = result.record.verified && result.fulltext?.status === "downloaded"
+          ? `引用已双源核验，开放全文已保存到 ${result.fulltext.localPath}。`
+          : result.fulltext?.status === "approval-required"
+            ? `引用已双源核验，发现开放全文候选。请先征得用户同意，再以 downloadOa=true 重新调用本工具下载到 ${result.fulltext.localPath}（候选：${result.fulltext.sourceUrl ?? "OA URL"}）。`
+            : result.fulltext?.status === "manual-download-required"
+              ? `该引用的题录已登记，但未找到开放 PDF。请通过 ${result.fulltext.doiUrl} 使用你的合法访问权限下载，并保存到 ${result.fulltext.localPath}；完成前不得将依赖全文的主张写入正文。`
+              : result.fulltext?.status === "download-failed"
+                ? `开放全文下载失败：${result.fulltext.reason ?? "未知原因"}。请通过 ${result.fulltext.doiUrl} 自行合法获取并保存到 ${result.fulltext.localPath}。`
+                : "该 DOI 或全文未能完成核验；请在最终交付前补核验或替换来源。";
         return {
           content: [{ type: "text", text: JSON.stringify({
             schemaVersion: "psyclaw/citation-use/v1",
@@ -2475,11 +2552,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             referenceTitle: ref?.title ?? null,
             archived: ref !== null,
             fulltext: result.fulltext,
-            next: result.record.verified && result.fulltext?.status === "downloaded"
-              ? `引用已双源核验，开放全文已保存到 ${result.fulltext.localPath}。`
-              : result.fulltext?.status === "manual-download-required"
-                ? `该引用的题录已登记，但未找到开放 PDF。请通过 ${result.fulltext.doiUrl} 使用你的合法访问权限下载，并保存到 ${result.fulltext.localPath}；完成前不得将依赖全文的主张写入正文。`
-                : "该 DOI 或全文未能完成核验；请在最终交付前补核验或替换来源。",
+            next: fulltextNext,
           }, null, 2) }],
           details: { citationId: result.record.citationId, doi: result.record.doi, verified: result.record.verified },
         };
