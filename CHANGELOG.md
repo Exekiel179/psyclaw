@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.30.0 - 2026-09-09
+
+- Minor line bump: Windows-first install/runtime hardening and clearer research command paths
+- Windows: resolve `.cmd` package managers, wrap MCP/`npx` stdio spawn, and discover Python via `py -3` / `python` for ARS/doctor
+- Decouple `/brainstorm` from `academic-grill` / `/grill` (ideation-only prompt; pressure test stays on `/grill`)
+- Panel: full-width whitepaper help, drop obsolete pipeline stepper/quick slash chips, fix model config detection across auth/models/env/yaml
+- Pin README and Windows installer default to 0.30.0; bump package governance apiVersion to 0.30
+
 ## 0.29.21 - 2026-09-09
 
 - Fix whitepaper panel layout to 100% width
