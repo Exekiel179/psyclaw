@@ -27,7 +27,7 @@ import { appendJsonlIfMissing } from "./project/jsonl.js";
 import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, c } from "./style/cli-ui.js";
-import { captureAgentError, initNodeObservability, maybeShowTelemetryNotice, readTelemetryEnvOverride, readTelemetryPreference, shutdownObservability, writeTelemetryPreference } from "./observability/index.js";
+import { captureAgentError, initNodeObservability, maybeShowTelemetryNotice, readTelemetryEnvOverride, readTelemetryPreference, shutdownObservability, withAgentSpan, writeTelemetryPreference } from "./observability/index.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
   try {
     await dispatch(args);
   } catch (error) {
-    await captureAgentError(error, { phase: "cli", command: peek ?? "default" });
+    await captureAgentError(error, { phase: "cli", command: peek ?? "default", cwd: process.cwd() });
     throw error;
   } finally {
     await shutdownObservability();
@@ -300,7 +300,7 @@ async function dispatch(args: string[]): Promise<void> {
     return;
   }
   if (command === "brief") {
-    const result = await runOfflineBrief(root);
+    const result = await withAgentSpan("cli.brief", { phase: "brief", command: "brief" }, () => runOfflineBrief(root));
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (result.verdict === "blocked") process.exitCode = 2;
     return;

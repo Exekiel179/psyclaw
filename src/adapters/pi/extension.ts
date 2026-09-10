@@ -51,10 +51,14 @@ import {
 import {
   captureAgentError,
   initNodeObservability,
+  lastPiGeneration,
   readTelemetryPreference,
   shutdownObservability,
   trackAgentEvent,
   trackGateWaiting,
+  trackLlmGeneration,
+  trackSkillInstall,
+  withAgentSpan,
   writeTelemetryPreference,
 } from "../../observability/index.js";
 
@@ -87,8 +91,8 @@ function parseInitArgs(args: string): { goal: string; paradigm: ResearchParadigm
   return { paradigm: "survey-observational", goal: trimmed };
 }
 
-async function notifyError(ctx: ExtensionCommandContext, error: unknown): Promise<void> {
-  await captureAgentError(error, { phase: "extension" });
+async function notifyError(ctx: ExtensionCommandContext, error: unknown, extra: Record<string, string> = {}): Promise<void> {
+  await captureAgentError(error, { phase: "extension", cwd: ctx.cwd, ...extra });
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 }
 
@@ -106,6 +110,7 @@ const activeAgentRuns = new Set<string>();
 const pendingInitApprovals = new Set<string>();
 const activeApprovalDialogs = new Set<string>();
 const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "research-brief"]);
+const controlledRunTelemetry = new Map<string, { startedAt: number; mode: string; skill_count: number }>();
 
 function coreSkillPath(name: string): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", "skills", "core", name, "SKILL.md");
@@ -827,11 +832,20 @@ async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandCon
     `${row.name}\n来源：${row.sourceRef}\n安装位置：${skillScopeLabel(scope)}\n目标目录：${recommendedSkillTarget(ctx.cwd, row.id, scope)}\n模型将检查仓库并使用文件与命令工具完成安装。`,
   );
   if (!approved) return;
-  const state = await readRecommendationState(ctx.cwd);
-  state.skillScopes = { ...(state.skillScopes ?? {}), [row.id]: scope };
-  await saveRecommendationState(ctx.cwd, state);
-  pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型，目标为${skillScopeLabel(scope)}。安装完成后请在 /skill 中启用，再执行 /reload。`, "info");
+  await withAgentSpan("cli.skill_install", { phase: "skill_install", scope, skill_id: row.id }, async () => {
+    try {
+      const state = await readRecommendationState(ctx.cwd);
+      state.skillScopes = { ...(state.skillScopes ?? {}), [row.id]: scope };
+      await saveRecommendationState(ctx.cwd, state);
+    } catch (error) {
+      void trackSkillInstall("error", { skill_id: row.id, scope, status: "error" });
+      await notifyError(ctx, error, { phase: "skill_install", skill_id: row.id, scope });
+      return;
+    }
+    void trackSkillInstall("queued", { skill_id: row.id, scope, status: "queued" });
+    pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+    ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型，目标为${skillScopeLabel(scope)}。安装完成后请在 /skill 中启用，再执行 /reload。`, "info");
+  });
 }
 
 async function showSkillManager(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext): Promise<void> {
@@ -1078,6 +1092,16 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => {
     runtimeMcps.close();
+    for (const [cwd, run] of controlledRunTelemetry) {
+      void trackAgentEvent("research_run_finished", {
+        phase: "controlled_run",
+        status: "shutdown",
+        duration_ms: Date.now() - run.startedAt,
+        mode: run.mode,
+        skill_count: run.skill_count,
+      });
+      controlledRunTelemetry.delete(cwd);
+    }
     void shutdownObservability();
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
@@ -1112,7 +1136,15 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     });
     return approved ? undefined : { block: true, terminate: true, reason: "用户拒绝该执行步骤或审批超时" };
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("agent_end", async (_event, ctx) => {
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("agent_end", async (event, ctx) => {
+    const generation = lastPiGeneration([event, (event as { message?: unknown }).message]);
+    if (generation) {
+      void trackLlmGeneration({
+        ...generation,
+        surface: "cli",
+        spanName: generation.spanName ?? "pi-agent-end",
+      });
+    }
     if (!pendingInitApprovals.has(ctx.cwd) || !(await planDocumentsReady(ctx.cwd))) return;
     pendingInitApprovals.delete(ctx.cwd);
     await reviewPrimaryDocuments(ctx);
@@ -1200,15 +1232,22 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           ctx.ui.notify("运行审批被拒绝或超时，未启动。", "warning");
           return;
         }
-        await activateControlledRun(ctx.cwd, runId, project.id, objective, selectedSkills, parsed.mode);
-        void trackAgentEvent("research_run_started", {
-          phase: "controlled_run",
-          status: "started",
-          mode: parsed.mode,
-          skill_count: selectedSkills.length,
+        await withAgentSpan("cli.research_run", { phase: "controlled_run", mode: parsed.mode }, async () => {
+          await activateControlledRun(ctx.cwd, runId, project.id, objective, selectedSkills, parsed.mode);
+          controlledRunTelemetry.set(ctx.cwd, {
+            startedAt: Date.now(),
+            mode: parsed.mode,
+            skill_count: selectedSkills.length,
+          });
+          void trackAgentEvent("research_run_started", {
+            phase: "controlled_run",
+            status: "started",
+            mode: parsed.mode,
+            skill_count: selectedSkills.length,
+          });
+          pi.appendEntry("psyclaw:controlled-run", { runId, projectId: project.id, objective, selectedSkills, mode: parsed.mode, activatedAt: new Date().toISOString() });
+          pi.sendUserMessage(controlledRunRequest(objective, selectedSkills, parsed.mode), ctx.isIdle() ? {} : { deliverAs: "followUp" });
         });
-        pi.appendEntry("psyclaw:controlled-run", { runId, projectId: project.id, objective, selectedSkills, mode: parsed.mode, activatedAt: new Date().toISOString() });
-        pi.sendUserMessage(controlledRunRequest(objective, selectedSkills, parsed.mode), ctx.isIdle() ? {} : { deliverAs: "followUp" });
         ctx.ui.notify(`${parsed.mode === "auto" ? "自动" : "人在环路"}研究流程已启动${selectedSkills.length > 0 ? `；本次使用 Skill：${selectedSkills.join(", ")}` : "；使用默认 Skill"}。`, "info");
       } catch (error) {
         await notifyError(ctx, error);
@@ -1246,7 +1285,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     description: "运行离线证据门控研究简报",
     handler: async (_args, ctx) => {
       try {
-        const result = await runOfflineBrief(ctx.cwd);
+        const result = await withAgentSpan("cli.brief", { phase: "brief" }, () => runOfflineBrief(ctx.cwd));
         ctx.ui.notify(
           result.verdict === "pass" ? `Brief ready: ${result.briefPath}` : "Brief blocked by evidence gates",
           result.verdict === "pass" ? "info" : "warning",
@@ -1364,10 +1403,15 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           return;
         }
         try {
-          const installed = await installLocalSkill(source, ctx.cwd);
+          const installed = await withAgentSpan("cli.skill_install_local", { phase: "skill_install", scope: "user" }, async () => {
+            void trackSkillInstall("started", { scope: "user" });
+            return installLocalSkill(source, ctx.cwd);
+          });
+          void trackSkillInstall("finished", { scope: "user", status: "finished" });
           ctx.ui.notify(`已安装本地 Skill ${installed.name}：${installed.target}。请执行 /reload。`, "info");
         } catch (error) {
-          await notifyError(ctx, error);
+          void trackSkillInstall("error", { scope: "user", status: "error" });
+          await notifyError(ctx, error, { phase: "skill_install", scope: "user" });
         }
         return;
       }

@@ -8,6 +8,7 @@ import {
   type RunnerEvent,
 } from "./runner.js";
 import { PiRpcClient, type PiRpcMessage } from "../adapters/pi/rpc.js";
+import { lastPiGeneration, trackLlmGeneration, withAgentSpan } from "../observability/index.js";
 
 export interface PiExecutorOptions {
   cwd: string;
@@ -143,7 +144,22 @@ export function createPiReadOnlyExecutor(options: PiExecutorOptions): WorkerExec
     });
     try {
       await client.start();
-      const events = await client.promptAndWait(taskPrompt(task, context), options.timeoutMs);
+      const events = await withAgentSpan("cli.llm_call", { phase: "pi_rpc", provider: options.provider ?? "unknown" }, () =>
+        client.promptAndWait(taskPrompt(task, context), options.timeoutMs),
+      );
+      const generation = lastPiGeneration(events);
+      if (generation) {
+        void trackLlmGeneration({
+          ...(generation.usage === undefined ? {} : { usage: generation.usage }),
+          ...(generation.latencyMs === undefined ? {} : { latencyMs: generation.latencyMs }),
+          ...(generation.error === undefined ? {} : { error: generation.error }),
+          ...(generation.errorName === undefined ? {} : { errorName: generation.errorName }),
+          provider: generation.provider ?? options.provider ?? "unknown",
+          model: generation.model ?? options.model ?? "unknown",
+          surface: "cli",
+          spanName: "pi-rpc-worker",
+        });
+      }
       const report = parseWorkerReport(extractJson(lastAssistantText(events) ?? ""), task, context);
       if (!report) return { report: blockedReport(task, context, "Worker did not return a valid structured report") };
       return { report };

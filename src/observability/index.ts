@@ -1,13 +1,19 @@
+import { arch, platform } from "node:os";
+import { PSYCLAW_VERSION } from "../branding.js";
 import {
   observabilityEnabled,
   readNodeObservabilityConfig,
   sanitizeAgentEventProperties,
   type NodeObservabilityConfig,
 } from "./config.js";
+import { filesystemErrorContext, redactUserPath } from "./error-context.js";
+import { ensureAnonymousDistinctId, newAnonymousDistinctId } from "./identity.js";
+import type { LlmGenerationInput } from "./llm.js";
 import type { ObservabilityHandle } from "./node-sdks.js";
 import { readTelemetryPreference, resolveTelemetryEnabled, telemetryPreferenceOptions, type TelemetryPreference } from "./preference.js";
 
 export {
+  DEFAULT_LANGFUSE_HOST,
   DEFAULT_POSTHOG_HOST,
   OBS_CONFIG_SCRIPT_ID,
   browserConfigForPreference,
@@ -21,6 +27,7 @@ export {
 export type { BrowserObservabilityConfig, NodeObservabilityConfig, AgentEventPropertyValue } from "./config.js";
 export {
   DEFAULT_TELEMETRY_PREFERENCE,
+  parseAnonymousDistinctId,
   parseTelemetryPreference,
   psyclawSettingsPath,
   readTelemetryEnvOverride,
@@ -33,6 +40,11 @@ export {
 export type { TelemetryPreference } from "./preference.js";
 export { maybeShowTelemetryNotice } from "./notice.js";
 export type { TelemetryNoticeChoice } from "./notice.js";
+export { ensureAnonymousDistinctId, newAnonymousDistinctId } from "./identity.js";
+export { filesystemErrorContext, fsWriteErrorMessage, redactUserPath } from "./error-context.js";
+export { extractPiGeneration, lastPiGeneration, posthogAiGenerationProperties } from "./llm.js";
+export type { LlmGenerationInput } from "./llm.js";
+export { readLangfuseConfig } from "./langfuse.js";
 
 type BootFn = (config: NodeObservabilityConfig) => Promise<ObservabilityHandle>;
 
@@ -60,7 +72,15 @@ export async function initNodeObservability(options: {
   if (!resolveTelemetryEnabled(preference, env)) {
     return handle !== undefined;
   }
-  const config = readNodeObservabilityConfig(env);
+  const distinctId = preference.anonymousId
+    ?? env.PSYCLAW_DISTINCT_ID?.trim()
+    ?? (options.preference !== undefined && options.settingsPath === undefined
+      ? newAnonymousDistinctId()
+      : await ensureAnonymousDistinctId(telemetryPreferenceOptions(options.settingsPath)));
+  const config = {
+    ...readNodeObservabilityConfig(env),
+    distinctId,
+  };
   // Disabled must not latch the singleton: tests and a later enable in the
   // same process still need to be able to boot.
   if (!observabilityEnabled(config)) {
@@ -87,15 +107,48 @@ export function trackAgentEvent(name: string, properties: Record<string, unknown
 }
 
 export function captureAgentError(error: unknown, context: Record<string, string> = {}): Promise<void> {
-  const safeContext: Record<string, string> = {};
-  for (const [key, value] of Object.entries(context)) {
-    if (typeof value === "string" && value.trim()) safeContext[key] = value.trim().slice(0, 80);
+  const extracted = filesystemErrorContext(error);
+  const safeContext: Record<string, string> = {
+    package_version: PSYCLAW_VERSION,
+    os_platform: platform(),
+    os_arch: arch(),
+  };
+  for (const [key, value] of Object.entries({ ...extracted, ...context })) {
+    if (typeof value === "string" && value.trim()) {
+      const limit = key === "failed_path" || key === "cwd" ? 240 : 80;
+      const next = key === "failed_path" || key === "cwd" ? redactUserPath(value.trim()) : value.trim();
+      safeContext[key] = next.slice(0, limit);
+    }
   }
   return emitWhenReady((active) => active.captureError(error, safeContext));
 }
 
 export function trackGateWaiting(gate: "plan_approval" | "run_approval" | "tool_approval"): Promise<void> {
   return trackAgentEvent("gate_waiting_for_human", { phase: "gate", gate, status: "waiting" });
+}
+
+export function trackSkillInstall(status: "queued" | "started" | "finished" | "error", properties: Record<string, unknown> = {}): Promise<void> {
+  return trackAgentEvent(`skill_install_${status === "queued" ? "queued" : status === "started" ? "started" : status === "error" ? "failed" : "finished"}`, {
+    phase: "skill_install",
+    status,
+    ...properties,
+  });
+}
+
+export function trackLlmGeneration(input: LlmGenerationInput): Promise<void> {
+  return emitWhenReady((active) => {
+    if (typeof active.captureLlmGeneration === "function") active.captureLlmGeneration(input);
+  });
+}
+
+export async function withAgentSpan<T>(
+  name: string,
+  attributes: Record<string, string>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  if (bootPromise) await bootPromise;
+  if (handle && typeof handle.runSpan === "function") return handle.runSpan(name, attributes, fn);
+  return fn();
 }
 
 export async function shutdownObservability(): Promise<void> {
