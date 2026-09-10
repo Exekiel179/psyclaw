@@ -1,7 +1,7 @@
 /**
- * Content preflight for skill bodies. This is a heuristic tripwire, not an OS
- * boundary: a body that instructs the agent to bypass gates or move data out
- * of the project is marked suspicious and the skill is never executable.
+ * Content inspection for skill bodies. This is advisory only: Skill text is
+ * not a security boundary and must not make an otherwise selected Skill
+ * unavailable. Filesystem and process boundaries are enforced elsewhere.
  */
 
 export interface PreflightResult {

@@ -8,6 +8,9 @@ import { assertSafeProjectPath } from "./paths.js";
 export const APPROVAL_SCHEMA = "psyclaw/approval/v1" as const;
 
 export type ApprovalDecision = "approved" | "skipped" | "rejected" | "auto-approved";
+/** Operational authorization only. Research-method decisions use the
+ * separate `psyclaw/research-decision/v1` contract and must never be inferred
+ * from an approval record. */
 export type ApprovalKind = "document" | "run-mode" | "step" | "tool";
 
 export interface ApprovalRecord {
@@ -37,13 +40,12 @@ export const PRIMARY_PLAN_DOCUMENTS = [
   { id: "plan", path: "notes/plan.md", title: "执行计划" },
 ] as const;
 
-export const DEFAULT_RUN_APPROVAL_NODES: readonly ApprovalNode[] = [
-  { id: "scope", title: "范围与研究问题", summary: "确认研究范围、主要问题与排除边界", required: true },
-  { id: "evidence", title: "证据收集方案", summary: "确认来源范围、检索方式与全文获取边界", required: true },
-  { id: "analysis", title: "分析与方法决策", summary: "确认变量、排除、缺失值与分析方法", required: true },
-  { id: "writing", title: "写作与主张边界", summary: "确认输出类型、引用与不确定性表达", required: true },
-  { id: "review", title: "复核与交付", summary: "确认复核方式、格式与最终交付范围", required: false },
-];
+/**
+ * `/run` authorizes ordinary planned execution. This list is intentionally
+ * empty: researcher decisions are created dynamically only for unresolved,
+ * consequential methodological trade-offs.
+ */
+export const DEFAULT_RUN_APPROVAL_NODES: readonly ApprovalNode[] = [];
 
 async function approvalPath(root: string): Promise<string> {
   return assertSafeProjectPath(root, ".psyclaw/approvals.jsonl");

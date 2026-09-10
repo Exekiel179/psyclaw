@@ -433,6 +433,13 @@ async function readObservabilityScript(panelHtmlPath: string): Promise<string | 
   return undefined;
 }
 
+interface PanelPluginRecord {
+  source: string;
+  scope: "project" | "user";
+  filtered: boolean;
+  installed: boolean;
+}
+
 export interface PanelServerOptions {
   /** Absolute or cwd-relative path to the panel HTML file. */
   panelHtmlPath?: string;
@@ -442,6 +449,16 @@ export interface PanelServerOptions {
   installSkill?: (task: string) => Promise<void>;
   /** Override `~/.psyclaw/agent/psyclaw-settings.json` (tests). */
   telemetrySettingsPath?: string;
+  /** Queue an explicitly requested external-tool installation task. */
+  installExternalTool?: (task: string) => Promise<void>;
+  /** Install a Plugin through Pi's native package manager. */
+  installPlugin?: (source: string, scope: "project" | "user") => Promise<void>;
+  /** Read Pi's configured packages without duplicating its package registry. */
+  listPlugins?: () => PanelPluginRecord[];
+}
+
+function pluginSourceIdentity(source: string): string {
+  return source.trim().replace(/^git:/, "").replace(/\.git$/i, "").replace(/\/$/, "").toLocaleLowerCase();
 }
 
 function panelSkillInstallTask(root: string, item: Record<string, unknown>, scope: RecommendedSkillScope): string {
@@ -461,7 +478,19 @@ function panelSkillInstallTask(root: string, item: Record<string, unknown>, scop
   ].join("\n");
 }
 
+function panelExternalToolInstallTask(root: string, item: Record<string, unknown>): string {
+  return [
+    `安装推荐外部工具：${String(item.name ?? item.id ?? "external tool")}。`,
+    `官方来源：${String(item.sourceRef ?? "")}`,
+    `当前工作目录：${root}`,
+    String(item.installHint ?? "读取官方最新安装说明，选择适合当前操作系统的安装方式。"),
+    "用户已在 Panel 中明确点击安装。读取官方安装说明，执行安装并验证版本或最小命令；不要读取或输出凭据。",
+    "这是外部工具，不要将它宣称为来源仓库提供的 Skill 或 Plugin。完成后用自然语言报告实际安装位置、版本和验证结果。",
+  ].join("\n");
+}
+
 /** Metadata-only catalog for the optional panel. No install, and no credential values — only presence. */
+
 async function panelCatalog(root: string): Promise<unknown> {
   const scans = await discoverAgents();
   const byId = new Map(scans.map((scan) => [scan.id, scan]));
@@ -604,13 +633,17 @@ async function recommendedSkills(): Promise<unknown> {
   ];
   for (const path of candidates) {
     try {
-      const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>>; externalTools?: Array<Record<string, unknown>> };
+      const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>>; plugins?: Array<Record<string, unknown>>; externalTools?: Array<Record<string, unknown>> };
       return {
         ...catalog,
         items: (catalog.items ?? []).filter((item) => item.kind === "skill").map((item) => ({
           ...item,
           slashCommand: `/skill enable ${String(item.id ?? "")}`,
-          installCommand: `/install skill ${String(item.id ?? "")}`,
+          installCommand: `/skill install ${String(item.id ?? "")}`,
+        })),
+        plugins: (catalog.plugins ?? []).filter((item) => item.kind === "plugin").map((item) => ({
+          ...item,
+          installCommand: `/plugin install ${String(item.sourceRef ?? item.id ?? "")}`,
         })),
         externalTools: (catalog.externalTools ?? []).filter((item) => item.kind === "external-tool"),
       };
@@ -630,7 +663,7 @@ async function recommendedMcps(): Promise<unknown> {
   for (const path of candidates) {
     try {
       const catalog = JSON.parse(await readFile(path, "utf8")) as { items?: Array<Record<string, unknown>> };
-      return { ...catalog, items: (catalog.items ?? []).map((item) => ({ ...item, slashCommand: `/mcp enable ${String(item.id ?? "")}`, installCommand: `/install mcp ${String(item.id ?? "")}` })) };
+      return { ...catalog, items: (catalog.items ?? []).map((item) => ({ ...item, slashCommand: `/mcp enable ${String(item.id ?? "")}`, installCommand: `/mcp install ${String(item.id ?? "")}` })) };
     } catch { /* try package layout */ }
   }
   return { schemaVersion: "psyclaw/recommended-mcp/v1", documentVersion: "0.1.0", items: [] };
@@ -958,13 +991,25 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           return;
         }
         const body = await readJsonBody(request);
-        const kind = body.kind === "skill" || body.kind === "mcp" ? body.kind : undefined;
+        const kind = body.kind === "skill" || body.kind === "mcp" || body.kind === "plugin" || body.kind === "external" ? body.kind : undefined;
         const id = String(body.id ?? "").trim();
         const approved = body.approved === true;
         const scope = body.scope === "project" || body.scope === "user" ? body.scope : undefined;
         const actor = String(body.actor ?? "researcher").trim();
         if (!kind || !id || !approved || actor.length < 1) throw new Error("kind, id, approved and actor are required");
-        const found = await findRecommendedItem(kind, id);
+        const found: { item: Record<string, unknown>; prep?: Record<string, unknown> } | undefined = kind === "plugin"
+          ? await (async (): Promise<{ item: Record<string, unknown>; prep?: Record<string, unknown> } | undefined> => {
+              const catalog = await recommendedSkills() as { plugins?: Array<Record<string, unknown>> };
+              const item = (catalog.plugins ?? []).find((candidate) => candidate.id === id);
+              return item ? { item } : undefined;
+            })()
+          : kind === "external"
+            ? await (async (): Promise<{ item: Record<string, unknown> } | undefined> => {
+                const catalog = await recommendedSkills() as { externalTools?: Array<Record<string, unknown>> };
+                const item = (catalog.externalTools ?? []).find((candidate) => candidate.id === id && candidate.installable !== false);
+                return item ? { item } : undefined;
+              })()
+          : await findRecommendedItem(kind, id);
         if (!found) {
           response.writeHead(404, { "content-type": "application/json" });
           response.end(JSON.stringify({ error: "unknown recommended item" }));
@@ -1003,6 +1048,31 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
             reloadHint: "/reload",
             message: "安装任务已交给当前模型；模型完成后请启用 Skill 并执行 /reload。",
           }));
+          return;
+        }
+        if (kind === "plugin") {
+          if (!scope) throw new Error("scope must be project or user for Plugin installation");
+          if (options.installPlugin === undefined) {
+            response.writeHead(503, { "content-type": "application/json" });
+            response.end(JSON.stringify({ error: "Plugin 安装器不可用，请在 PsyClaw 对话中执行 /panel 后重试。" }));
+            return;
+          }
+          const source = String(found.item.sourceRef ?? "").trim();
+          if (!source) throw new Error("Plugin source is missing");
+          await options.installPlugin(source, scope);
+          response.writeHead(202, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/plugin-install-receipt/v1", ok: true, id, source, scope, reloadHint: "/reload", message: "Plugin 已由 Pi 原生安装器处理；请执行 /reload。" }));
+          return;
+        }
+        if (kind === "external") {
+          if (options.installExternalTool === undefined) {
+            response.writeHead(503, { "content-type": "application/json" });
+            response.end(JSON.stringify({ error: "外部工具安装需要当前模型通道；请在 PsyClaw 对话中执行 /panel 后再安装。" }));
+            return;
+          }
+          await options.installExternalTool(panelExternalToolInstallTask(root, found.item));
+          response.writeHead(202, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/external-tool-install-task/v1", ok: true, queued: true, id, message: "安装任务已交给当前模型；完成后会报告版本与验证结果。" }));
           return;
         }
         const shellCommand = typeof found.prep?.command === "string" && found.prep.command.trim() ? found.prep.command.trim() : undefined;
@@ -1587,6 +1657,54 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       if (url.pathname === "/api/recommended-skills") {
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify(await recommendedSkills()));
+        return;
+      }
+      if (url.pathname === "/api/recommended-plugins") {
+        const catalog = await recommendedSkills() as { plugins?: Array<Record<string, unknown>> };
+        const configuredBySource = new Map<string, PanelPluginRecord>();
+        for (const entry of options.listPlugins?.() ?? []) {
+          const key = pluginSourceIdentity(entry.source);
+          const previous = configuredBySource.get(key);
+          if (!previous || entry.scope === "project") configuredBySource.set(key, entry);
+        }
+        const matched = new Set<string>();
+        const items = (catalog.plugins ?? []).map((item) => {
+          const sourceRef = String(item.sourceRef ?? "");
+          const sourceKey = pluginSourceIdentity(sourceRef);
+          const installed = configuredBySource.get(sourceKey);
+          if (installed) matched.add(sourceKey);
+          return {
+            ...item,
+            installed: installed?.installed === true,
+            enabled: installed?.installed === true,
+            configured: installed !== undefined,
+            local: false,
+            ...(installed === undefined ? {} : { scope: installed.scope }),
+            ...(installed?.filtered === undefined ? {} : { filtered: installed.filtered }),
+          };
+        });
+        const localItems = [...configuredBySource.entries()]
+          .filter(([key]) => !matched.has(key))
+          .map(([, entry], index) => {
+            const normalized = entry.source.replace(/^git:/, "").replace(/[?#].*$/, "").replace(/\.git$/i, "").replace(/\/$/, "");
+            const name = normalized.split(/[\\/]/).filter(Boolean).at(-1)?.replace(/^npm:/, "") || "Local Plugin";
+            return {
+              id: `local-plugin-${index + 1}`,
+              name,
+              kind: "plugin",
+              stage: "本地 Plugin",
+              description: "由 Pi 原生包管理器识别的本地已安装 Plugin。",
+              sourceRef: entry.source,
+              installed: entry.installed,
+              enabled: entry.installed,
+              configured: true,
+              local: true,
+              scope: entry.scope,
+              filtered: entry.filtered,
+            };
+          });
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ schemaVersion: "psyclaw/recommended-plugins/v1", items: [...items, ...localItems] }));
         return;
       }
       if (url.pathname === "/api/recommended-mcps") {

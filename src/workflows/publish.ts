@@ -104,10 +104,11 @@ export async function publishManuscript(root: string, options: PublishOptions = 
     if (!citationAudit.ok) {
       const missing = citationAudit.missingPdfs.map((item) => `${item.doi} -> ${item.doiUrl}（下载到 ${item.expectedPath}）`);
       throw new Error([
-        "论文发布已被引用证据门禁阻断。",
-        citationAudit.citedDois.length === 0 ? "尚未登记任何正文引用。" : "",
+        "论文暂不适合定稿：参考文献核对尚未完成。",
+        citationAudit.citedDois.length === 0 ? "尚未登记正文引用及其来源。" : "",
         citationAudit.missingVerification.length ? `未完成双源核验：${citationAudit.missingVerification.join(", ")}` : "",
         missing.length ? `本地缺少引用论文 PDF：${missing.join("；")}` : "",
+        "请补齐后重新导出；当前分析报告仍可单独导出，但不能标为正式论文。",
       ].filter(Boolean).join(" "));
     }
   }

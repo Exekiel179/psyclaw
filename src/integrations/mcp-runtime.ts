@@ -35,7 +35,9 @@ function runtimeEnvironment(value: unknown): Record<string, string> {
 
 function asRuntimeConfig(value: unknown): RuntimeMcpConfig | undefined {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.command !== "string") return undefined;
-  if (value.enabled === false || value.trusted === false || (value.transport !== undefined && value.transport !== "stdio")) return undefined;
+  // Trust metadata is surfaced by management UI; explicit user selection is
+  // the activation decision. Keep disable and transport checks here.
+  if (value.enabled === false || (value.transport !== undefined && value.transport !== "stdio")) return undefined;
   const args = Array.isArray(value.args) && value.args.every((item) => typeof item === "string") ? value.args : [];
   return {
     id: value.id,

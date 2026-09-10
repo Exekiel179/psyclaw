@@ -226,15 +226,24 @@ function Wizard({ onDone }: WizardProps): React.ReactElement {
   );
 }
 
-export function runWizard(): Promise<WizardResult> {
-  return new Promise((resolve) => {
-    let instance: ReturnType<typeof render>;
-    instance = render(
-      <Wizard onDone={(result) => {
-        instance.unmount();
-        resolve(result);
-      }} />,
-      { stdout: process.stdout, exitOnCtrlC: false },
-    );
+export async function runWizard(): Promise<WizardResult> {
+  let finish: ((result: WizardResult) => void) | undefined;
+  const resultPromise = new Promise<WizardResult>((resolve) => {
+    finish = resolve;
   });
+  let completed = false;
+  const instance = render(
+    <Wizard onDone={(result) => {
+      if (completed) return;
+      completed = true;
+      finish?.(result);
+      instance.unmount();
+    }} />,
+    { stdout: process.stdout, exitOnCtrlC: false },
+  );
+
+  const result = await resultPromise;
+  // Do not start Pi until Ink has restored raw mode and released stdin.
+  await instance.waitUntilExit();
+  return result;
 }

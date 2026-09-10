@@ -112,7 +112,7 @@ for (const path of candidates) {
 }
 
 if (manifest.name !== "psyclaw") contractFailures.push("package.json name must be psyclaw");
-if (manifest.bin?.psyclaw !== "dist/src/cli.js") {
+if (manifest.bin?.psyclaw !== "scripts/psyclaw.mjs") {
   contractFailures.push("package.json must expose the psyclaw CLI bin");
 }
 if (manifest.scripts?.postinstall !== undefined) {
