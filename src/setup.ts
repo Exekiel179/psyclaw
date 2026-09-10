@@ -173,6 +173,37 @@ export interface ProviderConfigInput {
 
 export type CredentialSource = "process-env" | "macos-launchctl" | "auth-store" | "missing";
 
+export function missingApiKeyUserMessage(apiKeyEnv: string): string {
+  assertApiKeyEnv(apiKeyEnv);
+  return `未找到 ${apiKeyEnv}；请输入 API Key 后再继续`;
+}
+
+export function missingProviderCredentialMessage(providerId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(providerId)) throw new Error("Invalid provider id");
+  return `未找到 ${providerId} 的可用凭据；请重新运行 /provider 并输入 API Key`;
+}
+
+export type ProviderKeyPromptDecision =
+  | { kind: "cancel" }
+  | { kind: "need-key"; message: string }
+  | { kind: "proceed"; apiKey?: string };
+
+/**
+ * Empty key submission keeps an existing credential. An empty submission with
+ * no credential is expected setup UX, not a thrown failure.
+ */
+export function decideProviderKeyPrompt(
+  submitted: string | undefined,
+  credential: CredentialSource,
+  apiKeyEnv: string,
+): ProviderKeyPromptDecision {
+  if (submitted === undefined) return { kind: "cancel" };
+  if (!submitted && credential === "missing") {
+    return { kind: "need-key", message: missingApiKeyUserMessage(apiKeyEnv) };
+  }
+  return submitted ? { kind: "proceed", apiKey: submitted } : { kind: "proceed" };
+}
+
 // These providers are implemented by Pi itself. PsyClaw only exposes their
 // credentials and selection; writing a simplified models.json entry would
 // discard Pi's native model/API metadata (some providers expose more than one

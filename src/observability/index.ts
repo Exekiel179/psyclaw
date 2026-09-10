@@ -5,6 +5,7 @@ import {
   type NodeObservabilityConfig,
 } from "./config.js";
 import type { ObservabilityHandle } from "./node-sdks.js";
+import { isExpectedUserError } from "./expected.js";
 import { readTelemetryPreference, resolveTelemetryEnabled, telemetryPreferenceOptions, type TelemetryPreference } from "./preference.js";
 
 export {
@@ -33,6 +34,7 @@ export {
 export type { TelemetryPreference } from "./preference.js";
 export { maybeShowTelemetryNotice } from "./notice.js";
 export type { TelemetryNoticeChoice } from "./notice.js";
+export { ExpectedUserError, isExpectedUserError, isExpectedUserErrorMessage } from "./expected.js";
 
 type BootFn = (config: NodeObservabilityConfig) => Promise<ObservabilityHandle>;
 
@@ -87,6 +89,7 @@ export function trackAgentEvent(name: string, properties: Record<string, unknown
 }
 
 export function captureAgentError(error: unknown, context: Record<string, string> = {}): Promise<void> {
+  if (isExpectedUserError(error)) return Promise.resolve();
   const safeContext: Record<string, string> = {};
   for (const [key, value] of Object.entries(context)) {
     if (typeof value === "string" && value.trim()) safeContext[key] = value.trim().slice(0, 80);

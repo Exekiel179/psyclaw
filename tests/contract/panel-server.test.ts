@@ -1,10 +1,12 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { bootstrapProject } from "../../src/project/bootstrap.js";
 import { RunEventLog } from "../../src/panel/events.js";
 import { createPanelServer } from "../../src/panel/server.js";
+import { postJson, withServer } from "../helpers.js";
 
 describe("read-only panel server", () => {
   it("serves the run listing and a snapshot over narrow JSON endpoints", async () => {
@@ -152,5 +154,41 @@ describe("read-only panel server", () => {
       }
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+
+  it("returns the same missing-key notice as CLI instead of a fake provider save", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-key-"));
+    await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    const previous = process.env.PSYCLAW_PANEL_TEST_API_KEY;
+    delete process.env.PSYCLAW_PANEL_TEST_API_KEY;
+    try {
+      await withServer(root, async (base) => {
+        const res = await postJson(base, "/api/provider-config", {
+          id: "panel-test-provider",
+          name: "Panel Test",
+          baseUrl: "https://example.invalid/v1",
+          api: "openai-completions",
+          apiKeyEnv: "PSYCLAW_PANEL_TEST_API_KEY",
+          modelId: "demo-model",
+        });
+        expect(res.status).toBe(400);
+        await expect(res.json()).resolves.toEqual({
+          error: "未找到 PSYCLAW_PANEL_TEST_API_KEY；请输入 API Key 后再继续",
+          reasonCode: "missing_api_key",
+        });
+      });
+    } finally {
+      if (previous === undefined) delete process.env.PSYCLAW_PANEL_TEST_API_KEY;
+      else process.env.PSYCLAW_PANEL_TEST_API_KEY = previous;
+    }
+  });
+
+  it("keeps panel provider copy aligned with the CLI missing-key prompt", async () => {
+    const html = await readFile(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "apps", "panel", "index.html"), "utf8");
+    expect(html).toContain('VIEWS=["project","ecosystem","provider"]');
+    expect(html).toContain('"#project"');
+    expect(html).toContain("未找到 ${model.apiKeyEnv}；请输入 API Key 后再继续");
+    expect(html).toContain('$("model-select").addEventListener("change"');
+    expect(html).toContain("apiKeyStored");
   });
 });
