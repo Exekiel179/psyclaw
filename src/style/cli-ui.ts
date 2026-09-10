@@ -86,6 +86,8 @@ export function formatCliUsage(): string {
     cmd("/help", "", c.white("查看全部对话命令")),
     "",
     `  ${c.gray("终端：")} ${c.teal("psyclaw -v")} ${c.darkGray("/")} ${c.teal("psyclaw --version")} ${c.gray("查看版本号")}`,
+    `  ${c.gray("终端：")} ${c.teal("psyclaw --continue")} ${c.darkGray("/")} ${c.teal("psyclaw -c")} ${c.gray("续接最近会话")}`,
+    `  ${c.gray("终端：")} ${c.teal("psyclaw --continuously-work")} ${c.gray("持续自动推进（也接受 --continue-work）")}`,
     `  ${c.gray("终端：")} ${c.teal("psyclaw telemetry on|off|status")} ${c.gray("管理匿名产品遥测")}`,
     "",
     `  ${c.darkGray("──────────────────────────────────────────────────────────")}`,

@@ -10,6 +10,7 @@ import { filesystemErrorContext, redactUserPath } from "./error-context.js";
 import { ensureAnonymousDistinctId, newAnonymousDistinctId } from "./identity.js";
 import type { LlmGenerationInput } from "./llm.js";
 import type { ObservabilityHandle } from "./node-sdks.js";
+import { isExpectedUserError } from "./expected.js";
 import { readTelemetryPreference, resolveTelemetryEnabled, telemetryPreferenceOptions, type TelemetryPreference } from "./preference.js";
 
 export {
@@ -45,6 +46,7 @@ export { filesystemErrorContext, fsWriteErrorMessage, redactUserPath } from "./e
 export { extractPiGeneration, lastPiGeneration, posthogAiGenerationProperties } from "./llm.js";
 export type { LlmGenerationInput } from "./llm.js";
 export { readLangfuseConfig } from "./langfuse.js";
+export { ExpectedUserError, isExpectedUserError, isExpectedUserErrorMessage } from "./expected.js";
 
 type BootFn = (config: NodeObservabilityConfig) => Promise<ObservabilityHandle>;
 
@@ -107,6 +109,7 @@ export function trackAgentEvent(name: string, properties: Record<string, unknown
 }
 
 export function captureAgentError(error: unknown, context: Record<string, string> = {}): Promise<void> {
+  if (isExpectedUserError(error)) return Promise.resolve();
   const extracted = filesystemErrorContext(error);
   const safeContext: Record<string, string> = {
     package_version: PSYCLAW_VERSION,

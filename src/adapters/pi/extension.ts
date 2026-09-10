@@ -8,7 +8,7 @@ import { RunEventLog } from "../../panel/events.js";
 import { readProject } from "../../research/ledger.js";
 import { join } from "node:path";
 import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
-import { PROVIDER_PRESETS, providerCredentialSource, saveProviderConfig } from "../../setup.js";
+import { PROVIDER_PRESETS, providerCredentialSource, saveProviderConfig, decideProviderKeyPrompt, missingProviderCredentialMessage } from "../../setup.js";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -1541,11 +1541,13 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           // environment/auth-store credential; this makes the flow explicit
           // and avoids silently skipping the key screen on another machine.
           const key = await promptProviderKey(ctx, preset.name, preset.apiKeyEnv);
-          if (key === undefined) return;
-          if (!key && credential === "missing") {
-            throw new Error(`未找到 ${preset.apiKeyEnv}；请输入 API Key 后再继续`);
+          const decision = decideProviderKeyPrompt(key, credential, preset.apiKeyEnv);
+          if (decision.kind === "cancel") return;
+          if (decision.kind === "need-key") {
+            ctx.ui.notify(decision.message, "warning");
+            return;
           }
-          await saveProviderConfig({ ...preset, ...(key ? { apiKey: key } : {}) });
+          await saveProviderConfig({ ...preset, ...(decision.apiKey ? { apiKey: decision.apiKey } : {}) });
           const refreshed = await Promise.race([
             ctx.modelRegistry.refresh().then(() => true),
             new Promise<false>((resolve) => setTimeout(() => resolve(false), 5_000)),
@@ -1559,7 +1561,10 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         const selected = models.find((model) => model.id === selectedId);
         if (!selected) throw new Error(`No model selected for provider: ${requested}`);
         const changed = await pi.setModel(selected);
-        if (!changed) throw new Error(`未找到 ${requested} 的可用凭据；请重新运行 /provider 并输入 API Key`);
+        if (!changed) {
+          ctx.ui.notify(missingProviderCredentialMessage(requested), "warning");
+          return;
+        }
         await saveDefaultModel(requested, selected.id);
         ctx.ui.notify(`已切换并设为默认模型：${requested}/${selected.id}`, "info");
       } catch (error) { await notifyError(ctx, error); }

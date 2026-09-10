@@ -2,7 +2,7 @@ import { access, mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/pro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { hasConfiguredProvider, providerCredentialSource, PROVIDER_PRESETS, saveProviderConfig, setupProviders } from "../../src/setup.js";
+import { hasConfiguredProvider, providerCredentialSource, PROVIDER_PRESETS, saveProviderConfig, setupProviders, decideProviderKeyPrompt, missingApiKeyUserMessage } from "../../src/setup.js";
 
 describe("provider setup and first-run detection", () => {
   it("reports unconfigured before setup and configured after", async () => {
@@ -106,5 +106,24 @@ describe("provider setup and first-run detection", () => {
     expect(await readFile(result.path, "utf8")).not.toContain("direct-entry-secret");
     expect(await readFile(join(agentDir, "auth.json"), "utf8")).toContain("direct-entry-secret");
     await expect(providerCredentialSource(preset, { agentDir })).resolves.toBe("auth-store");
+  });
+});
+
+describe("provider key prompt decisions", () => {
+  it("asks the user to enter a key when none exists, without treating it as a crash", () => {
+    expect(decideProviderKeyPrompt("", "missing", "OPENCODE_API_KEY")).toEqual({
+      kind: "need-key",
+      message: missingApiKeyUserMessage("OPENCODE_API_KEY"),
+    });
+    expect(missingApiKeyUserMessage("OPENCODE_API_KEY")).toBe("未找到 OPENCODE_API_KEY；请输入 API Key 后再继续");
+  });
+
+  it("keeps an existing credential on empty submit and cancels when the prompt is dismissed", () => {
+    expect(decideProviderKeyPrompt("", "process-env", "OPENCODE_API_KEY")).toEqual({ kind: "proceed" });
+    expect(decideProviderKeyPrompt(undefined, "missing", "OPENCODE_API_KEY")).toEqual({ kind: "cancel" });
+    expect(decideProviderKeyPrompt("sk-test", "missing", "OPENCODE_API_KEY")).toEqual({
+      kind: "proceed",
+      apiKey: "sk-test",
+    });
   });
 });

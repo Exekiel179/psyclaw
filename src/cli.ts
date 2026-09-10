@@ -27,7 +27,8 @@ import { appendJsonlIfMissing } from "./project/jsonl.js";
 import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, c } from "./style/cli-ui.js";
-import { captureAgentError, initNodeObservability, maybeShowTelemetryNotice, readTelemetryEnvOverride, readTelemetryPreference, shutdownObservability, withAgentSpan, writeTelemetryPreference } from "./observability/index.js";
+import { continueSessionArgs, peelContinuouslyWorkFlag, unknownFlagUsage } from "./cli-args.js";
+import { captureAgentError, ExpectedUserError, initNodeObservability, maybeShowTelemetryNotice, readTelemetryEnvOverride, readTelemetryPreference, shutdownObservability, withAgentSpan, writeTelemetryPreference } from "./observability/index.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
   "survey-observational",
@@ -143,7 +144,13 @@ async function addEvidence(root: string, args: string[]): Promise<void> {
   process.stdout.write(`${JSON.stringify(evidence, null, 2)}\n`);
 }
 
-async function ensureConfiguredThenChat(args: string[]): Promise<void> {
+async function ensureConfiguredThenChat(
+  args: string[],
+  opts?: { continuouslyWork?: boolean },
+): Promise<void> {
+  const peeled = peelContinuouslyWorkFlag(args);
+  const continuouslyWork = Boolean(opts?.continuouslyWork) || peeled.enabled;
+  args = peeled.args;
   if (!(await hasConfiguredProvider())) {
     const { runWizard } = await import("./wizard.js");
     const result = await runWizard();
@@ -152,7 +159,7 @@ async function ensureConfiguredThenChat(args: string[]): Promise<void> {
       args = ["--provider", result.provider, "--model", result.modelId, ...args];
     }
   }
-  await launchChat({ args });
+  await launchChat({ args, continuouslyWork });
 }
 
 async function telemetryStatusText(): Promise<string> {
@@ -188,7 +195,9 @@ async function dispatchTelemetry(args: string[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  const peeledLaunch = peelContinuouslyWorkFlag(process.argv.slice(2));
+  const args = peeledLaunch.args;
+  const continuouslyWork = peeledLaunch.enabled;
   const peek = args[0];
   const skipTelemetry = peek === "--help" || peek === "-h" || peek === "--version" || peek === "-v" || peek === "-V" || peek === "telemetry";
   if (!skipTelemetry) {
@@ -196,7 +205,7 @@ async function main(): Promise<void> {
     await initNodeObservability();
   }
   try {
-    await dispatch(args);
+    await dispatch(args, { continuouslyWork });
   } catch (error) {
     await captureAgentError(error, { phase: "cli", command: peek ?? "default", cwd: process.cwd() });
     throw error;
@@ -205,7 +214,8 @@ async function main(): Promise<void> {
   }
 }
 
-async function dispatch(args: string[]): Promise<void> {
+async function dispatch(args: string[], opts: { continuouslyWork: boolean } = { continuouslyWork: false }): Promise<void> {
+  const continuouslyWork = opts.continuouslyWork;
   const command = args.shift();
   const root = process.cwd();
   if (command === "--help" || command === "-h") {
@@ -216,14 +226,19 @@ async function dispatch(args: string[]): Promise<void> {
     process.stdout.write(`${PSYCLAW_VERSION}\n`);
     return;
   }
+  const continuationArgs = continueSessionArgs(command, args);
+  if (continuationArgs !== undefined) {
+    await ensureConfiguredThenChat(continuationArgs, { continuouslyWork });
+    return;
+  }
   // Bare `psyclaw` is the primary entrypoint: guide the user through first-run
   // setup when no provider is configured, then launch the conversation.
   if (!command) {
-    await ensureConfiguredThenChat(args);
+    await ensureConfiguredThenChat(args, { continuouslyWork });
     return;
   }
   if (command === "chat") {
-    await ensureConfiguredThenChat(args);
+    await ensureConfiguredThenChat(args, { continuouslyWork });
     return;
   }
   if (command === "wizard") {
@@ -396,7 +411,10 @@ async function dispatch(args: string[]): Promise<void> {
     }
     return;
   }
-  throw new Error(`Unknown command: ${command}\n\n${usage()}`);
+  if (command.startsWith("-")) {
+    throw new ExpectedUserError(unknownFlagUsage(command));
+  }
+  throw new ExpectedUserError(`Unknown command: ${command}\n\n${usage()}`);
 }
 
 main().catch((error: unknown) => {

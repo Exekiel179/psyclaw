@@ -5,9 +5,12 @@ import { join } from "node:path";
 import {
   captureAgentError,
   extractPiGeneration,
+  ExpectedUserError,
   filesystemErrorContext,
   fsWriteErrorMessage,
   injectBrowserObservabilityConfig,
+  isExpectedUserError,
+  isExpectedUserErrorMessage,
   maybeShowTelemetryNotice,
   observabilityEnabled,
   OBS_CONFIG_SCRIPT_ID,
@@ -261,6 +264,31 @@ describe("observability runtime gate", () => {
     });
     expect(errorContext?.cwd).toMatch(/^~/);
     expect(errorContext?.cwd).not.toContain(homedir());
+  });
+
+  it("does not report expected missing-key setup as a captured exception", async () => {
+    const errors: unknown[] = [];
+    await initNodeObservability({
+      env: {},
+      preference: { enabled: true, noticeAcknowledged: true },
+      boot: async () => ({
+        captureEvent() {},
+        captureError(error) { errors.push(error); },
+        async flush() {},
+      }),
+    });
+    await captureAgentError(new Error("未找到 OPENCODE_API_KEY；请输入 API Key 后再继续"), { phase: "extension" });
+    await captureAgentError(new ExpectedUserError("无法识别选项 --continue-work"), { phase: "cli" });
+    await captureAgentError(new Error("boom"), { phase: "cli" });
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as Error).message).toBe("boom");
+  });
+
+  it("classifies missing API key and unknown-flag usage as expected user setup", () => {
+    expect(isExpectedUserErrorMessage("未找到 OPENCODE_API_KEY；请输入 API Key 后再继续")).toBe(true);
+    expect(isExpectedUserErrorMessage("未找到 opencode-go 的可用凭据；请重新运行 /provider 并输入 API Key")).toBe(true);
+    expect(isExpectedUserErrorMessage("无法识别选项 --continue-work")).toBe(true);
+    expect(isExpectedUserError(new Error("disk full"))).toBe(false);
   });
 
   it("drops events when no handle is installed", () => {

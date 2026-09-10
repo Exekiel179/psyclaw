@@ -274,4 +274,46 @@ describe("Pi extension contract", () => {
     expect(state).toMatchObject({ objective: "Focus the review", selectedSkills: ["academic-grill"] });
     expect(sentMessage).toContain("本次运行由用户选择的优化 Skill：academic-grill");
   });
+
+  it("asks for a missing provider API key without throwing", async () => {
+    const previous = process.env.OPENCODE_API_KEY;
+    delete process.env.OPENCODE_API_KEY;
+    let providerHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "provider") providerHandler = options.handler;
+      },
+      registerTool() {},
+      setModel: async () => {
+        throw new Error("setModel should not run when the API key is missing");
+      },
+    } as any;
+    extension(api);
+    const notifications: Array<{ message: string; level?: string }> = [];
+    let customCalls = 0;
+    try {
+      await providerHandler?.("opencode-go", {
+        hasUI: true,
+        model: undefined,
+        modelRegistry: {
+          getAll: () => [],
+          refresh: async () => undefined,
+        },
+        ui: {
+          notify: (message: string, level?: string) => notifications.push({ message, level }),
+          custom: async () => {
+            customCalls += 1;
+            if (customCalls === 1) return { type: "select", id: "deepseek-v4-flash" };
+            return { type: "submit", value: "" };
+          },
+        },
+      });
+    } finally {
+      if (previous === undefined) delete process.env.OPENCODE_API_KEY;
+      else process.env.OPENCODE_API_KEY = previous;
+    }
+    expect(customCalls).toBe(2);
+    expect(notifications[0]?.level).toBe("warning");
+    expect(notifications[0]?.message).toBe("未找到 OPENCODE_API_KEY；请输入 API Key 后再继续");
+  });
 });

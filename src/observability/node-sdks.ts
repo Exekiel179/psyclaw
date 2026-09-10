@@ -14,6 +14,7 @@ import { PSYCLAW_VERSION } from "../branding.js";
 import { redactSecrets } from "../core/redact.js";
 import type { AgentEventPropertyValue, NodeObservabilityConfig } from "./config.js";
 import { filesystemErrorContext, redactUserPath } from "./error-context.js";
+import { isExpectedUserErrorMessage } from "./expected.js";
 import { createLangfuseHandle, readLangfuseConfig, type LangfuseHandle } from "./langfuse.js";
 import { posthogAiGenerationProperties, type LlmGenerationInput } from "./llm.js";
 
@@ -48,6 +49,10 @@ export async function bootNodeSdks(config: NodeObservabilityConfig): Promise<Obs
           for (const value of values) {
             if (typeof value.value === "string") value.value = redactSecrets(value.value).slice(0, 500);
           }
+        }
+        const exceptionText = values?.map((value) => value.value).find((value) => typeof value === "string");
+        if (isExpectedUserErrorMessage(event.message ?? "") || (typeof exceptionText === "string" && isExpectedUserErrorMessage(exceptionText))) {
+          return null;
         }
         if (event.user) {
           event.user = event.user.id === undefined ? {} : { id: event.user.id };
