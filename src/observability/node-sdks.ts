@@ -146,7 +146,16 @@ export async function bootNodeSdks(config: NodeObservabilityConfig): Promise<Obs
     },
     async runSpan(name, attributes, fn) {
       if (!sentry) return fn();
-      return sentry.startSpan({ name, op: "psyclaw", attributes }, async () => fn());
+      let started = false;
+      try {
+        return await sentry.startSpan({ name, op: "psyclaw", attributes }, () => {
+          started = true;
+          return fn();
+        });
+      } catch (error) {
+        if (!started) return fn();
+        throw error;
+      }
     },
     async flush() {
       await Promise.all([

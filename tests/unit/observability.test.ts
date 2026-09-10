@@ -26,6 +26,7 @@ import {
   trackSkillInstall,
   initNodeObservability,
   isObservabilityActive,
+  withAgentSpan,
   writeTelemetryPreference,
 } from "../../src/observability/index.js";
 import { DEFAULT_TELEMETRY_PREFERENCE } from "../../src/observability/preference.js";
@@ -265,6 +266,12 @@ describe("observability runtime gate", () => {
   it("drops events when no handle is installed", () => {
     setObservabilityHandleForTests(undefined);
     expect(() => trackAgentEvent("research_run_started", { phase: "cli" })).not.toThrow();
+  });
+
+  it("still runs the agent path when a span boot fails", async () => {
+    setObservabilityHandleForTests(undefined);
+    const result = await withAgentSpan("cli.research_run", { phase: "test" }, async () => "ok");
+    expect(result).toBe("ok");
   });
 });
 

@@ -146,7 +146,11 @@ export async function withAgentSpan<T>(
   attributes: Record<string, string>,
   fn: () => Promise<T>,
 ): Promise<T> {
-  if (bootPromise) await bootPromise;
+  try {
+    if (bootPromise) await bootPromise;
+  } catch {
+    /* telemetry boot failure must not block the agent */
+  }
   if (handle && typeof handle.runSpan === "function") return handle.runSpan(name, attributes, fn);
   return fn();
 }
@@ -165,7 +169,11 @@ export function setObservabilityHandleForTests(next: ObservabilityHandle | undef
 }
 
 async function emitWhenReady(fn: (active: ObservabilityHandle) => void): Promise<void> {
-  if (bootPromise) await bootPromise;
+  try {
+    if (bootPromise) await bootPromise;
+  } catch {
+    return;
+  }
   if (handle) fn(handle);
 }
 
