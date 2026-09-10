@@ -1,0 +1,4 @@
+{
+  "name": "PsyClaw",
+  "install": "corepack pnpm install --frozen-lockfile && corepack pnpm build"
+}
