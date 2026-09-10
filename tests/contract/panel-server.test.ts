@@ -147,6 +147,7 @@ describe("read-only panel server", () => {
       expect(enabledHtml).toContain("phc_example_not_live");
       expect(enabledHtml).not.toContain("ingest.us.sentry.io");
       expect(enabledHtml).toContain('"telemetryEnabled":true');
+      expect(enabledHtml).toMatch(/"distinctId":"psyclaw:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"/i);
     } finally {
       for (const [name, value] of Object.entries(previous)) {
         if (value === undefined) delete process.env[name];

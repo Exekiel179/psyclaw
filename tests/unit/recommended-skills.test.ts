@@ -6,9 +6,11 @@ import { describe, expect, it } from "vitest";
 import {
   enabledRecommendedSkillPaths,
   normalizeRecommendedSkillId,
+  partitionRecommendationState,
   readRecommendationState,
   readRecommendedCatalog,
   saveRecommendationState,
+  userRecommendationStatePath,
   validateInstalledRecommendedSkill,
 } from "../../src/skills/recommended.js";
 
@@ -65,6 +67,38 @@ describe("recommended Skill lifecycle", () => {
     const result = await enabledRecommendedSkillPaths(root);
     expect(result.paths).toEqual([]);
     expect(result.warnings.join("\n")).toMatch(/changed|frontmatter/i);
+  });
+
+  it("stores user-scope recommendation desire-state in the agent dir, not cwd/.psyclaw", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-rec-project-"));
+    const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-rec-agent-"));
+    await saveRecommendationState(root, {
+      schemaVersion: "psyclaw/recommendation-state/v1",
+      skills: ["session-handoff"],
+      mcp: [],
+      skillScopes: { "session-handoff": "user" },
+    }, { agentDir });
+    await expect(readFile(join(root, ".psyclaw", "recommendations.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    const userFile = JSON.parse(await readFile(userRecommendationStatePath(agentDir), "utf8")) as {
+      skills: string[];
+      skillScopes?: Record<string, string>;
+    };
+    expect(userFile.skills).toEqual(["session-handoff"]);
+    expect(userFile.skillScopes).toEqual({ "session-handoff": "user" });
+    await expect(readRecommendationState(root, { agentDir })).resolves.toMatchObject({
+      skills: ["session-handoff"],
+      skillScopes: { "session-handoff": "user" },
+    });
+    const parts = partitionRecommendationState({
+      schemaVersion: "psyclaw/recommendation-state/v1",
+      skills: ["session-handoff", "academic-reference-matcher"],
+      mcp: ["zotero"],
+      skillScopes: { "session-handoff": "user", "academic-reference-matcher": "project" },
+    });
+    expect(parts.user.skills).toEqual(["session-handoff"]);
+    expect(parts.project.skills).toEqual(["academic-reference-matcher"]);
+    expect(parts.project.mcp).toEqual(["zotero"]);
+    expect(parts.user.mcp).toEqual([]);
   });
 
   it("does not create nested Git metadata in the managed layout", async () => {
