@@ -184,6 +184,46 @@ describe("read-only panel server", () => {
     }
   });
 
+  it("returns a single error response when /api/project-file cannot be read", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-file-"));
+    await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await mkdir(join(root, "outputs", "not-a-file.json"), { recursive: true });
+    await writeFile(join(root, "outputs", "ok.json"), JSON.stringify({ ok: true }), "utf8");
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => { rejections.push(reason); };
+    process.on("unhandledRejection", onRejection);
+    try {
+      await withServer(root, async (base) => {
+        const missingQuery = await fetch(`${base}/api/project-file`);
+        expect(missingQuery.status).toBe(400);
+        await expect(missingQuery.json()).resolves.toEqual({ error: "path query parameter is required" });
+
+        const missing = await fetch(`${base}/api/project-file?path=${encodeURIComponent("outputs/does-not-exist.json")}`);
+        expect(missing.status).toBe(404);
+        await expect(missing.json()).resolves.toEqual({ error: "project file not found" });
+
+        const denied = await fetch(`${base}/api/project-file?path=${encodeURIComponent(".psyclaw/project.json")}`);
+        expect(denied.status).toBe(404);
+        await expect(denied.json()).resolves.toEqual({ error: "project file is outside the Panel read-only allowlist" });
+
+        const traversal = await fetch(`${base}/api/project-file?path=${encodeURIComponent("outputs/../.psyclaw/project.json")}`);
+        expect(traversal.status).toBe(404);
+
+        const notAFile = await fetch(`${base}/api/project-file?path=${encodeURIComponent("outputs/not-a-file.json")}`);
+        expect(notAFile.status).toBe(404);
+        await expect(notAFile.json()).resolves.toEqual({ error: "project file must be a regular file" });
+
+        const ok = await fetch(`${base}/api/project-file?path=${encodeURIComponent("outputs/ok.json")}`);
+        expect(ok.status).toBe(200);
+        await expect(ok.json()).resolves.toMatchObject({ format: "json", path: "outputs/ok.json" });
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+    expect(rejections).toEqual([]);
+  });
+
   it("keeps panel provider copy aligned with the CLI missing-key prompt", async () => {
     const html = await readFile(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "apps", "panel", "index.html"), "utf8");
     expect(html).toContain('VIEWS=["project","ecosystem","provider"]');
