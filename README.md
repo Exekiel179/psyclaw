@@ -4,7 +4,7 @@ PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、
 
 PsyClaw 自有代码使用 MIT 许可证；随 npm 包内置的 Academic Research Skills 位于 `vendor/ars`，保持上游署名并单独遵循 CC BY-NC 4.0，仅限非商业用途。
 
-当前版本：`0.30.2`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.30.3`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
 
 ## 发布流程
 
@@ -21,19 +21,19 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.30.2
+npm install -g psyclaw@0.30.3
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.30.2 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.30.3 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.30.2 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.30.3 --registry=https://registry.npmmirror.com
 ```
 
 或安装脚本：
@@ -46,7 +46,7 @@ PSYCLAW_CN=1 curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
 ```powershell
 # Windows PowerShell
 irm https://exekiel179.github.io/psyclaw/install.ps1 | iex
-# 可选：$env:PSYCLAW_CN = "1"；$env:PSYCLAW_VERSION = "0.30.2"
+# 可选：$env:PSYCLAW_CN = "1"；$env:PSYCLAW_VERSION = "0.30.3"
 ```
 
 检测到国内 npm registry（如 npmmirror）、`PSYCLAW_CN=1` 或 `PSYCLAW_GITHUB_MIRROR` 时，内置路径统一走国内可用路由：

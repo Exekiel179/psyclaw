@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.30.3 - 2026-09-11
+
+- Port Langfuse and PostHog LLM analytics with Sentry spans
+- Skip ExpectedUserError and missing-key Sentry noise
+- Correlate CLI and panel PostHog distinct_id
+- Add Cloud Agent environment config
+
 ## 0.30.2 - 2026-09-09
 
 - Defer telemetry SDK boot so first-run config is not blocked

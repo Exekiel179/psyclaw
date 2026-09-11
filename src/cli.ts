@@ -28,6 +28,7 @@ import { formatCliUsage, renderSuccessCard, renderProductUpdateSummary, c } from
 import { continueSessionArgs, peelContinuouslyWorkFlag } from "./cli-args.js";
 import {
   captureAgentError,
+  ExpectedUserError,
   initNodeObservability,
   maybeShowTelemetryNotice,
   readTelemetryEnvOverride,
@@ -140,7 +141,7 @@ function assertKnownOptions(args: readonly string[], allowed: readonly string[])
   const allowedSet = new Set(allowed);
   for (const [index, arg] of args.entries()) {
     if (!arg.startsWith("--")) continue;
-    if (!allowedSet.has(arg)) throw new Error(`Unknown option: ${arg}`);
+    if (!allowedSet.has(arg)) throw new ExpectedUserError(`Unknown option: ${arg}`);
     if (index + 1 >= args.length || args[index + 1]?.startsWith("--")) {
       throw new Error(`Option ${arg} requires a value`);
     }
@@ -258,7 +259,7 @@ async function main(): Promise<void> {
   try {
     await dispatch(args, { continuouslyWork });
   } catch (error) {
-    await captureAgentError(error, { phase: "cli", command: peek ?? "default" });
+    await captureAgentError(error, { phase: "cli", command: peek ?? "default", cwd: process.cwd() });
     throw error;
   } finally {
     await shutdownObservability();
@@ -455,7 +456,7 @@ async function dispatch(args: string[], opts: { continuouslyWork: boolean }): Pr
     }
     return;
   }
-  throw new Error(`Unknown command: ${command}\n\n${usage()}`);
+  throw new ExpectedUserError(`Unknown command: ${command}\n\n${usage()}`);
 }
 
 main().catch((error: unknown) => {

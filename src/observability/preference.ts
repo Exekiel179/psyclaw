@@ -6,6 +6,8 @@ import { atomicWriteFile } from "../project/jsonl.js";
 export interface TelemetryPreference {
   enabled: boolean;
   noticeAcknowledged: boolean;
+  /** Stable PostHog distinct_id shared by CLI and the local panel. */
+  anonymousId?: string;
 }
 
 export const DEFAULT_TELEMETRY_PREFERENCE: TelemetryPreference = {
@@ -24,6 +26,14 @@ export function telemetryPreferenceOptions(settingsPath?: string, now?: Date): {
   };
 }
 
+const ANONYMOUS_ID_RE = /^psyclaw:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function parseAnonymousDistinctId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return ANONYMOUS_ID_RE.test(trimmed) ? trimmed : undefined;
+}
+
 export function parseTelemetryPreference(settings: unknown): TelemetryPreference {
   if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
     return { ...DEFAULT_TELEMETRY_PREFERENCE };
@@ -32,10 +42,12 @@ export function parseTelemetryPreference(settings: unknown): TelemetryPreference
   if (!telemetry || typeof telemetry !== "object" || Array.isArray(telemetry)) {
     return { ...DEFAULT_TELEMETRY_PREFERENCE };
   }
-  const record = telemetry as { enabled?: unknown; noticeAcknowledged?: unknown };
+  const record = telemetry as { enabled?: unknown; noticeAcknowledged?: unknown; anonymousId?: unknown };
+  const anonymousId = parseAnonymousDistinctId(record.anonymousId);
   return {
     enabled: record.enabled !== false,
     noticeAcknowledged: record.noticeAcknowledged === true,
+    ...(anonymousId === undefined ? {} : { anonymousId }),
   };
 }
 
@@ -66,6 +78,9 @@ export async function writeTelemetryPreference(
   const next: TelemetryPreference = {
     enabled: patch.enabled ?? current.enabled,
     noticeAcknowledged: patch.noticeAcknowledged ?? current.noticeAcknowledged,
+    ...(patch.anonymousId ?? current.anonymousId
+      ? { anonymousId: patch.anonymousId ?? current.anonymousId }
+      : {}),
   };
   const previousTelemetry =
     existing.telemetry && typeof existing.telemetry === "object" && !Array.isArray(existing.telemetry)
@@ -80,6 +95,7 @@ export async function writeTelemetryPreference(
         ...previousTelemetry,
         enabled: next.enabled,
         noticeAcknowledged: next.noticeAcknowledged,
+        ...(next.anonymousId === undefined ? {} : { anonymousId: next.anonymousId }),
         updatedAt: (options.now ?? new Date()).toISOString(),
       },
     }, null, 2)}\n`,
