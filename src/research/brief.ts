@@ -89,7 +89,7 @@ export async function runOfflineBrief(root: string): Promise<BriefResult> {
     completed: ["evidence ledger loaded", "evidence sufficiency gates evaluated"],
     verified: blocked.length === 0 ? ["brief.md", "manifest", "verdict"] : ["manifest", "verdict"],
     blocked: blocked.map((gate) => gate.reason),
-    nextSteps: blocked.length === 0 ? ["human review before external use"] : ["resolve blocked evidence gates"],
+    nextSteps: blocked.length === 0 ? ["review before external use"] : ["retrieve missing evidence, narrow unsupported statements, and rerun the checks"],
     verificationCommands: ["pnpm typecheck", "pnpm test"],
     generatedAt: new Date().toISOString(),
   });

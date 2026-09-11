@@ -20,14 +20,13 @@ import {
   setupProviders,
   sha256File,
   writeHandoff,
-  initializeHitlWorkspace,
   PSYCLAW_VERSION,
 } from "./index.js";
 import { appendJsonlIfMissing } from "./project/jsonl.js";
 import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, c } from "./style/cli-ui.js";
-import { continueSessionArgs, peelContinuouslyWorkFlag, unknownFlagUsage } from "./cli-args.js";
+import { continueSessionArgs, enableDeveloperCommands, extractDeveloperFlag, peelContinuouslyWorkFlag, unknownFlagUsage } from "./cli-args.js";
 import { captureAgentError, ExpectedUserError, initNodeObservability, maybeShowTelemetryNotice, readTelemetryEnvOverride, readTelemetryPreference, shutdownObservability, withAgentSpan, writeTelemetryPreference } from "./observability/index.js";
 
 const PARADIGMS = new Set<ResearchParadigm>([
@@ -195,7 +194,9 @@ async function dispatchTelemetry(args: string[]): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const peeledLaunch = peelContinuouslyWorkFlag(process.argv.slice(2));
+  const developerParsed = extractDeveloperFlag(process.argv.slice(2));
+  if (developerParsed.developer) enableDeveloperCommands();
+  const peeledLaunch = peelContinuouslyWorkFlag(developerParsed.rest);
   const args = peeledLaunch.args;
   const continuouslyWork = peeledLaunch.enabled;
   const peek = args[0];
@@ -250,6 +251,7 @@ async function dispatch(args: string[], opts: { continuouslyWork: boolean } = { 
     await dispatchTelemetry(args);
     return;
   }
+
   if (command === "setup") {
     assertKnownOptions(args, ["--provider"]);
     const provider = option(args, "--provider");
@@ -300,17 +302,6 @@ async function dispatch(args: string[], opts: { continuouslyWork: boolean } = { 
     process.stdout.write(renderSuccessCard("已生成 HANDOFF 研究移交备忘录", {
       "Markdown 产物": "notes/HANDOFF.md",
       "JSON 结构化快照": "notes/handoff.json",
-    }));
-    return;
-  }
-  if (command === "hitl") {
-    const action = args.shift();
-    if (action !== "init" || args.length > 0) throw new Error("Usage: psyclaw hitl init");
-    const project = asProject(JSON.parse(await readFile(projectPaths(root).project, "utf8")));
-    await initializeHitlWorkspace(root, project.goal);
-    process.stdout.write(renderSuccessCard("已初始化人类裁决 (HITL) 工作区模板", {
-      "位置": "notes/ 与 logs/",
-      "状态": "待研究者确认节点已就绪",
     }));
     return;
   }

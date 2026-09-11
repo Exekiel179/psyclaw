@@ -1,28 +1,40 @@
 # PsyClaw
 
-PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、人工裁决、可恢复工作流和本地面板接到内置运行时上；它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
+PsyClaw 是面向社会科学研究的智能体工作台。它把研究项目、证据来源、Claim-Evidence 账本、完整性门禁、可恢复工作流和本地面板接到内置运行时上；只有无法由证据和通行方法消解、且会实质改变研究设计或解释的分歧才交由研究者取舍。它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.27.13`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+当前版本：`0.27.22`。正式命令、用户配置目录和后续发布统一使用 `psyclaw`。
+
+## 发布流程
+
+发布只提交已跟踪文件，并自动递增 patch 版本、创建版本标签，推送当前分支和标签；`.DS_Store`、论文附件、图形和其他未跟踪生成物不会被加入。GitHub Actions 随标签推送执行 Node 22 检查并发布 npm：
+
+```bash
+RELEASE_MESSAGE="release: describe the change" pnpm release:push
+```
+
+运行前请确认当前分支、工作区变更和 GitHub 权限。NPM 发布由 GitHub Actions 的 Trusted Publishing 完成，本机不需要 `npm login`。
 
 ## 安装
 
 需要 Node.js `>=22.19.0`。官方 npm 源：
 
 ```powershell
-npm install -g psyclaw@0.27.13
+npm install -g psyclaw@0.27.22
 ```
 
 如果本机 npm 配置把 registry 误写成带有 `~/` 的地址，请显式指定官方源：
 
 ```bash
-npm install -g psyclaw@0.27.13 --registry=https://registry.npmjs.org/
+npm install -g psyclaw@0.27.22 --registry=https://registry.npmjs.org/
 ```
 
 中国大陆网络较慢或无法访问官方源时：
 
 ```powershell
-npm install -g psyclaw@0.27.13 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.27.22 --registry=https://registry.npmmirror.com
 ```
+
+PsyClaw 启动时会确保 `ripgrep` 和 `fd` 可用。检测到 `HTTP_PROXY`、`HTTPS_PROXY` 或 `ALL_PROXY` 时，通过代理访问 GitHub 官方 API 与 Release；检测到国内 npm registry 时，版本查询、Release 压缩包，以及推荐 Skill / 默认工作流查漏补缺（Nature、academic-paper-skills 等）的 GitHub 拉取，统一走国内 GitHub 镜像：优先镜像源码归档，失败再尝试镜像 git remote，并在镜像不可用或返回错误页面时自动切换备用镜像。安装清单仍记录官方 `https://github.com/...` 地址与 pinned ref。可用 `PSYCLAW_GITHUB_MIRROR=https://your-mirror.example/` 指定自建 HTTPS 镜像。
 
 确认命令入口：
 
@@ -30,7 +42,7 @@ npm install -g psyclaw@0.27.13 --registry=https://registry.npmmirror.com
 psyclaw --help
 ```
 
-直接运行 `psyclaw` 会启动交互研究工作台；首次没有模型配置时会进入配置向导。向导会检查当前进程、macOS `launchctl` 和已有用户凭据，也允许直接遮罩输入 Key。`launchctl` Key 只注入当前运行进程、不落盘；登录 shell 仅在用户明确按 `Ctrl+I` 后读取。直接输入或明确导入的 Key 只保存到 PsyClaw 用户级 `auth.json`，不会写入项目或 `models.json`。也可显式运行 `psyclaw wizard`，或使用 `psyclaw setup --provider deepseek` 写入仅引用环境变量的预设。不要把 API key 写进命令参数、项目、README 或 Git 仓库。
+直接运行 `psyclaw` 会启动交互研究工作台；首次没有模型配置时会自动进入配置流程。配置界面会检查当前进程、macOS `launchctl` 和已有用户凭据，也允许直接遮罩输入 Key。`launchctl` Key 只注入当前运行进程、不落盘；登录 shell 仅在用户明确按 `Ctrl+I` 后读取。直接输入或明确导入的 Key 只保存到 PsyClaw 用户级 `auth.json`，不会写入项目或 `models.json`。模型、凭据、会话和宿主资源统一保存在 `~/.psyclaw/agent`，PsyClaw 不创建或使用 `~/.pi`。不要把 API key 写进命令参数、项目、README 或 Git 仓库。
 
 ## 五分钟开始
 
@@ -59,14 +71,16 @@ psyclaw brief
 | 需求 | 命令或操作 |
 | --- | --- |
 | 启动研究对话 | `psyclaw` 或 `psyclaw chat` |
+| 续接当前项目最近一次会话 | `psyclaw --continue` 或 `psyclaw -c` |
 | 创建研究项目 | `psyclaw init <goal> --paradigm <profile>` |
 | 启动受控研究流程 | 对话中依次输入 `/init <goal>`、`/run [--skills a,b] [objective]` |
 | 模拟同行评审 | 论文完成后在对话中输入 `/review` |
 | 登记本地证据 | `psyclaw evidence add <path> --level user\|fulltext` |
 | 生成离线简报 | `psyclaw brief` |
-| 创建人工裁决模板 | `psyclaw hitl init` |
 | 写研究移交记录 | `psyclaw handoff` |
 | 扫描本机其他 Agent | `psyclaw agents` |
+| 管理人设提示词 | 对话中 `/agents set`、`/agents use`、`/agents list`、`/agents clear` |
+| 启用开发者命令 | `psyclaw --developer` 或 `psyclaw -D`（显示 `/verify`、`/model`、`/agents run`） |
 | 查看 PsyClaw 和内置运行时更新 | `psyclaw check-updates` |
 | 更新 PsyClaw 和内置运行时 | `psyclaw update` |
 | 导出会话 | 使用 Pi 内置的 `/export` |

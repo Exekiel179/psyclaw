@@ -13,7 +13,7 @@
 import { execFile } from "node:child_process";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const NAME = "PsyClaw";
@@ -237,7 +237,11 @@ const MODE_PATCHES = [
     next: 'this.getStartupExpansionState(), 0, 0);',
   },
   {
-    old: `const [fdPath] = await Promise.all([
+    old: `// PsyClaw provides cross-platform Node search tools through its extension.
+        this.setupKeyHandlers();
+        this.setupEditorSubmitHandler();
+        // File completion remains optional; startup never downloads from GitHub.`,
+    next: `const [fdPath] = await Promise.all([
             ensureTool("fd", (status) => this.showManagedToolStatus(status)),
             ensureTool("rg", (status) => this.showManagedToolStatus(status)),
         ]);
@@ -245,20 +249,6 @@ const MODE_PATCHES = [
         // Enable the remaining input handlers only after managed-tool setup completes.
         this.setupKeyHandlers();
         this.setupEditorSubmitHandler();`,
-    next: `// Input must remain usable while optional search binaries are installed.
-        this.setupKeyHandlers();
-        this.setupEditorSubmitHandler();
-        const reportToolFailure = (status) => {
-            if (status.type === "warning") this.showManagedToolStatus(status);
-        };
-        void Promise.all([
-            ensureTool("fd", reportToolFailure),
-            ensureTool("rg", reportToolFailure),
-        ]).then(([fdPath]) => {
-            this.fdPath = fdPath;
-        }).catch((error) => {
-            this.showManagedToolStatus({ type: "warning", message: \`Search tools unavailable: \${error instanceof Error ? error.message : String(error)}\` });
-        });`,
   },
   {
     old: 'this.ui.terminal.setTitle(`${APP_TITLE} - ${sessionName} - ${cwdBasename}`);',
@@ -271,6 +261,31 @@ const MODE_PATCHES = [
   {
     old: 'then restart pi.',
     next: 'then restart PsyClaw.',
+  },
+  {
+    old: `if (text === "/login" || text.startsWith("/login ")) {
+                const providerRef = text.startsWith("/login ") ? text.slice(7).trim() : undefined;
+                this.editor.setText("");
+                await this.handleLoginCommand(providerRef);
+                return;
+            }`,
+    next: `if (text === "/login" || text.startsWith("/login ")) {
+                this.editor.setText("");
+                this.showWarning("PsyClaw 已统一隐藏底层登录命令。请使用 /provider 配置或切换模型。");
+                return;
+            }`,
+  },
+  {
+    old: `if (text === "/logout") {
+                this.showOAuthSelector("logout");
+                this.editor.setText("");
+                return;
+            }`,
+    next: `if (text === "/logout") {
+                this.editor.setText("");
+                this.showWarning("PsyClaw 已统一隐藏底层退出命令。请使用 /provider 管理模型配置。");
+                return;
+            }`,
   },
 ];
 
@@ -361,6 +376,30 @@ const SETTINGS_PATCHES = [
   },
 ];
 
+// PsyClaw owns provider setup through /provider. Keep Pi's authentication
+// implementation available underneath, but do not expose its lower-level
+// /login and /logout commands in autocomplete or command help.
+const HIDDEN_PI_COMMANDS = ["login", "logout"];
+
+async function applySlashCommandPatches(slashCommandsPath) {
+  let content = await readFile(slashCommandsPath, "utf8");
+  const applied = [];
+  for (const name of HIDDEN_PI_COMMANDS) {
+    const commandPattern = new RegExp(
+      `^\\s*\\{ name: "${name}", description: [^\\n]+\\},\\r?\\n`,
+      "m",
+    );
+    if (commandPattern.test(content)) {
+      content = content.replace(commandPattern, "");
+      applied.push(`hide /${name}`);
+    }
+  }
+  if (applied.length > 0) {
+    await atomicReplace(slashCommandsPath, content, true);
+  }
+  return applied;
+}
+
 async function applySettingsPatches(settingsManagerPath) {
   let content = await readFile(settingsManagerPath, "utf8");
   const applied = [];
@@ -376,33 +415,64 @@ async function applySettingsPatches(settingsManagerPath) {
   return applied;
 }
 
-async function main() {
+const MANAGED_TOOL_DOWNLOAD_GUARD = `    // PsyClaw supplies Node-based find/grep fallbacks. Keep PATH tools when
+    // present, but never fetch optional binaries from GitHub during startup.
+    return undefined;`;
+
+/** Repair a runtime previously modified by PsyClaw 0.27.20. Fresh Pi installs are unchanged. */
+export function restoreManagedToolDownloads(content) {
+  if (!content.includes(MANAGED_TOOL_DOWNLOAD_GUARD)) return { content, applied: false };
+  return { content: content.replace(`\n${MANAGED_TOOL_DOWNLOAD_GUARD}`, ""), applied: true };
+}
+
+async function restoreManagedToolManager(toolsManagerPath) {
+  const current = await readFile(toolsManagerPath, "utf8");
+  const result = restoreManagedToolDownloads(current);
+  if (result.applied) await atomicReplace(toolsManagerPath, result.content, true);
+  return result.applied;
+}
+
+export async function rebrandPiRuntime(options = {}) {
   const entry = import.meta.resolve("@earendil-works/pi-coding-agent");
   const pkgDir = dirname(dirname(fileURLToPath(entry)));
   const pkgPath = join(pkgDir, "package.json");
   const modePath = join(pkgDir, "dist", "modes", "interactive", "interactive-mode.js");
   const settingsManagerPath = join(pkgDir, "dist", "core", "settings-manager.js");
+  const slashCommandsPath = join(pkgDir, "dist", "core", "slash-commands.js");
+  const toolsManagerPath = join(pkgDir, "dist", "utils", "tools-manager.js");
 
   const pkgResult = await patchPackageJson(pkgPath);
   const applied = await applyModePatches(modePath);
   const settingsApplied = await applySettingsPatches(settingsManagerPath);
+  const commandApplied = await applySlashCommandPatches(slashCommandsPath);
+  const managedToolsRestored = await restoreManagedToolManager(toolsManagerPath);
 
-  process.stdout.write(
-    `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} (${pkgDir})\n`,
-  );
-  if (applied.length > 0) {
-    for (const label of applied) {
-      process.stdout.write(`  - ${label}…\n`);
+  if (!options.quiet) {
+    process.stdout.write(
+      `psyclaw rebrand: piConfig ${pkgResult.applied ? "applied" : "already set"} · ${applied.length > 0 ? `patched ${applied.length} display string(s)` : "display strings already patched"} · ${settingsApplied.length > 0 ? `patched ${settingsApplied.length} setting default(s)` : "settings already patched"} · ${commandApplied.length > 0 ? `hidden ${commandApplied.length} Pi command(s)` : "Pi commands already filtered"} · ${managedToolsRestored ? "restored managed-tool downloads" : "managed-tool downloads unchanged"} (${pkgDir})\n`,
+    );
+    if (applied.length > 0) {
+      for (const label of applied) {
+        process.stdout.write(`  - ${label}…\n`);
+      }
     }
-  }
-  if (settingsApplied.length > 0) {
-    for (const label of settingsApplied) {
-      process.stdout.write(`  - ${label}…\n`);
+    if (settingsApplied.length > 0) {
+      for (const label of settingsApplied) {
+        process.stdout.write(`  - ${label}…\n`);
+      }
+    }
+    if (commandApplied.length > 0) {
+      for (const label of commandApplied) {
+        process.stdout.write(`  - ${label}…\n`);
+      }
     }
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : "";
+if (invokedPath === fileURLToPath(import.meta.url)) {
+  rebrandPiRuntime().catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

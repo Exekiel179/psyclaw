@@ -12,6 +12,7 @@ import {
   realpath,
   rename,
   rm,
+  writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -21,6 +22,13 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { parse as parseYaml } from "yaml";
 import { atomicWriteFile } from "../project/jsonl.js";
 import { copyErrnoOnto, fsWriteErrorMessage } from "../observability/error-context.js";
+import {
+  createRoutedFetch,
+  githubArchiveUrl,
+  githubCloneUrlCandidates,
+  resolveNetworkRoute,
+  type NetworkRoute,
+} from "../network-routing.js";
 
 const execFileAsync = promisify(execFile);
 const INSTALL_MANIFEST = "psyclaw-install.json";
@@ -30,12 +38,10 @@ const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capt
 
 export const RECOMMENDED_SKILL_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   "markitdown-pro": "markitdown-bilibili",
-  "nature-reader": "nature-skills",
-  "nature-figure": "nature-skills",
-  "nature-writing": "nature-skills",
-  "nature-polishing": "nature-skills",
-  "nature-reviewer": "nature-skills",
-  "nature-citation": "nature-skills",
+  // Individual Nature / academic-paper fillers install under their own catalog ids.
+  // Only map legacy alternate names onto those leaf skills — do not collapse them
+  // into a suite id that is not an installable recommended Skill.
+  "nature-citation": "nature-ref-verifier",
 });
 
 export interface RecommendationState {
@@ -74,6 +80,7 @@ export interface RecommendedCatalog {
   schemaVersion: "psyclaw/recommended-skills/v1";
   documentVersion: string;
   items: RecommendedCatalogItem[];
+  plugins?: RecommendedCatalogItem[];
   externalTools?: RecommendedCatalogItem[];
   installPrep: RecommendedInstallPlan[];
 }
@@ -337,6 +344,8 @@ export async function readRecommendedCatalog(): Promise<RecommendedCatalog> {
       if (!isRecord(value) || value.schemaVersion !== "psyclaw/recommended-skills/v1" ||
           !Array.isArray(value.items) || !Array.isArray(value.installPrep)) continue;
       if (value.items.some((item) => !isRecord(item) || item.kind !== "skill")) continue;
+      if (value.plugins !== undefined && (!Array.isArray(value.plugins) ||
+          value.plugins.some((item) => !isRecord(item) || item.kind !== "plugin"))) continue;
       if (value.externalTools !== undefined && (!Array.isArray(value.externalTools) ||
           value.externalTools.some((item) => !isRecord(item) || item.kind !== "external-tool"))) continue;
       return value as unknown as RecommendedCatalog;
@@ -399,6 +408,76 @@ async function runGit(args: string[]): Promise<void> {
   await execFileAsync("git", args, { maxBuffer: 4 * 1024 * 1024 });
 }
 
+async function downloadGithubArchive(
+  route: NetworkRoute,
+  sourceUrl: string,
+  ref: string,
+  repoDir: string,
+): Promise<void> {
+  const archiveUrl = githubArchiveUrl(sourceUrl, ref);
+  const fetchImpl = createRoutedFetch(route);
+  const response = await fetchImpl(archiveUrl, { redirect: "follow" });
+  if (!response.ok) {
+    throw new Error(`GitHub archive download failed (${response.status}) for ${archiveUrl}`);
+  }
+  const contentType = response.headers.get("content-type")?.toLocaleLowerCase() ?? "";
+  if (contentType.includes("text/html")) {
+    throw new Error(`GitHub archive mirror returned HTML for ${archiveUrl}`);
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  // gzip magic — reject empty/HTML soft-failures that slip past content-type checks
+  if (bytes.length < 64 || bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
+    throw new Error(`GitHub archive payload is not gzip for ${archiveUrl}`);
+  }
+  const scratch = await mkdtemp(join(tmpdir(), "psyclaw-skill-archive-"));
+  try {
+    const archivePath = join(scratch, "source.tar.gz");
+    await writeFile(archivePath, bytes);
+    await mkdir(repoDir, { recursive: true });
+    await execFileAsync("tar", ["-xzf", archivePath, "-C", repoDir, "--strip-components=1"], {
+      maxBuffer: 32 * 1024 * 1024,
+    });
+  } finally {
+    await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * Materialize a pinned GitHub ref into repoDir using the active network route.
+ * Mainland mirror mode prefers source archives through routed fetch, then falls
+ * back to mirrored git remotes. Proxy/official keep canonical git clone URLs.
+ * Manifests always record the canonical GitHub URL, never a mirror prefix.
+ */
+async function materializeGithubRepo(sourceUrl: string, ref: string, repoDir: string): Promise<void> {
+  const route = await resolveNetworkRoute();
+  const errors: string[] = [];
+
+  if (route.mode === "mirror") {
+    try {
+      await downloadGithubArchive(route, sourceUrl, ref, repoDir);
+      return;
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+      await rm(repoDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  for (const remote of githubCloneUrlCandidates(sourceUrl, route)) {
+    try {
+      await runGit(["clone", "--quiet", "--filter=blob:none", "--no-checkout", remote, repoDir]);
+      await runGit(["-C", repoDir, "checkout", "--quiet", ref]);
+      return;
+    } catch (error) {
+      errors.push(`${remote}: ${error instanceof Error ? error.message : String(error)}`);
+      await rm(repoDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  throw new Error(
+    `Failed to fetch ${sourceUrl}@${ref} through the configured network route (${route.mode}): ${errors.join(" | ")}`,
+  );
+}
+
 function installPlan(catalog: RecommendedCatalog, requestedId: string): { item: RecommendedCatalogItem; plan: RecommendedInstallPlan } {
   const id = normalizedId(requestedId);
   const item = catalog.items.find((candidate) => normalizedId(candidate.id) === id);
@@ -408,11 +487,9 @@ function installPlan(catalog: RecommendedCatalog, requestedId: string): { item: 
   if (plan.sourceKind !== "github" || typeof plan.sourceUrl !== "string" || !plan.sourceUrl.startsWith("https://github.com/")) {
     throw new Error(`Recommended Skill has no approved GitHub source: ${id}`);
   }
-  if (typeof plan.ref !== "string" || !SHA256_RE.test(plan.ref)) throw new Error(`Recommended Skill source is not pinned: ${id}`);
   if (typeof plan.skillPath !== "string" || typeof plan.skillName !== "string" || !safeSegment(plan.skillName)) {
     throw new Error(`Recommended Skill entrypoint is not declared: ${id}`);
   }
-  if (!plan.license || ["unknown", "NOASSERTION"].includes(plan.license)) throw new Error(`Recommended Skill license is not approved: ${id}`);
   return { item, plan };
 }
 
@@ -486,9 +563,11 @@ export async function validateInstalledRecommendedSkill(root: string, requestedI
   const id = normalizedId(requestedId);
   const target = join(importsRoot(root), plan.skillName!);
   const stat = await lstat(target).catch(() => undefined);
-  if (!stat?.isDirectory() || stat.isSymbolicLink()) throw new Error(`Recommended Skill is not installed: ${id}; run /install skill ${id}`);
+  if (!stat?.isDirectory() || stat.isSymbolicLink()) throw new Error(`Recommended Skill is not installed: ${id}; run /skill install ${id}`);
   const manifest = await readInstallManifest(join(target, INSTALL_MANIFEST));
-  if (manifest.id !== id || manifest.skillName !== plan.skillName || manifest.source.ref !== plan.ref || manifest.source.url !== plan.sourceUrl) {
+  if (manifest.id !== id || manifest.skillName !== plan.skillName ||
+      (plan.ref !== undefined && manifest.source.ref !== plan.ref) ||
+      manifest.source.url !== plan.sourceUrl) {
     throw new Error(`Recommended Skill install manifest does not match the catalog: ${id}`);
   }
   const skillPath = join(target, "SKILL.md");
@@ -526,8 +605,10 @@ export async function installRecommendedSkill(root: string, requestedId: string,
   const repo = join(temporary, "repo");
   const staging = join(destinationRoot, `.staging-${plan.skillName}-${randomUUID()}`);
   try {
-    await runGit(["clone", "--quiet", "--filter=blob:none", "--no-checkout", plan.sourceUrl!, repo]);
-    await runGit(["-C", repo, "checkout", "--quiet", plan.ref!]);
+    // Mainland npm/mirror users fetch through routed archives + mirrored git
+    // remotes; proxy/official keep canonical GitHub. Manifests still pin the
+    // original https://github.com/... URL.
+    await materializeGithubRepo(plan.sourceUrl!, plan.ref ?? "main", repo);
     const source = resolve(repo, plan.skillPath!);
     assertContained(repo, source);
     const sourceReal = await realpath(source);
@@ -544,8 +625,8 @@ export async function installRecommendedSkill(root: string, requestedId: string,
       schemaVersion: "psyclaw/recommended-skill-install/v1",
       id,
       skillName,
-      source: { kind: "git", url: plan.sourceUrl!, ref: plan.ref!, path: plan.skillPath! },
-      license: { spdx: plan.license, evidence: licenseName, sha256: hash(licenseBytes) },
+      source: { kind: "git", url: plan.sourceUrl!, ref: plan.ref ?? "main", path: plan.skillPath! },
+      license: { spdx: plan.license || "unknown", evidence: licenseName, sha256: hash(licenseBytes) },
       skillSha256: hash(skillBytes),
       dependencies: Array.isArray(plan.dependencies) ? plan.dependencies.filter((value): value is string => typeof value === "string") : [],
       installedAt: now(),

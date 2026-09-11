@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { continueSessionArgs, peelContinuouslyWorkFlag, unknownFlagUsage } from "../../src/cli-args.js";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  continueSessionArgs,
+  developerCommandsEnabled,
+  enableDeveloperCommands,
+  extractDeveloperFlag,
+  peelContinuouslyWorkFlag,
+  unknownFlagUsage,
+} from "../../src/cli-args.js";
 import {
   CONTINUOUSLY_WORK_FLAG,
   continuouslyWorkPrompt,
@@ -80,5 +87,35 @@ describe("CLI usage copy", () => {
     expect(usage).toContain("psyclaw --continue");
     expect(usage).toContain("psyclaw --continuously-work");
     expect(usage).toContain("--continue-work");
+    expect(usage).toContain("psyclaw --developer");
+    expect(usage).toContain("psyclaw telemetry");
+  });
+});
+
+describe("extractDeveloperFlag", () => {
+  afterEach(() => {
+    delete process.env.PSYCLAW_DEVELOPER_COMMANDS;
+  });
+
+  it("strips --developer and -D from argv", () => {
+    expect(extractDeveloperFlag(["--developer", "chat", "--provider", "x"])).toEqual({
+      developer: true,
+      rest: ["chat", "--provider", "x"],
+    });
+    expect(extractDeveloperFlag(["-D", "--continue"])).toEqual({
+      developer: true,
+      rest: ["--continue"],
+    });
+    expect(extractDeveloperFlag(["chat"])).toEqual({
+      developer: false,
+      rest: ["chat"],
+    });
+  });
+
+  it("enables gated developer commands via env", () => {
+    expect(developerCommandsEnabled()).toBe(false);
+    enableDeveloperCommands();
+    expect(developerCommandsEnabled()).toBe(true);
+    expect(process.env.PSYCLAW_DEVELOPER_COMMANDS).toBe("1");
   });
 });

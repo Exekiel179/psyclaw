@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -18,6 +19,7 @@ import {
   continuouslyWorkWarningText,
 } from "./session/continuously-work.js";
 import { c } from "./style/cli-ui.js";
+import { ensureDefaultEcosystemFillers } from "./workflows/ensure-default-fillers.js";
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
 function packageRoot(): string {
@@ -81,6 +83,7 @@ export interface ChatLaunchOptions {
 export async function launchChat(options: ChatLaunchOptions = {}): Promise<number> {
   const piCli = resolvePiCli();
   const root = packageRoot();
+  const networkPreloadPath = join(root, "dist", "src", "network-routing.js");
   const extensionPath = options.extensionPath ?? join(root, "dist", "src", "extension.js");
   const panelExtensionPath = join(root, "dist", "src", "panel", "extension.js");
   const skillsPath = options.skillsPath ?? join(root, "skills", "core");
@@ -88,6 +91,9 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   // Branding is applied on first launch, not during npm installation, so the
   // package install itself never mutates dependency files.
   await applyRuntimeBranding(root);
+  // Seed default Nature / academic-paper gap-fill skills for this workspace.
+  // Network installs run later on session_start / /init so chat can open quickly.
+  await ensureDefaultEcosystemFillers(cwd, { install: false }).catch(() => undefined);
   const developerMode = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
   const toolAllowlist = developerMode
     ? "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp"
@@ -130,9 +136,18 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   if (continuouslyWork) {
     process.stderr.write(`${c.red(continuouslyWorkWarningText())}\n\n`);
   }
+  const agentDir = process.env.PSYCLAW_CODING_AGENT_DIR || join(homedir(), ".psyclaw", "agent");
+  const sessionDir = process.env.PSYCLAW_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
   const spawnEnv: NodeJS.ProcessEnv = {
     ...process.env,
     PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
+    PSYCLAW_CODING_AGENT_DIR: agentDir,
+    PSYCLAW_CODING_AGENT_SESSION_DIR: sessionDir,
+    // Compatibility for any locked Pi module that was bundled before the
+    // PsyClaw application name was applied.
+    PI_CODING_AGENT_DIR: agentDir,
+    PI_CODING_AGENT_SESSION_DIR: sessionDir,
+    PSYCLAW_NETWORK_PRELOAD: "1",
     ...(continuouslyWork ? { [CONTINUOUSLY_WORK_ENV]: "1" } : {}),
   };
   if (!continuouslyWork) delete spawnEnv[CONTINUOUSLY_WORK_ENV];
@@ -154,7 +169,7 @@ export async function launchChat(options: ChatLaunchOptions = {}): Promise<numbe
   }
 
   return new Promise<number>((resolve, reject) => {
-    const child = (options.spawnProcess ?? spawn)(process.execPath, [piCli, ...args], {
+    const child = (options.spawnProcess ?? spawn)(process.execPath, ["--import", networkPreloadPath, piCli, ...args], {
       cwd,
       stdio: "inherit",
       shell: false,

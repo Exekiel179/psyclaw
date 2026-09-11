@@ -3,6 +3,77 @@
 ## Unreleased
 
 - Anonymous product telemetry is on by default (coarse usage and errors; no research text or PII). A one-time startup notice explains what is collected and how to turn it off (`psyclaw telemetry off` / `/telemetry off`). `PSYCLAW_TELEMETRY=0` forces the current process off.
+- Correlated observability spans (Sentry/PostHog/Langfuse) and ExpectedUserError handling from PRs #8–#11 remain available when telemetry is enabled.
+- Session resume (`--continue` / `-c`), continuously-work (`--continuously-work` / `--continue-work`), and cloud-agent environment setup from master are preserved.
+
+## 0.27.25 - 2026-09-05
+
+- Remove the redundant `/install` slash command; use `/skill`, `/plugin`, and `/mcp` instead.
+- Repurpose `/agents` for simple agent persona prompt management (`list|show|set|use|clear|delete`).
+- Hide developer extras (`/verify`, `/model`, `/agents run`) unless launched with `psyclaw --developer` / `-D`.
+- Keep Pi's built-in `/export` in CLI help without reimplementing session export.
+
+
+
+## 0.27.24 - 2026-09-05
+
+- Route recommended Skill / default ecosystem filler installs through the same mainland GitHub mirror path used for managed tool downloads when a mainland npm registry or `PSYCLAW_GITHUB_MIRROR` is configured.
+- Prefer mirrored source archives, then mirrored git remotes, while keeping install manifests pinned to the canonical GitHub URL and commit.
+
+
+## 0.27.23 - 2026-09-05
+
+- Default-install Nature gap-fill skills (`nature-figure`, `nature-ref-verifier`, `nature-polishing`) into the research/manuscript workflow.
+- Default-install `lishix520/academic-paper-skills` fillers (`academic-paper-strategist`, `academic-paper-composer`) for outline planning and chapter writing.
+- Seed these fillers on `/init` and session start (best-effort, offline-safe) and inject an ecosystem gap-fill prompt patch when they are loaded.
+
+
+## 0.27.22 - 2026-09-04
+
+- Keep proxy users on GitHub's official API and Release URLs while routing mainland-registry users exclusively through mainland GitHub mirrors.
+- Retry managed `ripgrep` and `fd` downloads through a second mainland mirror when the primary mirror fails or returns an HTML error page.
+- Preserve Pi's native platform selection, version discovery, extraction, and installation behavior.
+
+## 0.27.21 - 2026-09-04
+
+- Restore Pi's official `ripgrep` and `fd` installation rules instead of disabling managed downloads.
+- Route official GitHub downloads through configured proxies, or route both GitHub API and Release requests through one mirror when a mainland npm registry is configured.
+
+## 0.27.20 - 2026-09-04
+
+- Stop Pi's optional `ripgrep` and `fd` GitHub downloads at the managed-tool boundary while continuing to use binaries already available on `PATH`.
+- Fall back silently to PsyClaw's built-in cross-platform Node search tools when those optional binaries are unavailable.
+
+## 0.27.19 - 2026-09-04
+
+- Add `psyclaw --continue` and `psyclaw -c` to resume the latest session for the current project through the bundled Pi runtime.
+- Use built-in cross-platform file search fallbacks so Windows startup no longer depends on downloading ripgrep and fd from GitHub Releases.
+
+## 0.27.18 - 2026-09-03
+
+- Fix the remaining Node 22 type compatibility issue in research-decision lookup.
+- Include all runtime isolation, workflow, ecosystem, Panel, and interaction updates from the preceding unpublished candidates.
+
+## 0.27.17 - 2026-09-03
+
+- Fix Node 22 compatibility in controlled-run authorization and research-decision event lookup.
+- Include the runtime isolation, research workflow, Plugin, MarkItDown, MCP, Panel, and interaction updates prepared in 0.27.16.
+
+## 0.27.16 - 2026-09-03
+
+- Isolate bundled runtime configuration under ~/.psyclaw and streamline first-launch provider setup.
+- Limit researcher decision prompts to substantive methodological trade-offs while improving guided research initialization and review.
+- Add Plugin, MarkItDown, and MCP ecosystem integration plus Panel and command interaction fixes.
+
+## 0.27.15 - 2026-09-02
+
+- Added Plugin recommendations for ARS Academic Research Suite, Nature Skills, Psych Network CSS, and Pingouin.
+- Added a repeatable GitHub-based release push workflow.
+
+## 0.27.14 - 2026-09-02
+
+- Added verified recommendations for Wang Fei's journal frontier, statistical forensics, and psychological network analysis projects.
+
 
 ## 0.27.13 - 2026-09-01
 
@@ -120,9 +191,9 @@
 
 ## 0.25.0 - 2026-08-24
 
-- `psypi v0.4.1` 的完整科研工作台、面板、动态启动横幅、推荐 Skill/MCP 生态与研究工作流迁入本仓库，作为 PsyClaw 的正式后续版本。
+- 旧版科研工作台的完整能力、面板、动态启动横幅、推荐 Skill/MCP 生态与研究工作流迁入本仓库，作为 PsyClaw 的正式后续版本。
 - 对外产品名、可执行命令、项目状态目录、工具名、扩展和治理 schema 统一为 `PsyClaw` / `psyclaw` / `.psyclaw`。
-- 保留既有 Pi 配置 profile 兼容性，因此已有模型、主题、安装包和生态 Skill 不需要重新配置；`psypi` 仓库作为历史代码库保留，不再是运行时依赖。
+- 保留既有 Pi 配置 profile 兼容性，因此已有模型、主题、安装包和生态 Skill 不需要重新配置；旧仓库仅作为历史代码参考，不再是运行时依赖。
 
 ## 0.4.1 - 2026-08-17
 

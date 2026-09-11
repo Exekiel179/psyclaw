@@ -9,7 +9,7 @@ import { allParadigms, finalizeWorkflow, type WorkflowResult, type WorkflowSpec 
 export const institutionalFulltextSpec: WorkflowSpec = {
   id: "institutional-fulltext",
   version: "1.0.0",
-  description: "Prepare an auditable, human-approved browser workflow for retrieving institutionally authorized full text.",
+  description: "Prepare a traceable browser workflow for retrieving institutionally authorized full text after access confirmation.",
   paradigms: allParadigms,
   steps: [
     { id: "identify", role: "researcher", effect: "read", description: "normalize the DOI, publisher URL, or title supplied by the researcher" },
@@ -58,9 +58,9 @@ export async function runInstitutionalFulltext(root: string, identifier = ""): P
     `Target: ${target}`,
     `Bridge: ${plan.bridge.adapter} (${plan.bridge.mode})`,
     "",
-    "## Human Gate",
+    "## Access Confirmation",
     "",
-    "The user must complete institutional authentication in the visible browser and confirm the exact article before download.",
+    "The user must complete institutional authentication in the visible browser and confirm the exact article before download. This confirms access and the download target; it is not a research-method decision.",
     "",
     "## Steps",
     "",
