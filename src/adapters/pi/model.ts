@@ -11,6 +11,7 @@ import {
   type ProviderConfig,
 } from "@earendil-works/pi-coding-agent";
 import { pricingFor } from "../../core/pricing.js";
+import { lastPiGeneration, trackLlmGeneration, withAgentSpan } from "../../observability/index.js";
 
 const PROVIDER_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 // Model ids are opaque provider values. Some registries use namespaces such
@@ -133,8 +134,36 @@ export class PiModelGateway implements ModelGateway {
     return this.runtime.streamSimple(this.resolve(ref), context, options);
   }
 
-  public complete(ref: ModelRef, context: Context, options?: SimpleStreamOptions): Promise<AssistantMessage> {
-    return this.runtime.completeSimple(this.resolve(ref), context, options);
+  public async complete(ref: ModelRef, context: Context, options?: SimpleStreamOptions): Promise<AssistantMessage> {
+    const startedAt = Date.now();
+    try {
+      const message = await withAgentSpan(
+        "cli.llm_call",
+        { phase: "pi_complete", provider: ref.provider, model: ref.id },
+        () => this.runtime.completeSimple(this.resolve(ref), context, options),
+      );
+      const generation = lastPiGeneration([{ type: "message", message }]);
+      void trackLlmGeneration({
+        provider: generation?.provider ?? ref.provider,
+        model: generation?.model ?? ref.id,
+        ...(generation?.usage === undefined ? {} : { usage: generation.usage }),
+        latencyMs: Date.now() - startedAt,
+        surface: "cli",
+        spanName: "pi-complete",
+      });
+      return message;
+    } catch (error) {
+      void trackLlmGeneration({
+        provider: ref.provider,
+        model: ref.id,
+        latencyMs: Date.now() - startedAt,
+        error: true,
+        errorName: error instanceof Error ? error.name : "Error",
+        surface: "cli",
+        spanName: "pi-complete",
+      });
+      throw error;
+    }
   }
 }
 

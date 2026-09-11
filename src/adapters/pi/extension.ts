@@ -116,6 +116,8 @@ import {
   readTelemetryPreference,
   shutdownObservability,
   trackGateWaiting,
+  trackSkillInstall,
+  withAgentSpan,
   writeTelemetryPreference,
 } from "../../observability/index.js";
 
@@ -126,8 +128,8 @@ function parseInitArgs(args: string): { goal?: string; paradigm?: ResearchParadi
   return { paradigm: "survey-observational", goal };
 }
 
-async function notifyError(ctx: ExtensionCommandContext, error: unknown): Promise<void> {
-  await captureAgentError(error, { phase: "extension" });
+async function notifyError(ctx: ExtensionCommandContext, error: unknown, extra: Record<string, string> = {}): Promise<void> {
+  await captureAgentError(error, { phase: "extension", cwd: ctx.cwd, ...extra });
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 }
 
@@ -915,9 +917,18 @@ async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandCon
     `${row.name}\n来源：${row.sourceRef}\n安装位置：${skillScopeLabel(scope)}\n目标目录：${recommendedSkillTarget(ctx.cwd, row.id, scope)}\n模型将检查仓库并使用文件与命令工具完成安装；安装后默认启用。`,
   );
   if (!approved) return;
-  await markRecommendedSkillDesired(ctx.cwd, row.id, scope);
-  pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型（默认启用），目标为${skillScopeLabel(scope)}。完成后请执行 /reload。`, "info");
+  await withAgentSpan("cli.skill_install", { phase: "skill_install", scope, skill_id: row.id }, async () => {
+    try {
+      await markRecommendedSkillDesired(ctx.cwd, row.id, scope);
+    } catch (error) {
+      void trackSkillInstall("error", { skill_id: row.id, scope, status: "error" });
+      await notifyError(ctx, error, { phase: "skill_install", skill_id: row.id, scope });
+      return;
+    }
+    void trackSkillInstall("queued", { skill_id: row.id, scope, status: "queued" });
+    pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
+    ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型（默认启用），目标为${skillScopeLabel(scope)}。完成后请执行 /reload。`, "info");
+  });
 }
 
 async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {

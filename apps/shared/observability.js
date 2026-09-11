@@ -32,7 +32,8 @@
     ).trim();
     const surface = fromWindow.surface === "panel" || fromWindow.surface === "website" ? fromWindow.surface : "web";
     const release = String(fromWindow.release || "").trim();
-    return { sentryDsn, posthogKey, posthogHost, surface, release };
+    const distinctId = String(fromWindow.distinctId || "").trim();
+    return { sentryDsn, posthogKey, posthogHost, surface, release, distinctId };
   }
 
   async function loadEsm(url) {
@@ -56,7 +57,7 @@
     const mod = await loadEsm("https://cdn.jsdelivr.net/npm/posthog-js@1/+esm");
     const posthog = mod.default || mod.posthog || mod;
     const panel = config.surface === "panel";
-    posthog.init(config.posthogKey, {
+    const init = {
       api_host: config.posthogHost,
       person_profiles: "identified_only",
       autocapture: true,
@@ -74,7 +75,9 @@
       loaded: function (client) {
         client.register({ surface: config.surface, app: "psyclaw" });
       },
-    });
+    };
+    if (config.distinctId) init.bootstrap = { distinctID: config.distinctId };
+    posthog.init(config.posthogKey, init);
     window.posthog = posthog;
   }
 

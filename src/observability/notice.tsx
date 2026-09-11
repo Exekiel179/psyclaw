@@ -30,7 +30,7 @@ function TelemetryNotice({ onDone }: { onDone: (choice: TelemetryNoticeChoice) =
     <Box borderStyle="round" borderColor={PSYCLAW_ACCENT} paddingX={2} paddingY={1} flexDirection="column">
       <Text bold>匿名产品遥测默认开启</Text>
       <Text>PsyClaw 会发送匿名的产品使用与错误信息，用来改进工具本身。</Text>
-      <Text dimColor>不含研究正文、论文、对话内容、个人路径或身份信息。随时可用 psyclaw telemetry off 关闭。</Text>
+      <Text dimColor>不含研究正文、论文、对话内容或个人身份。文件错误仅含脱敏路径与错误码。随时可用 psyclaw telemetry off 关闭。</Text>
       <Box flexDirection="column" marginY={1}>
         <Text bold={choice === 0} color={choice === 0 ? PSYCLAW_ACCENT : "gray"}>
           {choice === 0 ? "❯" : " "} 知道了，继续使用
