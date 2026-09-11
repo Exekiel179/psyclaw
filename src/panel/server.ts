@@ -411,6 +411,40 @@ async function readPanelProjectFile(root: string, relative: string): Promise<{ p
   return { path: normalized, content: await readFile(target, "utf8"), format };
 }
 
+/** Map a project-file read failure to a single HTTP status. Missing and blocked paths are 404. */
+function panelProjectFileErrorStatus(error: unknown): number {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  if (code === "ENOENT") return 404;
+  if (code === "EACCES" || code === "EPERM") return 403;
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("too large")) return 413;
+  if (
+    message.includes("outside the Panel read-only allowlist")
+    || message.includes("must be a regular file")
+    || message.includes("Path escapes")
+    || message.includes("Protected project path")
+    || message.includes("Symlink")
+    || message.includes("Resolved path escapes")
+  ) {
+    return 404;
+  }
+  return 500;
+}
+
+function panelProjectFileErrorPayload(error: unknown): { status: number; body: Record<string, unknown> } {
+  const status = panelProjectFileErrorStatus(error);
+  const message = error instanceof Error ? error.message : "";
+  if (status === 403) return { status, body: { error: "project file unreadable" } };
+  if (status === 413) return { status, body: { error: "project file is too large for Panel preview" } };
+  if (status === 404) {
+    const errorText = message.includes("outside the Panel read-only allowlist") || message.includes("must be a regular file")
+      ? message
+      : "project file not found";
+    return { status, body: { error: errorText } };
+  }
+  return { status, body: { error: "panel request failed", reasonCode: "panel.request-failed" } };
+}
+
 function publicInstallPlan(plan: ReturnType<typeof planAgentInstall>): Record<string, unknown> {
   // `projectRoot` is an internal containment anchor. It is not needed by a
   // read-only browser and would disclose a local filesystem path.
@@ -903,8 +937,22 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       }
       if (url.pathname === "/api/project-file") {
         const relative = url.searchParams.get("path") ?? "";
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-project-file/v1", ...(await readPanelProjectFile(root, relative)) }));
+        if (!relative.trim()) {
+          response.writeHead(400, { "content-type": "application/json" });
+          response.end(JSON.stringify({ error: "path query parameter is required" }));
+          return;
+        }
+        // Read before writeHead so a missing/unreadable file cannot commit 200
+        // and then a second 500 from the outer catch.
+        try {
+          const file = await readPanelProjectFile(root, relative);
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify({ schemaVersion: "psyclaw/panel-project-file/v1", ...file }));
+        } catch (error) {
+          const { status, body } = panelProjectFileErrorPayload(error);
+          response.writeHead(status, { "content-type": "application/json" });
+          response.end(JSON.stringify(body));
+        }
         return;
       }
       if (url.pathname === "/api/config") {
@@ -1855,6 +1903,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       response.writeHead(404, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: "not found" }));
     } catch {
+      if (response.headersSent) return;
       response.writeHead(500, { "content-type": "application/json" });
       response.end(JSON.stringify({ error: "panel request failed", reasonCode: "panel.request-failed" }));
     }
