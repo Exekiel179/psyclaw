@@ -12,6 +12,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { pricingFor } from "../../core/pricing.js";
 import { lastPiGeneration, trackLlmGeneration, withAgentSpan } from "../../observability/index.js";
+import { normalizeEndpoint } from "../../core/provider-endpoint.js";
+
+export { normalizeEndpoint } from "../../core/provider-endpoint.js";
 
 const PROVIDER_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 // Model ids are opaque provider values. Some registries use namespaces such
@@ -60,22 +63,6 @@ function assertModelId(value: string): void {
   if (!MODEL_ID_RE.test(value) || value.includes("..")) {
     throw new Error("model must be a stable provider identifier");
   }
-}
-
-function normalizeEndpoint(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error("Provider endpoint must be a valid URL");
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("Provider endpoint must use http or https");
-  }
-  if (url.username || url.password || url.hash) {
-    throw new Error("Provider endpoint must not contain credentials or a fragment");
-  }
-  return url.toString().replace(/\/$/, "");
 }
 
 function displayEndpoint(value: string): string {

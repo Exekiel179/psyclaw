@@ -6,6 +6,7 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import {
   PiModelGateway,
   deepSeekProviderSpec,
+  normalizeEndpoint,
   toOpenAICompatibleProviderConfig,
 } from "../../src/adapters/pi/model.js";
 import { createPiResourceLoader, loadPiSkillBody, snapshotPiResources } from "../../src/adapters/pi/resources.js";
@@ -32,6 +33,12 @@ describe("Pi runtime adapters", () => {
     expect(config.apiKey).toBe("$DEEPSEEK_API_KEY");
     expect(JSON.stringify(config)).not.toContain("sk-");
     expect(config.baseUrl).toBe("https://api.deepseek.com/v1");
+  });
+
+  it("normalizes http(s) endpoints and rejects other schemes", () => {
+    expect(normalizeEndpoint("https://api.deepseek.com/v1/")).toBe("https://api.deepseek.com/v1");
+    expect(normalizeEndpoint("http://localhost:11434/v1")).toBe("http://localhost:11434/v1");
+    expect(() => normalizeEndpoint("ftp://files.example.test/v1")).toThrow(/http or https/);
   });
 
   it("rejects provider URLs carrying credentials", () => {

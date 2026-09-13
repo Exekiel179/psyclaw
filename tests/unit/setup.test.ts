@@ -2,7 +2,7 @@ import { access, mkdir, mkdtemp, readFile, utimes, writeFile } from "node:fs/pro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { hasConfiguredProvider, providerCredentialSource, PROVIDER_PRESETS, saveProviderConfig, setupProviders } from "../../src/setup.js";
+import { hasConfiguredProvider, providerCredentialSource, PROVIDER_PRESETS, resolveProviderBaseUrl, saveProviderConfig, setupProviders } from "../../src/setup.js";
 
 describe("provider setup and first-run detection", () => {
   it("reports unconfigured before setup and configured after", async () => {
@@ -105,6 +105,21 @@ describe("provider setup and first-run detection", () => {
     await expect(access(lockPath)).rejects.toThrow();
   });
 
+  it("persists a custom OpenAI-compatible base URL without writing the key into models.json", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-baseurl-"));
+    const result = await saveProviderConfig({
+      id: "openai",
+      name: "OpenAI",
+      baseUrl: "https://gateway.example.test/v1/",
+      api: "openai-completions",
+      apiKeyEnv: "OPENAI_API_KEY",
+      models: [{ id: "gpt-5.5", name: "GPT-5.5" }],
+    }, { agentDir });
+    const parsed = JSON.parse(await readFile(result.path, "utf8")) as { providers: { openai: { baseUrl: string; apiKey: string } } };
+    expect(parsed.providers.openai.baseUrl).toBe("https://gateway.example.test/v1");
+    expect(parsed.providers.openai.apiKey).toBe("$OPENAI_API_KEY");
+  });
+
   it("stores a directly entered key only in the user auth store", async () => {
     const agentDir = await mkdtemp(join(tmpdir(), "psyclaw-setup-"));
     const preset = PROVIDER_PRESETS.find((item) => item.id === "google")!;
@@ -112,5 +127,20 @@ describe("provider setup and first-run detection", () => {
     expect(await readFile(result.path, "utf8")).not.toContain("direct-entry-secret");
     expect(await readFile(join(agentDir, "auth.json"), "utf8")).toContain("direct-entry-secret");
     await expect(providerCredentialSource(preset, { agentDir })).resolves.toBe("auth-store");
+  });
+});
+
+describe("provider base URL resolution", () => {
+  it("uses a trimmed custom URL and falls back to the preset when empty", () => {
+    expect(resolveProviderBaseUrl("  https://gateway.example.test/v1/  ", "https://api.openai.com/v1")).toBe("https://gateway.example.test/v1");
+    expect(resolveProviderBaseUrl("", "https://api.openai.com/v1")).toBe("https://api.openai.com/v1");
+    expect(resolveProviderBaseUrl(undefined, "https://api.deepseek.com")).toBe("https://api.deepseek.com");
+    expect(resolveProviderBaseUrl("", "")).toBe("");
+  });
+
+  it("rejects non-http schemes and credentialed URLs", () => {
+    expect(() => resolveProviderBaseUrl("ftp://files.example.test/v1")).toThrow(/http or https/);
+    expect(() => resolveProviderBaseUrl("javascript:alert(1)")).toThrow(/http or https/);
+    expect(() => resolveProviderBaseUrl("https://user:secret@gateway.example.test/v1")).toThrow(/credentials/);
   });
 });
