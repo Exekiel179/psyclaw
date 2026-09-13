@@ -56,6 +56,8 @@ export class SkillManagerComponent {
   focused = false;
   private selectedIndex = 0;
   private notice = "";
+  /** First Enter on a missing item arms install; second Enter confirms. */
+  private pendingInstallId: string | undefined;
 
   constructor(
     private readonly items: SkillManagerItem[],
@@ -109,7 +111,7 @@ export class SkillManagerComponent {
       if (selected.reason) lines.push(this.theme.fg("warning", truncateToWidth(`原因：${selected.reason}`, contentWidth)));
     }
     if (this.notice) lines.push("", this.theme.fg("warning", truncateToWidth(this.notice, contentWidth)));
-    lines.push("", this.theme.fg("dim", this.options.footer ?? "↑/↓ 移动 · Space/Enter 安装或启停 · a 全部启用 · d 全部停用 · Esc 关闭"));
+    lines.push("", this.theme.fg("dim", this.options.footer ?? "↑/↓ 移动 · Enter 先看介绍再确认安装 · Space 启停/直接安装 · a 全部启用 · d 全部停用 · Esc 关闭"));
     return lines;
   }
 
@@ -125,12 +127,14 @@ export class SkillManagerComponent {
     if (this.keybindings.matches(data, "tui.select.up") || matchesKey(data, "k")) {
       this.selectedIndex = (this.selectedIndex - 1 + this.items.length) % this.items.length;
       this.notice = "";
+      this.pendingInstallId = undefined;
       this.tui.requestRender();
       return;
     }
     if (this.keybindings.matches(data, "tui.select.down") || matchesKey(data, "j")) {
       this.selectedIndex = (this.selectedIndex + 1) % this.items.length;
       this.notice = "";
+      this.pendingInstallId = undefined;
       this.tui.requestRender();
       return;
     }
@@ -147,12 +151,23 @@ export class SkillManagerComponent {
     }
 
     const item = this.items[this.selectedIndex]!;
-    // Space and Enter share primary semantics: missing → install; enabled →
-    // disable; disabled → enable. Plugins may force Enter to install-only.
+    // Space: immediate install/toggle. Enter on missing: first shows intro,
+    // second confirms install. Plugins may force Enter to install-only.
     if (matchesKey(data, Key.space) || this.keybindings.matches(data, "tui.select.confirm")) {
       const isEnter = this.keybindings.matches(data, "tui.select.confirm");
       if (this.options.toggleEnabled === false) {
         if (isEnter && (item.status === "missing" || this.options.enterAction === "install")) {
+          if (item.status === "missing" && this.pendingInstallId !== item.id) {
+            this.pendingInstallId = item.id;
+            this.notice = [
+              `介绍：${item.description || item.name}`,
+              item.sourceRef ? `来源：${item.sourceRef}` : undefined,
+              `再按 Enter 确认安装「${item.name}」；↑/↓ 取消本次确认。`,
+            ].filter(Boolean).join(" · ");
+            this.tui.requestRender();
+            return;
+          }
+          this.pendingInstallId = undefined;
           this.done({ type: "install", id: item.id });
           return;
         }
@@ -175,6 +190,17 @@ export class SkillManagerComponent {
         return;
       }
       if (item.status === "missing") {
+        if (isEnter && this.pendingInstallId !== item.id) {
+          this.pendingInstallId = item.id;
+          this.notice = [
+            `介绍：${item.description || item.name}`,
+            item.sourceRef ? `来源：${item.sourceRef}` : undefined,
+            `再按 Enter 确认安装「${item.name}」；Space 可直接安装；↑/↓ 取消本次确认。`,
+          ].filter(Boolean).join(" · ");
+          this.tui.requestRender();
+          return;
+        }
+        this.pendingInstallId = undefined;
         this.done({ type: "install", id: item.id });
         return;
       }
