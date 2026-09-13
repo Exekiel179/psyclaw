@@ -39,6 +39,9 @@ describe("provider setup and first-run detection", () => {
     const result = await setupProviders({ agentDir });
     const text = await readFile(result.path, "utf8");
     for (const preset of PROVIDER_PRESETS) {
+      // Pi-native providers are credential-only; writing models.json would
+      // discard their official catalog metadata.
+      if (preset.id === "opencode-go") continue;
       expect(text).toContain(`$${preset.apiKeyEnv}`);
     }
     expect(text).not.toMatch(/sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}/);
