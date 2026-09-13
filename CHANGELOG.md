@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.5 - 2026-09-13
+
+- CLI /provider custom OpenAI-compatible gateway
+- K-Dense curated hub and leaf skill recommendations
+- Skill manager Enter shows intro before install
+
 ## 0.30.4 - 2026-09-13
 
 - Panel optional Provider Base URL for OpenAI-compatible gateways
