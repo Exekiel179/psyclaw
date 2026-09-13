@@ -1,11 +1,12 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { bootstrapProject } from "../../src/project/bootstrap.js";
 import { RunEventLog } from "../../src/panel/events.js";
 import { createPanelServer } from "../../src/panel/server.js";
-import { withServer } from "../helpers.js";
+import { postJson, withServer } from "../helpers.js";
 
 describe("read-only panel server", () => {
   it("serves the run listing and a snapshot over narrow JSON endpoints", async () => {
@@ -301,5 +302,46 @@ describe("read-only panel server", () => {
       process.off("unhandledRejection", onRejection);
     }
     expect(rejections).toEqual([]);
+  });
+
+  it("keeps panel Provider Base URL field wired for OpenAI-compatible gateways", async () => {
+    const html = await readFile(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "apps", "panel", "index.html"), "utf8");
+    expect(html).toContain('id="provider-base-url"');
+    expect(html).toContain("Base URL（可选，留空使用模型预设地址）");
+    expect(html).toContain("updateBaseUrl()");
+    expect(html).toContain("customBaseUrl || model.endpoint");
+    expect(html).toContain("Base URL 仅支持 http 或 https，且不能包含凭据或片段");
+  });
+
+  it("rejects non-http Provider Base URLs before saving", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-baseurl-"));
+    await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    await withServer(root, async (base) => {
+      const payload = {
+        id: "panel-test-provider",
+        name: "Panel Test",
+        api: "openai-completions",
+        apiKeyEnv: "PSYCLAW_PANEL_TEST_API_KEY",
+        modelId: "demo-model",
+      };
+
+      const invalid = await postJson(base, "/api/provider-config", {
+        ...payload,
+        baseUrl: "ftp://files.example.test/v1",
+      });
+      expect(invalid.status).toBe(400);
+      await expect(invalid.json()).resolves.toEqual({
+        error: "Provider endpoint must use http or https",
+      });
+
+      const credentialed = await postJson(base, "/api/provider-config", {
+        ...payload,
+        baseUrl: "https://user:secret@gateway.example.test/v1",
+      });
+      expect(credentialed.status).toBe(400);
+      await expect(credentialed.json()).resolves.toEqual({
+        error: "Provider endpoint must not contain credentials or a fragment",
+      });
+    });
   });
 });

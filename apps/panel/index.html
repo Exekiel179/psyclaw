@@ -2182,6 +2182,10 @@
             </div>
             <div class="form">
               <div class="field">
+                <label for="provider-base-url">Base URL（可选，留空使用模型预设地址）</label>
+                <input id="provider-base-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://api.example.com/v1">
+              </div>
+              <div class="field">
                 <label for="provider-key">API Key（留空不覆盖已有凭据）</label>
                 <input id="provider-key" type="password" autocomplete="off" placeholder="输入当前 Provider 的专属 Key">
               </div>
@@ -2851,6 +2855,22 @@ function updateModels() {
   if (state.active.provider === $("provider-select").value && state.active.model) {
     $("model-select").value = state.active.model;
   }
+  updateBaseUrl();
+}
+
+function updateBaseUrl() {
+  const input = $("provider-base-url");
+  if (!input) return;
+  input.value = currentModel()?.endpoint || "";
+}
+
+function isHttpEndpoint(value) {
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password && !url.hash;
+  } catch {
+    return false;
+  }
 }
 
 async function loadProvider() {
@@ -2927,6 +2947,7 @@ function currentModel() {
 }
 
 $("provider-select").addEventListener("change", updateModels);
+$("model-select").addEventListener("change", updateBaseUrl);
 
 $("save-provider").addEventListener("click", async () => {
   const feedback = $("provider-feedback");
@@ -2947,8 +2968,13 @@ $("save-provider").addEventListener("click", async () => {
 
 $("configure-provider").addEventListener("click", async () => {
   const feedback = $("config-feedback"), model = currentModel(), key = $("provider-key").value;
+  const customBaseUrl = $("provider-base-url")?.value.trim() || "";
   if (!model) {
     feedback.textContent = "请选择模型";
+    return;
+  }
+  if (customBaseUrl && !isHttpEndpoint(customBaseUrl)) {
+    feedback.textContent = "Base URL 仅支持 http 或 https，且不能包含凭据或片段";
     return;
   }
   feedback.textContent = "正在保存凭据...";
@@ -2959,7 +2985,7 @@ $("configure-provider").addEventListener("click", async () => {
       body: JSON.stringify({
         id: model.provider,
         name: model.provider,
-        baseUrl: model.endpoint,
+        baseUrl: customBaseUrl || model.endpoint,
         api: model.provider === "anthropic" ? "anthropic-messages" : "openai-completions",
         apiKeyEnv: model.apiKeyEnv,
         modelId: $("model-select").value,

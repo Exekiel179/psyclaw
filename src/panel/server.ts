@@ -15,6 +15,7 @@ import { recommendedAgentsForPanel } from "../agents/recommended-personas.js";
 import { planAgentInstall } from "../install/installer.js";
 import { deepSeekProviderSpec, PiModelGateway, type ModelDescriptor } from "../adapters/pi/model.js";
 import { PROVIDER_PRESETS, saveProviderConfig } from "../setup.js";
+import { resolveProviderBaseUrl } from "../core/provider-endpoint.js";
 import { assertSafeProjectPath, projectPaths } from "../project/paths.js";
 import { readManuscript } from "../project/manuscript.js";
 import { appendJsonlIfMissing, atomicWriteFile, readJsonl } from "../project/jsonl.js";
@@ -2032,7 +2033,14 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         const id = String(body.id ?? "").trim();
         const preset = PROVIDER_PRESETS.find((candidate) => candidate.id === id);
         const name = String(body.name ?? preset?.name ?? id).trim();
-        const baseUrl = String(body.baseUrl ?? preset?.baseUrl ?? "").trim();
+        let baseUrl = "";
+        try {
+          baseUrl = resolveProviderBaseUrl(body.baseUrl, preset?.baseUrl ?? "");
+        } catch (error) {
+          response.writeHead(400, { "content-type": "application/json" });
+          response.end(JSON.stringify({ error: error instanceof Error ? error.message : "Provider endpoint must use http or https" }));
+          return;
+        }
         const api = body.api === "anthropic-messages" ? "anthropic-messages" : "openai-completions";
         const apiKeyEnv = String(body.apiKeyEnv ?? preset?.apiKeyEnv ?? `PSYCLAW_${id.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_API_KEY`).trim();
         const modelId = String(body.modelId ?? "").trim();
