@@ -61,7 +61,7 @@ export function sessionHelpDocument(): SessionHelpDocument {
       { group: "能力", cmd: "/skill:<name>", blurb: "显式调用已启用技能" },
       { group: "能力", cmd: "/agents [任务]", blurb: "浏览或运行 Subagent" },
       { group: "能力", cmd: "/ars [任务|doctor|stop]", blurb: "学术模式；尾随任务启动完整流程" },
-      { group: "配置", cmd: "/provider [id]", blurb: "查看或切换模型 Provider" },
+      { group: "配置", cmd: "/provider [id]", blurb: "查看或切换 Provider；含「自定义 OpenAI 兼容接口」" },
       { group: "配置", cmd: "/mcp", blurb: "打开 MCP 管理页" },
       { group: "配置", cmd: "/plugin", blurb: "打开 Plugin 管理页" },
       { group: "其他", cmd: "/export", blurb: "导出会话" },

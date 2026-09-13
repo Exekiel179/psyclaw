@@ -135,3 +135,63 @@ export class SecretInputComponent {
     }
   }
 }
+
+export type TextInputResult = { type: "submit"; value: string } | { type: "close" };
+
+/** Plain (unmasked) single-line prompt for Base URL / model id. */
+export class TextInputComponent {
+  focused = false;
+  private value: string;
+  private completed = false;
+
+  constructor(
+    private readonly title: string,
+    private readonly hint: string,
+    private readonly tui: TUI,
+    private readonly theme: Theme,
+    private readonly keybindings: KeybindingsManager,
+    private readonly done: (result: TextInputResult) => void,
+    initial = "",
+  ) {
+    this.value = initial;
+  }
+
+  invalidate(): void {}
+
+  render(width: number): string[] {
+    const contentWidth = Math.max(24, width - 4);
+    const shown = this.value || this.theme.fg("dim", "（在此输入）");
+    return [
+      this.theme.fg("accent", this.theme.bold(this.title)),
+      "",
+      truncateToWidth(shown, contentWidth),
+      this.theme.fg("dim", this.hint),
+      "",
+      this.theme.fg("dim", "直接输入或粘贴 · Enter 确认 · Esc 返回"),
+    ];
+  }
+
+  handleInput(data: string): void {
+    if (this.completed) return;
+    if (this.keybindings.matches(data, "tui.select.cancel")) {
+      this.completed = true;
+      this.done({ type: "close" });
+      return;
+    }
+    if (this.keybindings.matches(data, "tui.input.submit") || data === "\n" || data === "\r") {
+      this.completed = true;
+      this.done({ type: "submit", value: this.value.trim() });
+      return;
+    }
+    if (this.keybindings.matches(data, "tui.editor.deleteCharBackward")) {
+      this.value = [...this.value].slice(0, -1).join("");
+      this.tui.requestRender();
+      return;
+    }
+    const pasted = data.replaceAll("\x1b[200~", "").replaceAll("\x1b[201~", "").replace(/[\r\n]/g, "");
+    if (pasted && !/[\u0000-\u001f\u007f]/u.test(pasted)) {
+      this.value += pasted;
+      this.tui.requestRender();
+    }
+  }
+}

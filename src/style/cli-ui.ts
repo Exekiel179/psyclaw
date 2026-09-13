@@ -82,7 +82,7 @@ export function formatCliUsage(): string {
     cmd("/ars", "[task|doctor|stop]", c.white("学术模式入口")),
     cmd("/mcp", "", c.white("打开 MCP 管理页")),
     cmd("/plugin", "", c.white("打开 Plugin 管理页")),
-    cmd("/provider", "[id]", c.white("查看、配置或切换 Provider")),
+    cmd("/provider", "[id]", c.white("查看、配置或切换 Provider（含自定义 OpenAI 兼容）")),
     cmd("/export", "", c.white("导出会话")),
     cmd("/pet", "[on|off]", c.white("启动横幅宠物")),
     cmd("/telemetry", "on|off|status", c.white("查看或关闭匿名产品遥测（默认开启）")),

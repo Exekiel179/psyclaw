@@ -61,11 +61,14 @@ import {
 } from "../../integrations/mcp-runtime.js";
 import {
   SecretInputComponent,
+  TextInputComponent,
   ProviderPickerComponent,
   type ProviderPickerItem,
   type ProviderPickerResult,
   type SecretInputResult,
+  type TextInputResult,
 } from "../../tui/provider-picker.js";
+import { resolveProviderBaseUrl } from "../../core/provider-endpoint.js";
 import {
   ARS_UPSTREAM_COMMIT,
   ARS_UPSTREAM_REF,
@@ -226,6 +229,62 @@ async function promptProviderKey(
   const result = await ctx.ui.custom<SecretInputResult>((tui, theme, keybindings, done) =>
     new SecretInputComponent(`配置 ${providerName}`, envName, tui, theme, keybindings, done));
   return result.type === "submit" ? result.value.trim() : undefined;
+}
+
+async function promptProviderText(
+  ctx: ExtensionCommandContext,
+  title: string,
+  hint: string,
+  initial = "",
+): Promise<string | undefined> {
+  if (typeof ctx.ui.custom !== "function") {
+    throw new Error(`${title}：当前环境不支持交互输入。请在交互式终端运行 /provider。`);
+  }
+  const result = await ctx.ui.custom<TextInputResult>((tui, theme, keybindings, done) =>
+    new TextInputComponent(title, hint, tui, theme, keybindings, done, initial));
+  return result.type === "submit" ? result.value.trim() : undefined;
+}
+
+/** Interactive setup for the built-in `custom` OpenAI-compatible provider. */
+async function configureCustomProvider(ctx: ExtensionCommandContext): Promise<{
+  baseUrl: string;
+  modelId: string;
+  apiKey?: string;
+} | undefined> {
+  const preset = PROVIDER_PRESETS.find((item) => item.id === "custom");
+  if (!preset) throw new Error("内置 custom Provider 预设缺失");
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
+    throw new Error("请在交互式终端运行 /provider，选择「自定义 OpenAI 兼容接口」，并填写 Base URL 与模型 ID");
+  }
+  const baseUrlRaw = await promptProviderText(
+    ctx,
+    "自定义 Provider · Base URL",
+    "例如 https://api.example.com/v1（须为 http/https，不含凭据）",
+  );
+  if (baseUrlRaw === undefined) return undefined;
+  let baseUrl = "";
+  try {
+    baseUrl = resolveProviderBaseUrl(baseUrlRaw);
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : "Base URL 无效");
+  }
+  if (!baseUrl) throw new Error("自定义 Provider 必须填写 Base URL");
+  const modelId = await promptProviderText(
+    ctx,
+    "自定义 Provider · 模型 ID",
+    "填写网关要求的模型名，例如 gpt-4o-mini 或 deepseek-chat",
+  );
+  if (modelId === undefined) return undefined;
+  if (!modelId || !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/.test(modelId)) {
+    throw new Error("模型 ID 无效；请使用字母数字及 . _ : / -");
+  }
+  const key = await promptProviderKey(ctx, preset.name, preset.apiKeyEnv);
+  if (key === undefined) return undefined;
+  const credential = await providerCredentialSource(preset);
+  if (!key && credential === "missing") {
+    throw new Error(`未找到 ${preset.apiKeyEnv}；请输入 API Key 后再继续`);
+  }
+  return { baseUrl, modelId, ...(key ? { apiKey: key } : {}) };
 }
 
 function parseModelRef(args: string): { provider: string; id: string } {
@@ -1791,7 +1850,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (!legacyTestApi) pi.registerCommand("provider", {
-    description: "查看或切换模型 Provider",
+    description: "查看、配置或切换 Provider（含自定义 OpenAI 兼容接口）",
     handler: async (args, ctx) => {
       try {
         let requested = args.trim();
@@ -1803,7 +1862,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         }
         if (!requested) {
           const current = ctx.model?.provider ?? "none";
-          const available = new Map(PROVIDER_PRESETS.filter((preset) => preset.models.length > 0).map((preset) => [preset.id, preset]));
+          const available = new Map(PROVIDER_PRESETS.filter((preset) =>
+            preset.models.length > 0 || preset.id === "custom",
+          ).map((preset) => [preset.id, preset]));
           for (const id of providers.keys()) if (!available.has(id)) available.set(id, {
             id,
             name: ctx.modelRegistry.getProviderDisplayName(id),
@@ -1814,19 +1875,50 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           });
           if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
             const lines = [...available].map(([id, preset]) => `${id}${id === current ? " *" : ""} — ${preset.name}`);
-            ctx.ui.notify([`当前 Provider: ${current}`, ...lines, "", "切换：/provider <id>"].join("\n"), "info");
+            ctx.ui.notify([`当前 Provider: ${current}`, ...lines, "", "切换：/provider <id>（自定义：/provider custom）"].join("\n"), "info");
             return;
           }
           const selectedProvider = await pickProviderItem(ctx, "选择模型 Provider", [...available].map(([id, preset]) => ({
             id,
             label: preset.name,
-            description: `${id} · ${providers.get(id)?.length ?? preset.models.length} 个模型`,
+            description: id === "custom"
+              ? "自建/第三方 OpenAI 兼容网关：填写 Base URL、模型 ID 与 API Key"
+              : `${id} · ${providers.get(id)?.length ?? preset.models.length} 个模型`,
             current: id === current,
           })));
           if (!selectedProvider) return;
           requested = selectedProvider;
         }
         if (!/^[A-Za-z0-9._:-]+$/.test(requested)) throw new Error("请使用 /provider 打开选择，或 /provider <provider-id>");
+
+        if (requested === "custom") {
+          const custom = await configureCustomProvider(ctx);
+          if (!custom) return;
+          const preset = PROVIDER_PRESETS.find((item) => item.id === "custom")!;
+          await saveProviderConfig({
+            ...preset,
+            baseUrl: custom.baseUrl,
+            models: [{ id: custom.modelId, name: custom.modelId }],
+            ...(custom.apiKey ? { apiKey: custom.apiKey } : {}),
+          });
+          const refreshed = await Promise.race([
+            ctx.modelRegistry.refresh().then(() => true),
+            new Promise<false>((resolve) => setTimeout(() => resolve(false), 5_000)),
+          ]);
+          if (!refreshed) {
+            ctx.ui.notify("自定义 Provider 已保存；模型目录刷新超时，请重新启动 PsyClaw 后使用。", "warning");
+            return;
+          }
+          const selected = ctx.modelRegistry.getAll().find((model) =>
+            model.provider === "custom" && model.id === custom.modelId);
+          if (!selected) throw new Error(`自定义模型未出现在目录中：custom/${custom.modelId}；请检查 Base URL 后重试`);
+          const changed = await pi.setModel(selected);
+          if (!changed) throw new Error("未找到 custom 的可用凭据；请重新运行 /provider custom 并输入 API Key");
+          await saveDefaultModel("custom", selected.id);
+          ctx.ui.notify(`已切换并设为默认模型：custom/${selected.id}（${custom.baseUrl}）`, "info");
+          return;
+        }
+
         const preset = PROVIDER_PRESETS.find((item) => item.id === requested);
         let models = providers.get(requested) ?? [];
         const modelChoices = models.length > 0 ? models : (preset?.models ?? []);
