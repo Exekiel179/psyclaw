@@ -89,15 +89,6 @@ describe("SkillManagerComponent", () => {
     expect(actions).toEqual([{ type: "toggle", id: "enabled", enabled: false }]);
   });
 
-  it("opens the install flow for missing Skills with Enter or Space", () => {
-    const { component, actions } = createComponent();
-    component.handleInput("DOWN");
-    component.handleInput("DOWN");
-    component.handleInput("DOWN");
-    component.handleInput("ENTER");
-    expect(actions).toEqual([{ type: "install", id: "missing" }]);
-  });
-
   it("disables an enabled Skill with Enter", () => {
     const { component, actions } = createComponent();
     component.handleInput("DOWN");
@@ -146,7 +137,28 @@ describe("SkillManagerComponent", () => {
     expect(text).toContain("尚未安装");
     expect(text).toContain("传输：stdio · 风险：network");
     component.handleInput("ENTER");
+    expect(actions).toEqual([]);
+    expect(component.render(100).join("\n")).toContain("再按 Enter 确认安装");
+    component.handleInput("ENTER");
     expect(actions).toEqual([{ type: "install", id: "paper-search-mcp" }]);
+  });
+
+  it("requires a second Enter to install a missing Skill after showing the intro", () => {
+    const { component, actions, tui } = createComponent();
+    for (let index = 0; index < 3; index += 1) component.handleInput("DOWN");
+    component.handleInput("ENTER");
+    expect(actions).toEqual([]);
+    expect(tui.requestRender).toHaveBeenCalled();
+    expect(component.render(100).join("\n")).toMatch(/介绍：|再按 Enter 确认安装/);
+    component.handleInput("ENTER");
+    expect(actions).toEqual([{ type: "install", id: "missing" }]);
+  });
+
+  it("installs a missing Skill immediately with Space", () => {
+    const { component, actions } = createComponent();
+    for (let index = 0; index < 3; index += 1) component.handleInput("DOWN");
+    component.handleInput(" ");
+    expect(actions).toEqual([{ type: "install", id: "missing" }]);
   });
 
   it("toggles an enabled MCP off instead of reinstalling", () => {
