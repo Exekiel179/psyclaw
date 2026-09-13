@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Panel Provider page accepts an optional Base URL so OpenAI-compatible custom gateways can be saved; leaving the field empty keeps the selected model's catalog/preset endpoint.
 - Anonymous product telemetry is on by default (coarse usage and errors; no research text or PII). A one-time startup notice explains what is collected and how to turn it off (`psyclaw telemetry off` / `/telemetry off`). `PSYCLAW_TELEMETRY=0` forces the current process off.
 - Correlated observability spans (Sentry/PostHog/Langfuse) and ExpectedUserError handling from PRs #8–#11 remain available when telemetry is enabled.
 - Session resume (`--continue` / `-c`), continuously-work (`--continuously-work` / `--continue-work`), and cloud-agent environment setup from master are preserved.

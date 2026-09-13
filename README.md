@@ -84,7 +84,7 @@ psyclaw brief
 | 查看 PsyClaw 和内置运行时更新 | `psyclaw check-updates` |
 | 更新 PsyClaw 和内置运行时 | `psyclaw update` |
 | 导出会话 | 使用 Pi 内置的 `/export` |
-| 打开科研面板 | 在对话中输入 `/panel` |
+| 打开科研面板 | 在对话中输入 `/panel`（Provider 页可选填 Base URL，指向 OpenAI 兼容网关） |
 | 查看或切换 Provider | 在对话中输入 `/provider` 或 `/provider <id>` |
 | 管理启动横幅宠物 | `/pet status`、`/pet on`、`/pet off`（默认关闭） |
 | 匿名产品遥测 | `psyclaw telemetry status`、`psyclaw telemetry off`、`psyclaw telemetry on`（默认开启；对话中 `/telemetry`） |

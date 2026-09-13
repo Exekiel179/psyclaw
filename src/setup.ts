@@ -6,6 +6,9 @@ import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { DEFAULT_PRICING, PROVIDER_PRICING } from "./core/pricing.js";
+import { resolveProviderBaseUrl } from "./core/provider-endpoint.js";
+
+export { resolveProviderBaseUrl } from "./core/provider-endpoint.js";
 
 export interface ProviderPreset {
   id: string;
@@ -355,15 +358,11 @@ async function readProviderCatalog(modelsPath: string): Promise<Record<string, u
 function providerConfig(input: ProviderConfigInput): Record<string, unknown> {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(input.id)) throw new Error("Invalid provider id");
   if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(input.apiKeyEnv)) throw new Error("Invalid API key environment name");
-  if (input.baseUrl) {
-    const url = new URL(input.baseUrl);
-    if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("Provider endpoint must use http or https");
-    if (url.username || url.password || url.hash) throw new Error("Provider endpoint must not contain credentials or fragments");
-  }
+  const baseUrl = resolveProviderBaseUrl(input.baseUrl);
   if (input.models.length === 0) throw new Error("At least one model is required");
   const pricing = PROVIDER_PRICING[input.id] ?? DEFAULT_PRICING;
   return {
-    baseUrl: input.baseUrl,
+    baseUrl,
     api: input.api,
     apiKey: `$${input.apiKeyEnv}`,
     models: input.models.map((model) => ({

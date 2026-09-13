@@ -231,5 +231,58 @@ describe("read-only panel server", () => {
     expect(html).toContain("未找到 ${model.apiKeyEnv}；请输入 API Key 后再继续");
     expect(html).toContain('$("model-select").addEventListener("change"');
     expect(html).toContain("apiKeyStored");
+    expect(html).toContain('id="provider-base-url"');
+    expect(html).toContain("Base URL（可选，留空使用模型预设地址）");
+    expect(html).toContain("updateBaseUrl()");
+    expect(html).toContain("baseUrl:customBaseUrl||model.endpoint");
+    expect(html).toContain("Base URL 仅支持 http 或 https，且不能包含凭据或片段");
+  });
+
+  it("accepts a custom http(s) Base URL and rejects non-http schemes before saving", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-panel-baseurl-"));
+    await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
+    const previous = process.env.PSYCLAW_PANEL_TEST_API_KEY;
+    delete process.env.PSYCLAW_PANEL_TEST_API_KEY;
+    try {
+      await withServer(root, async (base) => {
+        const payload = {
+          id: "panel-test-provider",
+          name: "Panel Test",
+          api: "openai-completions",
+          apiKeyEnv: "PSYCLAW_PANEL_TEST_API_KEY",
+          modelId: "demo-model",
+        };
+        const custom = await postJson(base, "/api/provider-config", {
+          ...payload,
+          baseUrl: "https://gateway.example.test/v1/",
+        });
+        expect(custom.status).toBe(400);
+        await expect(custom.json()).resolves.toEqual({
+          error: "未找到 PSYCLAW_PANEL_TEST_API_KEY；请输入 API Key 后再继续",
+          reasonCode: "missing_api_key",
+        });
+
+        const invalid = await postJson(base, "/api/provider-config", {
+          ...payload,
+          baseUrl: "ftp://files.example.test/v1",
+        });
+        expect(invalid.status).toBe(400);
+        await expect(invalid.json()).resolves.toEqual({
+          error: "Provider endpoint must use http or https",
+        });
+
+        const credentialed = await postJson(base, "/api/provider-config", {
+          ...payload,
+          baseUrl: "https://user:secret@gateway.example.test/v1",
+        });
+        expect(credentialed.status).toBe(400);
+        await expect(credentialed.json()).resolves.toEqual({
+          error: "Provider endpoint must not contain credentials or a fragment",
+        });
+      });
+    } finally {
+      if (previous === undefined) delete process.env.PSYCLAW_PANEL_TEST_API_KEY;
+      else process.env.PSYCLAW_PANEL_TEST_API_KEY = previous;
+    }
   });
 });
