@@ -59,7 +59,7 @@ CLI 在遥测开启且 `SENTRY_DSN`（或打包公钥）可用时，对关键路
 - `cli.research_run` — `/run` 启动与编排器 `runPlan` / `resumePlan`
 - `cli.brief` — 离线 brief
 - `cli.skill_install` / `cli.skill_install_local` — 推荐 / 本地 Skill 安装
-- `cli.llm_call` — `PiModelGateway.complete` 与只读 RPC worker 的主模型调用
+- `cli.llm_call` — `PiModelGateway.complete`、只读 RPC worker，以及 ARS 审稿席位 / 编辑合成 / re-review 各阶段 RPC（`phase=ars_review_seat_*` / `ars_synthesis` / `ars_rereview_*`）
 
 Sentry Node 初始化 **全局 OpenTelemetry TracerProvider**。不要再为 Langfuse 注册第二个 `NodeSDK`。
 
@@ -67,7 +67,7 @@ Sentry Node 初始化 **全局 OpenTelemetry TracerProvider**。不要再为 Lan
 
 LLM 栈是锁定版本的 Pi（`@earendil-works/pi-coding-agent` / `@earendil-works/pi-ai`），不是 OpenAI SDK。因此采用 [PostHog 手动 `$ai_generation` 捕获](https://posthog.com/docs/llm-analytics/installation/manual-capture)，并保持 `POSTHOG_PRIVACY_MODE` 语义（永远不发 prompt/completion）。官方 `@posthog/pi` 扩展会另起一套 identity 且默认可能上传对话内容，本仓库不加载它。
 
-挂载点：Pi `agent_end`、RPC worker 返回的 session 事件、`PiModelGateway.complete`。
+挂载点：Pi `agent_end`、RPC worker 返回的 session 事件、`PiModelGateway.complete`、ARS multi-agent 审稿席位 / 编辑合成 / re-review 各阶段 `promptAndWait`。
 
 ## Langfuse（可选，Cloud 免费档）
 
