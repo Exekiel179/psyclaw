@@ -159,10 +159,12 @@ async function emitPiTurnGeneration(
   extras: { latencyMs?: number; provider?: string; model?: string },
 ): Promise<boolean> {
   if (!generation) return false;
+  const provider = generation.provider ?? extras.provider;
+  const model = generation.model ?? extras.model;
   await trackLlmGeneration({
     ...generation,
-    provider: generation.provider ?? extras.provider,
-    model: generation.model ?? extras.model,
+    ...(provider === undefined ? {} : { provider }),
+    ...(model === undefined ? {} : { model }),
     ...(extras.latencyMs === undefined ? {} : { latencyMs: extras.latencyMs }),
     surface: "cli",
     spanName: "pi-turn",
@@ -1456,9 +1458,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     const fallback = ctxProviderModel(ctx);
     const generation = extractPiGeneration({ type: "message", message: event.message });
     const latencyMs = turnStartedAt === undefined ? undefined : Math.max(0, Date.now() - turnStartedAt);
+    const provider = generation?.provider ?? fallback.provider;
+    const model = generation?.model ?? fallback.model;
     finishAgentSpan(llmTurnSpan, piTurnSpanAttributes({
-      provider: generation?.provider ?? fallback.provider,
-      model: generation?.model ?? fallback.model,
+      ...(provider === undefined ? {} : { provider }),
+      ...(model === undefined ? {} : { model }),
     }));
     llmTurnSpan = undefined;
     if (await emitPiTurnGeneration(generation, { ...fallback, ...(latencyMs === undefined ? {} : { latencyMs }) })) {
