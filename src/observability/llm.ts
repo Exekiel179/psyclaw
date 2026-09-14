@@ -60,7 +60,11 @@ export function usageFromUnknown(value: unknown): LlmUsage | undefined {
 export function extractPiGeneration(entry: unknown): LlmGenerationInput | undefined {
   if (!entry || typeof entry !== "object") return undefined;
   const record = entry as { type?: unknown; message?: unknown; usage?: unknown };
-  if (record.type === "message" && record.message && typeof record.message === "object") {
+  if (
+    (record.type === "message" || record.type === "message_end")
+    && record.message
+    && typeof record.message === "object"
+  ) {
     const message = record.message as {
       usage?: unknown;
       provider?: unknown;
