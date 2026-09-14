@@ -20,7 +20,6 @@ const rootFiles = [
   "CHANGELOG.md",
   "CLAUDE.md",
   "LICENSE",
-  "PRODUCT.md",
   "README.md",
   "package.json",
   "package.json.psyclaw",
