@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.30.6 - 2026-09-14
+
+- Add /biosignal domain pack for MNE NeuroKit and BIDS install
+- Align recommended skill catalog to upstream including paper-lookup and paper2local
+- Emit PostHog and Sentry LLM telemetry for ARS multi-agent RPC seats
+
+## Unreleased
+
+- (none)
+
 ## 0.30.5 - 2026-09-13
 
 - CLI /provider custom OpenAI-compatible gateway
@@ -65,11 +75,6 @@
 - Anonymous product telemetry default-on (Sentry + PostHog) with one-time notice and easy opt-out (`psyclaw telemetry on|off`)
 - Panel preference-aware observability injection; website visitors stay opt-in empty
 - Docs: docs/telemetry.md
-
-## Unreleased
-
-- Panel Provider page accepts an optional Base URL for OpenAI-compatible custom gateways; empty keeps the selected model's catalog/preset endpoint.
-- Anonymous product telemetry is on by default (coarse usage and errors; no research text or PII). A one-time startup notice explains what is collected and how to turn it off (`psyclaw telemetry off` / `/telemetry off`). `PSYCLAW_TELEMETRY=0` forces the current process off.
 
 ## 0.29.17 - 2026-09-08
 
