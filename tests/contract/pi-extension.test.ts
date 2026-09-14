@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import extension from "../../src/adapters/pi/extension.js";
 import { bootstrapProject } from "../../src/project/bootstrap.js";
+import { setObservabilityHandleForTests, shutdownObservability } from "../../src/observability/index.js";
 
 describe("Pi extension contract", () => {
   it("registers only the small legacy research command surface without registerTool", async () => {
@@ -275,5 +276,116 @@ describe("Pi extension contract", () => {
     expect(names).not.toContain("brief");
     expect(names).toContain("init");
     expect(names).toContain("verify");
+  });
+
+  describe("interactive LLM telemetry", () => {
+    afterEach(async () => {
+      await shutdownObservability();
+    });
+
+    function modernApi() {
+      const handlers = new Map<string, Array<(event: any, ctx: any) => unknown>>();
+      const api = {
+        registerCommand() {},
+        registerTool() {},
+        on(event: string, handler: (event: any, ctx: any) => unknown) {
+          const list = handlers.get(event) ?? [];
+          list.push(handler);
+          handlers.set(event, list);
+        },
+      } as any;
+      return { api, handlers };
+    }
+
+    async function emit(handlers: Map<string, Array<(event: any, ctx: any) => unknown>>, event: string, payload: unknown, ctx: unknown) {
+      for (const handler of handlers.get(event) ?? []) {
+        await handler(payload, ctx);
+      }
+    }
+
+    it("captures $ai_generation and cli.llm_call on turn_end and skips duplicate agent_end", async () => {
+      const generations: unknown[] = [];
+      const spans: Array<{ name: string; attributes: Record<string, string>; ended?: Record<string, string> }> = [];
+      setObservabilityHandleForTests({
+        captureEvent() {},
+        captureError() {},
+        captureLlmGeneration(input) { generations.push(input); },
+        startSpan(name, attributes) {
+          const span = { name, attributes };
+          spans.push(span);
+          return {
+            setAttributes(next) { Object.assign(span.attributes, next); },
+            end(next) { span.ended = next ?? {}; },
+          };
+        },
+        async flush() {},
+      });
+      const { api, handlers } = modernApi();
+      extension(api);
+      const ctx = { hasUI: true, mode: "tui", model: { provider: "deepseek", id: "deepseek-v4-flash" } };
+      await emit(handlers, "agent_start", { type: "agent_start" }, ctx);
+      await emit(handlers, "turn_start", { type: "turn_start", turnIndex: 0, timestamp: Date.now() - 40 }, ctx);
+      await emit(handlers, "turn_end", {
+        type: "turn_end",
+        turnIndex: 0,
+        message: { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 8, output: 2 } },
+        toolResults: [],
+      }, ctx);
+      await emit(handlers, "agent_end", {
+        type: "agent_end",
+        messages: [{ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 8, output: 2 } }],
+      }, ctx);
+
+      expect(generations).toHaveLength(1);
+      expect(generations[0]).toMatchObject({
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+        usage: { input: 8, output: 2 },
+        surface: "cli",
+        spanName: "pi-turn",
+      });
+      expect((generations[0] as { latencyMs?: number }).latencyMs).toBeGreaterThanOrEqual(40);
+      expect(spans).toHaveLength(1);
+      expect(spans[0]).toMatchObject({
+        name: "cli.llm_call",
+        attributes: { phase: "pi_turn", provider: "deepseek", model: "deepseek-v4-flash" },
+      });
+      expect(spans[0]?.ended).toMatchObject({ phase: "pi_turn", provider: "deepseek", model: "deepseek-v4-flash" });
+    });
+
+    it("falls back to agent_end when turn_end has no usage metadata", async () => {
+      const generations: unknown[] = [];
+      setObservabilityHandleForTests({
+        captureEvent() {},
+        captureError() {},
+        captureLlmGeneration(input) { generations.push(input); },
+        async flush() {},
+      });
+      const { api, handlers } = modernApi();
+      extension(api);
+      const ctx = { hasUI: false, mode: "rpc", model: { provider: "openai", id: "gpt-5" } };
+      await emit(handlers, "agent_start", { type: "agent_start" }, ctx);
+      await emit(handlers, "turn_end", {
+        type: "turn_end",
+        turnIndex: 0,
+        message: { role: "assistant", content: [{ type: "text", text: "ok" }] },
+        toolResults: [],
+      }, ctx);
+      await emit(handlers, "agent_end", {
+        type: "agent_end",
+        messages: [
+          { role: "user", content: "研究目标" },
+          { usage: { input: 3, output: 1 } },
+        ],
+      }, ctx);
+      expect(generations).toHaveLength(1);
+      expect(generations[0]).toMatchObject({
+        provider: "openai",
+        model: "gpt-5",
+        usage: { input: 3, output: 1 },
+        surface: "cli",
+        spanName: "pi-turn",
+      });
+    });
   });
 });

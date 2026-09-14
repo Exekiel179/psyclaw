@@ -59,9 +59,9 @@ export function usageFromUnknown(value: unknown): LlmUsage | undefined {
  */
 export function extractPiGeneration(entry: unknown): LlmGenerationInput | undefined {
   if (!entry || typeof entry !== "object") return undefined;
-  const record = entry as { type?: unknown; message?: unknown; usage?: unknown };
+  const record = entry as { type?: unknown; message?: unknown; messages?: unknown; usage?: unknown };
   if (
-    (record.type === "message" || record.type === "message_end")
+    (record.type === "message" || record.type === "message_end" || record.type === "turn_end")
     && record.message
     && typeof record.message === "object"
   ) {
@@ -87,11 +87,16 @@ export function extractPiGeneration(entry: unknown): LlmGenerationInput | undefi
       ...(model === undefined ? {} : { model }),
       usage,
       error,
-      spanName: "pi-message",
+      spanName: record.type === "turn_end" ? "pi-turn" : "pi-message",
     };
   }
-  if ((record.type === "agent_end" || record.type === "agent_settled") && record.message && typeof record.message === "object") {
-    return extractPiGeneration({ type: "message", message: record.message });
+  if (record.type === "agent_end" || record.type === "agent_settled") {
+    if (record.message && typeof record.message === "object") {
+      return extractPiGeneration({ type: "message", message: record.message });
+    }
+    if (Array.isArray(record.messages)) {
+      return lastPiGeneration(record.messages.map((message) => ({ type: "message", message })));
+    }
   }
   if ((record.type === "branch_summary" || record.type === "compaction") && record.usage) {
     const usage = usageFromUnknown(record.usage);
