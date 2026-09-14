@@ -52,6 +52,7 @@ export * from "./skills/contracts.js";
 export * from "./skills/preflight.js";
 export * from "./skills/registry.js";
 export * from "./skills/recommended.js";
+export * from "./skills/biosignal-pack.js";
 export * from "./skills/user-skills.js";
 export * from "./trust/manifest.js";
 export * from "./trust/sbom.js";
