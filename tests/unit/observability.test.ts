@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   captureAgentError,
   extractPiGeneration,
+  lastPiGeneration,
   ExpectedUserError,
   filesystemErrorContext,
   fsWriteErrorMessage,
@@ -29,6 +30,8 @@ import {
   trackSkillInstall,
   initNodeObservability,
   isObservabilityActive,
+  startAgentSpan,
+  finishAgentSpan,
   withAgentSpan,
   writeTelemetryPreference,
 } from "../../src/observability/index.js";
@@ -301,6 +304,32 @@ describe("observability runtime gate", () => {
     const result = await withAgentSpan("cli.research_run", { phase: "test" }, async () => "ok");
     expect(result).toBe("ok");
   });
+
+  it("starts and finishes inactive spans through the handle", async () => {
+    const spans: Array<{ name: string; attributes: Record<string, string>; ended?: Record<string, string> }> = [];
+    setObservabilityHandleForTests({
+      captureEvent() {},
+      captureError() {},
+      startSpan(name, attributes) {
+        const span = { name, attributes };
+        spans.push(span);
+        return {
+          setAttributes(next) { Object.assign(span.attributes, next); },
+          end(next) { span.ended = next ?? {}; },
+        };
+      },
+      async flush() {},
+    });
+    const span = await startAgentSpan("cli.llm_call", { phase: "pi_turn", provider: "deepseek" });
+    finishAgentSpan(span, { phase: "pi_turn", model: "deepseek-v4-flash" });
+    expect(spans).toEqual([
+      {
+        name: "cli.llm_call",
+        attributes: { phase: "pi_turn", provider: "deepseek" },
+        ended: { phase: "pi_turn", model: "deepseek-v4-flash" },
+      },
+    ]);
+  });
 });
 
 describe("committed telemetry files", () => {
@@ -405,6 +434,28 @@ describe("LLM and Langfuse payloads", () => {
         usage: { input: 4, output: 1 },
       },
     })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 4, output: 1 } });
+  });
+
+  it("reads usage from turn_end, message_end, and agent_end message lists", () => {
+    expect(extractPiGeneration({
+      type: "turn_end",
+      message: { provider: "openai", model: "gpt-5", usage: { input: 4, output: 1 } },
+    })).toMatchObject({ provider: "openai", model: "gpt-5", usage: { input: 4, output: 1 }, spanName: "pi-turn" });
+    expect(extractPiGeneration({
+      type: "message_end",
+      message: { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 2, output: 3 } },
+    })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 2, output: 3 } });
+    expect(extractPiGeneration({
+      type: "agent_end",
+      messages: [
+        { role: "user", content: "研究目标" },
+        { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 9, output: 5 } },
+      ],
+    })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 9, output: 5 } });
+    expect(lastPiGeneration([
+      { type: "message_end", message: { provider: "a", model: "m1", usage: { input: 1, output: 1 } } },
+      { type: "agent_settled" },
+    ])).toMatchObject({ model: "m1" });
   });
 
   it("treats Langfuse as unset when keys are missing", () => {

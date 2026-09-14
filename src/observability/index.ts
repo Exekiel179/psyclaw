@@ -9,7 +9,7 @@ import {
 import { filesystemErrorContext, redactUserPath } from "./error-context.js";
 import { ensureAnonymousDistinctId, newAnonymousDistinctId } from "./identity.js";
 import type { LlmGenerationInput } from "./llm.js";
-import type { ObservabilityHandle } from "./node-sdks.js";
+import type { AgentSpanHandle, ObservabilityHandle } from "./node-sdks.js";
 import { isExpectedUserError } from "./expected.js";
 import { readTelemetryPreference, resolveTelemetryEnabled, telemetryPreferenceOptions, type TelemetryPreference } from "./preference.js";
 
@@ -158,6 +158,35 @@ export async function withAgentSpan<T>(
   return fn();
 }
 
+/**
+ * Start a Sentry Performance span that outlives a single callback.
+ * Used for Pi turn_start → turn_end, where the work happens inside Pi.
+ */
+export async function startAgentSpan(
+  name: string,
+  attributes: Record<string, string> = {},
+): Promise<AgentSpanHandle | undefined> {
+  try {
+    if (bootPromise) await bootPromise;
+  } catch {
+    return undefined;
+  }
+  if (handle && typeof handle.startSpan === "function") return handle.startSpan(name, attributes);
+  return undefined;
+}
+
+export function finishAgentSpan(
+  span: AgentSpanHandle | undefined,
+  attributes?: Record<string, string>,
+): void {
+  if (!span) return;
+  try {
+    span.end(attributes);
+  } catch {
+    /* telemetry must not block the agent */
+  }
+}
+
 export async function shutdownObservability(): Promise<void> {
   const active = handle;
   handle = undefined;
@@ -180,4 +209,4 @@ async function emitWhenReady(fn: (active: ObservabilityHandle) => void): Promise
   if (handle) fn(handle);
 }
 
-export type { ObservabilityHandle };
+export type { AgentSpanHandle, ObservabilityHandle };
