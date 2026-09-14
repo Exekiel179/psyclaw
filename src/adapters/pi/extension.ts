@@ -31,6 +31,12 @@ import {
   type RecommendationState,
 } from "../../skills/recommended.js";
 import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../tui/skill-manager.js";
+import { BiosignalWizardComponent, type BiosignalWizardResult } from "../../tui/biosignal-wizard.js";
+import {
+  readBiosignalPackCatalog,
+  resolveBiosignalInstallPlan,
+  type BiosignalInstallPlan,
+} from "../../skills/biosignal-pack.js";
 import { WakeOptionsComponent } from "../../tui/wake-options.js";
 import {
   applyWakeVerifySync,
@@ -990,6 +996,177 @@ async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandCon
   });
 }
 
+function modelBiosignalPackInstallTask(
+  root: string,
+  plan: BiosignalInstallPlan,
+  skillRows: SkillManagerRow[],
+  mcpRows: McpManagerRow[],
+  mcpPlans: Array<Record<string, unknown>>,
+  skillScope: RecommendedSkillScope,
+): string {
+  const skillLines = plan.skillIds.map((id) => {
+    const row = skillRows.find((candidate) => candidate.id === id);
+    const target = recommendedSkillTarget(root, id, skillScope);
+    return [
+      `- Skill ${row?.name ?? id} (${id})`,
+      `  来源：${row?.sourceRef ?? "未提供"}`,
+      ...(row?.installHint ? [`  入口提示：${row.installHint}`] : []),
+      `  目标目录：${target}`,
+      row?.collection
+        ? "  形态：多 Skill 套件（子目录含 SKILL.md）"
+        : "  形态：叶子 Skill（目标目录直接含 SKILL.md）",
+    ].join("\n");
+  });
+  const mcpLines = plan.mcpIds.map((id) => {
+    const row = mcpRows.find((candidate) => candidate.id === id);
+    const prep = mcpPlans.find((candidate) => candidate.id === id);
+    return [
+      `- MCP ${row?.name ?? id} (${id})`,
+      `  来源：${row?.sourceRef ?? "未提供"}`,
+      `  参考命令：${typeof prep?.command === "string" ? prep.command : "请阅读来源仓库安装说明"}`,
+      `  建议配置：${typeof prep?.target === "string" ? prep.target : `.psyclaw/mcp/${id}.json`}`,
+    ].join("\n");
+  });
+  return [
+    "安装并配置「生理信号分析」能力包。",
+    `研究域：${plan.domainNames.join("、")}（${plan.domainIds.join(", ")}）`,
+    `当前项目：${root}`,
+    `Skill 安装位置：${skillScopeLabel(skillScope)}。`,
+    "用户已通过 /biosignal 向导明确授权本次打包安装。你可以直接联网、克隆或下载来源、使用所需包管理器安装依赖、执行安装命令，并写入与清单有关的项目或用户级配置；不要再次要求用户批准这些安装步骤。",
+    "不要写入 data/raw、.git、凭据或符号链接目标。不要把模型口头声称当作完成证据；每个条目安装后检查目标目录或 MCP 配置是否存在。",
+    "",
+    "MCP 清单：",
+    ...(mcpLines.length > 0 ? mcpLines : ["（无）"]),
+    "",
+    "Skill 清单：",
+    ...(skillLines.length > 0 ? skillLines : ["（无）"]),
+    "",
+    "目录中的版本、命令和依赖只作参考；请先阅读各来源仓库的实际安装说明再落地。各项已在推荐状态中默认启用；全部完成后执行 /reload，并提醒用户：Shift+Tab 切到 analysis，用自然语言描述数据与分析目标即可开始。",
+    "若某一条目安装命令本身失败，直接诊断并修复；只有遇到必须由用户提供的凭据或外部软件许可证时才向用户说明。",
+  ].join("\n");
+}
+
+async function markBiosignalPackDesired(
+  root: string,
+  plan: BiosignalInstallPlan,
+  skillScope: RecommendedSkillScope,
+): Promise<void> {
+  const state = await readRecommendationState(root);
+  const skills = new Set(state.skills);
+  const mcp = new Set(state.mcp);
+  const skillScopes = { ...(state.skillScopes ?? {}) };
+  for (const id of plan.skillIds) {
+    const normalized = normalizeRecommendedSkillId(id);
+    skills.add(normalized);
+    skillScopes[normalized] = skillScope;
+  }
+  for (const id of plan.mcpIds) mcp.add(id);
+  state.skills = [...skills];
+  state.mcp = [...mcp];
+  state.skillScopes = skillScopes;
+  await saveRecommendationState(root, state);
+}
+
+async function queueBiosignalPackInstall(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  plan: BiosignalInstallPlan,
+  runtime: RuntimeMcpRegistry,
+): Promise<void> {
+  if (plan.mcpIds.length === 0 && plan.skillIds.length === 0) {
+    ctx.ui.notify("所选研究域没有需要安装的 MCP 或 Skill。", "info");
+    return;
+  }
+  const skillScope = plan.skillIds.length > 0 ? await chooseSkillScope(ctx) : "project";
+  if (plan.skillIds.length > 0 && !skillScope) return;
+  const scope = skillScope ?? "project";
+  const skillCatalog = await readRecommendedCatalog();
+  const mcpCatalog = await recommendedItems("mcp");
+  const missingSkills = plan.skillIds.filter((id) => {
+    const item = skillCatalog.items.find((candidate) => normalizeRecommendedSkillId(String(candidate.id ?? "")) === normalizeRecommendedSkillId(id));
+    return !item || typeof item.sourceRef !== "string" || !/^https:\/\//.test(item.sourceRef);
+  });
+  if (missingSkills.length > 0) {
+    throw new Error(`能力包 Skill 缺少可安装来源：${missingSkills.join(", ")}`);
+  }
+  const skillRows: SkillManagerRow[] = plan.skillIds.map((id) => {
+    const item = skillCatalog.items.find((candidate) => normalizeRecommendedSkillId(String(candidate.id ?? "")) === normalizeRecommendedSkillId(id))!;
+    return {
+      id: normalizeRecommendedSkillId(id),
+      name: String(item.name ?? id),
+      description: String(item.description ?? ""),
+      sourceRef: String(item.sourceRef),
+      ...(typeof item.installHint === "string" ? { installHint: item.installHint } : {}),
+      collection: item.skillLayout === "collection",
+      installed: false,
+      enabled: true,
+      scope,
+      blocked: false,
+      source: "recommended" as const,
+    };
+  });
+  const mcpRows = await mcpManagerRows(ctx.cwd, await readRecommendationState(ctx.cwd), runtime);
+  const selectedMcp = plan.mcpIds.map((id) => {
+    const row = mcpRows.find((candidate) => candidate.id === id);
+    if (!row?.sourceRef) throw new Error(`能力包 MCP 缺少来源网址：${id}`);
+    return row;
+  });
+  const summary = [
+    `研究域：${plan.domainNames.join("、")}`,
+    plan.mcpIds.length > 0 ? `MCP：${plan.mcpIds.join(", ")}` : "MCP：无",
+    plan.skillIds.length > 0 ? `Skill：${plan.skillIds.join(", ")}` : "Skill：无",
+    plan.skillIds.length > 0 ? `Skill 安装位置：${skillScopeLabel(scope)}` : "",
+  ].filter(Boolean).join("\n");
+  const approved = await ctx.ui.confirm(
+    "交给当前模型安装生理信号能力包？",
+    `${summary}\n\n模型将按现有 /mcp 与 /skill 约定完成下载与配置；安装后默认启用。`,
+  );
+  if (!approved) return;
+  await markBiosignalPackDesired(ctx.cwd, plan, scope);
+  pi.sendUserMessage(
+    modelBiosignalPackInstallTask(ctx.cwd, plan, skillRows, selectedMcp, mcpCatalog.installPrep, scope),
+    ctx.isIdle() ? {} : { deliverAs: "followUp" },
+  );
+  ctx.ui.notify("已将生理信号能力包安装任务交给当前模型。完成后请执行 /reload，并 Shift+Tab 切到 analysis 使用。", "info");
+}
+
+async function showBiosignalPack(pi: ExtensionAPI, ctx: ExtensionCommandContext, runtime: RuntimeMcpRegistry): Promise<void> {
+  const catalog = await readBiosignalPackCatalog();
+  if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
+    const lines = [
+      "生理信号分析能力包（无交互 UI 时仅列出研究域）：",
+      ...catalog.domains.map((domain) => `- ${domain.id}: ${domain.name} — ${domain.description}`),
+      "请在交互式终端运行 /biosignal 完成选型与安装。",
+    ];
+    ctx.ui.notify(lines.join("\n"), "info");
+    return;
+  }
+  const result = await ctx.ui.custom((tui, theme, keybindings, done: (value: BiosignalWizardResult) => void) => (
+    new BiosignalWizardComponent(
+      catalog.domains.map((domain) => ({
+        id: domain.id,
+        name: domain.name,
+        description: domain.description,
+      })),
+      (domainIds) => {
+        const plan = resolveBiosignalInstallPlan(catalog, domainIds);
+        return {
+          domainNames: plan.domainNames,
+          mcpIds: plan.mcpIds,
+          skillIds: plan.skillIds,
+        };
+      },
+      tui,
+      theme,
+      keybindings,
+      done,
+    )
+  ));
+  if (result.type === "close") return;
+  const plan = resolveBiosignalInstallPlan(catalog, result.domainIds);
+  await queueBiosignalPackInstall(pi, ctx, plan, runtime);
+}
+
 async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
   if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
     const state = await readRecommendationState(ctx.cwd);
@@ -1773,6 +1950,13 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     description: "打开 Skill 管理页",
     handler: async (_args, ctx) => {
       try { await showSkillManager(pi, ctx); } catch (error) { await notifyError(ctx, error); }
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("biosignal", {
+    description: "生理信号分析能力包：选型研究域并安装 MCP/Skill",
+    handler: async (_args, ctx) => {
+      try { await showBiosignalPack(pi, ctx, runtimeMcps); } catch (error) { await notifyError(ctx, error); }
     },
   });
 
