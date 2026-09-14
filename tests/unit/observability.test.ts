@@ -397,6 +397,14 @@ describe("LLM and Langfuse payloads", () => {
       },
     })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 8, output: 2 } });
     expect(extractPiGeneration({ type: "message", message: { role: "user", content: "研究目标" } })).toBeUndefined();
+    expect(extractPiGeneration({
+      type: "message_end",
+      message: {
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+        usage: { input: 4, output: 1 },
+      },
+    })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 4, output: 1 } });
   });
 
   it("treats Langfuse as unset when keys are missing", () => {
