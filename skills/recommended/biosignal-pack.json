@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "psyclaw/biosignal-pack/v1",
+  "documentVersion": "0.1.0",
+  "syncedAt": "2026-09-14",
+  "description": "生理信号分析能力包：按研究域选型后，编排 mne-mcp 与配套 Skill 的安装配置。模式仍为 analysis，本包不是第四种 Shift+Tab 模式。",
+  "domains": [
+    {
+      "id": "eeg-erp",
+      "name": "EEG / ERP",
+      "description": "脑电与事件相关电位：预处理、伪迹、ERP 平均与报告。",
+      "mcp": ["mne-mcp"],
+      "skills": [
+        "mne-analyst",
+        "mne-mcp-guard",
+        "mne-methodology-critic",
+        "mne-preprocess",
+        "mne-artifacts",
+        "mne-erp"
+      ]
+    },
+    {
+      "id": "meg",
+      "name": "MEG",
+      "description": "脑磁图：预处理、频谱与源定位等传感器/源空间分析。",
+      "mcp": ["mne-mcp"],
+      "skills": [
+        "mne-analyst",
+        "mne-mcp-guard",
+        "mne-methodology-critic",
+        "mne-preprocess",
+        "mne-spectral",
+        "mne-source"
+      ]
+    },
+    {
+      "id": "fnirs",
+      "name": "fNIRS",
+      "description": "近红外：通道预处理、时频与基本统计流程（经 MNE）。",
+      "mcp": ["mne-mcp"],
+      "skills": [
+        "mne-analyst",
+        "mne-mcp-guard",
+        "mne-methodology-critic",
+        "mne-preprocess",
+        "mne-timefreq"
+      ]
+    },
+    {
+      "id": "ecg-hrv",
+      "name": "ECG / HRV",
+      "description": "心电与心率变异：峰检测、HRV 指标与质量检查（NeuroKit2）。",
+      "mcp": [],
+      "skills": ["neurokit2"]
+    },
+    {
+      "id": "bids",
+      "name": "BIDS 数据组织",
+      "description": "EEG/MEG/NIRS 等生理数据的 BIDS 布局与校验（可选配套）。",
+      "mcp": [],
+      "skills": ["bids"]
+    }
+  ]
+}

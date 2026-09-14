@@ -78,6 +78,7 @@ export function formatCliUsage(): string {
     cmd("/panel", "[help]", c.white("打开科研工作台")),
     cmd("/help", "", c.white("打开 Panel 使用速览（本页同步更新）")),
     cmd("/skill", "", c.white("打开 Skill 管理页")),
+    cmd("/biosignal", "", c.white("生理信号能力包：选型并安装配置")),
     cmd("/agents", "[task]", c.white("浏览或运行 Subagent")),
     cmd("/ars", "[task|doctor|stop]", c.white("学术模式入口")),
     cmd("/mcp", "", c.white("打开 MCP 管理页")),

@@ -118,7 +118,7 @@
       "id": "mne-mcp",
       "name": "MNE MCP",
       "stage": "神经生理",
-      "description": "为 EEG、MEG、iEEG 等 MNE-Python 分析提供受控工具；当前作为本机 MNE skill 的 MCP 候选入口。",
+      "description": "为 EEG、MEG、iEEG、fNIRS 等 MNE-Python 分析提供受控工具；也可经 /biosignal 能力包与配套 Skill 一并安装配置。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
       "transport": "stdio",
       "risk": "local-data-and-compute",
