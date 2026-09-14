@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.7 - 2026-09-14
+
+- Interactive Pi turn_end/agent_end emit PostHog $ai_generation and Sentry cli.llm_call spans (PR #15)
+- Includes main after v0.30.6 (#15 on top of ARS RPC + /biosignal)
+
 ## 0.30.6 - 2026-09-14
 
 - Add /biosignal domain pack for MNE NeuroKit and BIDS install
