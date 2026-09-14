@@ -59,6 +59,7 @@ export function sessionHelpDocument(): SessionHelpDocument {
       { group: "工作台", cmd: "/help", blurb: "打开本页" },
       { group: "能力", cmd: "/skill", blurb: "打开 Skill 管理页" },
       { group: "能力", cmd: "/skill:<name>", blurb: "显式调用已启用技能" },
+      { group: "能力", cmd: "/biosignal", blurb: "生理信号能力包：选型研究域并安装配置" },
       { group: "能力", cmd: "/agents [任务]", blurb: "浏览或运行 Subagent" },
       { group: "能力", cmd: "/ars [任务|doctor|stop]", blurb: "学术模式；尾随任务启动完整流程" },
       { group: "配置", cmd: "/provider [id]", blurb: "查看或切换 Provider；含「自定义 OpenAI 兼容接口」" },

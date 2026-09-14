@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.8.2",
+  "documentVersion": "0.8.5",
   "syncedAt": "2026-09-14",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
@@ -10,68 +10,70 @@
       "name": "Mac Computer Use",
       "kind": "skill",
       "stage": "电脑操控",
-      "description": "通过截图、键鼠与窗口操作操控 macOS 上无 API 的原生应用，并在每步留下可审计取证。适用于必须点击 GUI 才能完成、且用户已明确授权本机 UI 操控的任务。启用前需本机辅助功能/屏幕录制权限；未经授权不得启动。",
+      "description": "操控无 API 的 macOS 原生应用并留下可复现取证：指定窗口截图（含后台遮挡）、点击输入、探测是否可自动化；内嵌 Chromium 的应用可走 CDP 零焦点操控。适用于必须 GUI 操作且用户已明确授权本机辅助功能/屏幕录制的任务。浏览器内网页操作不属本技能范围。",
       "sourceRef": "https://github.com/alchaincyf/huashu-mac-use",
-      "installHint": "git clone 完整仓库到 skills 目录；启用前须本机辅助功能/屏幕录制权限，并经用户明确批准。"
+      "installHint": "安装仓库根目录完整 Skill（上游名 huashu-mac-use）。启用前须本机辅助功能与屏幕录制权限，并经用户明确批准。"
     },
     {
       "id": "scientific-visualization",
       "name": "Scientific Visualization",
       "kind": "skill",
       "stage": "科研绘图",
-      "description": "基于 Matplotlib、Seaborn 或 Plotly 创建并审计真实、可访问、可投稿的科研图表。适用于需要从数据生成出版级可视化，或对既有图稿做可访问性与真实性核验的场景。安装时只取 monorepo 中的 skills/scientific-visualization 目录，勿整仓克隆。",
+      "description": "K-Dense 科研可视化（v1.2）：用 Matplotlib / Seaborn / Plotly 创建并审计真实、可访问、可投稿图稿（多面板、不确定性与缺失展示、对比度、导出规划）。需要 Python 3.11+；Plotly 静态导出可能依赖 Chrome/Chromium + Kaleido。只安装 skills/scientific-visualization，勿整仓克隆。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/scientific-visualization 完整目录，包含其 scripts、assets 与 references。"
+      "installHint": "只安装仓库中的 skills/scientific-visualization 完整目录（SKILL.md、scripts、assets、references）；不要安装整个 scientific-agent-skills。"
     },
     {
       "id": "academic-figure-skill",
       "name": "Academic Figure Skill",
       "kind": "skill",
       "stage": "科研绘图",
-      "description": "围绕 Nature、Cell、Science 等图稿规范与常用图型，生成出版级矢量图并做多轮视觉质检。适用于投稿前需要严格版式、配色与标注规范的学术图稿制作。安装时保留根目录完整 Skill 包（SKILL.md、references、assets 与脚本）。",
+      "description": "面向 Nature / Cell / Science 等投稿规范的学术图稿制作、润色、复核与导出。适用于明确要出版级矢量图/图版的场景；不适用于交互仪表盘（Plotly/Bokeh）、无投稿意图的探索图、纯数学函数图或 PPT/Figma 优先流程。安装根目录完整 Skill 包。",
       "sourceRef": "https://github.com/TingxiYu/academic-figure-skill",
-      "installHint": "安装仓库根目录的完整 Skill 包，保留 SKILL.md、references、assets 和脚本。"
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md、references、assets 与脚本）。"
     },
     {
       "id": "figure-generation",
       "name": "Scientific Figure Generation",
       "kind": "skill",
       "stage": "科研绘图",
-      "description": "通过查询扩展、可执行绘图代码与视觉反馈，生成柱状图、热图、消融图、训练曲线等论文常见图型。适用于机器学习/实验报告类图稿需要可复现脚本与迭代质检的场景。只安装仓库内 skills/figure-generation 目录，勿整仓安装。",
+      "description": "三阶段科研图生成：查询扩展 → 可执行 matplotlib/seaborn 代码 → VLM 视觉反馈迭代。覆盖柱状图、折线、热图、训练曲线、消融图等。适用于论文/实验报告需要可复现绘图脚本的场景。只安装 skills/figure-generation，勿整仓安装。",
       "sourceRef": "https://github.com/lingzhi227/agent-research-skills",
-      "installHint": "只安装仓库中的 skills/figure-generation 完整目录，包含 scripts 和 references。"
+      "installHint": "只安装仓库中的 skills/figure-generation 完整目录，包含 scripts 与 references。"
     },
     {
       "id": "beautify-chart",
       "name": "Science Plot Formatter",
       "kind": "skill",
       "stage": "图表美化",
-      "description": "审查并改造已有 Matplotlib 脚本，使其达到论文投稿所需的排版、配色、字体与导出质量。适用于已有可运行绘图代码、只需美化与规范化导出的场景，而非从零生成图型。优先安装 .codex/skills/beautify-chart；若不存在再改用 .claude/skills/beautify-chart。",
+      "description": "在已有 Matplotlib 脚本上按目标会议/期刊版式做紧约束美化：需提供脚本路径、venue 与栏宽占比；先渲染再改、再渲染对照。适用于已有可运行绘图代码、而非从零生成图型。",
       "sourceRef": "https://github.com/preordinary/science-plot-formatter",
-      "installHint": "安装仓库中的 .codex/skills/beautify-chart 完整目录；若该路径不存在，再采用 .claude/skills/beautify-chart。"
+      "installHint": "优先安装 .codex/skills/beautify-chart；若不存在再采用 .claude/skills/beautify-chart。"
     },
     {
       "id": "zotero-translators",
       "name": "Zotero Translators",
       "kind": "skill",
       "stage": "题录",
-      "description": "从出版社与数据库页面提取规范题录、DOI、PDF 与补充材料，服务文献入库与元数据规范化。适用于需要把网页文献条目转为 Zotero 可用字段、或批量补全题录的场景。本身是翻译器集合，使用时依赖 Zotero/兼容客户端环境。",
-      "sourceRef": "https://github.com/zotero/translators"
+      "description": "Zotero 官方 translators 仓库：从网页抓取规范题录字段的翻译器集合（不是单一 PsyClaw 叶子 Skill）。适用于开发/调试网站翻译器或理解题录抓取规则；日常入库仍依赖本机 Zotero。仓库另含 .agent/skills/* 供翻译器开发，勿误当作全文检索技能。",
+      "sourceRef": "https://github.com/zotero/translators",
+      "installHint": "本条目不是可一键启用的单文件 SKILL。若只需翻译器：按 Zotero 文档使用本仓库。若开发翻译器：参考仓库 .agent/skills/（如 develop-web-translator）。不要把整个 translators 树当 PsyClaw Skill 目录安装。"
     },
     {
       "id": "scansci-pdf",
       "name": "ScanSci PDF",
       "kind": "skill",
       "stage": "全文获取",
-      "description": "按开放来源、官方接口与用户授权会话尝试获取论文全文。适用于已有题录/DOI、需要合法途径补齐 PDF 的场景。不得绕过付费墙或未经授权复用他人会话；优先开放获取与机构授权渠道。",
-      "sourceRef": "https://github.com/Rimagination/scansci-pdf"
+      "description": "学术文献检索、DOI/arXiv 校验、题录导出与经配置的开放获取/出版社/机构授权渠道取全文。适用于已有标识或清单、需合法补齐 PDF 与组织文献列表的场景；不得绕过付费墙或未经授权复用他人会话。",
+      "sourceRef": "https://github.com/Rimagination/scansci-pdf",
+      "installHint": "只安装仓库中的 skills/scansci-pdf 完整目录（含 SKILL.md 与配套脚本）；不要整仓当单一 Skill 混装。"
     },
     {
       "id": "paper2local",
       "name": "paper2local",
       "kind": "skill",
       "stage": "全文获取",
-      "description": "把 DOI、URL、arXiv 等已选文献下载到本地目录（PsyClaw 默认 literature/pdfs）。适用于只要轻量本地落盘、不依赖 Zotero 或 MinerU 的场景。仅用标准库下载；不要安装 Timisic/paper2zotero-skill 全量依赖栈。",
+      "description": "把用户已选定的 DOI、URL、arXiv id 或直链 PDF 下载到本地目录（PsyClaw 默认 literature/pdfs），并报告路径与哈希。轻量落盘专用：不做 Zotero 写入、不做 MinerU/OCR、不做发现与筛选流水线；付费墙无法简单 HTTP 获取时请用户本地放置或另授浏览器会话。",
       "sourceRef": "https://github.com/Exekiel179/paper2local",
       "installHint": "安装仓库根目录完整 Skill（SKILL.md + scripts/）。不要安装 Timisic/paper2zotero-skill 全量依赖栈。"
     },
@@ -80,50 +82,59 @@
       "name": "ScholarBridge",
       "kind": "skill",
       "stage": "文献质控",
-      "description": "连接文献清单、PDF 完整性校验、哈希去重与 Zotero 交接，形成可追溯的本地文献库质控链路。适用于批量导入后需要查缺补漏、去重与交接 Zotero 的场景。输出应可核验，不以口头声称代替完整性证据。",
-      "sourceRef": "https://github.com/LHT666-hub/ScholarBridge"
+      "description": "批量发现、下载、核验并归档学术 PDF，再交接 Zotero：支持 DOI/PMCID/arXiv/PDF URL/BibTeX/RIS/CSV 等；优先 CORE、Unpaywall、arXiv、PMC、Europe PMC、OpenAlex、DOAJ 等合法开放全文，也可为知网/万方/维普等生成用户授权的可见浏览器下载队列，接管下载目录、校验 PDF、去重并生成入库任务。输出须可核验。",
+      "sourceRef": "https://github.com/LHT666-hub/ScholarBridge",
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套脚本/配置说明）。"
     },
     {
       "id": "mentorforge",
       "name": "MentorForge",
       "kind": "skill",
       "stage": "方法蒸馏",
-      "description": "从学者主页、论文与全文信号卡中提炼可追问的科研方法论镜头。适用于希望把某学者/团队的研究路径蒸馏为可复用提问框架的场景。蒸馏结果应可回溯到来源文献与页面，避免无依据的方法断言。",
-      "sourceRef": "https://github.com/qwqalice/MentorForge"
+      "description": "把真实学者/导师/实验室的公开论文、主页、报告与访谈蒸馏为有证据依据的「赛博导师」镜头 Skill。适用于希望按某研究者方法路径追问的场景；蒸馏结果须可回溯来源，禁止无依据人格化断言。",
+      "sourceRef": "https://github.com/qwqalice/MentorForge",
+      "installHint": "只安装仓库中的 research-mentor-distiller/ 完整目录（含 SKILL.md）；不要默认安装整仓其他内容。"
     },
     {
       "id": "supervisor-skills",
       "name": "Supervisor-Skills",
       "kind": "skill",
       "stage": "研究写作",
-      "description": "覆盖研究构思、调研、写作、图表、评审与投稿前检查的科研工作流技能集合。适用于需要端到端导师式辅导、而非单一绘图或检索工具的场景。按任务选用其中子技能，并保留来源与版本可追溯性。",
-      "sourceRef": "https://github.com/HKUSTDial/Supervisor-Skills"
+      "description": "港科大 Dial 实验室「科研副导师」技能套件：含 idea 评估、深研、写作/润色、图表、预投稿审阅、rebuttal 等子技能。适用于端到端导师式辅导；请按任务选用子目录，勿把整套当成单一叶子。",
+      "sourceRef": "https://github.com/HKUSTDial/Supervisor-Skills",
+      "installHint": "这是多 Skill 套件：安装仓库 skills/ 下所需子目录（各含 SKILL.md），或按用户明确要求安装整套 skills/；保留相对结构，执行 /reload。",
+      "skillLayout": "collection"
     },
     {
       "id": "academic-reference-matcher",
       "name": "Academic Reference Matcher",
       "kind": "skill",
       "stage": "引用核验",
-      "description": "逐条拆分文稿中的 Claim，检索可核对来源，并输出 Claim–Reference 对照表。适用于投稿前引用核对、审稿回应或防止悬空断言的场景。无法核验的条目应标为 uncertain，不得把检索结果直接写成既定事实。",
-      "sourceRef": "https://github.com/keros68/academic-reference-matcher"
+      "description": "针对用户提供的学术正文、既有引用或书目：做 Claim–来源匹配、引用支持核验、替换与常见格式整理。适用于投稿前核对、审稿回应；不适用于开放式「随便找文献」或一般事实核查。无法核验标 uncertain。",
+      "sourceRef": "https://github.com/keros68/academic-reference-matcher",
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套文件）。"
     },
     {
       "id": "journal-frontier-radar",
       "name": "Journal Frontier Radar",
       "kind": "skill",
       "stage": "文献前沿",
-      "description": "基于期刊文章清单开展可追溯的前沿追踪、主题映射、关键词分析与未解决问题发现。适用于需要持续扫描目标期刊、并产出可引用证据链的前沿调研。前置依赖 Kimi WebBridge：须先安装并用 `kimi-webbridge status` 确认 extension_connected；不要把本机 Downloads 解压扩展当 PsyClaw Plugin 安装。",
+      "description": "对用户选定期刊在固定窗口（1/2/3/6 个月或 1/2 年）做可追溯前沿分析：枚举近期文章、主题与关键词、对照领域前沿并提炼未解决问题。依赖 Kimi WebBridge；须先 status 确认 extension_connected。",
       "sourceRef": "https://github.com/kingfly51/journal-frontier-radar",
-      "prerequisites": ["kimi-webbridge"],
-      "requiresExternalTools": ["kimi-webbridge"],
-      "installHint": "安装仓库中的 skills/journal-frontier-radar 完整目录，包含 SKILL.md 及其脚本。启用前须先安装推荐外部工具 Kimi WebBridge（官方 daemon + Chrome/Edge 扩展），并用 `kimi-webbridge status` 确认 extension_connected: true；不要把本机 Downloads 解压扩展当 PsyClaw Plugin 安装。"
+      "prerequisites": [
+        "kimi-webbridge"
+      ],
+      "requiresExternalTools": [
+        "kimi-webbridge"
+      ],
+      "installHint": "安装仓库中的 skills/journal-frontier-radar 完整目录。启用前须先安装推荐外部工具 Kimi WebBridge，并用 `kimi-webbridge status` 确认 extension_connected: true；不要把本机 Downloads 解压扩展当 PsyClaw Plugin 安装。"
     },
     {
       "id": "manuscript-statistical-forensics",
       "name": "Manuscript Statistical Forensics",
       "kind": "skill",
       "stage": "统计审查",
-      "description": "对论文 PDF 做数值一致性、统计方法与研究完整性审查，帮助发现可能的报告错误或不一致。适用于审稿、预印本自查或教学演示统计审计流程。单一异常不得直接判定为学术不端；使用时必须提供可读取的论文 PDF。",
+      "description": "对必填论文 PDF（可选审稿材料与原始数据）做数值一致性、统计/方法问题与可疑模式筛查，服务研究诚信与投稿前后自查。单一异常不得直接判定学术不端；必须提供可读取 PDF。",
       "sourceRef": "https://github.com/kingfly51/manuscript-statistical-forensics",
       "installHint": "安装仓库根目录的 SKILL.md 及配套文件；使用时必须提供可读取的论文 PDF。"
     },
@@ -132,78 +143,189 @@
       "name": "Excel Research Data",
       "kind": "skill",
       "stage": "数据与文档",
-      "description": "对 Excel/表格研究数据做体检、清洗、口径对齐、对账与分析报告整理。适用于问卷/实验导出表需要统一变量定义、缺失值与对账口径的场景。统计推断仍应委托成熟库或受信任 MCP，本技能侧重数据整理与文档化。",
-      "sourceRef": "https://github.com/alchaincyf/huashu-excel"
+      "description": "表格数据全流程：脏表体检、清洗、定口径、算指标、对账、出报告（Excel/CSV/系统导出）。核心是让数字经得起追问；统计推断仍应委托成熟库或受信任 MCP。幻灯片/PPT 不属本技能。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-excel",
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套脚本）。"
     },
     {
       "id": "huashu-md-html",
       "name": "Markdown Publishing",
       "kind": "skill",
       "stage": "数据与文档",
-      "description": "将研究材料转为 Markdown，并导出出版级 HTML/DOCX。适用于需要从草稿或混合格式材料生成可分享文档、而非直接投稿期刊模板的场景。导出前应核对图表与引用是否仍与源材料一致。",
-      "sourceRef": "https://github.com/alchaincyf/huashu-md-html"
+      "description": "md/html/docx/pdf/epub 多向流水线：任意文件或 URL 转干净 Markdown，再导出出版级 HTML/DOCX/PDF/EPUB；含模板与设计师模式。适用于「md 生产、多端消费」；不负责新生成配图或单纯截图压缩。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-md-html",
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套脚本/模板）。"
     },
     {
       "id": "huashu-report",
       "name": "Research Report Pipeline",
       "kind": "skill",
       "stage": "研究与写作",
-      "description": "研究报告生产流水线，覆盖结构规划、证据组织、图表嵌入与成稿导出。适用于需要可重复的报告生产流程、而非单次临时写作的场景。成稿中的 Claim 与数值仍须可回溯到来源证据与 receipt。",
-      "sourceRef": "https://github.com/alchaincyf/huashu-report"
+      "description": "机构级研究报告与学术文稿流水线（行业报告、白皮书、调研、数据洞察、arXiv 向论文，含 16:9 咨询 deck）。定结构、写发现、建图表视觉系统；单篇随笔或纯演示 PPT 不适用。Claim 与数值须可回溯。",
+      "sourceRef": "https://github.com/alchaincyf/huashu-report",
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套脚本）。"
     },
     {
       "id": "distill-scholar",
       "name": "Distill Scholar",
       "kind": "skill",
       "stage": "方法蒸馏",
-      "description": "将学者或学派蒸馏为可调用的方法论镜头 Skill，便于后续按该镜头提问与审稿。适用于已有学者材料、希望沉淀可复用研究视角的场景。只安装仓库中的 distill-scholar/ 目录（SKILL.md + references），勿整仓混装其他 distill 包。",
+      "description": "PsyClaw Distill · 学者蒸馏：把学者/学派公开著作与言论提炼为可运行方法学镜头（心智模型、启发式、表达 DNA、反模式、诚实边界）。非数字分身、非治疗。只安装 distill-scholar/。",
       "sourceRef": "https://github.com/Exekiel179/distill-skills",
-      "installHint": "Install only the distill-scholar directory (SKILL.md + references)."
+      "installHint": "只安装仓库中的 distill-scholar/ 目录（SKILL.md + references）。"
     },
     {
       "id": "distill-journal",
       "name": "Distill Journal",
       "kind": "skill",
       "stage": "方法蒸馏",
-      "description": "蒸馏目标期刊或会议的写作风格与体裁惯例，生成可调用的 venue 镜头。适用于投稿定向润色前需要风格参考库的场景。硬门槛：本地至少 3 篇目标 venue 全文，建议 8–12 篇；只安装 distill-journal/ 目录。",
+      "description": "PsyClaw Distill · 期刊/文体风格蒸馏：从本地论文提炼某刊或某类文体的结构、语气、必检项与禁写项。硬门槛：本地至少 3 篇目标全文（建议 8–12 篇，覆盖类型与年份）。只安装 distill-journal/。",
       "sourceRef": "https://github.com/Exekiel179/distill-skills",
-      "installHint": "Install only distill-journal/. Prepare ≥3 target-venue full texts under literature/pdfs or a user path before distilling."
+      "installHint": "只安装 distill-journal/。蒸馏前在 literature/pdfs 或用户指定路径准备 ≥3 篇目标 venue 全文。"
     },
     {
       "id": "psytrainer-ml",
       "name": "PsyTrainer ML",
       "kind": "skill",
       "stage": "机器学习",
-      "description": "用自然语言配置并运行 PsyTrainer 表格模型训练与批量预测，并解读模型结果。仅在用户显式调用时启用；预测只加载可信本地 model.pkl。安装阶段用 scripts/install_runtime 写入 .venv 与 runtime.json，任务中禁止再 pip install；不要嵌套进 psyclaw 源码树。",
+      "description": "检查特征/标签 CSV，配置 PsyTrainer 分类或回归，训练防泄漏表格 Pipeline（支持 group/time 划分），预测并导出实测图与 Word 报告。须 runtime.json 中 ready:true；优先 scripts/pipeline_train.py。禁止用留出集结果选模型/特征。",
       "sourceRef": "https://github.com/Exekiel179/psytrainer-ml-skill",
-      "installHint": "Skill 名 psytrainer-ml。克隆 https://github.com/Exekiel179/psytrainer-ml-skill 到目标目录后，在安装阶段装依赖：macOS/Linux 用 `python3 scripts/install_runtime.py --wheel <PsyTrainer.whl>`；Windows 用 `scripts\\install_runtime.cmd --wheel D:\\wheels\\PsyTrainer-*.whl` 或 `install_runtime.ps1`（支持 glob / PSYTRAINER_WHEEL / py 启动器）。创建 .venv 并写 runtime.json；任务中禁止再 pip install。不要嵌套进 psyclaw 源码树。"
+      "installHint": "克隆仓库到目标目录后，安装阶段用 scripts/install_runtime（macOS/Linux: `python3 scripts/install_runtime.py --wheel <PsyTrainer.whl>`；Windows: install_runtime.cmd/ps1）创建 .venv 并写 runtime.json；任务中禁止再 pip install。保留 vendor/；不要嵌套进 psyclaw 源码树。"
     },
     {
       "id": "literature-review",
       "name": "Literature Review",
       "kind": "skill",
       "stage": "文献综述",
-      "description": "K-Dense 文献综述技能：协助规划检索范围、组织主题脉络、综合证据并产出可追溯的综述草稿结构。适用于需要系统梳理某一议题文献、并保留引用与不确定标记的场景。只安装 monorepo 中的 skills/literature-review 目录，切勿默认安装整个 scientific-agent-skills 仓库。",
+      "description": "K-Dense 系统文献综述（v1.8）：跨 PubMed、arXiv、bioRxiv、Semantic Scholar 等做系统综述/合成检索，产出可追溯 markdown/PDF 结构。适用于系统综述、荟萃准备或全面检索；探索性「随便找几篇」请用 paper-lookup。只安装 skills/literature-review，勿整仓安装。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/literature-review 完整目录，包含其 SKILL.md、scripts、assets 与 references；不要安装整个仓库。"
+      "installHint": "只安装仓库中的 skills/literature-review 完整目录（SKILL.md、scripts、assets、references）；不要安装整个仓库。"
+    },
+    {
+      "id": "paper-lookup",
+      "name": "Paper Lookup",
+      "kind": "skill",
+      "stage": "文献检索",
+      "description": "K-Dense 学术文献检索（v2.2）：经 PubMed、Europe PMC、OpenAlex、Crossref、Semantic Scholar、arXiv/bioRxiv/medRxiv、Unpaywall 等约 18 个公开学术 API，做可复现的论文/DOI/PMID/预印本/开放获取与引用查询。适用于「找论文、查 DOI、要摘要/OA PDF、看谁引用了这篇」等定向检索；脚本仅用 Python 标准库，无强制凭据（可选 NCBI/S2/CORE/OpenAlex key 提高限额）。只安装 skills/paper-lookup；无法核验的结果标 uncertain，勿整仓安装。",
+      "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
+      "installHint": "只安装仓库中的 skills/paper-lookup 完整目录，包含其 SKILL.md、scripts、assets 与 references；不要安装整个仓库。优先用捆绑脚本调用 API；可选环境变量 NCBI_API_KEY、S2_API_KEY、CORE_API_KEY、OPENALEX_API_KEY 仅用于提高限额，不是硬性准入。"
     },
     {
       "id": "research-lookup",
       "name": "Research Lookup",
       "kind": "skill",
-      "stage": "文献检索",
-      "description": "K-Dense 研究检索技能：面向科研问题快速查找论文、事实与背景资料，并尽量带回可核验来源。适用于开题调研、补证某一 Claim、或在写作中需要定向查证的场景。只安装 skills/research-lookup 目录；无法核验的内容应标为 uncertain，勿整仓安装。",
+      "stage": "文稿证据包",
+      "description": "K-Dense 手稿证据编译（v1.5）：默认经 Parallel Search/Extract 汇编约 60 条可核验参考文献，产出 packet、evidence-matrix、claim-source-map 等结构化证据包。适用于已明确要为文稿系统搜集背景/对立证据的场景，而非轻量「查几篇论文」。需 parallel-cli（建议 parallel-web-tools[cli]==0.7.1）与 Parallel 鉴权（CLI login 或 PARALLEL_API_KEY）；可选 OPENROUTER_API_KEY 仅作显式 Perplexity 回退。日常检索请优先 paper-lookup；系统综述协议请用 literature-review。只安装 skills/research-lookup，勿整仓安装。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/research-lookup 完整目录，包含其 SKILL.md、scripts、assets 与 references；不要安装整个仓库。"
+      "installHint": "只安装仓库中的 skills/research-lookup 完整目录，包含其 SKILL.md、scripts、assets 与 references；不要安装整个仓库。启用前建议 `uv tool install \"parallel-web-tools[cli]==0.7.1\"` 并完成 `parallel-cli login`（或配置 PARALLEL_API_KEY）；不要在命令行参数中打印密钥。"
     },
     {
       "id": "scientific-writing",
       "name": "Scientific Writing",
       "kind": "skill",
       "stage": "科学写作",
-      "description": "K-Dense 科学写作技能：协助起草与修订 IMRaD 等科研文稿结构、段落逻辑与表述清晰度。适用于已有研究结果或证据材料、需要组织成可投稿草稿的场景。写作中的数值与引用须可回溯；只安装 skills/scientific-writing 目录，切勿默认安装整个 monorepo。",
+      "description": "K-Dense 科学写作（v2.1）：起草/修订/审计手稿或报告，强调证据 provenance、报告规范覆盖、作者责任、保密与本地一致性检查。适用于已有结果材料、需要可追溯成稿的场景；数值与引用须可回溯。只安装 skills/scientific-writing。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/scientific-writing 完整目录，包含其 SKILL.md、scripts、assets 与 references；不要安装整个仓库。"
+      "installHint": "只安装仓库中的 skills/scientific-writing 完整目录（SKILL.md、scripts、assets、references）；不要安装整个仓库。"
+    },
+    {
+      "id": "mne-analyst",
+      "name": "MNE Analyst",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "经 MNE-MCP 分析人类神经生理数据（EEG/MEG/sEEG/ECoG/fNIRS）：加载、预处理、ICA、epoch、ERP/频谱/时频/源定位等会话态流水线。通常与 mne-mcp 及 mne-mcp-guard 一并启用。只安装 skills/mne-analyst。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装 MNE-MCP 仓库中的 skills/mne-analyst 完整目录；建议同时启用 mne-mcp 与 mne-mcp-guard。"
+    },
+    {
+      "id": "mne-mcp-guard",
+      "name": "MNE MCP Guard",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "MNE-MCP 护栏：在 EEG/MEG/iEEG 流水线出错前拦截常见失败（单位、参考、滤波、坏道、会话态误用等），并在失败时辅助诊断。只安装 skills/mne-mcp-guard。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-mcp-guard 完整目录。"
+    },
+    {
+      "id": "mne-methodology-critic",
+      "name": "MNE Methodology Critic",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "对经 MNE 完成或拟定的 EEG/MEG/fNIRS 分析做怀疑性方法学审查：统计假设、多重比较、探索/确证边界与可解释过度。只安装 skills/mne-methodology-critic。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-methodology-critic 完整目录。"
+    },
+    {
+      "id": "mne-preprocess",
+      "name": "MNE Preprocess",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "MNE 预处理分册：滤波（FIR/IIR）、陷波、重采样、重参考、坏道与基础质检。只安装 skills/mne-preprocess。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-preprocess 完整目录。"
+    },
+    {
+      "id": "mne-artifacts",
+      "name": "MNE Artifacts",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "MNE 伪迹分册：ICA/SSP/autoreject 与眼电回归等，处理眼动、心电、肌电与线噪。只安装 skills/mne-artifacts。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-artifacts 完整目录。"
+    },
+    {
+      "id": "mne-erp",
+      "name": "MNE ERP",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "MNE ERP/ERF 分册：事件、epoch、条件平均、差分波、峰/平均波幅与潜伏期等。只安装 skills/mne-erp。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-erp 完整目录。"
+    },
+    {
+      "id": "mne-spectral",
+      "name": "MNE Spectral",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "MNE 频谱分册：Welch/多窗 PSD、频带功率、谱斜率与 1/f（specparam 等）。只安装 skills/mne-spectral。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-spectral 完整目录。"
+    },
+    {
+      "id": "mne-timefreq",
+      "name": "MNE Time-Frequency",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "MNE 时频分册：Morlet/多窗/Stockwell、ERSP、ITC、诱发 vs 诱导功率等。只安装 skills/mne-timefreq。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-timefreq 完整目录。"
+    },
+    {
+      "id": "mne-source",
+      "name": "MNE Source",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "MNE 源定位分册：噪声协方差、正向模型、最小范数/波束形成等源空间分析。只安装 skills/mne-source。",
+      "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
+      "installHint": "只安装仓库中的 skills/mne-source 完整目录。"
+    },
+    {
+      "id": "neurokit2",
+      "name": "NeuroKit2",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "K-Dense NeuroKit2（v1.2）：外周生理时序预处理、事件/间期、多模态对齐、变异性与复杂度工作流（钉选 NeuroKit2 0.2.13 思路）。适用于 ECG/PPG/HRV 等，而非 EEG/MEG 主流程；不可用于临床诊断。只安装 skills/neurokit2。",
+      "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
+      "installHint": "只安装仓库中的 skills/neurokit2 完整目录（SKILL.md、scripts、assets、references）；不要安装整个仓库。"
+    },
+    {
+      "id": "bids",
+      "name": "BIDS",
+      "kind": "skill",
+      "stage": "生理信号",
+      "description": "K-Dense BIDS（v1.1）：组织与核验脑影像/生理等 BIDS 数据集（MRI、EEG、MEG、iEEG、PET、NIRS、行为等）。适用于入库、共享与结构校验。只安装 skills/bids。",
+      "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
+      "installHint": "只安装仓库中的 skills/bids 完整目录（SKILL.md、scripts、assets、references）；不要安装整个仓库。"
     }
   ],
   "plugins": [
@@ -239,7 +361,7 @@
       "name": "K-Dense Scientific Agent Skills",
       "kind": "plugin",
       "stage": "科学技能库",
-      "description": "K-Dense scientific-agent-skills 是约 160+ 科研叶子技能的 monorepo Hub。PsyClaw 默认只推荐其中已策展的叶子条目（如 scientific-visualization、literature-review、research-lookup、scientific-writing），请按叶子 installHint 安装对应 skills/<id> 目录。不要默认安装整棵仓库；若确需整套 Plugin，须用户显式要求，并先阅读仓库 README 了解结构与许可。",
+      "description": "K-Dense scientific-agent-skills 是约 160+ 科研叶子技能的 monorepo Hub。PsyClaw 默认只推荐已策展叶子（scientific-visualization、paper-lookup、literature-review、research-lookup、scientific-writing、neurokit2、bids 等），请按叶子 installHint 安装 skills/<id>。不要默认安装整棵仓库；整套 Plugin 须用户显式要求。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
       "installHint": "警告：不要默认 git clone / 安装整个仓库。优先按 catalog 中各叶子条目的 installHint，只安装 skills/<id> 对应目录。仅当用户明确要求启用整套 K-Dense 套件时，才可按 Plugin 方式安装完整仓库，并先阅读 README。"
     }
@@ -299,7 +421,14 @@
       "skillName": "psytrainer-ml",
       "license": "MIT",
       "target": ".psyclaw/imports/recommended/psytrainer-ml",
-      "dependencies": ["Python 3.10+ (Windows: py launcher)", "scripts/install_runtime.py|.ps1|.cmd", "PsyTrainer wheel via --wheel or PSYTRAINER_WHEEL", "pandas", "numpy", "joblib"],
+      "dependencies": [
+        "Python 3.10+ (Windows: py launcher)",
+        "scripts/install_runtime.py|.ps1|.cmd",
+        "PsyTrainer wheel via --wheel or PSYTRAINER_WHEEL",
+        "pandas",
+        "numpy",
+        "joblib"
+      ],
       "status": "review-required",
       "requiresApproval": true,
       "blockedReason": "After clone, run install_runtime (py/ps1/cmd) with the PsyTrainer wheel at install time on the target OS; prediction still requires trusted local model.pkl paths."
