@@ -121,14 +121,54 @@ import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js
 import { openResearchWorkbench } from "../../panel/workbench.js";
 import {
   captureAgentError,
+  extractPiGeneration,
+  finishAgentSpan,
   initNodeObservability,
+  lastPiGeneration,
   readTelemetryPreference,
   shutdownObservability,
+  startAgentSpan,
   trackGateWaiting,
+  trackLlmGeneration,
   trackSkillInstall,
   withAgentSpan,
   writeTelemetryPreference,
+  type AgentSpanHandle,
+  type LlmGenerationInput,
 } from "../../observability/index.js";
+
+function ctxProviderModel(ctx: { model?: { provider?: string; id?: string } | undefined }): { provider?: string; model?: string } {
+  const provider = typeof ctx.model?.provider === "string" ? ctx.model.provider : undefined;
+  const model = typeof ctx.model?.id === "string" ? ctx.model.id : undefined;
+  return {
+    ...(provider === undefined ? {} : { provider }),
+    ...(model === undefined ? {} : { model }),
+  };
+}
+
+function piTurnSpanAttributes(extras: { provider?: string; model?: string } = {}): Record<string, string> {
+  return {
+    phase: "pi_turn",
+    ...(extras.provider ? { provider: extras.provider.slice(0, 80) } : {}),
+    ...(extras.model ? { model: extras.model.slice(0, 120) } : {}),
+  };
+}
+
+async function emitPiTurnGeneration(
+  generation: LlmGenerationInput | undefined,
+  extras: { latencyMs?: number; provider?: string; model?: string },
+): Promise<boolean> {
+  if (!generation) return false;
+  await trackLlmGeneration({
+    ...generation,
+    provider: generation.provider ?? extras.provider,
+    model: generation.model ?? extras.model,
+    ...(extras.latencyMs === undefined ? {} : { latencyMs: extras.latencyMs }),
+    surface: "cli",
+    spanName: "pi-turn",
+  });
+  return true;
+}
 
 /** Codex-style slash surface: bare command, or command + trailing free text. No subcommand trees. */
 function parseInitArgs(args: string): { goal?: string; paradigm?: ResearchParadigm } {
@@ -1347,6 +1387,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   let arsModeEditor: ArsModeEditor | undefined;
   let arsUiContext: { sessionManager: Parameters<typeof isArsPiActive>[0]; isIdle: () => boolean; hasUI: boolean; ui: { setStatus: (key: string, text: string | undefined) => void } } | undefined;
   let sessionMode: PsyClawSessionMode = "chat";
+  let turnStartedAt: number | undefined;
+  let llmTurnSpan: AgentSpanHandle | undefined;
+  let capturedTurnGeneration = false;
 
   const applySessionMode = (mode: PsyClawSessionMode, opts?: { syncSession?: boolean }) => {
     sessionMode = mode;
@@ -1394,8 +1437,48 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => {
+    finishAgentSpan(llmTurnSpan);
+    llmTurnSpan = undefined;
     runtimeMcps.close();
     void shutdownObservability();
+  });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("agent_start", () => {
+    capturedTurnGeneration = false;
+  });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("turn_start", async (event, ctx) => {
+    finishAgentSpan(llmTurnSpan);
+    turnStartedAt = typeof event.timestamp === "number" && Number.isFinite(event.timestamp)
+      ? event.timestamp
+      : Date.now();
+    llmTurnSpan = await startAgentSpan("cli.llm_call", piTurnSpanAttributes(ctxProviderModel(ctx)));
+  });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("turn_end", async (event, ctx) => {
+    const fallback = ctxProviderModel(ctx);
+    const generation = extractPiGeneration({ type: "message", message: event.message });
+    const latencyMs = turnStartedAt === undefined ? undefined : Math.max(0, Date.now() - turnStartedAt);
+    finishAgentSpan(llmTurnSpan, piTurnSpanAttributes({
+      provider: generation?.provider ?? fallback.provider,
+      model: generation?.model ?? fallback.model,
+    }));
+    llmTurnSpan = undefined;
+    if (await emitPiTurnGeneration(generation, { ...fallback, ...(latencyMs === undefined ? {} : { latencyMs }) })) {
+      capturedTurnGeneration = true;
+      turnStartedAt = undefined;
+    }
+  });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("agent_end", async (event, ctx) => {
+    const fallback = ctxProviderModel(ctx);
+    finishAgentSpan(llmTurnSpan, piTurnSpanAttributes(fallback));
+    llmTurnSpan = undefined;
+    const latencyMs = turnStartedAt === undefined ? undefined : Math.max(0, Date.now() - turnStartedAt);
+    turnStartedAt = undefined;
+    if (capturedTurnGeneration) {
+      capturedTurnGeneration = false;
+      return;
+    }
+    capturedTurnGeneration = false;
+    const generation = lastPiGeneration([event]);
+    await emitPiTurnGeneration(generation, { ...fallback, ...(latencyMs === undefined ? {} : { latencyMs }) });
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", async (event, ctx) => {
     if (!(await readActiveProject(ctx?.cwd ?? process.cwd()))) return;

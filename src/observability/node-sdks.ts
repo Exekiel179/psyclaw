@@ -18,12 +18,18 @@ import { isExpectedUserErrorMessage } from "./expected.js";
 import { createLangfuseHandle, readLangfuseConfig, type LangfuseHandle } from "./langfuse.js";
 import { posthogAiGenerationProperties, type LlmGenerationInput } from "./llm.js";
 
+export interface AgentSpanHandle {
+  setAttributes(attributes: Record<string, string>): void;
+  end(attributes?: Record<string, string>): void;
+}
+
 export interface ObservabilityHandle {
   readonly distinctId?: string;
   captureEvent(name: string, properties: Record<string, AgentEventPropertyValue>): void;
   captureError(error: unknown, context?: Record<string, string>): void;
   captureLlmGeneration?(input: LlmGenerationInput): void;
   runSpan?<T>(name: string, attributes: Record<string, string>, fn: () => Promise<T>): Promise<T>;
+  startSpan?(name: string, attributes: Record<string, string>): AgentSpanHandle | undefined;
   flush(): Promise<void>;
 }
 
@@ -160,6 +166,28 @@ export async function bootNodeSdks(config: NodeObservabilityConfig): Promise<Obs
       } catch (error) {
         if (!started) return fn();
         throw error;
+      }
+    },
+    startSpan(name, attributes) {
+      if (!sentry) return undefined;
+      try {
+        const span = sentry.startInactiveSpan({
+          name,
+          op: "psyclaw",
+          attributes,
+          forceTransaction: true,
+        });
+        return {
+          setAttributes(next) {
+            span.setAttributes(next);
+          },
+          end(next) {
+            if (next) span.setAttributes(next);
+            span.end();
+          },
+        };
+      } catch {
+        return undefined;
       }
     },
     async flush() {
