@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.8.5",
-  "syncedAt": "2026-09-14",
+  "documentVersion": "0.8.6",
+  "syncedAt": "2026-09-15",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
@@ -188,9 +188,9 @@
       "name": "PsyTrainer ML",
       "kind": "skill",
       "stage": "机器学习",
-      "description": "检查特征/标签 CSV，配置 PsyTrainer 分类或回归，训练防泄漏表格 Pipeline（支持 group/time 划分），预测并导出实测图与 Word 报告。须 runtime.json 中 ready:true；优先 scripts/pipeline_train.py。禁止用留出集结果选模型/特征。",
+      "description": "表格 CSV 分类/回归：折内预处理、9+12 算法比较、分组/时间划分、有界搜索与重采样，批量预测并导出诊断图与中英文 Word/Markdown 报告。入口 scripts/pipeline_train.py；runtime.json 的 ready 仅表示 .venv 已建，任务时按需补装依赖。禁止用留出/测试集结果选模型或特征。",
       "sourceRef": "https://github.com/Exekiel179/psytrainer-ml-skill",
-      "installHint": "克隆仓库到目标目录后，安装阶段用 scripts/install_runtime（macOS/Linux: `python3 scripts/install_runtime.py --wheel <PsyTrainer.whl>`；Windows: install_runtime.cmd/ps1）创建 .venv 并写 runtime.json；任务中禁止再 pip install。保留 vendor/；不要嵌套进 psyclaw 源码树。"
+      "installHint": "优先从 Releases 下载 psytrainer-ml-skill.zip，解压为完整 psytrainer-ml/（含 SKILL.md）。PsyClaw 用户目录：~/.psyclaw/skills/psytrainer-ml；或项目 .psyclaw/imports/recommended/psytrainer-ml。需 CPython 3.12–3.14。在 Skill 根目录运行 python3 scripts/install_runtime.py（Windows: install_runtime.ps1）只建 .venv；勿预装全部算法库、勿跑样例训练。调用：/skill:psytrainer-ml。"
     },
     {
       "id": "literature-review",
@@ -416,22 +416,20 @@
       "id": "psytrainer-ml",
       "sourceKind": "github",
       "sourceUrl": "https://github.com/Exekiel179/psytrainer-ml-skill.git",
-      "ref": "16afe7ad5cf6fcd6d0fe259c4ee1fc10c0cce388",
+      "ref": "11dd5dfa42ad6b9ce6f6b0eb7076704dcb2b55cc",
       "skillPath": ".",
       "skillName": "psytrainer-ml",
       "license": "MIT",
       "target": ".psyclaw/imports/recommended/psytrainer-ml",
       "dependencies": [
-        "Python 3.10+ (Windows: py launcher)",
-        "scripts/install_runtime.py|.ps1|.cmd",
-        "PsyTrainer wheel via --wheel or PSYTRAINER_WHEEL",
-        "pandas",
-        "numpy",
-        "joblib"
+        "CPython 3.12-3.14 (Windows: py launcher)",
+        "scripts/install_runtime.py|.ps1",
+        "Release ZIP preferred over full git clone for end users",
+        "Task-time package install via install_runtime --packages when missing"
       ],
       "status": "review-required",
       "requiresApproval": true,
-      "blockedReason": "After clone, run install_runtime (py/ps1/cmd) with the PsyTrainer wheel at install time on the target OS; prediction still requires trusted local model.pkl paths."
+      "blockedReason": "After place/clone, run install_runtime once to create .venv; optional ML packages install on first task. Prefer Release ZIP. Prediction requires trusted local pipeline.joblib/model paths."
     }
   ]
 }
