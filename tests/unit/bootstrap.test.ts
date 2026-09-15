@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { ExpectedUserError } from "../../src/observability/expected.js";
 import { bootstrapProject, writeHandoff, hasCanonicalWorkspace, ensureProjectBinding } from "../../src/project/bootstrap.js";
-import { assertSafeProjectPath, projectPaths } from "../../src/project/paths.js";
+import {
+  assertSafeProjectPath,
+  ensureProjectDirectories,
+  isUnsuitableProjectRoot,
+  projectPaths,
+} from "../../src/project/paths.js";
 
 async function tempProject(): Promise<string> {
   return mkdtemp(join(tmpdir(), "psyclaw-test-"));
@@ -62,5 +68,40 @@ describe("project bootstrap 0.29", () => {
     const rebound = await ensureProjectBinding({ root });
     expect(rebound.project.id).toBe(first.id);
     expect(rebound.created).toBe(false);
+  });
+
+  it("treats Windows System32 and Program Files as unsuitable project roots", () => {
+    expect(isUnsuitableProjectRoot("C:\\Windows\\System32", { platform: "win32" })).toBe(true);
+    expect(isUnsuitableProjectRoot("C:/Windows/SysWOW64", { platform: "linux" })).toBe(true);
+    expect(isUnsuitableProjectRoot("C:\\Program Files\\Git", { platform: "win32" })).toBe(true);
+    expect(isUnsuitableProjectRoot("C:\\Users\\researcher\\study", { platform: "win32" })).toBe(false);
+    expect(isUnsuitableProjectRoot("/etc", { platform: "linux" })).toBe(true);
+    expect(isUnsuitableProjectRoot(resolve("C:\\Windows\\System32"))).toBe(true);
+  });
+
+  it("refuses to mkdir project dirs under System32 before Node EPERM", async () => {
+    const root = "C:\\Windows\\System32";
+    await expect(ensureProjectDirectories(root)).rejects.toSatisfy((error: unknown) => {
+      return error instanceof ExpectedUserError
+        && error.message.includes("无法在当前工作目录创建项目文件")
+        && (error as NodeJS.ErrnoException).code === "EPERM"
+        && String((error as NodeJS.ErrnoException).path ?? "").replaceAll("\\", "/").includes(".psyclaw");
+    });
+    await expect(bootstrapProject({ root, goal: "不应建仓" })).rejects.toBeInstanceOf(ExpectedUserError);
+    expect(existsSync(resolve(root, ".psyclaw"))).toBe(false);
+  });
+
+  it("refuses an unwritable project root with a Chinese path error", async () => {
+    if (typeof process.getuid === "function" && process.getuid() === 0) return;
+    const root = await tempProject();
+    await chmod(root, 0o555);
+    try {
+      await expect(ensureProjectDirectories(root)).rejects.toSatisfy((error: unknown) => {
+        return error instanceof ExpectedUserError && error.message.includes("无法在当前工作目录创建项目文件");
+      });
+      expect(existsSync(join(root, ".psyclaw"))).toBe(false);
+    } finally {
+      await chmod(root, 0o755);
+    }
   });
 });

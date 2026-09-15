@@ -32,7 +32,12 @@ import { readPublishedVersions } from "../workflows/publish.js";
 export { verifyDoi } from "../core/doi.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
 import { sessionHelpDocument } from "../session/help.js";
-import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
+import {
+  readRecommendationState,
+  recommendedSkillTarget,
+  saveRecommendationState,
+  type RecommendedSkillScope,
+} from "../skills/recommended.js";
 import {
   readUserSkillState,
   scanLocalSkills,
@@ -44,21 +49,6 @@ import { readActiveAnalysisPlan } from "../analysis/plan.js";
 import { browserConfigForPreference, injectBrowserObservabilityConfig } from "../observability/config.js";
 import { readTelemetryPreference, telemetryPreferenceOptions, writeTelemetryPreference } from "../observability/preference.js";
 
-interface RecommendationState { schemaVersion: "psyclaw/recommendation-state/v1"; skills: string[]; mcp: string[]; skillScopes?: Record<string, RecommendedSkillScope>; }
-
-async function readRecommendationState(root: string): Promise<RecommendationState> {
-  try {
-    const value = JSON.parse(await readFile(join(root, ".psyclaw", "recommendations.json"), "utf8")) as Partial<RecommendationState>;
-    const skillScopes = value.skillScopes && typeof value.skillScopes === "object"
-      ? Object.fromEntries(Object.entries(value.skillScopes).filter((entry): entry is [string, RecommendedSkillScope] => entry[1] === "project" || entry[1] === "user"))
-      : undefined;
-    return { schemaVersion: "psyclaw/recommendation-state/v1", skills: Array.isArray(value.skills) ? value.skills.filter((id): id is string => typeof id === "string") : [], mcp: Array.isArray(value.mcp) ? value.mcp.filter((id): id is string => typeof id === "string") : [], ...(skillScopes === undefined ? {} : { skillScopes }) };
-  } catch { return { schemaVersion: "psyclaw/recommendation-state/v1", skills: [], mcp: [] }; }
-}
-
-async function writeRecommendationState(root: string, state: RecommendationState): Promise<void> {
-  await atomicWriteFile(await assertSafeProjectPath(root, ".psyclaw/recommendations.json"), `${JSON.stringify({ ...state, skills: [...new Set(state.skills)].sort(), mcp: [...new Set(state.mcp)].sort() }, null, 2)}\n`);
-}
 
 /** Bundled capabilities, listed separately from the downloadable ecosystem. */
 const CORE_SKILLS = [
@@ -1445,7 +1435,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           const state = await readRecommendationState(root);
           state.skills = [...new Set([...state.skills, id])];
           state.skillScopes = { ...(state.skillScopes ?? {}), [id]: scope };
-          await writeRecommendationState(root, state);
+          await saveRecommendationState(root, state);
           response.writeHead(202, { "content-type": "application/json" });
           response.end(JSON.stringify({
             schemaVersion: "psyclaw/model-install-task/v1",
@@ -1469,7 +1459,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           await options.installMcp(panelMcpInstallTask(root, found.item, found.prep));
           const state = await readRecommendationState(root);
           state.mcp = [...new Set([...state.mcp, id])];
-          await writeRecommendationState(root, state);
+          await saveRecommendationState(root, state);
           response.writeHead(202, { "content-type": "application/json" });
           response.end(JSON.stringify({
             schemaVersion: "psyclaw/model-install-task/v1",
@@ -1549,7 +1539,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         const values = new Set(state[kind]);
         if (body.enabled) values.add(id); else values.delete(id);
         state[kind] = [...values];
-        await writeRecommendationState(root, state);
+        await saveRecommendationState(root, state);
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ schemaVersion: "psyclaw/recommendation-state-receipt/v1", ok: true, state }));
         return;
