@@ -33,6 +33,15 @@ function windowsProtectedPrefix(pathValue: string): boolean {
   );
 }
 
+/** Catch `.../C:/Windows/...` after a non-Windows `path.resolve`. */
+function hasWindowsProtectedNeedle(pathValue: string): boolean {
+  const n = posixify(pathValue).toLowerCase();
+  return (
+    /(?:^|\/)[a-z]:\/windows(?:\/|$)/.test(n) ||
+    /(?:^|\/)[a-z]:\/program files(?: \(x86\))?(?:\/|$)/.test(n)
+  );
+}
+
 function envProtectedRoots(env: NodeJS.ProcessEnv): string[] {
   return [
     env.WINDIR,
@@ -60,7 +69,9 @@ export function isUnsuitableProjectRoot(
     windowsProtectedPrefix(original) ||
     windowsProtectedPrefix(withoutDrive(original)) ||
     windowsProtectedPrefix(resolved) ||
-    windowsProtectedPrefix(withoutDrive(resolved))
+    windowsProtectedPrefix(withoutDrive(resolved)) ||
+    hasWindowsProtectedNeedle(original) ||
+    hasWindowsProtectedNeedle(resolved)
   ) {
     return true;
   }

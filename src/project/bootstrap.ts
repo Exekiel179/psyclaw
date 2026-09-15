@@ -6,7 +6,7 @@ import type { Handoff, ResearchParadigm, ResearchProject } from "../core/contrac
 import { CONTRACT_VERSION } from "../core/contracts.js";
 import { asHandoff, asProject } from "../core/schemas.js";
 import { atomicWriteFile } from "./jsonl.js";
-import { projectPaths, ensureProjectDirectories, assertSafeProjectPath } from "./paths.js";
+import { projectPaths, ensureProjectDirectories, assertSafeProjectPath, assertProjectRootUsable } from "./paths.js";
 import { scaffoldWorkspace } from "./workspace.js";
 import { readProject } from "../research/ledger.js";
 
@@ -107,6 +107,7 @@ export async function ensureProjectBinding(options: BootstrapOptions): Promise<{
  * If the canonical layout already exists, rebinds project.json instead of failing.
  */
 export async function bootstrapProject(options: BootstrapOptions): Promise<ResearchProject> {
+  await assertProjectRootUsable(options.root);
   const paths = projectPaths(options.root);
   const now = options.now ?? new Date().toISOString();
   const goal = (options.goal?.trim() || "未命名研究项目");

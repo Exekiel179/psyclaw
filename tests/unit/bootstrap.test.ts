@@ -76,6 +76,7 @@ describe("project bootstrap 0.29", () => {
     expect(isUnsuitableProjectRoot("C:\\Program Files\\Git", { platform: "win32" })).toBe(true);
     expect(isUnsuitableProjectRoot("C:\\Users\\researcher\\study", { platform: "win32" })).toBe(false);
     expect(isUnsuitableProjectRoot("/etc", { platform: "linux" })).toBe(true);
+    expect(isUnsuitableProjectRoot(resolve("C:\\Windows\\System32"))).toBe(true);
   });
 
   it("refuses to mkdir project dirs under System32 before Node EPERM", async () => {
