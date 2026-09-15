@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.8.6",
+  "documentVersion": "0.8.7",
   "syncedAt": "2026-09-15",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
@@ -235,7 +235,7 @@
       "stage": "生理信号",
       "description": "经 MNE-MCP 分析人类神经生理数据（EEG/MEG/sEEG/ECoG/fNIRS）：加载、预处理、ICA、epoch、ERP/频谱/时频/源定位等会话态流水线。通常与 mne-mcp 及 mne-mcp-guard 一并启用。只安装 skills/mne-analyst。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装 MNE-MCP 仓库中的 skills/mne-analyst 完整目录；建议同时启用 mne-mcp 与 mne-mcp-guard。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-analyst）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-analyst 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-mcp-guard",
@@ -244,7 +244,7 @@
       "stage": "生理信号",
       "description": "MNE-MCP 护栏：在 EEG/MEG/iEEG 流水线出错前拦截常见失败（单位、参考、滤波、坏道、会话态误用等），并在失败时辅助诊断。只安装 skills/mne-mcp-guard。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-mcp-guard 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-mcp-guard）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-mcp-guard 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-methodology-critic",
@@ -253,7 +253,7 @@
       "stage": "生理信号",
       "description": "对经 MNE 完成或拟定的 EEG/MEG/fNIRS 分析做怀疑性方法学审查：统计假设、多重比较、探索/确证边界与可解释过度。只安装 skills/mne-methodology-critic。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-methodology-critic 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-methodology-critic）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-methodology-critic 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-preprocess",
@@ -262,7 +262,7 @@
       "stage": "生理信号",
       "description": "MNE 预处理分册：滤波（FIR/IIR）、陷波、重采样、重参考、坏道与基础质检。只安装 skills/mne-preprocess。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-preprocess 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-preprocess）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-preprocess 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-artifacts",
@@ -271,7 +271,7 @@
       "stage": "生理信号",
       "description": "MNE 伪迹分册：ICA/SSP/autoreject 与眼电回归等，处理眼动、心电、肌电与线噪。只安装 skills/mne-artifacts。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-artifacts 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-artifacts）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-artifacts 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-erp",
@@ -280,7 +280,7 @@
       "stage": "生理信号",
       "description": "MNE ERP/ERF 分册：事件、epoch、条件平均、差分波、峰/平均波幅与潜伏期等。只安装 skills/mne-erp。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-erp 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-erp）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-erp 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-spectral",
@@ -289,7 +289,7 @@
       "stage": "生理信号",
       "description": "MNE 频谱分册：Welch/多窗 PSD、频带功率、谱斜率与 1/f（specparam 等）。只安装 skills/mne-spectral。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-spectral 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-spectral）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-spectral 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-timefreq",
@@ -298,7 +298,7 @@
       "stage": "生理信号",
       "description": "MNE 时频分册：Morlet/多窗/Stockwell、ERSP、ITC、诱发 vs 诱导功率等。只安装 skills/mne-timefreq。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-timefreq 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-timefreq）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-timefreq 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "mne-source",
@@ -307,7 +307,7 @@
       "stage": "生理信号",
       "description": "MNE 源定位分册：噪声协方差、正向模型、最小范数/波束形成等源空间分析。只安装 skills/mne-source。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-source 完整目录。"
+      "installHint": "推荐：在已有 MNE 的 Python 3.12+ 环境执行 `python -m pip install --upgrade mne-mcp==0.4.1` 后 `python -m mne_mcp.cli setup --clients psyclaw`（注册 ~/.psyclaw/mcp/mne.json 并安装全套随包技能含 mne-source）。若只要单技能：从 https://github.com/Exekiel179/MNE-MCP 的 skills/mne-source 完整目录安装，并同时启用 mne-mcp。"
     },
     {
       "id": "neurokit2",
