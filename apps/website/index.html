@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="PsyClaw：面向社会科学研究的证据驱动科研智能体。严密证据账本、本地沙盒与可复现工作流。">
-  <title>PsyClaw / 社会科学科研智能体工作台</title>
+  <meta name="description" content="PsyClaw：面向社会科学研究的证据驱动科研工作台。chat / analysis / academic 三种模式，证据账本与可复现委托。">
+  <title>PsyClaw</title>
   <meta name="psyclaw-sentry-dsn" content="">
   <meta name="psyclaw-posthog-key" content="">
   <meta name="psyclaw-posthog-host" content="">
@@ -12,2045 +12,698 @@
   <script src="../shared/observability.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,650;0,9..144,750;0,9..144,800;1,9..144,600&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Serif+SC:wght@600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    /* ==============================================================
-       1. Top-Tier Aesthetic Design Tokens (Obsidian Dark / Ivory Light / Aurora)
-       ============================================================== */
-    :root, [data-theme="dark"] {
-      color-scheme: dark;
-      --bg: #07090e;
-      --bg-card: rgba(15, 20, 31, 0.85);
-      --bg-card-solid: #0f141f;
-      --bg-inner: #0a0e17;
-      --bg-code: #05070b;
-      --line: rgba(255, 255, 255, 0.08);
-      --line-subtle: rgba(255, 255, 255, 0.04);
-      --line-accent: #2dd4bf;
-
-      --ink: #f1f5f9;
-      --ink-muted: #94a3b8;
-      --ink-faint: #64748b;
-
-      --accent: #2dd4bf;
-      --accent-glow: rgba(45, 212, 191, 0.3);
-      --accent-ink: #5eead4;
-      --accent-bg: rgba(45, 212, 191, 0.12);
-
-      --ok: #34d399;
-      --ok-ink: #10b981;
-      --warn: #fbbf24;
-      --warn-ink: #f59e0b;
-      --crit: #f43f5e;
-
-      --grad-hero: radial-gradient(60rem 40rem at 50% -10%, rgba(45, 212, 191, 0.18), rgba(99, 102, 241, 0.1) 40%, transparent 75%);
-      --grad-ambient: radial-gradient(40rem 30rem at 90% 40%, rgba(168, 85, 247, 0.1), transparent 70%);
-
-      --glass-blur: 24px;
-      --subpixel-border: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 32px rgba(0, 0, 0, 0.36);
-    }
-
-    [data-theme="light"] {
+    :root {
       color-scheme: light;
-      --bg: #fbfbfc;
-      --bg-card: rgba(255, 255, 255, 0.92);
-      --bg-card-solid: #ffffff;
-      --bg-inner: #f3f4f8;
-      --bg-code: #0b0f19;
-      --line: #e2e8f0;
-      --line-subtle: #edf2f7;
-      --line-accent: #0d9488;
-
-      --ink: #090d16;
-      --ink-muted: #475569;
-      --ink-faint: #94a3b8;
-
-      --accent: #0d9488;
-      --accent-glow: rgba(13, 148, 136, 0.22);
-      --accent-ink: #0f766e;
-      --accent-bg: rgba(13, 148, 136, 0.08);
-
-      --ok: #16a34a;
-      --ok-ink: #15803d;
-      --warn: #d97706;
-      --warn-ink: #b45309;
-      --crit: #e11d48;
-
-      --grad-hero: radial-gradient(60rem 40rem at 50% -10%, rgba(13, 148, 136, 0.14), rgba(59, 130, 246, 0.08) 40%, transparent 75%);
-      --grad-ambient: radial-gradient(40rem 30rem at 90% 40%, rgba(147, 51, 234, 0.06), transparent 70%);
-
-      --glass-blur: 20px;
-      --subpixel-border: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 8px 24px rgba(0, 0, 0, 0.04);
-    }
-
-    [data-theme="aurora"] {
-      color-scheme: dark;
-      --bg: #090616;
-      --bg-card: rgba(20, 16, 40, 0.85);
-      --bg-card-solid: #15112e;
-      --bg-inner: #0e0a22;
-      --bg-code: #06040f;
-      --line: rgba(168, 85, 247, 0.22);
-      --line-subtle: rgba(168, 85, 247, 0.1);
-      --line-accent: #c084fc;
-
-      --ink: #fdf4ff;
-      --ink-muted: #c084fc;
-      --ink-faint: #818cf8;
-
-      --accent: #e879f9;
-      --accent-glow: rgba(232, 121, 249, 0.4);
-      --accent-ink: #f0abfc;
-      --accent-bg: rgba(232, 121, 249, 0.18);
-
-      --ok: #34d399;
-      --ok-ink: #10b981;
-      --warn: #fbbf24;
-      --warn-ink: #f59e0b;
-      --crit: #fb7185;
-
-      --grad-hero: radial-gradient(60rem 40rem at 50% -10%, rgba(232, 121, 249, 0.22), rgba(129, 140, 248, 0.18) 40%, transparent 75%);
-      --grad-ambient: radial-gradient(40rem 30rem at 90% 40%, rgba(45, 212, 191, 0.15), transparent 70%);
-
-      --glass-blur: 24px;
-      --subpixel-border: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 8px 32px rgba(120, 20, 180, 0.3);
+      --bg: #e9eef2;
+      --bg-deep: #dfe6ec;
+      --ink: #0c1222;
+      --ink-soft: #3d4a5c;
+      --ink-faint: #6b7a8d;
+      --line: rgba(12, 18, 34, 0.12);
+      --accent: #1a5f56;
+      --accent-soft: #2a7a6f;
+      --paper: #f7f9fb;
+      --hero-veil: linear-gradient(105deg, rgba(12, 18, 34, 0.78) 0%, rgba(12, 18, 34, 0.42) 48%, rgba(12, 18, 34, 0.18) 100%);
+      --font-display: "Instrument Serif", "Songti SC", Georgia, serif;
+      --font-body: "Source Sans 3", "PingFang SC", "Noto Sans SC", sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+      --max: 1120px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    /* Full-Page Lock & Snap Scrolling */
-    html, body {
-      height: 100%;
-      overflow: hidden; /* Controlled by One-Wheel Slide Engine */
-      background-color: var(--bg);
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
       color: var(--ink);
-      font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: var(--font-body);
+      font-size: 1.05rem;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
-      transition: background-color 0.3s ease, color 0.3s ease;
     }
-
-    /* Ambient Glow Layer */
-    .ambient-glow-layer {
-      position: fixed;
-      inset: 0;
-      background-image: var(--grad-hero), var(--grad-ambient);
-      pointer-events: none;
-      z-index: 0;
-    }
-
     a { color: inherit; text-decoration: none; }
-    .shell { width: min(1200px, calc(100% - 48px)); margin: 0 auto; position: relative; z-index: 2; height: 100%; }
-    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+    img { display: block; max-width: 100%; }
 
-    /* Custom Scrollbars */
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: var(--bg-inner); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-    /* Full Page Main Slider Container */
-    #fullpage-slider {
-      height: 100vh;
-      width: 100%;
-      position: relative;
-      transition: transform 0.75s cubic-bezier(0.25, 1, 0.3, 1);
-      will-change: transform;
+    .shell {
+      width: min(var(--max), calc(100% - 2.5rem));
+      margin-inline: auto;
     }
 
-    .page-slide {
-      height: 100vh;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      padding: 4.5rem 0 1.5rem;
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-
-    /* Fixed Side Navigation Paging Dots */
-    .side-page-nav {
-      position: fixed;
-      right: 24px;
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 95;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .side-nav-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
-      border: 1px solid var(--line);
-      cursor: pointer;
-      transition: all 0.25s ease;
-      position: relative;
-    }
-    .side-nav-dot:hover {
-      background: var(--accent);
-      transform: scale(1.3);
-    }
-    .side-nav-dot.active {
-      background: var(--accent);
-      box-shadow: 0 0 14px var(--accent);
-      transform: scale(1.4);
-    }
-    .side-nav-tooltip {
+    /* —— Nav —— */
+    .topbar {
       position: absolute;
-      right: 22px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: var(--bg-card-solid);
-      border: 1px solid var(--line);
-      padding: 0.25rem 0.65rem;
-      border-radius: 4px;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.72rem;
-      color: var(--accent-ink);
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
+      inset: 0 0 auto;
+      z-index: 20;
+      padding: 1.25rem 0;
     }
-    .side-nav-dot:hover .side-nav-tooltip { opacity: 1; }
-
-    /* ==============================================================
-       2. Corner Bracket Frame System
-       ============================================================== */
-    .figure-frame {
-      position: relative;
-      background: var(--bg-card);
-      backdrop-filter: blur(var(--glass-blur));
-      -webkit-backdrop-filter: blur(var(--glass-blur));
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      box-shadow: var(--subpixel-border);
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .figure-corner {
-      position: absolute;
-      width: 9px;
-      height: 9px;
-      border-color: var(--accent);
-      border-style: solid;
-      pointer-events: none;
-      z-index: 4;
-    }
-    .figure-corner--tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
-    .figure-corner--tr { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
-    .figure-corner--bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
-    .figure-corner--br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
-
-    .figure-caption {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.65rem 1.2rem;
-      background: var(--bg-inner);
-      border-top: 1px solid var(--line);
-      border-bottom-left-radius: inherit;
-      border-bottom-right-radius: inherit;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.76rem;
-      color: var(--ink-muted);
-    }
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--ok);
-      display: inline-block;
-      box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
-      animation: pulseLive 2s infinite ease-in-out;
-    }
-    @keyframes pulseLive {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
-
-    /* ==============================================================
-       3. Header & Navigation (Theme Switcher + Glass Bar)
-       ============================================================== */
-    header {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      background: rgba(7, 9, 14, 0.82);
-      border-bottom: 1px solid var(--line);
-      padding: 0.75rem 0;
-      transition: background 0.3s ease;
-    }
-    [data-theme="light"] header { background: rgba(251, 251, 252, 0.9); }
-    [data-theme="aurora"] header { background: rgba(9, 6, 22, 0.85); }
-
-    .nav {
+    .topbar-inner {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1.5rem;
+      gap: 1rem;
     }
     .brand {
+      font-family: var(--font-display);
+      font-size: 1.55rem;
+      letter-spacing: -0.02em;
+      color: #f4f7fa;
+    }
+    .top-links {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      font-weight: 800;
-      cursor: pointer;
-    }
-    .brand-mark {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      background: linear-gradient(135deg, #2dd4bf, #818cf8);
-      color: #07090e;
-      display: grid;
-      place-items: center;
-      font-weight: 800;
-      font-size: 1.25rem;
-      font-family: "Fraunces", Georgia, serif;
-      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 4px 14px var(--accent-glow);
-    }
-    .brand:hover .brand-mark { transform: rotate(-8deg) scale(1.08); }
-    .brand-text {
-      font-size: 1.2rem;
-      letter-spacing: -0.03em;
-      color: var(--ink);
-      font-weight: 800;
-    }
-    .brand-badge {
-      font-size: 0.68rem;
-      font-family: "JetBrains Mono", monospace;
-      background: var(--accent-bg);
-      color: var(--accent-ink);
-      border: 1px solid var(--accent-glow);
-      padding: 0.15rem 0.5rem;
-      border-radius: 9999px;
-      font-weight: 700;
-    }
-    .nav-links {
-      display: flex;
-      gap: 1.8rem;
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: var(--ink-muted);
-    }
-    .nav-links a {
-      transition: color 0.15s ease;
-      cursor: pointer;
-    }
-    .nav-links a:hover, .nav-links a.active { color: var(--accent-ink); }
-
-    .nav-right-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    /* Theme Switcher Capsule */
-    .theme-switcher {
-      display: flex;
-      background: var(--bg-inner);
-      border: 1px solid var(--line);
-      border-radius: 9999px;
-      padding: 3px;
-      gap: 2px;
-    }
-    .theme-btn {
-      background: transparent;
-      border: none;
-      padding: 4px 10px;
-      border-radius: 9999px;
-      color: var(--ink-muted);
-      font-size: 0.75rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-family: "JetBrains Mono", monospace;
-    }
-    .theme-btn.active {
-      background: var(--bg-card-solid);
-      color: var(--accent-ink);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-
-    /* ==============================================================
-       4. Hero Section Typography (Restored Clean Impact Title)
-       ============================================================== */
-    @keyframes auroraFlow {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    .hero-kicker {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.8rem;
-      color: var(--accent-ink);
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      margin-bottom: 1.2rem;
-      background: var(--accent-bg);
-      border: 1px solid var(--accent-glow);
-      padding: 0.3rem 0.9rem;
-      border-radius: 999px;
-      box-shadow: 0 0 16px var(--accent-glow);
-    }
-
-    .hero-title {
-      font-family: "Fraunces", "Noto Serif SC", Georgia, serif;
-      font-size: clamp(2.4rem, 4.8vw, 4.2rem);
-      line-height: 1.18;
-      font-weight: 750;
-      letter-spacing: -0.035em;
-      color: var(--ink);
-      margin-bottom: 1.2rem;
-      max-width: 980px;
-      text-align: center;
-    }
-    .hero-title-main {
-      display: inline-block;
-      background: linear-gradient(135deg, var(--ink) 0%, var(--accent-ink) 50%, var(--ink) 100%);
-      background-size: 250% auto;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: auroraFlow 7s ease infinite;
-    }
-    .hero-subtitle-accent {
-      display: inline-block;
-      font-style: italic;
-      background: linear-gradient(135deg, #38bdf8, #818cf8 35%, #ec4899 70%, #2dd4bf 100%);
-      background-size: 300% 300%;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      animation: auroraFlow 5s ease infinite;
-      filter: drop-shadow(0 0 24px rgba(45, 212, 191, 0.3));
-    }
-
-    .hero-orient {
-      color: var(--ink-muted);
-      font-size: 1.08rem;
-      line-height: 1.65;
-      max-width: 760px;
-      text-align: center;
-      margin-bottom: 1.4rem;
-    }
-
-    /* Live Trust Metrics Ticker Bar */
-    .hero-trust-ticker {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 1.4rem;
-      margin-bottom: 1.6rem;
-      padding: 0.65rem 1.4rem;
-      background: var(--bg-card);
-      border: 1px solid var(--line);
-      border-radius: 9999px;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.76rem;
-      color: var(--ink-muted);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-    }
-    .ticker-item {
-      display: flex;
-      align-items: center;
-      gap: 0.45rem;
-    }
-    .ticker-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
-    }
-    .ticker-val {
-      color: var(--accent-ink);
-      font-weight: 750;
-    }
-
-    /* Prominent Installation Stage */
-    .hero-install-stage {
-      width: min(680px, 100%);
-      background: var(--bg-card);
-      border: 1.5px solid var(--accent);
-      border-radius: 14px;
-      box-shadow: 0 0 32px var(--accent-glow), var(--subpixel-border);
-      overflow: hidden;
-      text-align: left;
-      margin-bottom: 1.2rem;
-    }
-    .install-stage-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.55rem 1.1rem;
-      background: var(--bg-inner);
-      border-bottom: 1px solid var(--line);
-    }
-    .install-tabs-pills {
-      display: flex;
-      gap: 4px;
-    }
-    .install-pill-btn {
-      background: transparent;
-      border: none;
-      color: var(--ink-muted);
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.78rem;
-      font-weight: 700;
-      padding: 0.25rem 0.75rem;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .install-pill-btn.active {
-      background: var(--accent-bg);
-      color: var(--accent-ink);
-      border: 1px solid var(--accent-glow);
-    }
-    .install-cmd-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.95rem 1.3rem;
-      background: var(--bg-code);
-      font-family: "JetBrains Mono", monospace;
+      gap: 1.25rem;
       font-size: 0.92rem;
+      font-weight: 500;
+      color: rgba(244, 247, 250, 0.78);
     }
-    .shell-cmd-text {
-      color: #f1f5f9;
-      word-break: break-all;
+    .top-links a:hover { color: #fff; }
+    .top-cta {
+      border: 1px solid rgba(244, 247, 250, 0.35);
+      padding: 0.45rem 0.9rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+      color: #f4f7fa;
+      transition: background 0.2s ease, border-color 0.2s ease;
     }
-    .shell-cmd-text span.prefix {
-      color: var(--accent-ink);
-      margin-right: 0.5rem;
-      font-weight: 750;
-    }
-    .copy-hero-btn {
-      background: linear-gradient(135deg, #2dd4bf, #0d9488);
-      border: none;
-      color: #07090e;
-      padding: 0.48rem 1.1rem;
-      border-radius: 8px;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.8rem;
-      font-weight: 800;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 14px var(--accent-glow);
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-    .copy-hero-btn:hover {
-      transform: translateY(-1.5px);
-      box-shadow: 0 6px 20px var(--accent-glow);
+    .top-cta:hover {
+      background: rgba(244, 247, 250, 0.1);
+      border-color: rgba(244, 247, 250, 0.7);
     }
 
-    .scroll-down-indicator {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.2rem;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.7rem;
-      color: var(--ink-faint);
-      cursor: pointer;
-      animation: bounceFloat 2s infinite ease-in-out;
-    }
-    @keyframes bounceFloat {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(5px); }
-    }
-
-    /* ==============================================================
-       5. Section Layouts (Centered & Fit in 100vh)
-       ============================================================== */
-    .section-header-compact {
-      text-align: center;
-      max-width: 760px;
-      margin: 0 auto 1.4rem;
-    }
-    .section-tag {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: var(--accent-ink);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 0.3rem;
-    }
-    .section-title {
-      font-family: "Fraunces", Georgia, serif;
-      font-size: clamp(1.8rem, 3.2vw, 2.4rem);
-      font-weight: 750;
-      letter-spacing: -0.03em;
-      color: var(--ink);
-      margin-bottom: 0.5rem;
-    }
-    .section-desc {
-      color: var(--ink-muted);
-      font-size: 0.95rem;
-      line-height: 1.55;
-    }
-
-    /* Terminal Window */
-    .terminal-container {
-      width: min(920px, 100%);
-      margin: 0 auto;
-    }
-    .terminal-top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.6rem 1.1rem;
-      background: #0d121c;
-      border-bottom: 1px solid var(--line);
-      border-top-left-radius: 12px;
-      border-top-right-radius: 12px;
-      flex-wrap: wrap;
-      gap: 0.6rem;
-    }
-    .term-dots {
-      display: flex;
-      gap: 6px;
-    }
-    .term-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-    .term-dot.red { background: #f43f5e; }
-    .term-dot.yellow { background: #fbbf24; }
-    .term-dot.green { background: #34d399; }
-
-    .term-scenario-tabs {
-      display: flex;
-      gap: 4px;
-      background: rgba(255, 255, 255, 0.04);
-      padding: 3px;
-      border-radius: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .term-tab-btn {
-      background: transparent;
-      border: none;
-      color: #94a3b8;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.72rem;
-      padding: 0.22rem 0.6rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .term-tab-btn.active {
-      background: rgba(45, 212, 191, 0.2);
-      color: #5eead4;
-      font-weight: 700;
-    }
-
-    .term-actions-right {
-      display: flex;
-      gap: 0.5rem;
-    }
-    .term-action-btn {
-      background: var(--accent-bg);
-      border: 1px solid var(--accent-glow);
-      color: #5eead4;
-      font-size: 0.74rem;
-      font-family: "JetBrains Mono", monospace;
-      font-weight: 700;
-      padding: 0.25rem 0.75rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .term-action-btn:hover {
-      background: var(--accent);
-      color: #07090e;
-      box-shadow: 0 0 12px var(--accent-glow);
-    }
-
-    .terminal-body {
-      background: var(--bg-code);
-      padding: 1.3rem 1.6rem;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.84rem;
-      line-height: 1.7;
-      text-align: left;
-      color: #f1f5f9;
-      min-height: 270px;
-      max-height: 340px;
-      overflow-y: auto;
-      border-bottom-left-radius: 12px;
-      border-bottom-right-radius: 12px;
-    }
-    .grad-cyan { color: #38bdf8; font-weight: 700; }
-    .grad-teal { color: #2dd4bf; font-weight: 700; }
-    .term-arrow { color: #818cf8; margin: 0 0.2rem; }
-
-    /* Security Gatekeeper Card */
-    .gatekeeper-unified-card {
-      background: var(--bg-card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 1.8rem;
-      box-shadow: var(--subpixel-border);
-      width: min(960px, 100%);
-      margin: 0 auto;
-    }
-    .gatekeeper-scenario-bar {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0.65rem;
-      margin-bottom: 1.3rem;
-    }
-    @media (max-width: 900px) { .gatekeeper-scenario-bar { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 540px) { .gatekeeper-scenario-bar { grid-template-columns: 1fr; } }
-
-    .scenario-pill-btn {
-      background: var(--bg-inner);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 0.75rem 0.9rem;
-      text-align: left;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-    .scenario-pill-btn:hover {
-      border-color: var(--accent);
-      transform: translateY(-2px);
-    }
-    .scenario-pill-btn.active {
-      background: var(--accent-bg);
-      border-color: var(--accent);
-      box-shadow: 0 0 16px var(--accent-glow);
-    }
-    .scenario-pill-title {
-      font-weight: 750;
-      font-size: 0.85rem;
-      color: var(--ink);
-    }
-    .scenario-pill-tag {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.66rem;
-      font-weight: 700;
-    }
-    .scenario-pill-tag.blocked { color: #fb7185; }
-    .scenario-pill-tag.warn { color: #fbbf24; }
-    .scenario-pill-tag.passed { color: #34d399; }
-
-    .gatekeeper-flow-box {
-      background: var(--bg-code);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 1.3rem;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.82rem;
-      color: #f1f5f9;
-    }
-    .gatekeeper-flow-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 0.7rem;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-      margin-bottom: 1rem;
-    }
-    .verdict-badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 9999px;
-      font-weight: 750;
-      font-size: 0.75rem;
-    }
-    .verdict-badge.blocked { background: rgba(244, 63, 94, 0.2); color: #fb7185; border: 1px solid #f43f5e; }
-    .verdict-badge.passed { background: rgba(52, 211, 153, 0.2); color: #34d399; border: 1px solid #10b981; }
-    .verdict-badge.warn { background: rgba(251, 191, 36, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
-
-    .gatekeeper-stages-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 1rem;
-      margin-bottom: 1.1rem;
-    }
-    @media (max-width: 768px) { .gatekeeper-stages-grid { grid-template-columns: 1fr; } }
-
-    .stage-item-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 0.85rem;
-    }
-    .stage-label {
-      font-size: 0.7rem;
-      color: #94a3b8;
-      margin-bottom: 0.35rem;
-      text-transform: uppercase;
-      font-weight: 700;
-    }
-    .stage-content {
-      font-size: 0.8rem;
-      line-height: 1.55;
-      color: #f1f5f9;
-    }
-
-    .gatekeeper-receipt-row {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px dashed rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      font-size: 0.74rem;
-      color: #94a3b8;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    /* Equal Height Manuscript & Ledger */
-    .manuscript-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 1.6rem;
-      align-items: stretch;
-      width: min(1040px, 100%);
-      margin: 0 auto;
-    }
-    @media (max-width: 960px) { .manuscript-grid { grid-template-columns: 1fr; } }
-
-    .manuscript-paper, .evidence-inspector-card {
-      background: var(--bg-card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 1.8rem;
-      box-shadow: var(--subpixel-border);
-      height: 440px;
-      display: flex;
-      flex-direction: column;
-    }
-    .manuscript-scroll-content, .inspector-scroll-content {
-      flex: 1;
-      overflow-y: auto;
-      padding-right: 0.4rem;
-    }
-    .manuscript-journal-header {
-      display: flex;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--line);
-      padding-bottom: 0.75rem;
-      margin-bottom: 1.1rem;
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.74rem;
-      color: var(--ink-muted);
-    }
-    .manuscript-title {
-      font-family: "Fraunces", Georgia, serif;
-      font-size: 1.35rem;
-      font-weight: 750;
-      line-height: 1.35;
-      color: var(--ink);
-      margin-bottom: 1rem;
-    }
-    .claim-highlight {
-      background: var(--accent-bg);
-      border-bottom: 2px solid var(--accent);
-      color: var(--accent-ink);
-      font-weight: 600;
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      display: inline;
-    }
-    .claim-highlight:hover, .claim-highlight.active {
-      background: var(--accent);
-      color: #07090e;
-    }
-    .claim-highlight.uncertain {
-      background: rgba(251, 191, 36, 0.15);
-      border-bottom-color: #fbbf24;
-      color: #fbbf24;
-    }
-    .claim-highlight.uncertain:hover, .claim-highlight.uncertain.active {
-      background: #fbbf24;
-      color: #07090e;
-    }
-
-    .inspector-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1rem;
-      padding-bottom: 0.65rem;
-      border-bottom: 1px solid var(--line);
-    }
-    .inspector-title {
-      font-family: "Fraunces", Georgia, serif;
-      font-size: 1.15rem;
-      font-weight: 750;
-      color: var(--ink);
-    }
-    .inspector-field-row {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-      margin-bottom: 1rem;
-    }
-    .inspector-label {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.7rem;
-      font-weight: 700;
-      color: var(--ink-faint);
-      text-transform: uppercase;
-    }
-    .inspector-value {
-      font-size: 0.88rem;
-      color: var(--ink);
-      line-height: 1.45;
-    }
-
-    /* Paradigms Carousel */
-    .carousel-top-controls {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: min(1040px, 100%);
-      margin: 0 auto 0.8rem;
-    }
-    .carousel-arrows {
-      display: flex;
-      gap: 0.5rem;
-    }
-    .carousel-arrow-btn {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: var(--bg-card);
-      border: 1px solid var(--line);
-      color: var(--ink);
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 0.95rem;
-    }
-    .carousel-arrow-btn:hover {
-      background: var(--accent);
-      color: #07090e;
-      border-color: var(--accent);
-      box-shadow: 0 0 14px var(--accent-glow);
-    }
-
-    .paradigms-carousel-container {
-      width: min(1040px, 100%);
-      margin: 0 auto;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      display: flex;
-      gap: 1.1rem;
-      padding: 0.4rem 0.2rem 1.2rem;
-      scrollbar-width: thin;
-    }
-    .paradigm-carousel-card {
-      min-width: 290px;
-      max-width: 290px;
-      scroll-snap-align: start;
-      background: var(--bg-card);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 1.5rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 1rem;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: var(--subpixel-border);
-      cursor: grab;
-    }
-    .paradigm-carousel-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-4px);
-      box-shadow: 0 12px 32px var(--accent-glow);
-    }
-    .paradigm-num {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.76rem;
-      font-weight: 750;
-      color: var(--accent-ink);
-    }
-    .paradigm-title {
-      font-family: "Fraunces", Georgia, serif;
-      font-size: 1.18rem;
-      font-weight: 750;
-      color: var(--ink);
-      margin: 0.25rem 0;
-    }
-    .paradigm-desc {
-      font-size: 0.84rem;
-      color: var(--ink-muted);
-      line-height: 1.55;
-    }
-    .paradigm-engine-pill {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 0.68rem;
-      background: var(--bg-inner);
-      border: 1px solid var(--line);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      color: var(--accent-ink);
-      width: fit-content;
-    }
-
-    /* Comparison Table */
-    .spotlight-table-wrap {
-      border-radius: 16px;
-      border: 1px solid var(--line);
-      overflow: hidden;
-      background: var(--bg-card);
-      width: min(980px, 100%);
-      margin: 0 auto 1.5rem;
-      box-shadow: var(--subpixel-border);
+    /* —— Hero: one composition, full-bleed image —— */
+    .hero {
       position: relative;
+      min-height: 100svh;
+      display: flex;
+      align-items: flex-end;
+      color: #f4f7fa;
+      overflow: hidden;
     }
-    .spotlight-overlay {
+    .hero-media {
       position: absolute;
       inset: 0;
-      pointer-events: none;
-      background: radial-gradient(400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(45, 212, 191, 0.12), transparent 70%);
-      transition: opacity 0.2s ease;
-      opacity: 0;
+      background:
+        var(--hero-veil),
+        url("./assets/workbench_hero.jpg") center / cover no-repeat;
+      transform: scale(1.02);
+      animation: heroSettle 1.4s ease-out both;
     }
-    .spotlight-table-wrap:hover .spotlight-overlay { opacity: 1; }
+    @keyframes heroSettle {
+      from { transform: scale(1.06); filter: saturate(0.85); }
+      to { transform: scale(1.02); filter: saturate(1); }
+    }
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      width: min(var(--max), calc(100% - 2.5rem));
+      margin: 0 auto;
+      padding: 7.5rem 0 4.5rem;
+      animation: riseIn 0.9s ease-out 0.15s both;
+    }
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero-brand {
+      font-family: var(--font-display);
+      font-size: clamp(3.4rem, 8vw, 6.2rem);
+      line-height: 0.95;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.1rem;
+    }
+    .hero-line {
+      max-width: 28ch;
+      font-family: var(--font-display);
+      font-size: clamp(1.55rem, 2.8vw, 2.15rem);
+      font-style: italic;
+      line-height: 1.25;
+      margin-bottom: 0.85rem;
+    }
+    .hero-support {
+      max-width: 42ch;
+      color: rgba(244, 247, 250, 0.82);
+      font-size: 1.05rem;
+      margin-bottom: 1.75rem;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.75rem;
+      padding: 0.7rem 1.2rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      border: 1px solid transparent;
+      transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: #f4f7fa;
+      color: var(--ink);
+    }
+    .btn-primary:hover { background: #fff; }
+    .btn-ghost {
+      background: transparent;
+      border-color: rgba(244, 247, 250, 0.4);
+      color: #f4f7fa;
+    }
+    .btn-ghost:hover { border-color: #f4f7fa; }
 
+    /* —— Sections —— */
+    section {
+      padding: 5.5rem 0;
+    }
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 3.6vw, 2.75rem);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.75rem;
+      max-width: 18ch;
+    }
+    .section-lead {
+      color: var(--ink-soft);
+      max-width: 48ch;
+      margin-bottom: 2.25rem;
+    }
+
+    .modes {
+      background: var(--paper);
+      border-block: 1px solid var(--line);
+    }
+    .mode-list {
+      display: grid;
+      gap: 0;
+      border-top: 1px solid var(--line);
+    }
+    .mode-row {
+      display: grid;
+      grid-template-columns: 7rem 1fr;
+      gap: 1.5rem;
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--line);
+      align-items: start;
+      animation: riseIn 0.7s ease-out both;
+    }
+    .mode-row:nth-child(1) { animation-delay: 0.05s; }
+    .mode-row:nth-child(2) { animation-delay: 0.12s; }
+    .mode-row:nth-child(3) { animation-delay: 0.19s; }
+    .mode-name {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      padding-top: 0.2rem;
+    }
+    .mode-copy h3 {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 400;
+      margin-bottom: 0.35rem;
+    }
+    .mode-copy p {
+      color: var(--ink-soft);
+      max-width: 54ch;
+      font-size: 1rem;
+    }
+    .mode-tools {
+      margin-top: 0.65rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--ink-faint);
+    }
+
+    .evidence {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 2.5rem;
+      align-items: center;
+    }
+    .evidence-visual {
+      position: relative;
+      overflow: hidden;
+      min-height: 320px;
+      background: #101820 url("./assets/evidence_ledger.jpg") center / cover no-repeat;
+      border: 1px solid var(--line);
+    }
+    .evidence-visual::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(12, 18, 34, 0.35), transparent 45%);
+    }
+    .evidence-points {
+      list-style: none;
+      display: grid;
+      gap: 1rem;
+    }
+    .evidence-points li {
+      padding-left: 1rem;
+      border-left: 2px solid var(--accent);
+      color: var(--ink-soft);
+    }
+    .evidence-points strong {
+      display: block;
+      color: var(--ink);
+      font-weight: 600;
+      margin-bottom: 0.15rem;
+    }
+
+    .install {
+      background: var(--bg-deep);
+    }
+    .install-panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1rem;
+      align-items: center;
+      padding: 1.25rem 1.35rem;
+      background: var(--ink);
+      color: #f4f7fa;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .install-cmd {
+      font-family: var(--font-mono);
+      font-size: clamp(0.82rem, 1.6vw, 0.95rem);
+      word-break: break-all;
+    }
+    .install-cmd span { color: #8fd0c5; }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid rgba(244, 247, 250, 0.35);
+      color: #f4f7fa;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 0.55rem 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .copy-btn:hover {
+      background: rgba(244, 247, 250, 0.08);
+      border-color: rgba(244, 247, 250, 0.7);
+    }
+    .install-note {
+      margin-top: 1rem;
+      color: var(--ink-faint);
+      font-size: 0.92rem;
+    }
+    .install-note a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .pkg-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+    }
+    .pkg-tab {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink-soft);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+    }
+    .pkg-tab[aria-selected="true"] {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(26, 95, 86, 0.08);
+    }
+
+    .ecosystem {
+      background: var(--paper);
+      border-block: 1px solid var(--line);
+    }
+    .eco-list {
+      border-top: 1px solid var(--line);
+    }
+    .eco-row {
+      display: grid;
+      grid-template-columns: 7.5rem 1fr;
+      gap: 1.25rem;
+      padding: 1.15rem 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .eco-stage {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      padding-top: 0.2rem;
+    }
+    .eco-copy h3 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 400;
+      margin-bottom: 0.3rem;
+    }
+    .eco-names {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--ink-faint);
+      line-height: 1.5;
+    }
+    .eco-mcp {
+      margin-top: 1.25rem;
+      font-size: 0.92rem;
+      color: var(--ink-soft);
+    }
+    @media (max-width: 860px) {
+      .eco-row { grid-template-columns: 1fr; gap: 0.25rem; }
+    }
+
+    .compare {
+      overflow-x: auto;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.88rem;
+      font-size: 0.95rem;
+      min-width: 640px;
+    }
+    th, td {
       text-align: left;
+      padding: 0.95rem 0.85rem;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
     }
     th {
-      background: var(--bg-inner);
-      padding: 0.95rem 1.2rem;
-      color: var(--ink-muted);
-      font-size: 0.78rem;
-      font-weight: 750;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
-      border-bottom: 1px solid var(--line);
+      color: var(--ink-faint);
+      font-weight: 500;
     }
-    td {
-      padding: 1rem 1.2rem;
-      border-bottom: 1px solid var(--line);
-      vertical-align: middle;
-      transition: background 0.2s ease;
-    }
-    tr:hover td {
-      background: rgba(45, 212, 191, 0.04);
-    }
-    tr:last-child td { border-bottom: none; }
-    .td-highlight {
-      background: var(--accent-bg);
-      color: var(--ink);
-      font-weight: 700;
-    }
+    td:last-child { color: var(--accent-soft); font-weight: 600; }
 
     footer {
-      padding-top: 1rem;
+      padding: 2.5rem 0 3rem;
       border-top: 1px solid var(--line);
       display: flex;
-      justify-content: space-between;
-      align-items: center;
       flex-wrap: wrap;
+      justify-content: space-between;
       gap: 1rem;
-      color: var(--ink-muted);
-      font-size: 0.82rem;
-      width: min(980px, 100%);
-      margin: 0 auto;
+      color: var(--ink-faint);
+      font-size: 0.88rem;
+    }
+    footer strong {
+      color: var(--ink);
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 400;
+    }
+
+    @media (max-width: 860px) {
+      .top-links a:not(.top-cta) { display: none; }
+      .evidence { grid-template-columns: 1fr; }
+      .mode-row { grid-template-columns: 1fr; gap: 0.35rem; }
+      .install-panel { grid-template-columns: 1fr; }
+      .hero-content { padding-bottom: 3.25rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .hero-media, .hero-content, .mode-row { animation: none; }
+      .btn:hover { transform: none; }
     }
   </style>
 </head>
 <body>
-
-  <div class="ambient-glow-layer"></div>
-
-  <!-- Side Section Navigation Indicator Dots -->
-  <aside class="side-page-nav" aria-label="页面分屏导航">
-    <div class="side-nav-dot active" data-slide-index="0">
-      <span class="side-nav-tooltip">01 / 主屏愿景与安装</span>
-    </div>
-    <div class="side-nav-dot" data-slide-index="1">
-      <span class="side-nav-tooltip">02 / 终端推演模拟器</span>
-    </div>
-    <div class="side-nav-dot" data-slide-index="2">
-      <span class="side-nav-tooltip">03 / 学术安全门禁</span>
-    </div>
-    <div class="side-nav-dot" data-slide-index="3">
-      <span class="side-nav-tooltip">04 / 真实文献溯源</span>
-    </div>
-    <div class="side-nav-dot" data-slide-index="4">
-      <span class="side-nav-tooltip">05 / 10 大范式轮播</span>
-    </div>
-    <div class="side-nav-dot" data-slide-index="5">
-      <span class="side-nav-tooltip">06 / 架构对比与收据</span>
-    </div>
-  </aside>
-
-  <!-- Top Minimalist Sticky Header -->
-  <header>
-    <div class="shell nav">
-      <div class="brand" data-goto-slide="0">
-        <div class="brand-mark">ψ</div>
-        <span class="brand-text">PsyClaw</span>
-        <span class="brand-badge">RESEARCH AGENT</span>
-      </div>
-
-      <nav class="nav-links" aria-label="主导航">
-        <a data-goto-slide="1">Terminal</a>
-        <a data-goto-slide="2">学术审查门禁</a>
-        <a data-goto-slide="3">文献证据溯源</a>
-        <a data-goto-slide="4">10 大研究范式</a>
-        <a data-goto-slide="5">架构对比</a>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="#top">PsyClaw</a>
+      <nav class="top-links" aria-label="主导航">
+        <a href="#modes">三种工作流</a>
+        <a href="#evidence">证据</a>
+        <a href="#ecosystem">推荐生态</a>
+        <a href="#install">安装</a>
+        <a class="top-cta" href="https://github.com/Exekiel179/psyclaw">GitHub</a>
       </nav>
-
-      <div class="nav-right-actions">
-        <!-- Theme Switcher -->
-        <div class="theme-switcher" aria-label="主题切换">
-          <button class="theme-btn active" data-set-theme="dark" title="黑曜石暗黑">Dark</button>
-          <button class="theme-btn" data-set-theme="light" title="象牙白纸质">Light</button>
-          <button class="theme-btn" data-set-theme="aurora" title="极光深邃">Aurora</button>
-        </div>
-      </div>
     </div>
   </header>
 
-  <!-- Full-Page Smooth Slider (1-Wheel = 1-Slide) -->
-  <div id="fullpage-slider">
-
-    <!-- ==============================================================
-         SLIDE 0: Hero Vision & Prominent Quick Install
-         ============================================================== -->
-    <div class="page-slide" id="slide-0">
-      <div class="hero-kicker">
-        <span>ψ</span>
-        <span>EVIDENCE-GROUNDED SOCIAL-SCIENCE RESEARCH AGENT</span>
-      </div>
-
-      <!-- Restored Clean Typographic Headline -->
-      <h1 class="hero-title">
-        <span class="hero-title-main">不做学术幻觉的产物。</span><br>
-        <span class="hero-subtitle-accent">每一条结论，都应可追溯、可核验。</span>
-      </h1>
-
-      <p class="hero-orient">
-        PsyClaw 是专为社会科学研究者打造的高可信科研智能体。通过多源交叉审计、确定性统计委托与 SHA-256 结构化可复现账本，把 AI 转化为真正的学术生产力。
-      </p>
-
-      <!-- Live Trust Metrics Ticker Bar -->
-      <div class="hero-trust-ticker">
-        <div class="ticker-item">
-          <span class="ticker-dot"></span>
-          <span>统计计算: <span class="ticker-val">外部成熟工具委托</span></span>
-        </div>
-        <div class="ticker-item">
-          <span class="ticker-dot"></span>
-          <span>引用核验: <span class="ticker-val">可配置多源适配器</span></span>
-        </div>
-        <div class="ticker-item">
-          <span class="ticker-dot"></span>
-          <span>可校验账本: <span class="ticker-val">SHA-256 Receipts</span></span>
+  <main id="top">
+    <section class="hero" aria-label="PsyClaw 介绍">
+      <div class="hero-media" role="img" aria-label="PsyClaw 本地面板工作台"></div>
+      <div class="hero-content">
+        <h1 class="hero-brand">PsyClaw</h1>
+        <p class="hero-line">社会科学研究工作台：结论要可追溯。</p>
+        <p class="hero-support">本地运行的证据驱动智能体。统计委托成熟工具，引用可核验，完成状态靠 receipt 而不是口头声称。</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#install">安装 0.30.7</a>
+          <a class="btn btn-ghost" href="https://github.com/Exekiel179/psyclaw">查看源码</a>
         </div>
       </div>
+    </section>
 
-      <!-- Prominent Installation Box in Center Hero Screen -->
-      <div class="hero-install-stage">
-        <div class="install-stage-header">
-          <div class="install-tabs-pills">
-            <button class="install-pill-btn active" data-pkg="pnpm">pnpm</button>
-            <button class="install-pill-btn" data-pkg="npm">npm</button>
-            <button class="install-pill-btn" data-pkg="yarn">yarn</button>
-            <button class="install-pill-btn" data-pkg="bun">bun</button>
-          </div>
-          <span class="mono" style="font-size: 0.72rem; color: var(--accent-ink); font-weight: 700;">
-            ⚡ QUICK INSTALL
-          </span>
-        </div>
-        <div class="install-cmd-content">
-          <div class="shell-cmd-text mono">
-            <span class="prefix">$</span><span id="install-cmd-text">pnpm add -g psyclaw@0.29.14 && psyclaw</span>
-          </div>
-          <button class="copy-hero-btn" id="copy-install-btn">
-            <span>COPY</span>
-            <span class="mono">📋</span>
-          </button>
+    <section class="modes" id="modes">
+      <div class="shell">
+        <p class="section-label">Workflows</p>
+        <h2 class="section-title">三种模式，各有推荐工具路径</h2>
+        <p class="section-lead">用 Shift+Tab 在 chat → analysis → academic 间切换。自然语言会 soft-route 到对应技能；高风险步骤仍需人确认。</p>
+        <div class="mode-list">
+          <article class="mode-row">
+            <div class="mode-name">chat</div>
+            <div class="mode-copy">
+              <h3>澄清与摸底</h3>
+              <p>普通研究对话，不强制流水线。需要抉择时用唤醒选项；一旦像数据分析或写稿，提醒切到正确模式。</p>
+              <p class="mode-tools">推荐：psyclaw_wake_options · /grill · /brainstorm</p>
+            </div>
+          </article>
+          <article class="mode-row">
+            <div class="mode-name">analysis</div>
+            <div class="mode-copy">
+              <h3>方案、脚本与交接</h3>
+              <p>soft-route 进入 analysis-plan：逐项确认 → 仪式批准 → 本地可复现脚本 → 同意后再核查 → 人审 → /handoff。</p>
+              <p class="mode-tools">推荐：analysis-plan · /plan · /crosscheck · /verify · /handoff</p>
+            </div>
+          </article>
+          <article class="mode-row">
+            <div class="mode-name">academic</div>
+            <div class="mode-copy">
+              <h3>文献、成稿与审稿</h3>
+              <p>仅 soft-route 捆绑学术技能；定稿前两道 AI 核查加人审。Stage 3 五席走 psyclaw_ars_multi_agent，不在主会话假装分席。</p>
+              <p class="mode-tools">推荐：deep-research / academic-paper* / nature-* · psyclaw_cite · psyclaw_ars_multi_agent</p>
+            </div>
+          </article>
         </div>
       </div>
+    </section>
 
-      <div class="scroll-down-indicator" onclick="goToSlide(1)">
-        <span>SCROLL DOWN</span>
-        <span class="mono">▼</span>
+    <section id="evidence">
+      <div class="shell evidence">
+        <div>
+          <p class="section-label">Evidence</p>
+          <h2 class="section-title">把声称钉在账本上</h2>
+          <p class="section-lead">没有可定位证据的事实性 Claim 必须标为 uncertain 或被阻断。副作用要有结构化 receipt。</p>
+          <ul class="evidence-points">
+            <li>
+              <strong>引用可核验</strong>
+              经 Crossref / OpenAlex 等适配器核对后再入账，而不是模型口头引用。
+            </li>
+            <li>
+              <strong>统计外置</strong>
+              计算委托 Python / R / SPSS / Stata / Mplus 或受信任 MCP，并保留脚本与环境信息。
+            </li>
+            <li>
+              <strong>完成本地可审计</strong>
+              Panel 展示门禁、产物与待人确认项；研究正文默认不进遥测。
+            </li>
+          </ul>
+        </div>
+        <div class="evidence-visual" role="img" aria-label="证据账本示意"></div>
       </div>
-    </div>
+    </section>
 
-    <!-- ==============================================================
-         SLIDE 1: Multi-Scenario Interactive Terminal Simulator
-         ============================================================== -->
-    <div class="page-slide" id="slide-1">
-      <div class="section-header-compact">
-        <div class="section-tag">SYNTHETIC WORKFLOW FIXTURES</div>
-        <h2 class="section-title">可交互终端推演模拟器</h2>
-        <p class="section-desc">
-          以下均为合成演示数据，不代表真实研究、文献核验或统计结果。切换场景可查看 CLI 审查流水线与 receipt 结构：
+    <section class="ecosystem" id="ecosystem">
+      <div class="shell">
+        <p class="section-label">Recommended · catalog 0.8.5</p>
+        <h2 class="section-title">可选推荐生态，默认只发现不执行</h2>
+        <p class="section-lead">捆绑工作流之外，Panel 与 /skill 还可安装社区推荐 Skill 与 MCP。启用前核对来源与信任状态；当前技能目录 35 项、MCP 12 项（2026-09-14）。</p>
+        <div class="eco-list">
+          <article class="eco-row">
+            <div class="eco-stage">科研绘图</div>
+            <div class="eco-copy">
+              <h3>投稿级图稿与可视化审计</h3>
+              <p class="eco-names">Scientific Visualization · Academic Figure Skill · Scientific Figure Generation</p>
+            </div>
+          </article>
+          <article class="eco-row">
+            <div class="eco-stage">全文获取</div>
+            <div class="eco-copy">
+              <h3>合法补齐 PDF 与本地落盘</h3>
+              <p class="eco-names">ScanSci PDF · paper2local</p>
+            </div>
+          </article>
+          <article class="eco-row">
+            <div class="eco-stage">方法蒸馏</div>
+            <div class="eco-copy">
+              <h3>学者 / 期刊风格蒸馏</h3>
+              <p class="eco-names">MentorForge · Distill Scholar · Distill Journal</p>
+            </div>
+          </article>
+          <article class="eco-row">
+            <div class="eco-stage">生理信号</div>
+            <div class="eco-copy">
+              <h3>MNE / NeuroKit / BIDS 能力包</h3>
+              <p class="eco-names">MNE Analyst · MNE MCP Guard · MNE Methodology Critic · MNE Preprocess 等 11 项</p>
+            </div>
+          </article>
+          <article class="eco-row">
+            <div class="eco-stage">文献检索</div>
+            <div class="eco-copy">
+              <h3>检索与文献工作流增强</h3>
+              <p class="eco-names">Paper Lookup</p>
+            </div>
+          </article>
+          <article class="eco-row">
+            <div class="eco-stage">统计审查</div>
+            <div class="eco-copy">
+              <h3>稿件统计取证与审查</h3>
+              <p class="eco-names">Manuscript Statistical Forensics</p>
+            </div>
+          </article>
+        </div>
+        <p class="eco-mcp">MCP 示例：Computer Use MCP · MarkItDown MCP · Paper Search MCP · Scientific Papers MCP · PubMed Search MCP · Zotero MCP …</p>
+        <p class="install-note" style="margin-top:1.25rem">完整列表见仓库 <a href="https://github.com/Exekiel179/psyclaw/blob/main/skills/recommended/catalog.json">skills/recommended/catalog.json</a>；产品内打开 Panel「生态」页安装。</p>
+      </div>
+    </section>
+
+    <section class="install" id="install">
+      <div class="shell">
+        <p class="section-label">Install</p>
+        <h2 class="section-title">一分钟装上本地工作台</h2>
+        <p class="section-lead">需要 Node.js ≥ 22.19。装完直接运行 <span class="mono" style="font-family:var(--font-mono)">psyclaw</span>。</p>
+
+        <div class="pkg-tabs" role="tablist" aria-label="包管理器">
+          <button class="pkg-tab" type="button" role="tab" aria-selected="true" data-pkg="npm">npm</button>
+          <button class="pkg-tab" type="button" role="tab" aria-selected="false" data-pkg="pnpm">pnpm</button>
+          <button class="pkg-tab" type="button" role="tab" aria-selected="false" data-pkg="cn">中国镜像</button>
+        </div>
+
+        <div class="install-panel">
+          <code class="install-cmd" id="install-cmd"><span>$</span> npm install -g psyclaw@0.30.7 && psyclaw</code>
+          <button class="copy-btn" type="button" id="copy-install">复制</button>
+        </div>
+        <p class="install-note">
+          也可用安装脚本：
+          <a href="https://exekiel179.github.io/psyclaw/install.sh">install.sh</a>
+          ·
+          <a href="https://github.com/Exekiel179/psyclaw#readme">README</a>
+          · 当前版本 <strong>0.30.7</strong>
         </p>
       </div>
+    </section>
 
-      <div class="terminal-container figure-frame">
-        <div class="figure-corner figure-corner--tl"></div>
-        <div class="figure-corner figure-corner--tr"></div>
-        <div class="figure-corner figure-corner--bl"></div>
-        <div class="figure-corner figure-corner--br"></div>
-
-        <div class="terminal-top-bar">
-          <div class="term-dots">
-            <div class="term-dot red"></div>
-            <div class="term-dot yellow"></div>
-            <div class="term-dot green"></div>
-          </div>
-
-          <!-- Scenario Switcher Tabs -->
-          <div class="term-scenario-tabs">
-            <button class="term-tab-btn active" data-term-scenario="meta">元分析森林图</button>
-            <button class="term-tab-btn" data-term-scenario="sem">结构方程中介</button>
-            <button class="term-tab-btn" data-term-scenario="prereg">预注册审计</button>
-            <button class="term-tab-btn" data-term-scenario="network">计算社会学网络</button>
-          </div>
-
-          <div class="term-actions-right">
-            <button class="term-action-btn" id="run-terminal-demo-btn">▶ 运行当前示例</button>
-          </div>
-        </div>
-
-        <div class="terminal-body" id="hero-term-body">
-          <div style="margin-bottom: 0.6rem;">
-            <span class="grad-cyan">█▀█ █▀▀ █ █ █▀█ ▀█▀</span>   <span style="color: #64748b;">·</span>   <span class="grad-teal">P S Y C L A W</span>  <span style="color: #94a3b8;">v0.29.14</span>   <span style="color: #ffffff;">( ᐡ <span style="color: #38bdf8;">⌐■-■</span> ᐡ )</span> <span style="color: #fbbf24;">✨</span><br>
-            <span class="grad-cyan">█▀▀ ▄██  █  █▀▀ ▄█▄</span>       <span style="color: #94a3b8;">Evidence-Grounded Social-Science Research Agent</span>   <span style="color: #ffffff;">c( づ 📜 づ )</span>
-          </div>
-          <div style="color: #2dd4bf; margin-bottom: 0.25rem;">• Pipeline  : <span style="color: #38bdf8;">intake</span> <span class="term-arrow">➔</span> <span style="color: #818cf8;">capture</span> <span class="term-arrow">➔</span> <span style="color: #a855f7;">citation-audit</span> <span class="term-arrow">➔</span> <span style="color: #2dd4bf;">brief</span></div>
-          <div style="color: #2dd4bf; margin-bottom: 0.25rem;">• Protocol  : <span style="color: #34d399;">✔ 2+ Source Cross-Check</span> <span style="color: #64748b;">·</span> <span style="color: #2dd4bf;">✔ SHA-256 Provenance Ledger</span></div>
-          <div style="color: #2dd4bf; margin-bottom: 0.8rem;">• Workbench : <span style="color: #38bdf8;">http://127.0.0.1:3721</span> <span style="color: #a855f7;">(Interactive Panel Active)</span></div>
-          <div id="term-dynamic-lines" style="color: #94a3b8; line-height: 1.75;">
-            <span style="color: #64748b;">$</span> psyclaw chat<br>
-            <span style="color: #64748b;">&gt;</span> 对在线学习参与度研究执行元分析，先核验文献与效应量数据<br>
-            <span style="color: #34d399;">[fixture:intake]</span> 模拟多源检索并生成合成研究清单...<br>
-            <span style="color: #38bdf8;">[capture]</span> 抽取 Hedges' g 效应量矩阵与方差协方差结构... <span style="color: #34d399;">匹配完成</span><br>
-            <span style="color: #a855f7;">[fixture:audit]</span> 统计字段由外部工具返回；本示例不提供真实数值<br>
-            <span style="color: #2dd4bf;">[fixture:brief]</span> 生成演示报告并签发合成 receipt: <span style="color: #5eead4;">fixture-meta-001</span>
-          </div>
-        </div>
-
-        <div class="figure-caption">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span class="live-dot"></span>
-            <span>SYNTHETIC DEMO · NOT RESEARCH EVIDENCE</span>
-          </div>
-          <div class="mono">PSYCLAW_VERSION=0.29.14</div>
+    <section id="compare">
+      <div class="shell">
+        <p class="section-label">Difference</p>
+        <h2 class="section-title">相对通用助手多了什么</h2>
+        <p class="section-lead">不是又一个聊天框，而是带门禁与账本的研究工作台。</p>
+        <div class="compare">
+          <table>
+            <thead>
+              <tr>
+                <th>维度</th>
+                <th>通用对话助手</th>
+                <th>PsyClaw</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>工作方式</td>
+                <td>单轮闲聊、无模式约束</td>
+                <td>chat / analysis / academic 分路径推进</td>
+              </tr>
+              <tr>
+                <td>引用</td>
+                <td>易虚构文献</td>
+                <td>核验后再入引用账本</td>
+              </tr>
+              <tr>
+                <td>统计</td>
+                <td>模型口算</td>
+                <td>委托成熟库与可复现脚本</td>
+              </tr>
+              <tr>
+                <td>完成标准</td>
+                <td>口头「做完了」</td>
+                <td>receipt、门禁与人审</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
+    </section>
+  </main>
 
-    <!-- ==============================================================
-         SLIDE 2: Full-Width Unified Security Gatekeeper Monitor
-         ============================================================== -->
-    <div class="page-slide" id="slide-2">
-      <div class="section-header-compact">
-        <div class="section-tag">SECURITY AUDIT GATEKEEPER</div>
-        <h2 class="section-title">学术严谨性与幻觉拦截控制台</h2>
-        <p class="section-desc">
-          面对 AI 幻觉虚构文献、p-hacking 统计篡改与未预注册分析，PsyClaw 设立了 4 道前置确定性门禁：
-        </p>
+  <div class="shell">
+    <footer>
+      <div>
+        <strong>PsyClaw</strong>
+        <div>v0.30.7 · Evidence-grounded social-science research agent</div>
       </div>
-
-      <div class="gatekeeper-unified-card figure-frame">
-        <div class="figure-corner figure-corner--tl"></div>
-        <div class="figure-corner figure-corner--tr"></div>
-        <div class="figure-corner figure-corner--bl"></div>
-        <div class="figure-corner figure-corner--br"></div>
-
-        <!-- Top Scenario Selector Bar -->
-        <div class="gatekeeper-scenario-bar">
-          <div class="scenario-pill-btn active" data-audit="p-hacking">
-            <span class="scenario-pill-tag blocked">⚠️ SECURITY VIOLATION</span>
-            <div class="scenario-pill-title">p-hacking 假阳性篡改拦截</div>
-          </div>
-          <div class="scenario-pill-btn" data-audit="fake-doi">
-            <span class="scenario-pill-tag blocked">🚫 HALLUCINATION BLOCKED</span>
-            <div class="scenario-pill-title">幻觉伪造文献与虚构 DOI 阻断</div>
-          </div>
-          <div class="scenario-pill-btn" data-audit="no-prereg">
-            <span class="scenario-pill-tag warn">🔒 METHODOLOGY GUARD</span>
-            <div class="scenario-pill-title">未预注册探索性分析降级</div>
-          </div>
-          <div class="scenario-pill-btn" data-audit="verified-chain">
-            <span class="scenario-pill-tag passed">✅ FULLY AUTHENTICATED</span>
-            <div class="scenario-pill-title">全链路双源交叉验证通过</div>
-          </div>
-        </div>
-
-        <!-- 3-Stage Security Verification Pipeline Monitor -->
-        <div class="gatekeeper-flow-box">
-          <div class="gatekeeper-flow-header">
-            <span style="font-weight: 750; color: #94a3b8;">GATEKEEPER PIPELINE VERDICT</span>
-            <span class="verdict-badge blocked" id="audit-verdict-badge">HARD BLOCKED</span>
-          </div>
-
-          <div class="gatekeeper-stages-grid">
-            <div class="stage-item-card">
-              <div class="stage-label">1. 输入捕获与声称解析</div>
-              <div class="stage-content" id="stage-1-text">
-                模型尝试在 18 项探索性子量表中筛选出 p=0.038 单项报告为主假设结论。
-              </div>
-            </div>
-
-            <div class="stage-item-card">
-              <div class="stage-label">2. 确定性审查门禁检验</div>
-              <div class="stage-content" id="stage-2-text">
-                检测到假设自由度通胀 (Multiple Hypothesis Inflation Without Bonferroni/FDR Correction)。
-              </div>
-            </div>
-
-            <div class="stage-item-card">
-              <div class="stage-label">3. 裁决决策与证据账本</div>
-              <div class="stage-content" id="stage-3-text">
-                立即阻断下游生成，强制打上 UNCERTAIN 永久风险标签并签发异常审计收据。
-              </div>
-            </div>
-          </div>
-
-          <div class="gatekeeper-receipt-row mono">
-            <span id="audit-receipt-hash">PROVENANCE_RECEIPT: 3b9c028a4e8d... (SHA-256 Verified)</span>
-            <span id="audit-receipt-time">TIMESTAMP: 2026-08-16T02:40:00Z · PROTOCOL #SEC-01</span>
-          </div>
-        </div>
+      <div>
+        MIT ·
+        <a href="https://github.com/Exekiel179/psyclaw">GitHub</a>
+        · 营销页默认不采集；CLI 遥测可关
       </div>
-    </div>
-
-    <!-- ==============================================================
-         SLIDE 3: Real Evidential Manuscript Reader (Equal Height)
-         ============================================================== -->
-    <div class="page-slide" id="slide-3">
-      <div class="section-header-compact">
-        <div class="section-tag">SYNTHETIC EVIDENCE FIXTURE</div>
-        <h2 class="section-title">证据链交互结构示例</h2>
-        <p class="section-desc">
-          以下论文、统计量、标识符和 receipt 均为界面 fixture，不对应真实研究。点击 Claim 可查看字段联动：
-        </p>
-      </div>
-
-      <div class="manuscript-grid">
-        <!-- Left: Academic Manuscript Paper -->
-        <div class="manuscript-paper figure-frame">
-          <div class="figure-corner figure-corner--tl"></div>
-          <div class="figure-corner figure-corner--tr"></div>
-          <div class="figure-corner figure-corner--bl"></div>
-          <div class="figure-corner figure-corner--br"></div>
-
-          <div class="manuscript-journal-header">
-            <span>SYNTHETIC MANUSCRIPT FIXTURE</span>
-            <span>NOT A REAL JOURNAL ARTICLE</span>
-          </div>
-
-          <div class="manuscript-scroll-content">
-            <h3 class="manuscript-title">
-              数字多任务处理对工作记忆容量与高阶学术决策的抑制机制
-            </h3>
-
-            <p style="margin-bottom: 1rem; color: var(--ink-muted); font-size: 0.92rem;">
-              <strong>摘要与实证段落：</strong> 在本项多中心双盲实验（N=342）中，我们考察了高频任务切换对学术工作者的认知资源消耗。
-              <span class="claim-highlight active" data-claim-id="claim-1">
-                实验组在高干扰环境下的工作记忆跨度显著低于对照组 [Cohen's d = 0.42, 95% CI: 0.28, 0.56, p &lt; 0.001]
-              </span>。
-              该效应在排除年龄、先验领域知识后依然稳健存在。
-            </p>
-
-            <p style="margin-bottom: 1rem; color: var(--ink-muted); font-size: 0.92rem;">
-              进一步的中介效应检验表明，
-              <span class="claim-highlight" data-claim-id="claim-2">
-                注意力分散通过认知超载对多任务决策精度产生负向预测效应 [β = -0.34, t = -4.12, p &lt; 0.001]
-              </span>。
-              针对这一假设，研究团队在数据采集前已于 OSF 完成严格的证实性预注册协议。
-            </p>
-
-            <p style="color: var(--ink-muted); font-size: 0.92rem;">
-              然而，针对部分亚组样本的探索性回溯分析中，
-              <span class="claim-highlight uncertain" data-claim-id="claim-3">
-                社交网络沉浸时长与决策偏误的关系因样本流失率较高且未预先声明剔除标准，被 PsyClaw 标记为存疑论断 [Uncertain]
-              </span>。
-            </p>
-          </div>
-        </div>
-
-        <!-- Right: Equal-Height Real-time Synchronized Evidence Inspector -->
-        <div class="evidence-inspector-card figure-frame">
-          <div class="figure-corner figure-corner--tl"></div>
-          <div class="figure-corner figure-corner--tr"></div>
-          <div class="figure-corner figure-corner--bl"></div>
-          <div class="figure-corner figure-corner--br"></div>
-
-          <div class="inspector-header">
-            <span class="inspector-title" id="insp-title">实证证据链账本</span>
-            <span class="scenario-pill-tag passed" id="insp-status-badge">SYNTHETIC FIXTURE PASS</span>
-          </div>
-
-          <div class="inspector-scroll-content">
-            <div class="inspector-field-row">
-              <span class="inspector-label">Target Claim 实证论断</span>
-              <span class="inspector-value" id="insp-claim-text">工作记忆跨度显著低于对照组 (Cohen's d = 0.42, p &lt; 0.001)</span>
-            </div>
-
-            <div class="inspector-field-row">
-              <span class="inspector-label">DOI 注册源核验</span>
-              <span class="inspector-value mono" style="color: #38bdf8;" id="insp-doi-text">fixture:claim-001 (合成标识符，不是 DOI)</span>
-            </div>
-
-            <div class="inspector-field-row">
-              <span class="inspector-label">OSF 预注册协议</span>
-              <span class="inspector-value mono" style="color: #34d399;" id="insp-prereg-text">fixture:prereg-001 (合成预注册记录)</span>
-            </div>
-
-            <div class="inspector-field-row">
-              <span class="inspector-label">原生统计环境与可复现脚本</span>
-              <span class="inspector-value mono" style="color: #a855f7;" id="insp-engine-text">R 4.3.2 (pwr 1.3-0, pingouin 0.5.3) 确定性双盲方差分析</span>
-            </div>
-
-            <div class="inspector-field-row">
-              <span class="inspector-label">SHA-256 Provenance Receipt</span>
-              <span class="inspector-value mono" style="font-size: 0.74rem; color: #94a3b8;" id="insp-hash-text">7f8a9b2c3d4e5f60a1b2c3d4e5f67890abcdef12</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ==============================================================
-         SLIDE 4: Horizontal Smooth-Scroll Carousel for 10 Paradigms
-         ============================================================== -->
-    <div class="page-slide" id="slide-4">
-      <div class="section-header-compact">
-        <div class="section-tag">10 METHODOLOGICAL PARADIGMS</div>
-        <h2 class="section-title">10 大社会科学研究范式轮播矩阵</h2>
-        <p class="section-desc">
-          PsyClaw 拒绝单一证据标准，左右滑动探索为 10 类社科研究范式配置的专属学术审查规则与统计计算委托：
-        </p>
-      </div>
-
-      <div class="carousel-top-controls">
-        <div class="mono" style="font-size: 0.78rem; color: var(--accent-ink);">
-          ✦ 左右拖拽或点击箭头浏览全量 10 大范式
-        </div>
-        <div class="carousel-arrows">
-          <button class="carousel-arrow-btn" id="carousel-prev-btn" aria-label="上一页">◀</button>
-          <button class="carousel-arrow-btn" id="carousel-next-btn" aria-label="下一页">▶</button>
-        </div>
-      </div>
-
-      <div class="paradigms-carousel-container" id="paradigms-carousel">
-        <!-- 01 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#01 / EXPERIMENTAL</div>
-            <div class="paradigm-title">量化与行为实验</div>
-            <div class="paradigm-desc">OSF 预注册校验、功效分析 (Power Analysis)、双盲控制与方差分析委托。</div>
-          </div>
-          <div class="paradigm-engine-pill">R (pwr, ez) · Python (pingouin)</div>
-        </div>
-
-        <!-- 02 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#02 / QUALITATIVE</div>
-            <div class="paradigm-title">质性扎根理论</div>
-            <div class="paradigm-desc">三级编码审计跟踪 (Open/Axial/Selective Coding) 与理论饱和度交叉评估。</div>
-          </div>
-          <div class="paradigm-engine-pill">NVivo / MAXQDA Codebook Link</div>
-        </div>
-
-        <!-- 03 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#03 / SURVEY_SEM</div>
-            <div class="paradigm-title">问卷测量与结构方程</div>
-            <div class="paradigm-desc">信效度检验 (Cronbach's α, CR, AVE) 与 CFA/SEM 拟合指数核验。</div>
-          </div>
-          <div class="paradigm-engine-pill">Mplus · R (lavaan, psych)</div>
-        </div>
-
-        <!-- 04 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#04 / COMPUTATIONAL</div>
-            <div class="paradigm-title">计算社会学与大数据</div>
-            <div class="paradigm-desc">网络拓扑分析、文本挖掘、主题模型 (BERTopic) 与因果推断匹配。</div>
-          </div>
-          <div class="paradigm-engine-pill">Python (networkx, scikit-learn)</div>
-        </div>
-
-        <!-- 05 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#05 / META_ANALYSIS</div>
-            <div class="paradigm-title">系统评价与元分析</div>
-            <div class="paradigm-desc">PRISMA 流程追踪、漏斗图发表偏倚检验与贝叶斯随机效应森林图。</div>
-          </div>
-          <div class="paradigm-engine-pill">R (metafor, brms)</div>
-        </div>
-
-        <!-- 06 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#06 / LONGITUDINAL</div>
-            <div class="paradigm-title">追踪与纵向面板数据</div>
-            <div class="paradigm-desc">固定效应 (Fixed Effects)、交叉滞后面板模型 (CLPM) 与生存分析。</div>
-          </div>
-          <div class="paradigm-engine-pill">Stata · R (plm, survival)</div>
-        </div>
-
-        <!-- 07 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#07 / CAUSAL_INFERENCE</div>
-            <div class="paradigm-title">准实验与因果推断</div>
-            <div class="paradigm-desc">双重差分 (DID)、断点回归 (RDD)、倾向得分匹配 (PSM) 与合成控制。</div>
-          </div>
-          <div class="paradigm-engine-pill">Stata · R (did, MatchIt, rdd)</div>
-        </div>
-
-        <!-- 08 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#08 / MIXED_METHODS</div>
-            <div class="paradigm-title">混合研究方法</div>
-            <div class="paradigm-desc">顺序解释设计、收敛平行设计与定性定量证据三角互证 (Triangulation)。</div>
-          </div>
-          <div class="paradigm-engine-pill">Integrated Mixed Ledger Engine</div>
-        </div>
-
-        <!-- 09 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#09 / ETHNOGRAPHY</div>
-            <div class="paradigm-title">田野民族志与比较案例</div>
-            <div class="paradigm-desc">深度厚描法审计、反身性审视 (Reflexivity) 与跨案例模式匹配分析。</div>
-          </div>
-          <div class="paradigm-engine-pill">Audit Trail / Hermeneutic Log</div>
-        </div>
-
-        <!-- 10 -->
-        <div class="paradigm-carousel-card">
-          <div>
-            <div class="paradigm-num">#10 / REPLICATION</div>
-            <div class="paradigm-title">多实验室可重复性检验</div>
-            <div class="paradigm-desc">精确复现与概念复现对比、R-Index 稳健性评估及 Many Labs 协议对齐。</div>
-          </div>
-          <div class="paradigm-engine-pill">OSF Replication Harness · R</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ==============================================================
-         SLIDE 5: Architectural Comparison (Interactive Spotlight)
-         ============================================================== -->
-    <div class="page-slide" id="slide-5">
-      <div class="section-header-compact">
-        <div class="section-tag">ARCHITECTURAL COMPARISON</div>
-        <h2 class="section-title">为什么学术界需要 PsyClaw？</h2>
-        <p class="section-desc">对比通用大模型、单点辅助工具与 PsyClaw 证据智能体工作台（鼠标悬浮体验聚光灯高光反射）：</p>
-      </div>
-
-      <div class="spotlight-table-wrap" id="spotlight-table">
-        <div class="spotlight-overlay" id="spotlight-overlay"></div>
-        <table>
-          <thead>
-            <tr>
-              <th>核心能力维度</th>
-              <th>通用 LLM / 对话助手</th>
-              <th>单点文献检索工具</th>
-              <th style="color: var(--accent-ink); background: var(--accent-bg);">PsyClaw 科研证据智能体</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>引用真实性保障</strong></td>
-              <td>易产生幻觉虚构文献</td>
-              <td>仅提供检索列表</td>
-              <td class="td-highlight">✔ 2+ 注册源强制交叉核验 (Crossref/OpenAlex)</td>
-            </tr>
-            <tr>
-              <td><strong>统计计算可信度</strong></td>
-              <td>模型口算存在严重偏差</td>
-              <td>无计算能力</td>
-              <td class="td-highlight">✔ 委托原生 Python/R/Mplus 环境与可复现脚本</td>
-            </tr>
-            <tr>
-              <td><strong>学术造假防范</strong></td>
-              <td>无预注册意识与门禁</td>
-              <td>不审查研究假设</td>
-              <td class="td-highlight">✔ 自动审查 OSF 预注册、阻断未声明 p-hacking</td>
-            </tr>
-            <tr>
-              <td><strong>全流程追溯机制</strong></td>
-              <td>不可复现黑盒输出</td>
-              <td>静态元数据导出</td>
-              <td class="td-highlight">✔ 每一条论断签发 SHA-256 结构化账本收据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Footer Inside Slide 5 -->
-      <footer>
-        <div style="display: flex; align-items: center; gap: 0.8rem;">
-          <div class="brand-mark" style="width: 26px; height: 26px; font-size: 0.95rem;">ψ</div>
-          <span style="font-weight: 750; color: var(--ink);">PsyClaw v0.29.14</span>
-          <span>— Evidence-Grounded Social-Science Research Agent</span>
-        </div>
-
-        <div class="mono" style="font-size: 0.76rem;">
-          MIT LICENSE · REPRODUCIBLE RESEARCH PROTOCOL · CLI 默认开启匿名产品遥测（可关闭；营销页本身不自动采集）
-        </div>
-      </footer>
-    </div>
-
+    </footer>
   </div>
 
-  <!-- Interactive Full-Page Wheel Controller & UI Scripts -->
   <script>
-    // ==============================================================
-    // 1. One-Wheel-One-Page Full-Page Slide Engine (整屏滚轮翻页系统)
-    // ==============================================================
-    const slider = document.getElementById("fullpage-slider");
-    const totalSlides = 6;
-    let currentSlide = 0;
-    let isTransitioning = false;
-    const transitionDuration = 750; // ms
-
-    const sideNavDots = document.querySelectorAll(".side-nav-dot");
-    const navLinks = document.querySelectorAll(".nav-links a");
-
-    function updateNavState(index) {
-      sideNavDots.forEach((dot, idx) => {
-        dot.classList.toggle("active", idx === index);
-      });
-      navLinks.forEach((link) => {
-        const target = parseInt(link.getAttribute("data-goto-slide"), 10);
-        link.classList.toggle("active", target === index);
-      });
-    }
-
-    function goToSlide(index) {
-      if (index < 0) index = 0;
-      if (index >= totalSlides) index = totalSlides - 1;
-      currentSlide = index;
-      slider.style.transform = `translateY(-${currentSlide * 100}vh)`;
-      updateNavState(currentSlide);
-    }
-
-    // Wheel Event Listener with Momentum Lock
-    window.addEventListener("wheel", (e) => {
-      // Don't hijack if user is scrolling inside a scrollable child that has room
-      const target = e.target;
-      const scrollable = target.closest(".manuscript-scroll-content, .inspector-scroll-content, .terminal-body, .paradigms-carousel-container");
-      if (scrollable) {
-        const canScrollUp = scrollable.scrollTop > 0;
-        const canScrollDown = scrollable.scrollTop + scrollable.clientHeight < scrollable.scrollHeight;
-        if ((e.deltaY < 0 && canScrollUp) || (e.deltaY > 0 && canScrollDown)) {
-          return; // Let child scroll
-        }
-      }
-
-      if (isTransitioning) return;
-
-      if (Math.abs(e.deltaY) > 25) {
-        if (e.deltaY > 0 && currentSlide < totalSlides - 1) {
-          isTransitioning = true;
-          goToSlide(currentSlide + 1);
-          setTimeout(() => { isTransitioning = false; }, transitionDuration);
-        } else if (e.deltaY < 0 && currentSlide > 0) {
-          isTransitioning = true;
-          goToSlide(currentSlide - 1);
-          setTimeout(() => { isTransitioning = false; }, transitionDuration);
-        }
-      }
-    }, { passive: false });
-
-    // Keyboard navigation (Arrow keys / PageUp / PageDown / Space)
-    window.addEventListener("keydown", (e) => {
-      if (isTransitioning) return;
-      if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
-        if (currentSlide < totalSlides - 1) {
-          isTransitioning = true;
-          goToSlide(currentSlide + 1);
-          setTimeout(() => { isTransitioning = false; }, transitionDuration);
-        }
-      } else if (e.key === "ArrowUp" || e.key === "PageUp") {
-        if (currentSlide > 0) {
-          isTransitioning = true;
-          goToSlide(currentSlide - 1);
-          setTimeout(() => { isTransitioning = false; }, transitionDuration);
-        }
-      }
-    });
-
-    // Touch Swipe Support
-    let touchStartY = 0;
-    window.addEventListener("touchstart", (e) => {
-      touchStartY = e.touches[0].clientY;
-    }, { passive: true });
-
-    window.addEventListener("touchend", (e) => {
-      if (isTransitioning) return;
-      const touchEndY = e.changedTouches[0].clientY;
-      const deltaY = touchStartY - touchEndY;
-      if (Math.abs(deltaY) > 40) {
-        if (deltaY > 0 && currentSlide < totalSlides - 1) {
-          isTransitioning = true;
-          goToSlide(currentSlide + 1);
-          setTimeout(() => { isTransitioning = false; }, transitionDuration);
-        } else if (deltaY < 0 && currentSlide > 0) {
-          isTransitioning = true;
-          goToSlide(currentSlide - 1);
-          setTimeout(() => { isTransitioning = false; }, transitionDuration);
-        }
-      }
-    }, { passive: true });
-
-    // Side Dot clicks & Header clicks
-    sideNavDots.forEach(dot => {
-      dot.addEventListener("click", () => {
-        const target = parseInt(dot.getAttribute("data-slide-index"), 10);
-        goToSlide(target);
-      });
-    });
-
-    document.querySelectorAll("[data-goto-slide]").forEach(el => {
-      el.addEventListener("click", () => {
-        const target = parseInt(el.getAttribute("data-goto-slide"), 10);
-        goToSlide(target);
-      });
-    });
-
-    // ==============================================================
-    // 2. Theme Switcher System
-    // ==============================================================
-    const themeButtons = document.querySelectorAll("[data-set-theme]");
-    themeButtons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const theme = btn.getAttribute("data-set-theme");
-        document.documentElement.setAttribute("data-theme", theme);
-        themeButtons.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        try { localStorage.setItem("psyclaw_theme", theme); } catch (e) {}
-      });
-    });
-    try {
-      const savedTheme = localStorage.getItem("psyclaw_theme");
-      if (savedTheme) {
-        document.documentElement.setAttribute("data-theme", savedTheme);
-        themeButtons.forEach(b => b.classList.toggle("active", b.getAttribute("data-set-theme") === savedTheme));
-      }
-    } catch (e) {}
-
-    // ==============================================================
-    // 3. Quick Install Copy System
-    // ==============================================================
-    const pkgCommands = {
-      pnpm: "pnpm add -g psyclaw@0.29.14 && psyclaw",
-      npm: "npm install -g psyclaw@0.29.14 && psyclaw",
-      yarn: "yarn global add psyclaw@0.29.14 && psyclaw",
-      bun: "bun add -g psyclaw@0.29.14 && psyclaw",
+    const COMMANDS = {
+      npm: "npm install -g psyclaw@0.30.7 && psyclaw",
+      pnpm: "pnpm add -g psyclaw@0.30.7 && psyclaw",
+      cn: "npm install -g psyclaw@0.30.7 --registry=https://registry.npmmirror.com && psyclaw",
     };
-    const installPillButtons = document.querySelectorAll(".install-pill-btn");
-    const cmdText = document.getElementById("install-cmd-text");
-    const copyHeroBtn = document.getElementById("copy-install-btn");
+    const cmdEl = document.getElementById("install-cmd");
+    const copyBtn = document.getElementById("copy-install");
+    const tabs = document.querySelectorAll(".pkg-tab");
 
-    installPillButtons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        installPillButtons.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        const pkg = btn.getAttribute("data-pkg");
-        cmdText.textContent = pkgCommands[pkg] || pkgCommands.pnpm;
-      });
-    });
-
-    copyHeroBtn.addEventListener("click", () => {
-      navigator.clipboard.writeText(cmdText.textContent).then(() => {
-        copyHeroBtn.innerHTML = `<span>COPIED!</span> <span class="mono">✔</span>`;
-        setTimeout(() => {
-          copyHeroBtn.innerHTML = `<span>COPY</span> <span class="mono">📋</span>`;
-        }, 1800);
-      });
-    });
-
-    // ==============================================================
-    // 4. Multi-Scenario Live Terminal Simulator
-    // ==============================================================
-    const termTabButtons = document.querySelectorAll("[data-term-scenario]");
-    const runTerminalDemoBtn = document.getElementById("run-terminal-demo-btn");
-    const termDynamicLines = document.getElementById("term-dynamic-lines");
-
-    const TERMINAL_SCENARIOS = {
-      meta: [
-        { text: "$ psyclaw chat", color: "#64748b" },
-        { text: "> 对在线学习参与度研究执行元分析，先核验文献与效应量数据", color: "#64748b" },
-        { text: "[fixture:intake] 模拟多源检索并生成合成研究清单...", color: "#38bdf8" },
-        { text: "[capture] 抽取 Hedges' g 效应量矩阵与方差协方差结构... 匹配完成", color: "#818cf8" },
-        { text: "[fixture:audit] 统计字段由外部工具返回；本示例不提供真实数值", color: "#a855f7" },
-        { text: "[fixture:brief] 生成演示报告并签发合成 receipt: fixture-meta-001", color: "#34d399" },
-      ],
-      sem: [
-        { text: "$ psyclaw chat", color: "#64748b" },
-        { text: "> 审查结构方程模型方案与 sample_n890.csv 的可复现分析契约", color: "#64748b" },
-        { text: "[intake] 解析测量模型: 4 潜变量 (Workload, Burnout, SelfEfficacy, Turnover)...", color: "#38bdf8" },
-        { text: "[fixture:capture] 生成 Mplus 委托契约；不在浏览器中执行统计", color: "#818cf8" },
-        { text: "[fixture:audit] 等待外部统计产物与环境记录", color: "#34d399" },
-        { text: "[fixture:brief] 仅展示中介路径字段结构，不声称统计结论", color: "#34d399" },
-      ],
-      prereg: [
-        { text: "$ psyclaw chat", color: "#64748b" },
-        { text: "> 核对预注册与 experiment_run1.parquet，报告所有分析偏离", color: "#64748b" },
-        { text: "[fixture:intake] 读取合成预注册记录 fixture:prereg-001...", color: "#38bdf8" },
-        { text: "[fixture:audit] 比较合成剔除规则与分析契约", color: "#34d399" },
-        { text: "[fixture:audit] 演示匹配/偏离字段，不给出真实风险概率", color: "#34d399" },
-        { text: "[fixture:ledger] 签发合成门禁 receipt: fixture-prereg-001", color: "#34d399" },
-      ],
-      network: [
-        { text: "$ psyclaw chat", color: "#64748b" },
-        { text: "> 为 sociology_abstracts_2025 构建可追溯主题图谱，保留来源定位", color: "#64748b" },
-        { text: "[fixture:intake] 加载合成摘要清单并建立主题图谱契约...", color: "#38bdf8" },
-        { text: "[fixture:capture] 生成 networkx/BERTopic 委托脚本", color: "#818cf8" },
-        { text: "[fixture:audit] 等待外部图谱产物后再核验中心性与置换检验", color: "#34d399" },
-        { text: "[fixture:brief] 输出演示拓扑产物清单与合成哈希", color: "#34d399" },
-      ]
-    };
-
-    let currentTermScenario = "meta";
-
-    function renderTermLines(scenarioKey) {
-      termDynamicLines.innerHTML = "";
-      const lines = TERMINAL_SCENARIOS[scenarioKey] || TERMINAL_SCENARIOS.meta;
-      lines.forEach(item => {
-        const div = document.createElement("div");
-        div.style.color = item.color;
-        div.textContent = item.text;
-        termDynamicLines.appendChild(div);
+    function setCmd(pkg) {
+      const text = COMMANDS[pkg] || COMMANDS.npm;
+      cmdEl.innerHTML = "<span>$</span> " + text;
+      tabs.forEach((tab) => {
+        tab.setAttribute("aria-selected", tab.getAttribute("data-pkg") === pkg ? "true" : "false");
       });
     }
 
-    termTabButtons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        termTabButtons.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        currentTermScenario = btn.getAttribute("data-term-scenario");
-        renderTermLines(currentTermScenario);
-      });
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => setCmd(tab.getAttribute("data-pkg")));
     });
 
-    runTerminalDemoBtn.addEventListener("click", () => {
-      termDynamicLines.innerHTML = "";
-      const lines = TERMINAL_SCENARIOS[currentTermScenario] || TERMINAL_SCENARIOS.meta;
-      let idx = 0;
-      function streamLine() {
-        if (idx < lines.length) {
-          const item = lines[idx];
-          const div = document.createElement("div");
-          div.style.color = item.color;
-          div.textContent = item.text;
-          termDynamicLines.appendChild(div);
-          idx++;
-          setTimeout(streamLine, 450);
-        }
+    copyBtn.addEventListener("click", async () => {
+      const text = cmdEl.textContent.replace(/^\$\s*/, "").trim();
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtn.textContent = "已复制";
+        setTimeout(() => { copyBtn.textContent = "复制"; }, 1400);
+      } catch {
+        copyBtn.textContent = "失败";
+        setTimeout(() => { copyBtn.textContent = "复制"; }, 1400);
       }
-      streamLine();
     });
-
-    // ==============================================================
-    // 5. Unified Gatekeeper Monitor Switcher
-    // ==============================================================
-    const scenarioPills = document.querySelectorAll(".scenario-pill-btn");
-    const gateVerdictBadge = document.getElementById("audit-verdict-badge");
-    const stage1Text = document.getElementById("stage-1-text");
-    const stage2Text = document.getElementById("stage-2-text");
-    const stage3Text = document.getElementById("stage-3-text");
-    const receiptHash = document.getElementById("audit-receipt-hash");
-    const receiptTime = document.getElementById("audit-receipt-time");
-
-    const AUDIT_FLOW_DATA = {
-      "p-hacking": {
-        badgeText: "HARD BLOCKED",
-        badgeClass: "blocked",
-        s1: "模型试图在 18 项探索性子量表中筛选出 p=0.038 单项报告为主假设结论。",
-        s2: "检测到假设自由度通胀 (Multiple Hypothesis Inflation Without Bonferroni/FDR Correction)。",
-        s3: "立即阻断下游生成，强制打上 UNCERTAIN 永久风险标签并签发异常审计收据。",
-        hash: "PROVENANCE_RECEIPT: 3b9c028a4e8d... (p-hacking Violation Blocked)",
-        time: "TIMESTAMP: 2026-08-16T02:40:00Z · PROTOCOL #SEC-01"
-      },
-      "fake-doi": {
-        badgeText: "HALLUCINATION BLOCKED",
-        badgeClass: "blocked",
-        s1: "外部 LLM 凭空捏造论文标题并附加虚构 DOI: 10.1016/j.socsci.2025.99999。",
-        s2: "Crossref & OpenAlex 双注册中心联合检索均返回 404 NOT_FOUND。",
-        s3: "绝不将未经来源核验的 Claim 写入事实，直接阻断引用并输出安全警告。",
-        hash: "REJECTED_HASH: e8a912f001c4... (Unregistered DOI Blocked)",
-        time: "TIMESTAMP: 2026-08-16T02:40:00Z · PROTOCOL #SEC-02"
-      },
-      "no-prereg": {
-        badgeText: "DOWNGRADED TO EXPLORATORY",
-        badgeClass: "warn",
-        s1: "论文试图将未在 OSF 预先登记的亚组探索性分析声称为预设证实性研究。",
-        s2: "OSF 协议哈希不存在与本次数据采集前匹配的时间戳与假设清单。",
-        s3: "方法学门禁强制将结论定级降为「探索性发现 (Exploratory)」，禁止声称因果推断。",
-        hash: "RECEIPT_HASH: a4f569b82103... (Exploratory Protocol Tagged)",
-        time: "TIMESTAMP: 2026-08-16T02:40:00Z · PROTOCOL #SEC-03"
-      },
-      "verified-chain": {
-        badgeText: "FULLY AUTHENTICATED",
-        badgeClass: "passed",
-        s1: "合成论断与 fixture:claim-001 的演示元数据匹配。",
-        s2: "合成预注册、分析契约与外部工具 receipt 字段齐备。",
-        s3: "合成 fixture 的门禁字段齐备，签发可校验的 SHA-256 receipt 示例。",
-        hash: "LEDGER_HASH: 7f8a9b2c3d4e5f... (SHA-256 Authenticated)",
-        time: "TIMESTAMP: 2026-08-16T02:40:00Z · PROVENANCE LEDGER #PL-001"
-      }
-    };
-
-    scenarioPills.forEach(pill => {
-      pill.addEventListener("click", () => {
-        scenarioPills.forEach(p => p.classList.remove("active"));
-        pill.classList.add("active");
-        const key = pill.getAttribute("data-audit");
-        const data = AUDIT_FLOW_DATA[key];
-        if (data) {
-          gateVerdictBadge.textContent = data.badgeText;
-          gateVerdictBadge.className = "verdict-badge " + data.badgeClass;
-          stage1Text.textContent = data.s1;
-          stage2Text.textContent = data.s2;
-          stage3Text.textContent = data.s3;
-          receiptHash.textContent = data.hash;
-          receiptTime.textContent = data.time;
-        }
-      });
-    });
-
-    // ==============================================================
-    // 6. Manuscript Claim Interactive Inspector
-    // ==============================================================
-    const claimHighlights = document.querySelectorAll(".claim-highlight");
-    const inspTitle = document.getElementById("insp-title");
-    const inspStatus = document.getElementById("insp-status-badge");
-    const inspClaim = document.getElementById("insp-claim-text");
-    const inspDoi = document.getElementById("insp-doi-text");
-    const inspPrereg = document.getElementById("insp-prereg-text");
-    const inspEngine = document.getElementById("insp-engine-text");
-    const inspHash = document.getElementById("insp-hash-text");
-
-    const CLAIMS_DATA = {
-      "claim-1": {
-        title: "实证论断 #EV-01",
-        status: "SYNTHETIC FIXTURE PASS",
-        statusClass: "passed",
-        claim: "实验组工作记忆跨度显著低于对照组 [Cohen's d = 0.42, p < 0.001]",
-        doi: "fixture:claim-001 (合成标识符，不是 DOI)",
-        prereg: "fixture:prereg-001 (合成预注册记录)",
-        engine: "外部统计工具 receipt 字段示例；未执行真实分析",
-        hash: "fixture-sha256-claim-001"
-      },
-      "claim-2": {
-        title: "实证论断 #EV-02",
-        status: "STATISTICALLY CONSISTENT",
-        statusClass: "passed",
-        claim: "注意力分散通过认知超载对多任务决策精度产生负向预测效应 [β = -0.34, t = -4.12]",
-        doi: "fixture:claim-002 (合成标识符，不是 DOI)",
-        prereg: "fixture:prereg-002 (合成模型字段)",
-        engine: "Mplus/R 委托契约示例；未执行真实分析",
-        hash: "fixture-sha256-claim-002"
-      },
-      "claim-3": {
-        title: "存疑论断 #EV-03 (Uncertain)",
-        status: "UNCERTAIN / PRE-REG MISSING",
-        statusClass: "warn",
-        claim: "社交网络沉浸时长与决策偏误的关系（样本流失率高且未预注册剔除标准）",
-        doi: "fixture:claim-003 (合成标识符，不是 DOI)",
-        prereg: "未在 OSF 预注册该亚组分析，属于事后回溯探索 (HARK-ing Risk)",
-        engine: "外部统计委托尚未完成，因此保持 uncertain",
-        hash: "fixture-sha256-claim-003"
-      }
-    };
-
-    claimHighlights.forEach(tag => {
-      tag.addEventListener("click", () => {
-        claimHighlights.forEach(t => t.classList.remove("active"));
-        tag.classList.add("active");
-        const claimId = tag.getAttribute("data-claim-id");
-        const data = CLAIMS_DATA[claimId];
-        if (data) {
-          inspTitle.textContent = data.title;
-          inspStatus.textContent = data.status;
-          inspStatus.className = "scenario-pill-tag " + data.statusClass;
-          inspClaim.textContent = data.claim;
-          inspDoi.textContent = data.doi;
-          inspPrereg.textContent = data.prereg;
-          inspEngine.textContent = data.engine;
-          inspHash.textContent = data.hash;
-        }
-      });
-    });
-
-    // ==============================================================
-    // 7. 10 Paradigms Horizontal Carousel Navigation
-    // ==============================================================
-    const carousel = document.getElementById("paradigms-carousel");
-    const prevBtn = document.getElementById("carousel-prev-btn");
-    const nextBtn = document.getElementById("carousel-next-btn");
-
-    if (carousel && prevBtn && nextBtn) {
-      prevBtn.addEventListener("click", () => {
-        carousel.scrollBy({ left: -320, behavior: "smooth" });
-      });
-      nextBtn.addEventListener("click", () => {
-        carousel.scrollBy({ left: 320, behavior: "smooth" });
-      });
-    }
-
-    // ==============================================================
-    // 8. Spotlight Glass-Wipe Reflection Effect for Table
-    // ==============================================================
-    const tableWrap = document.getElementById("spotlight-table");
-    const spotlightOverlay = document.getElementById("spotlight-overlay");
-
-    if (tableWrap && spotlightOverlay) {
-      tableWrap.addEventListener("mousemove", (e) => {
-        const rect = tableWrap.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        tableWrap.style.setProperty("--mouse-x", `${x}px`);
-        tableWrap.style.setProperty("--mouse-y", `${y}px`);
-      });
-    }
   </script>
 </body>
 </html>
