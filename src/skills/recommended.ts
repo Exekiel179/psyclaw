@@ -18,6 +18,9 @@ import { fileURLToPath } from "node:url";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { parse as parseYaml } from "yaml";
 import { atomicWriteFile } from "../project/jsonl.js";
+import { assertProjectRootUsable, assertSafeProjectPath, isUnsuitableProjectRoot } from "../project/paths.js";
+import { copyErrnoOnto, fsWriteErrorMessage } from "../observability/error-context.js";
+import { ExpectedUserError } from "../observability/expected.js";
 import {
   configuredRegistry,
   rewriteGithubHttpsThroughMirror,
@@ -122,48 +125,147 @@ export function normalizeRecommendedSkillId(id: string): string {
   return normalizedId(id);
 }
 
-function recommendationStatePath(root: string): string {
+export function projectRecommendationStatePath(root: string): string {
   return join(resolve(root), ".psyclaw", "recommendations.json");
 }
 
-export async function readRecommendationState(root: string): Promise<RecommendationState> {
+export function userRecommendationStatePath(agentDir = getAgentDir()): string {
+  return join(agentDir, "recommendations.json");
+}
+
+function emptyRecommendationState(): RecommendationState {
+  return { schemaVersion: "psyclaw/recommendation-state/v1", skills: [], mcp: [] };
+}
+
+function parseRecommendationState(value: unknown): RecommendationState {
+  if (!isRecord(value)) throw new Error("invalid state");
+  const skills = Array.isArray(value.skills)
+    ? value.skills.filter((id): id is string => typeof id === "string").map(normalizedId)
+    : [];
+  const mcp = Array.isArray(value.mcp) ? value.mcp.filter((id): id is string => typeof id === "string") : [];
+  const skillSources = isRecord(value.skillSources)
+    ? Object.fromEntries(Object.entries(value.skillSources).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
+    : undefined;
+  const skillScopes = isRecord(value.skillScopes)
+    ? Object.fromEntries(Object.entries(value.skillScopes)
+      .filter((entry): entry is [string, RecommendedSkillScope] => entry[1] === "project" || entry[1] === "user")
+      .map(([id, scope]) => [normalizedId(id), scope]))
+    : undefined;
+  return {
+    schemaVersion: "psyclaw/recommendation-state/v1",
+    skills: [...new Set(skills)].sort(),
+    mcp: [...new Set(mcp)].sort(),
+    ...(skillScopes === undefined ? {} : { skillScopes }),
+    ...(skillSources === undefined ? {} : { skillSources }),
+  };
+}
+
+async function readRecommendationStateFile(path: string): Promise<RecommendationState> {
   try {
-    const value = JSON.parse(await readFile(recommendationStatePath(root), "utf8")) as unknown;
-    if (!isRecord(value)) throw new Error("invalid state");
-    const skills = Array.isArray(value.skills)
-      ? value.skills.filter((id): id is string => typeof id === "string").map(normalizedId)
-      : [];
-    const mcp = Array.isArray(value.mcp) ? value.mcp.filter((id): id is string => typeof id === "string") : [];
-    const skillSources = isRecord(value.skillSources)
-      ? Object.fromEntries(Object.entries(value.skillSources).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
-      : undefined;
-    const skillScopes = isRecord(value.skillScopes)
-      ? Object.fromEntries(Object.entries(value.skillScopes)
-        .filter((entry): entry is [string, RecommendedSkillScope] => entry[1] === "project" || entry[1] === "user")
-        .map(([id, scope]) => [normalizedId(id), scope]))
-      : undefined;
-    return {
-      schemaVersion: "psyclaw/recommendation-state/v1",
-      skills: [...new Set(skills)].sort(),
-      mcp: [...new Set(mcp)].sort(),
-      ...(skillScopes === undefined ? {} : { skillScopes }),
-      ...(skillSources === undefined ? {} : { skillSources }),
-    };
+    return parseRecommendationState(JSON.parse(await readFile(path, "utf8")) as unknown);
   } catch {
-    return { schemaVersion: "psyclaw/recommendation-state/v1", skills: [], mcp: [] };
+    return emptyRecommendationState();
   }
 }
 
-export async function saveRecommendationState(root: string, state: RecommendationState): Promise<void> {
-  const path = recommendationStatePath(root);
-  await mkdir(dirname(path), { recursive: true });
-  await atomicWriteFile(path, `${JSON.stringify({
+function skillScopeOf(state: RecommendationState, id: string): RecommendedSkillScope {
+  return state.skillScopes?.[id] ?? "project";
+}
+
+function pickScopedState(state: RecommendationState, scope: RecommendedSkillScope): RecommendationState {
+  const skills = state.skills.map(normalizedId).filter((id) => skillScopeOf(state, id) === scope);
+  const skillScopes = Object.fromEntries(
+    Object.entries(state.skillScopes ?? {}).filter(([id, value]) => value === scope && skills.includes(normalizedId(id))),
+  );
+  const skillSources = state.skillSources === undefined
+    ? undefined
+    : Object.fromEntries(Object.entries(state.skillSources).filter(([key]) => skills.includes(normalizedId(key))));
+  return {
     schemaVersion: "psyclaw/recommendation-state/v1",
-    skills: [...new Set(state.skills.map(normalizedId))].sort(),
-    mcp: [...new Set(state.mcp)].sort(),
-    ...(state.skillScopes === undefined ? {} : { skillScopes: state.skillScopes }),
-    ...(state.skillSources === undefined ? {} : { skillSources: state.skillSources }),
-  }, null, 2)}\n`);
+    skills,
+    mcp: scope === "project" ? [...state.mcp] : [],
+    ...(Object.keys(skillScopes).length > 0 ? { skillScopes } : {}),
+    ...(skillSources !== undefined && Object.keys(skillSources).length > 0 ? { skillSources } : {}),
+  };
+}
+
+function mergeRecommendationState(project: RecommendationState, user: RecommendationState): RecommendationState {
+  const skillScopes: Record<string, RecommendedSkillScope> = { ...(project.skillScopes ?? {}) };
+  for (const id of user.skills) skillScopes[normalizedId(id)] = "user";
+  for (const [id, scope] of Object.entries(user.skillScopes ?? {})) skillScopes[normalizedId(id)] = scope;
+  const skills = [...new Set([...project.skills, ...user.skills].map(normalizedId))].sort();
+  const mcp = [...new Set([...project.mcp, ...user.mcp])].sort();
+  const skillSources = { ...(project.skillSources ?? {}), ...(user.skillSources ?? {}) };
+  return {
+    schemaVersion: "psyclaw/recommendation-state/v1",
+    skills,
+    mcp,
+    ...(Object.keys(skillScopes).length > 0 ? { skillScopes } : {}),
+    ...(Object.keys(skillSources).length > 0 ? { skillSources } : {}),
+  };
+}
+
+export async function readRecommendationState(
+  root: string,
+  options: { agentDir?: string } = {},
+): Promise<RecommendationState> {
+  const project = await readRecommendationStateFile(projectRecommendationStatePath(root));
+  const user = await readRecommendationStateFile(userRecommendationStatePath(options.agentDir ?? getAgentDir()));
+  return mergeRecommendationState(project, user);
+}
+
+function throwProjectStateUnwritable(path: string): never {
+  const failedPath = dirname(path);
+  const fake = Object.assign(new Error("EPERM"), { code: "EPERM", syscall: "mkdir", path: failedPath });
+  throw copyErrnoOnto(new ExpectedUserError(fsWriteErrorMessage(fake, path, "project")), fake, failedPath);
+}
+
+async function writeRecommendationStateFile(
+  path: string,
+  state: RecommendationState,
+  scope: "project" | "user",
+): Promise<void> {
+  try {
+    await mkdir(dirname(path), { recursive: true });
+    await atomicWriteFile(path, `${JSON.stringify({
+      schemaVersion: "psyclaw/recommendation-state/v1",
+      skills: [...new Set(state.skills.map(normalizedId))].sort(),
+      mcp: [...new Set(state.mcp)].sort(),
+      ...(state.skillScopes === undefined ? {} : { skillScopes: state.skillScopes }),
+      ...(state.skillSources === undefined ? {} : { skillSources: state.skillSources }),
+    }, null, 2)}\n`);
+  } catch (error) {
+    if (error instanceof ExpectedUserError) throw error;
+    throw copyErrnoOnto(new Error(fsWriteErrorMessage(error, path, scope)), error, path);
+  }
+}
+
+export async function saveRecommendationState(
+  root: string,
+  state: RecommendationState,
+  options: { agentDir?: string } = {},
+): Promise<void> {
+  const agentDir = options.agentDir ?? getAgentDir();
+  const userState = pickScopedState(state, "user");
+  const projectState = pickScopedState(state, "project");
+  const userPath = userRecommendationStatePath(agentDir);
+  const projectPath = projectRecommendationStatePath(root);
+  const existingUser = await readRecommendationStateFile(userPath);
+  if (userState.skills.length > 0 || existingUser.skills.length > 0) {
+    await writeRecommendationStateFile(userPath, userState, "user");
+  }
+
+  const existingProject = await readRecommendationStateFile(projectPath);
+  const needsProjectWrite = projectState.skills.length > 0 || projectState.mcp.length > 0
+    || existingProject.skills.length > 0 || existingProject.mcp.length > 0;
+  if (!needsProjectWrite) return;
+  if (isUnsuitableProjectRoot(root)) {
+    if (projectState.skills.length > 0 || projectState.mcp.length > 0) throwProjectStateUnwritable(projectPath);
+    return;
+  }
+  await assertProjectRootUsable(root);
+  await assertSafeProjectPath(root, ".psyclaw/recommendations.json");
+  await writeRecommendationStateFile(projectPath, projectState, "project");
 }
 
 function catalogCandidates(): string[] {
@@ -410,8 +512,8 @@ export async function installRecommendedSkill(root: string, requestedId: string,
   }
 }
 
-export async function enabledRecommendedSkillPaths(root: string): Promise<EnabledSkillPaths> {
-  const state = await readRecommendationState(root);
+export async function enabledRecommendedSkillPaths(root: string, options: { agentDir?: string } = {}): Promise<EnabledSkillPaths> {
+  const state = await readRecommendationState(root, options);
   const catalog = await readRecommendedCatalog();
   const catalogIds = new Set(catalog.items.map((item) => normalizedId(item.id)));
   const paths: string[] = [];

@@ -1,7 +1,107 @@
-import { lstat, mkdir, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { constants as fsConstants } from "node:fs";
+import { access, lstat, mkdir, realpath } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { copyErrnoOnto, redactUserPath } from "../observability/error-context.js";
+import { ExpectedUserError } from "../observability/expected.js";
 
 export const PSYCLAW_DIR = ".psyclaw" as const;
+
+function posixify(value: string): string {
+  return value.replaceAll("\\", "/").replace(/\/+$/, "") || "/";
+}
+
+function withoutDrive(value: string): string {
+  return posixify(value).replace(/^[a-zA-Z]:/, "") || "/";
+}
+
+function pathInside(root: string, candidate: string): boolean {
+  const base = posixify(root).toLowerCase();
+  const haystack = posixify(candidate).toLowerCase();
+  return haystack === base || haystack.startsWith(`${base}/`);
+}
+
+function windowsProtectedPrefix(pathValue: string): boolean {
+  const normalized = (posixify(pathValue).startsWith("/") ? posixify(pathValue) : `/${posixify(pathValue)}`).toLowerCase();
+  const stem = normalized.replace(/^[a-z]:/, "");
+  return (
+    stem === "/windows" ||
+    stem.startsWith("/windows/") ||
+    stem === "/program files" ||
+    stem.startsWith("/program files/") ||
+    stem === "/program files (x86)" ||
+    stem.startsWith("/program files (x86)/")
+  );
+}
+
+function envProtectedRoots(env: NodeJS.ProcessEnv): string[] {
+  return [
+    env.WINDIR,
+    env.SystemRoot,
+    env.PROGRAMFILES,
+    env["PROGRAMFILES(X86)"],
+    env.ProgramW6432,
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+}
+
+/**
+ * True when `root` is an OS-protected location that must not host a research
+ * project or project-scoped `.psyclaw` state (Windows System32 / Program Files,
+ * and equivalent Unix system prefixes).
+ */
+export function isUnsuitableProjectRoot(
+  root: string,
+  options: { platform?: NodeJS.Platform; env?: NodeJS.ProcessEnv } = {},
+): boolean {
+  const platform = options.platform ?? process.platform;
+  const env = options.env ?? process.env;
+  const original = posixify(root);
+  const resolved = posixify(resolve(root));
+  if (
+    windowsProtectedPrefix(original) ||
+    windowsProtectedPrefix(withoutDrive(original)) ||
+    windowsProtectedPrefix(resolved) ||
+    windowsProtectedPrefix(withoutDrive(resolved))
+  ) {
+    return true;
+  }
+  for (const protectedRoot of envProtectedRoots(env)) {
+    if (pathInside(protectedRoot, original) || pathInside(protectedRoot, resolved)) return true;
+  }
+  if (platform === "win32") return false;
+  const unixPrefixes = ["/bin", "/sbin", "/etc", "/boot", "/proc", "/sys", "/dev", "/System"];
+  return unixPrefixes.some((prefix) => resolved === prefix || resolved.startsWith(`${prefix}/`));
+}
+
+export function unusableProjectRootMessage(root: string, failedPath = join(resolve(root), PSYCLAW_DIR)): string {
+  const display = redactUserPath(failedPath);
+  return `无法在当前工作目录创建项目文件：${display}。该路径不可写（常见原因：从 C:\\Windows\\System32 或其他系统目录启动）。请先切换到可写的研究项目目录后再运行 /init。`;
+}
+
+export function throwUnusableProjectRoot(root: string, failedPath = join(resolve(root), PSYCLAW_DIR)): never {
+  const error = Object.assign(new Error("EPERM"), { code: "EPERM", syscall: "mkdir", path: failedPath });
+  throw copyErrnoOnto(new ExpectedUserError(unusableProjectRootMessage(root, failedPath)), error, failedPath);
+}
+
+/**
+ * Refuse to mkdir under OS-protected cwd before Node throws a bare EPERM.
+ * Unexpected permission failures still propagate with errno + path attached.
+ */
+export async function assertProjectRootUsable(root: string): Promise<void> {
+  const base = resolve(root);
+  if (isUnsuitableProjectRoot(base) || isUnsuitableProjectRoot(root)) {
+    throwUnusableProjectRoot(root);
+  }
+  try {
+    await access(base, fsConstants.W_OK);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return;
+    if (code === "EPERM" || code === "EACCES") {
+      throw copyErrnoOnto(new ExpectedUserError(unusableProjectRootMessage(root)), error, join(base, PSYCLAW_DIR));
+    }
+    throw error;
+  }
+}
 
 export function projectPaths(root: string) {
   const base = resolve(root);
@@ -49,6 +149,7 @@ export function projectPaths(root: string) {
 
 export async function ensureProjectDirectories(root: string): Promise<void> {
   const paths = projectPaths(root);
+  await assertProjectRootUsable(root);
   const rootStat = await lstat(paths.root);
   if (rootStat.isSymbolicLink()) throw new Error(`Project root symlink is not allowed: ${paths.root}`);
   const directoryTargets = [
@@ -90,7 +191,15 @@ export async function ensureProjectDirectories(root: string): Promise<void> {
       if (!stat.isDirectory()) throw new Error(`Expected directory: ${target}`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      await mkdir(candidate, { recursive: false });
+      try {
+        await mkdir(candidate, { recursive: false });
+      } catch (mkdirError) {
+        const code = (mkdirError as NodeJS.ErrnoException).code;
+        if (code === "EPERM" || code === "EACCES") {
+          throw copyErrnoOnto(new Error(unusableProjectRootMessage(root, candidate)), mkdirError, candidate);
+        }
+        throw mkdirError;
+      }
     }
   }
 }
