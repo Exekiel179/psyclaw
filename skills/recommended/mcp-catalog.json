@@ -1,6 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-mcp/v1",
-  "documentVersion": "0.3.3",
+  "documentVersion": "0.3.4",
+  "syncedAt": "2026-09-15",
   "sourceDocument": "学术AI_Skill分享资料.pdf + curated research MCP review",
   "sourceRef": "user-curated",
   "items": [
@@ -118,7 +119,7 @@
       "id": "mne-mcp",
       "name": "MNE MCP",
       "stage": "神经生理",
-      "description": "为 EEG、MEG、iEEG、fNIRS 等 MNE-Python 分析提供受控工具；也可经 /biosignal 能力包与配套 Skill 一并安装配置。",
+      "description": "MNE-Python 神经生理分析 MCP（EEG/MEG/sEEG/ECoG/fNIRS）：持久会话、结构化工具与图件捕获；PyPI mne-mcp 0.4.1 为轻量接口层，科学栈复用本机环境并由 setup/安装器按需补齐。可经 /biosignal 与配套 Skill 一并启用；PsyClaw 注册文件为 ~/.psyclaw/mcp/mne.json。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
       "transport": "stdio",
       "risk": "local-data-and-compute",
@@ -148,7 +149,7 @@
     {"id":"scholar-mcp","sourceKind":"github","ref":"f94eac6a49c6d35a83f35148375eebfa08459e9b","license":"MIT","command":"git clone https://github.com/pvliesdonk/scholar-mcp .psyclaw/mcp-src/scholar-mcp && git -C .psyclaw/mcp-src/scholar-mcp checkout f94eac6a49c6d35a83f35148375eebfa08459e9b","target":".psyclaw/mcp/scholar-mcp.json","dependencies":["Git","provider/API configuration per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify executable entrypoint and API terms before registration."},
     {"id":"drawio-mcp","sourceKind":"npm","ref":"1.5.0","license":"Apache-2.0","command":"npx -y @drawio/mcp@1.5.0","target":".psyclaw/mcp/drawio-mcp.json","dependencies":["Node.js >=18","npm","browser to open app.diagrams.net (or DRAWIO_BASE_URL)"],"status":"review-required","requiresApproval":true,"blockedReason":"Confirm stdio config opens diagrams in the browser; optional DRAWIO_BASE_URL for self-hosted draw.io. Hosted MCP Apps endpoint https://mcp.draw.io/mcp is a separate path."},
     {"id":"playwright-mcp","sourceKind":"github","ref":"7e0457a7cbf88823bf0146d12c46ae12c6818247","license":"Apache-2.0","command":"npx -y @playwright/mcp@latest","target":".psyclaw/mcp/playwright-mcp.json","dependencies":["Node.js >=18","npm or pnpm","optional browser extension for existing login session"],"status":"review-required","requiresApproval":true,"blockedReason":"Pin npm package version before execution; browser navigation/download remains separately approved."},
-    {"id":"mne-mcp","sourceKind":"github","ref":"627142cb5beebe1a210a8e0fb1e15afbec8b8010","license":"MIT","command":"uvx --from mne-mcp==0.3.0 mne-mcp","target":".psyclaw/mcp/mne-mcp.json","dependencies":["Python >=3.10","uv","MNE-Python data dependencies"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify PyPI artifact hash and local-data write policy before registration."},
+    {"id":"mne-mcp","sourceKind":"pypi","ref":"0.4.1","license":"MIT","command":"python -m pip install --upgrade 'mne-mcp==0.4.1' && python -m mne_mcp.cli setup --clients psyclaw","target":".psyclaw/mcp/mne.json","dependencies":["CPython >=3.12","pip","existing or installer-provisioned MNE analysis stack (mne/numpy/scipy/matplotlib/pandas)","optional scikit-learn / mne-connectivity / autoreject / mne-bids / nibabel / pyvista for advanced tools"],"status":"review-required","requiresApproval":true,"blockedReason":"Prefer an existing MNE scientific env; setup writes ~/.psyclaw/mcp/mne.json and companion skills under ~/.psyclaw/skills. Verify with python -m mne_mcp.cli verify --client psyclaw, then /reload. Local EEG data write policy still requires human trust."},
     {"id":"spss-mcp","sourceKind":"github","ref":"fb4f020189b28b8acfb23a710875a7f9ae4e1e62","license":"MIT","command":"git clone https://github.com/Exekiel179/SPSS-MCP .psyclaw/mcp-src/spss-mcp && git -C .psyclaw/mcp-src/spss-mcp checkout fb4f020189b28b8acfb23a710875a7f9ae4e1e62","target":".psyclaw/mcp/spss-mcp.json","dependencies":["Git","IBM SPSS Statistics","Python runtime per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify repository entrypoint and SPSS license/runtime before registration."}
   ]
 }
