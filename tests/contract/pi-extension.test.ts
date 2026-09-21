@@ -20,7 +20,7 @@ describe("Pi extension contract", () => {
     // research surface: /verify and /model stay reachable for the CLI/simple
     // hosts, while UI-gated research commands (agents/grill/...) are not
     // registered at all.
-    expect([...commands.keys()]).toEqual(["init", "crosscheck", "verify", "help", "plan", "handoff", "model"]);
+    expect([...commands.keys()]).toEqual(["exit", "init", "crosscheck", "verify", "help", "plan", "handoff", "model"]);
   });
 
   it("registers the full research command surface on a modern Pi API", () => {
@@ -31,12 +31,25 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     expect(commands).toEqual([
-      "init", "crosscheck", "verify", "help", "plan", "handoff", "grill", "brainstorm", "review", "loop",
+      "exit", "init", "crosscheck", "verify", "help", "plan", "handoff", "grill", "brainstorm", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
       "skill", "biosignal", "ars", "plugin", "mcp", "provider", "pet", "telemetry", "agents",
     ]);
     expect(commands).not.toContain("run");
     expect(commands).not.toContain("brief");
+  });
+
+  it("supports /exit as a graceful alias for /quit", async () => {
+    let exitHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "exit") exitHandler = options.handler;
+      },
+    } as any;
+    extension(api);
+    let shutdownCalls = 0;
+    await exitHandler?.("", { shutdown: () => { shutdownCalls += 1; } });
+    expect(shutdownCalls).toBe(1);
   });
 
   it("lets the init command bootstrap through the Pi context cwd", async () => {

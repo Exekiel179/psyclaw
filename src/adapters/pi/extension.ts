@@ -1727,6 +1727,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     });
     return undefined;
   });
+  pi.registerCommand("exit", {
+    description: "完整退出 PsyClaw（等同 /quit）",
+    handler: async (_args, ctx) => {
+      ctx.shutdown();
+    },
+  });
   pi.registerCommand("init", {
     description: "搭建干净工作仓库（目录 + psyclaw.md），不自动追问",
     handler: async (args, ctx) => {

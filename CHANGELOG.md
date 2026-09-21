@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.8 - 2026-09-21
+
+- Support `/exit` as a graceful alias for `/quit`
+- Refresh recommended Skill, MCP, and Subagent catalogs against current upstream sources
+- Pin executable MCP package versions and correct licenses, runtimes, and install guidance
+
 ## 0.30.7 - 2026-09-14
 
 - Interactive Pi turn_end/agent_end emit PostHog $ai_generation and Sentry cli.llm_call spans (PR #15)

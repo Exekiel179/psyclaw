@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-mcp/v1",
-  "documentVersion": "0.3.3",
+  "documentVersion": "0.3.4",
   "sourceDocument": "学术AI_Skill分享资料.pdf + curated research MCP review",
   "sourceRef": "user-curated",
   "items": [
@@ -138,17 +138,200 @@
     }
   ],
   "installPrep": [
-    {"id":"computer-use-mcp","sourceKind":"github","ref":"latest","license":"MIT","command":"npx -y @zavora-ai/computer-use-mcp","target":".psyclaw/mcp/computer-use-mcp.json","dependencies":["Node.js >=18","npm","OS accessibility / screen permissions"],"status":"review-required","requiresApproval":true,"blockedReason":"Desktop control is high-risk; pin package version and require explicit per-action approval before enabling write effects."},
-    {"id":"markitdown-mcp","sourceKind":"pypi","ref":"latest-stable","license":"MIT","command":"python -m pip install markitdown-mcp","target":".psyclaw/mcp/markitdown-mcp.json","dependencies":["Python >=3.10","pip","markitdown-mcp"],"status":"installable","requiresApproval":true},
-    {"id":"paper-search-mcp","sourceKind":"github","ref":"c8b642183bb725f0a7faec89e58b558df09079d1","license":"MIT","command":"git clone https://github.com/openags/paper-search-mcp .psyclaw/mcp-src/paper-search-mcp && git -C .psyclaw/mcp-src/paper-search-mcp checkout c8b642183bb725f0a7faec89e58b558df09079d1","target":".psyclaw/mcp/paper-search-mcp.json","dependencies":["Git","Python/uv per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify package entrypoint and lockfile before registering a stdio server."},
-    {"id":"scientific-papers-mcp","sourceKind":"github","ref":"646da8d8af653f6b833f3725bae4cafc38a9428e","license":"unknown","command":"git clone https://github.com/benedict2310/Scientific-Papers-MCP .psyclaw/mcp-src/scientific-papers-mcp && git -C .psyclaw/mcp-src/scientific-papers-mcp checkout 646da8d8af653f6b833f3725bae4cafc38a9428e","target":".psyclaw/mcp/scientific-papers-mcp.json","dependencies":["Git","repository runtime requirements"],"status":"blocked","requiresApproval":true,"blockedReason":"License metadata is not verified."},
-    {"id":"pubmed-search-mcp","sourceKind":"github","ref":"master","license":"NOASSERTION","command":"git clone https://github.com/u9401066/pubmed-search-mcp .psyclaw/mcp-src/pubmed-search-mcp && git -C .psyclaw/mcp-src/pubmed-search-mcp checkout master","target":".psyclaw/mcp/pubmed-search-mcp.json","dependencies":["Git","PubMed/NCBI access configuration"],"status":"blocked","requiresApproval":true,"blockedReason":"License and immutable commit were not verified."},
-    {"id":"zotero-mcp","sourceKind":"github","ref":"d57892db395c38d7782f037bc9fc8222e6a429ae","license":"unknown","command":"git clone https://github.com/richardjlyon/zotero-mcp .psyclaw/mcp-src/zotero-mcp && git -C .psyclaw/mcp-src/zotero-mcp checkout d57892db395c38d7782f037bc9fc8222e6a429ae","target":".psyclaw/mcp/zotero-mcp.json","dependencies":["Git","Zotero local library","Zotero API/token only if explicitly configured"],"status":"blocked","requiresApproval":true,"blockedReason":"License is not verified and local-library write effects require a separate trust decision."},
-    {"id":"academic-mcp","sourceKind":"github","ref":"main","license":"MIT","command":"git clone https://github.com/veale/academic-mcp .psyclaw/mcp-src/academic-mcp && git -C .psyclaw/mcp-src/academic-mcp checkout main","target":".psyclaw/mcp/academic-mcp.json","dependencies":["Git","Zotero/OpenAlex/Semantic Scholar configuration per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Immutable commit and external API terms require preflight."},
-    {"id":"scholar-mcp","sourceKind":"github","ref":"f94eac6a49c6d35a83f35148375eebfa08459e9b","license":"MIT","command":"git clone https://github.com/pvliesdonk/scholar-mcp .psyclaw/mcp-src/scholar-mcp && git -C .psyclaw/mcp-src/scholar-mcp checkout f94eac6a49c6d35a83f35148375eebfa08459e9b","target":".psyclaw/mcp/scholar-mcp.json","dependencies":["Git","provider/API configuration per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify executable entrypoint and API terms before registration."},
-    {"id":"drawio-mcp","sourceKind":"npm","ref":"1.5.0","license":"Apache-2.0","command":"npx -y @drawio/mcp@1.5.0","target":".psyclaw/mcp/drawio-mcp.json","dependencies":["Node.js >=18","npm","browser to open app.diagrams.net (or DRAWIO_BASE_URL)"],"status":"review-required","requiresApproval":true,"blockedReason":"Confirm stdio config opens diagrams in the browser; optional DRAWIO_BASE_URL for self-hosted draw.io. Hosted MCP Apps endpoint https://mcp.draw.io/mcp is a separate path."},
-    {"id":"playwright-mcp","sourceKind":"github","ref":"7e0457a7cbf88823bf0146d12c46ae12c6818247","license":"Apache-2.0","command":"npx -y @playwright/mcp@latest","target":".psyclaw/mcp/playwright-mcp.json","dependencies":["Node.js >=18","npm or pnpm","optional browser extension for existing login session"],"status":"review-required","requiresApproval":true,"blockedReason":"Pin npm package version before execution; browser navigation/download remains separately approved."},
-    {"id":"mne-mcp","sourceKind":"github","ref":"627142cb5beebe1a210a8e0fb1e15afbec8b8010","license":"MIT","command":"uvx --from mne-mcp==0.3.0 mne-mcp","target":".psyclaw/mcp/mne-mcp.json","dependencies":["Python >=3.10","uv","MNE-Python data dependencies"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify PyPI artifact hash and local-data write policy before registration."},
-    {"id":"spss-mcp","sourceKind":"github","ref":"fb4f020189b28b8acfb23a710875a7f9ae4e1e62","license":"MIT","command":"git clone https://github.com/Exekiel179/SPSS-MCP .psyclaw/mcp-src/spss-mcp && git -C .psyclaw/mcp-src/spss-mcp checkout fb4f020189b28b8acfb23a710875a7f9ae4e1e62","target":".psyclaw/mcp/spss-mcp.json","dependencies":["Git","IBM SPSS Statistics","Python runtime per repository metadata"],"status":"review-required","requiresApproval":true,"blockedReason":"Verify repository entrypoint and SPSS license/runtime before registration."}
-  ]
+    {
+      "id": "computer-use-mcp",
+      "sourceKind": "npm",
+      "ref": "7.4.0",
+      "license": "MIT",
+      "command": "npx -y @zavora-ai/computer-use-mcp@7.4.0",
+      "target": ".psyclaw/mcp/computer-use-mcp.json",
+      "dependencies": [
+        "Node.js >=20",
+        "npm",
+        "OS accessibility / screen permissions"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Desktop control is high-risk; pin package version and require explicit per-action approval before enabling write effects."
+    },
+    {
+      "id": "markitdown-mcp",
+      "sourceKind": "pypi",
+      "ref": "0.0.1a7",
+      "license": "MIT",
+      "command": "python -m pip install markitdown-mcp==0.0.1a7",
+      "target": ".psyclaw/mcp/markitdown-mcp.json",
+      "dependencies": [
+        "Python >=3.10",
+        "pip",
+        "markitdown-mcp"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "PyPI currently provides only prerelease 0.0.1a7; verify prerelease acceptance and artifact hash before installation."
+    },
+    {
+      "id": "paper-search-mcp",
+      "sourceKind": "github",
+      "ref": "8d305842789d64a441f7a540350f04754731cdf2",
+      "license": "MIT",
+      "command": "git clone https://github.com/openags/paper-search-mcp .psyclaw/mcp-src/paper-search-mcp && git -C .psyclaw/mcp-src/paper-search-mcp checkout 8d305842789d64a441f7a540350f04754731cdf2",
+      "target": ".psyclaw/mcp/paper-search-mcp.json",
+      "dependencies": [
+        "Git",
+        "Python >=3.10",
+        "uv"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Review repository lockfile and register the verified paper-search-mcp stdio entrypoint before enabling."
+    },
+    {
+      "id": "scientific-papers-mcp",
+      "sourceKind": "github",
+      "ref": "646da8d8af653f6b833f3725bae4cafc38a9428e",
+      "license": "MIT",
+      "command": "git clone https://github.com/benedict2310/Scientific-Papers-MCP .psyclaw/mcp-src/scientific-papers-mcp && git -C .psyclaw/mcp-src/scientific-papers-mcp checkout 646da8d8af653f6b833f3725bae4cafc38a9428e",
+      "target": ".psyclaw/mcp/scientific-papers-mcp.json",
+      "dependencies": [
+        "Git",
+        "repository runtime requirements"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Verify the npm artifact or build output and executable registration before enabling."
+    },
+    {
+      "id": "pubmed-search-mcp",
+      "sourceKind": "github",
+      "ref": "d7a4060f6009a1f08a28c30795a5b1680cdadef9",
+      "license": "Apache-2.0",
+      "command": "git clone https://github.com/u9401066/pubmed-search-mcp .psyclaw/mcp-src/pubmed-search-mcp && git -C .psyclaw/mcp-src/pubmed-search-mcp checkout d7a4060f6009a1f08a28c30795a5b1680cdadef9",
+      "target": ".psyclaw/mcp/pubmed-search-mcp.json",
+      "dependencies": [
+        "Git",
+        "Python >=3.10",
+        "uv",
+        "PubMed/NCBI access configuration"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Review the locked dependencies and external provider configuration before registering the verified pubmed-search-mcp stdio entrypoint."
+    },
+    {
+      "id": "zotero-mcp",
+      "sourceKind": "github",
+      "ref": "d57892db395c38d7782f037bc9fc8222e6a429ae",
+      "license": "MIT OR Apache-2.0",
+      "command": "git clone https://github.com/richardjlyon/zotero-mcp .psyclaw/mcp-src/zotero-mcp && git -C .psyclaw/mcp-src/zotero-mcp checkout d57892db395c38d7782f037bc9fc8222e6a429ae",
+      "target": ".psyclaw/mcp/zotero-mcp.json",
+      "dependencies": [
+        "Git",
+        "Zotero local library",
+        "Zotero API/token only if explicitly configured"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Local-library access and write-capable operations require a separate trust decision before registering the zotero-mcp executable."
+    },
+    {
+      "id": "academic-mcp",
+      "sourceKind": "github",
+      "ref": "f493de604eb672fdd7eb49edbc7a233c771c5a5a",
+      "license": "MIT",
+      "command": "git clone https://github.com/veale/academic-mcp .psyclaw/mcp-src/academic-mcp && git -C .psyclaw/mcp-src/academic-mcp checkout f493de604eb672fdd7eb49edbc7a233c771c5a5a",
+      "target": ".psyclaw/mcp/academic-mcp.json",
+      "dependencies": [
+        "Git",
+        "Python >=3.12",
+        "uv",
+        "Zotero/OpenAlex/Semantic Scholar configuration per repository metadata"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Review locked dependencies and external API terms before registering `uv run python -m academic_mcp` as the stdio server."
+    },
+    {
+      "id": "scholar-mcp",
+      "sourceKind": "github",
+      "ref": "499db128daa0a66e62e1dfc6f61578f7d9a5b4b9",
+      "license": "MIT",
+      "command": "git clone https://github.com/pvliesdonk/scholar-mcp .psyclaw/mcp-src/scholar-mcp && git -C .psyclaw/mcp-src/scholar-mcp checkout 499db128daa0a66e62e1dfc6f61578f7d9a5b4b9",
+      "target": ".psyclaw/mcp/scholar-mcp.json",
+      "dependencies": [
+        "Git",
+        "Python >=3.11",
+        "uv",
+        "provider/API configuration per repository metadata"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Review locked dependencies and provider/API terms before registering `scholar-mcp serve`."
+    },
+    {
+      "id": "drawio-mcp",
+      "sourceKind": "npm",
+      "ref": "1.6.0",
+      "license": "Apache-2.0",
+      "command": "npx -y @drawio/mcp@1.6.0",
+      "target": ".psyclaw/mcp/drawio-mcp.json",
+      "dependencies": [
+        "Node.js >=18",
+        "npm",
+        "browser to open app.diagrams.net (or DRAWIO_BASE_URL)"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Confirm stdio config opens diagrams in the browser; optional DRAWIO_BASE_URL for self-hosted draw.io. Hosted MCP Apps endpoint https://mcp.draw.io/mcp is a separate path."
+    },
+    {
+      "id": "playwright-mcp",
+      "sourceKind": "npm",
+      "ref": "0.0.82",
+      "license": "Apache-2.0",
+      "command": "npx -y @playwright/mcp@0.0.82",
+      "target": ".psyclaw/mcp/playwright-mcp.json",
+      "dependencies": [
+        "Node.js >=18",
+        "npm or pnpm",
+        "optional browser extension for existing login session"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Browser navigation and downloads remain separately approved; package execution is pinned to npm version 0.0.82."
+    },
+    {
+      "id": "mne-mcp",
+      "sourceKind": "pypi",
+      "ref": "0.4.3",
+      "license": "MIT",
+      "command": "uvx --from mne-mcp==0.4.3 mne-mcp",
+      "target": ".psyclaw/mcp/mne-mcp.json",
+      "dependencies": [
+        "Python >=3.12",
+        "uv",
+        "MNE-Python data dependencies"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "Verify the pinned PyPI artifact hash and local-data write policy before registration."
+    },
+    {
+      "id": "spss-mcp",
+      "sourceKind": "github",
+      "ref": "fb4f020189b28b8acfb23a710875a7f9ae4e1e62",
+      "license": "MIT",
+      "command": "git clone https://github.com/Exekiel179/SPSS-MCP .psyclaw/mcp-src/spss-mcp && git -C .psyclaw/mcp-src/spss-mcp checkout fb4f020189b28b8acfb23a710875a7f9ae4e1e62",
+      "target": ".psyclaw/mcp/spss-mcp.json",
+      "dependencies": [
+        "Git",
+        "IBM SPSS Statistics",
+        "Python runtime per repository metadata"
+      ],
+      "status": "review-required",
+      "requiresApproval": true,
+      "blockedReason": "The source entrypoint is `spss-mcp = spss_mcp.cli:main`; verify IBM SPSS licensing/runtime availability before registration."
+    }
+  ],
+  "syncedAt": "2026-09-21"
 }

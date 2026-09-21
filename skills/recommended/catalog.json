@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.8.5",
-  "syncedAt": "2026-09-14",
+  "documentVersion": "0.8.6",
+  "syncedAt": "2026-09-21",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
@@ -39,7 +39,7 @@
       "stage": "科研绘图",
       "description": "三阶段科研图生成：查询扩展 → 可执行 matplotlib/seaborn 代码 → VLM 视觉反馈迭代。覆盖柱状图、折线、热图、训练曲线、消融图等。适用于论文/实验报告需要可复现绘图脚本的场景。只安装 skills/figure-generation，勿整仓安装。",
       "sourceRef": "https://github.com/lingzhi227/agent-research-skills",
-      "installHint": "只安装仓库中的 skills/figure-generation 完整目录，包含 scripts 与 references。"
+      "installHint": "只安装仓库中的 skills/figure-generation 完整目录，包含 scripts 与 references。注意：当前上游 SKILL.md 与脚本引用 ~/.claude/skills/figure-generation；在 PsyClaw/Pi 中启用前须确认兼容该路径，或在受审修改中改为安装目录相对路径。"
     },
     {
       "id": "beautify-chart",
@@ -66,7 +66,7 @@
       "stage": "全文获取",
       "description": "学术文献检索、DOI/arXiv 校验、题录导出与经配置的开放获取/出版社/机构授权渠道取全文。适用于已有标识或清单、需合法补齐 PDF 与组织文献列表的场景；不得绕过付费墙或未经授权复用他人会话。",
       "sourceRef": "https://github.com/Rimagination/scansci-pdf",
-      "installHint": "只安装仓库中的 skills/scansci-pdf 完整目录（含 SKILL.md 与配套脚本）；不要整仓当单一 Skill 混装。"
+      "installHint": "只安装仓库中的 skills/scansci-pdf 完整目录（含 SKILL.md）；该叶子主要路由到仓库配套的 scansci-pdf MCP server，单独复制目录不会安装或配置服务器。启用前须按上游说明配置并验证 MCP；不要整仓当单一 Skill 混装。"
     },
     {
       "id": "paper2local",
@@ -82,9 +82,9 @@
       "name": "ScholarBridge",
       "kind": "skill",
       "stage": "文献质控",
-      "description": "批量发现、下载、核验并归档学术 PDF，再交接 Zotero：支持 DOI/PMCID/arXiv/PDF URL/BibTeX/RIS/CSV 等；优先 CORE、Unpaywall、arXiv、PMC、Europe PMC、OpenAlex、DOAJ 等合法开放全文，也可为知网/万方/维普等生成用户授权的可见浏览器下载队列，接管下载目录、校验 PDF、去重并生成入库任务。输出须可核验。",
+      "description": "批量规范化、下载、核验并归档学术 PDF，再生成 Zotero 交接任务：支持 DOI/PMCID/arXiv/PDF URL/BibTeX/RIS/CSV 等；开放来源基础链路可运行，并提供 Kimi WebBridge / Playwright 授权浏览器通用执行器。授权数据库与 Zotero 闭环仍须按平台和本机环境逐项验证；不得把题录命中、浏览器点击或任务生成表述为全文下载或 Zotero 写入成功。",
       "sourceRef": "https://github.com/LHT666-hub/ScholarBridge",
-      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套脚本/配置说明）。"
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套 scripts/references/assets）。启用前运行上游 doctor；开放来源与授权浏览器路线分别验收。当前部分平台仅验证到检索结果页，且只读 Zotero MCP 不能给已有条目自动挂附件，须使用受支持的 Connector/写入插件或人工交接。"
     },
     {
       "id": "mentorforge",
@@ -103,7 +103,8 @@
       "description": "港科大 Dial 实验室「科研副导师」技能套件：含 idea 评估、深研、写作/润色、图表、预投稿审阅、rebuttal 等子技能。适用于端到端导师式辅导；请按任务选用子目录，勿把整套当成单一叶子。",
       "sourceRef": "https://github.com/HKUSTDial/Supervisor-Skills",
       "installHint": "这是多 Skill 套件：安装仓库 skills/ 下所需子目录（各含 SKILL.md），或按用户明确要求安装整套 skills/；保留相对结构，执行 /reload。",
-      "skillLayout": "collection"
+      "skillLayout": "collection",
+      "license": "CC-BY-NC-SA-4.0"
     },
     {
       "id": "academic-reference-matcher",
@@ -111,8 +112,8 @@
       "kind": "skill",
       "stage": "引用核验",
       "description": "针对用户提供的学术正文、既有引用或书目：做 Claim–来源匹配、引用支持核验、替换与常见格式整理。适用于投稿前核对、审稿回应；不适用于开放式「随便找文献」或一般事实核查。无法核验标 uncertain。",
-      "sourceRef": "https://github.com/keros68/academic-reference-matcher",
-      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套文件）。"
+      "sourceRef": "https://github.com/keros68/xiaoyu-skill",
+      "installHint": "原仓库已归档；从后继仓库只安装 skills/academic-reference-matcher/ 完整目录，并保留 LICENSE 与 NOTICE.md。"
     },
     {
       "id": "journal-frontier-radar",
@@ -127,7 +128,7 @@
       "requiresExternalTools": [
         "kimi-webbridge"
       ],
-      "installHint": "安装仓库中的 skills/journal-frontier-radar 完整目录。启用前须先安装推荐外部工具 Kimi WebBridge，并用 `kimi-webbridge status` 确认 extension_connected: true；不要把本机 Downloads 解压扩展当 PsyClaw Plugin 安装。"
+      "installHint": "安装仓库中的 skills/journal-frontier-radar 完整目录。启用前须安装 Kimi Browser Extension（兼容 id: kimi-webbridge），先用 `kimi-webbridge status` 确认 extension_connected: true，再执行一次无副作用的 `list_tabs` 端到端预检；不要把本机 Downloads 解压扩展当 PsyClaw Plugin 安装。"
     },
     {
       "id": "manuscript-statistical-forensics",
@@ -136,7 +137,8 @@
       "stage": "统计审查",
       "description": "对必填论文 PDF（可选审稿材料与原始数据）做数值一致性、统计/方法问题与可疑模式筛查，服务研究诚信与投稿前后自查。单一异常不得直接判定学术不端；必须提供可读取 PDF。",
       "sourceRef": "https://github.com/kingfly51/manuscript-statistical-forensics",
-      "installHint": "安装仓库根目录的 SKILL.md 及配套文件；使用时必须提供可读取的论文 PDF。"
+      "installHint": "安装仓库根目录的 SKILL.md 及配套文件；使用时必须提供可读取的论文 PDF。",
+      "license": "unknown"
     },
     {
       "id": "huashu-excel",
@@ -154,7 +156,7 @@
       "stage": "数据与文档",
       "description": "md/html/docx/pdf/epub 多向流水线：任意文件或 URL 转干净 Markdown，再导出出版级 HTML/DOCX/PDF/EPUB；含模板与设计师模式。适用于「md 生产、多端消费」；不负责新生成配图或单纯截图压缩。",
       "sourceRef": "https://github.com/alchaincyf/huashu-md-html",
-      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套脚本/模板）。"
+      "installHint": "安装仓库根目录完整 Skill（SKILL.md 及配套脚本/模板）。按所用转换链准备 MarkItDown >=0.1.5、Pandoc、Playwright、python-docx 或 ebooklib；安装目录存在不代表这些运行依赖已就绪。"
     },
     {
       "id": "huashu-report",
@@ -188,9 +190,9 @@
       "name": "PsyTrainer ML",
       "kind": "skill",
       "stage": "机器学习",
-      "description": "检查特征/标签 CSV，配置 PsyTrainer 分类或回归，训练防泄漏表格 Pipeline（支持 group/time 划分），预测并导出实测图与 Word 报告。须 runtime.json 中 ready:true；优先 scripts/pipeline_train.py。禁止用留出集结果选模型/特征。",
+      "description": "检查特征/标签 CSV，配置 PsyTrainer 分类或回归，训练防泄漏表格 Pipeline（支持 group/time 划分），预测并导出实测图与 Word 报告。须使用 CPython 3.12–3.14 并由安装脚本生成 runtime.json；优先 scripts/pipeline_train.py。禁止用留出集结果选模型/特征。",
       "sourceRef": "https://github.com/Exekiel179/psytrainer-ml-skill",
-      "installHint": "克隆仓库到目标目录后，安装阶段用 scripts/install_runtime（macOS/Linux: `python3 scripts/install_runtime.py --wheel <PsyTrainer.whl>`；Windows: install_runtime.cmd/ps1）创建 .venv 并写 runtime.json；任务中禁止再 pip install。保留 vendor/；不要嵌套进 psyclaw 源码树。"
+      "installHint": "克隆仓库到目标目录后，macOS/Linux 运行 `python3 scripts/install_runtime.py`，Windows 运行配套 PowerShell 安装脚本，创建 .venv 并写 runtime.json；PsyTrainer wheel 仅用于 `--legacy --wheel` 兼容路径，不是默认安装依赖。任务中禁止再 pip install。保留 vendor/；不要嵌套进 psyclaw 源码树。"
     },
     {
       "id": "literature-review",
@@ -199,7 +201,7 @@
       "stage": "文献综述",
       "description": "K-Dense 系统文献综述（v1.8）：跨 PubMed、arXiv、bioRxiv、Semantic Scholar 等做系统综述/合成检索，产出可追溯 markdown/PDF 结构。适用于系统综述、荟萃准备或全面检索；探索性「随便找几篇」请用 paper-lookup。只安装 skills/literature-review，勿整仓安装。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/literature-review 完整目录（SKILL.md、scripts、assets、references）；不要安装整个仓库。"
+      "installHint": "安装 skills/literature-review 完整目录，并另行安装/启用同仓库的 skills/parallel-web 与 skills/scientific-schematics；仅复制 literature-review 叶子不足以满足当前上游检索与制图依赖。不要安装整个仓库。"
     },
     {
       "id": "paper-lookup",
@@ -217,7 +219,7 @@
       "stage": "文稿证据包",
       "description": "K-Dense 手稿证据编译（v1.5）：默认经 Parallel Search/Extract 汇编约 60 条可核验参考文献，产出 packet、evidence-matrix、claim-source-map 等结构化证据包。适用于已明确要为文稿系统搜集背景/对立证据的场景，而非轻量「查几篇论文」。需 parallel-cli（建议 parallel-web-tools[cli]==0.7.1）与 Parallel 鉴权（CLI login 或 PARALLEL_API_KEY）；可选 OPENROUTER_API_KEY 仅作显式 Perplexity 回退。日常检索请优先 paper-lookup；系统综述协议请用 literature-review。只安装 skills/research-lookup，勿整仓安装。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/research-lookup 完整目录，包含其 SKILL.md、scripts、assets 与 references；不要安装整个仓库。启用前建议 `uv tool install \"parallel-web-tools[cli]==0.7.1\"` 并完成 `parallel-cli login`（或配置 PARALLEL_API_KEY）；不要在命令行参数中打印密钥。"
+      "installHint": "只安装仓库中的 skills/research-lookup 完整目录，包含其 SKILL.md、scripts、assets 与 references；不要安装整个仓库。启用前建议安装 parallel-web-tools[cli]>=0.7.1 并完成 `parallel-cli login`（或配置 PARALLEL_API_KEY）；不要在命令行参数中打印密钥。"
     },
     {
       "id": "scientific-writing",
@@ -235,7 +237,7 @@
       "stage": "生理信号",
       "description": "经 MNE-MCP 分析人类神经生理数据（EEG/MEG/sEEG/ECoG/fNIRS）：加载、预处理、ICA、epoch、ERP/频谱/时频/源定位等会话态流水线。通常与 mne-mcp 及 mne-mcp-guard 一并启用。只安装 skills/mne-analyst。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装 MNE-MCP 仓库中的 skills/mne-analyst 完整目录；建议同时启用 mne-mcp 与 mne-mcp-guard。"
+      "installHint": "只安装 MNE-MCP 仓库中的 skills/mne-analyst 完整目录；建议同时启用 mne-mcp 与 mne-mcp-guard；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-mcp-guard",
@@ -244,7 +246,7 @@
       "stage": "生理信号",
       "description": "MNE-MCP 护栏：在 EEG/MEG/iEEG 流水线出错前拦截常见失败（单位、参考、滤波、坏道、会话态误用等），并在失败时辅助诊断。只安装 skills/mne-mcp-guard。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-mcp-guard 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-mcp-guard 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-methodology-critic",
@@ -253,7 +255,7 @@
       "stage": "生理信号",
       "description": "对经 MNE 完成或拟定的 EEG/MEG/fNIRS 分析做怀疑性方法学审查：统计假设、多重比较、探索/确证边界与可解释过度。只安装 skills/mne-methodology-critic。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-methodology-critic 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-methodology-critic 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-preprocess",
@@ -262,7 +264,7 @@
       "stage": "生理信号",
       "description": "MNE 预处理分册：滤波（FIR/IIR）、陷波、重采样、重参考、坏道与基础质检。只安装 skills/mne-preprocess。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-preprocess 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-preprocess 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-artifacts",
@@ -271,7 +273,7 @@
       "stage": "生理信号",
       "description": "MNE 伪迹分册：ICA/SSP/autoreject 与眼电回归等，处理眼动、心电、肌电与线噪。只安装 skills/mne-artifacts。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-artifacts 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-artifacts 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-erp",
@@ -280,7 +282,7 @@
       "stage": "生理信号",
       "description": "MNE ERP/ERF 分册：事件、epoch、条件平均、差分波、峰/平均波幅与潜伏期等。只安装 skills/mne-erp。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-erp 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-erp 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-spectral",
@@ -289,7 +291,7 @@
       "stage": "生理信号",
       "description": "MNE 频谱分册：Welch/多窗 PSD、频带功率、谱斜率与 1/f（specparam 等）。只安装 skills/mne-spectral。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-spectral 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-spectral 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-timefreq",
@@ -298,7 +300,7 @@
       "stage": "生理信号",
       "description": "MNE 时频分册：Morlet/多窗/Stockwell、ERSP、ITC、诱发 vs 诱导功率等。只安装 skills/mne-timefreq。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-timefreq 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-timefreq 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "mne-source",
@@ -307,7 +309,7 @@
       "stage": "生理信号",
       "description": "MNE 源定位分册：噪声协方差、正向模型、最小范数/波束形成等源空间分析。只安装 skills/mne-source。",
       "sourceRef": "https://github.com/Exekiel179/MNE-MCP",
-      "installHint": "只安装仓库中的 skills/mne-source 完整目录。"
+      "installHint": "只安装仓库中的 skills/mne-source 完整目录；运行环境要求 Python 3.12+ 与 mne-mcp 0.4.3。优先按 https://github.com/Exekiel179/MNE-MCP/blob/v0.4.3/INSTALL_AGENT.md 安装；仓库现有 14 个配套 Skill，PsyClaw 仅策展其中 9 个。"
     },
     {
       "id": "neurokit2",
@@ -325,7 +327,7 @@
       "stage": "生理信号",
       "description": "K-Dense BIDS（v1.1）：组织与核验脑影像/生理等 BIDS 数据集（MRI、EEG、MEG、iEEG、PET、NIRS、行为等）。适用于入库、共享与结构校验。只安装 skills/bids。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/bids 完整目录（SKILL.md、scripts、assets、references）；不要安装整个仓库。"
+      "installHint": "只安装仓库中的 skills/bids 完整目录（SKILL.md、scripts、assets、references）；不要安装整个仓库。按任务另行准备 pybids、BIDS validator，以及可选的数据转换工具；复制 Skill 不代表运行依赖已就绪。"
     }
   ],
   "plugins": [
@@ -334,9 +336,10 @@
       "name": "Nature Skills Suite",
       "kind": "plugin",
       "stage": "研究全流程",
-      "description": "以 Plugin 方式提供 Nature Skills 套件，覆盖检索、精读、统计、绘图、写作和评审等任务。适用于希望一次启用完整 Nature 风格科研工作流、而非单独安装若干叶子 Skill 的场景。安装后套件内 Skill 应保持原目录结构，便于按任务选用。",
+      "description": "Nature Skills Suite（当前上游 19 个 Skill），覆盖检索、精读、统计、绘图、写作和评审等任务。适用于希望启用完整 Nature 风格科研工作流、或按需选择叶子 Skill 的场景。",
       "sourceRef": "https://github.com/Yuan1z0825/nature-skills",
-      "installHint": "使用 Pi 原生 Plugin 管理器安装完整仓库；套件内的 Skill 保持原目录结构。"
+      "installHint": "按上游支持的 skills CLI 安装：先运行 `npx skills add Yuan1z0825/nature-skills --list` 查看条目；整套安装用 `--all`，按需安装用 `--skill <name>`。不要假定仓库已提供 Pi 原生 Plugin manifest。",
+      "license": "Apache-2.0"
     },
     {
       "id": "pingouin",
@@ -354,7 +357,8 @@
       "stage": "网络分析",
       "description": "心理网络分析插件，包含 analyze 与 analyze-cross-sectional-network 等 Skill，用于横断面症状网络建模、中心性、桥接、可预测性及稳定性分析。适用于心理测量网络建模与可复现分析脚本场景。安装时保留 plugins/ 下的插件结构及其 skills 子目录，勿当作单一叶子 Skill 拆装。",
       "sourceRef": "https://github.com/kingfly51/psych-network-css",
-      "installHint": "这是 Plugin 仓库，不是单一 Skill；安装时保留 plugins/ 下的插件结构及其 skills 子目录。"
+      "installHint": "按上游 Plugin 流程安装：`/plugin marketplace add kingfly51/psych-network-css`，再执行 `/plugin install psych-network-analysis@psych-network-css` 与 `/reload-plugins`。许可证尚未核实，启用前须人工复核。",
+      "license": "unknown"
     },
     {
       "id": "k-dense-scientific-skills",
@@ -369,13 +373,13 @@
   "externalTools": [
     {
       "id": "kimi-webbridge",
-      "name": "Kimi WebBridge",
+      "name": "Kimi Browser Extension (formerly Kimi WebBridge)",
       "kind": "external-tool",
       "installable": true,
       "stage": "浏览器桥接",
       "description": "月之暗面官方本机浏览器桥：daemon（127.0.0.1:10086）+ Chrome/Edge 扩展。让 Agent 操作用户真实浏览器与登录态；Journal Frontier Radar 的前置依赖。不是 PsyClaw Plugin，也不是可 clone 进 .psyclaw 的 Skill 包。",
       "sourceRef": "https://www.kimi.com/zh-cn/features/webbridge",
-      "installHint": "按官网安装，不要把 Downloads 解压扩展当 PsyClaw Plugin。1) macOS/Linux 执行 `curl -fsSL https://cdn.kimi.com/webbridge/install.sh | bash`（Windows 按官网指引）；2) 从 Chrome Web Store 或 Edge Add-ons 安装 Kimi WebBridge 扩展并保持浏览器运行；商店不可用时才从官网下载后手动「加载已解压的扩展程序」；3) 运行 `kimi-webbridge status`，确认 extension_connected: true；4) 安装脚本若写入宿主 Skill 目录（常见为 ~/.claude/skills/kimi-webbridge），保留即可，供 Agent 调用本机 daemon。完成后报告 daemon 路径、扩展连接状态与验证命令输出。"
+      "installHint": "按官网安装，不要把 Downloads 解压扩展当 PsyClaw Plugin。1) macOS/Linux 执行 `curl -fsSL https://cdn.kimi.com/webbridge/install.sh | bash`（Windows 按官网指引）；2) 安装浏览器扩展并保持浏览器运行；3) 运行 `kimi-webbridge status` 确认 extension_connected: true；4) 再执行一次无副作用的 `list_tabs` 端到端预检。完成后报告 daemon 路径、扩展连接状态与验证输出。"
     },
     {
       "id": "markitdown",
@@ -385,25 +389,26 @@
       "stage": "材料转换",
       "description": "文档转 Markdown 工具，可处理 PDF、Word、PPT、Excel、HTML 等研究材料，并供文档读取类 Skill 调用。",
       "sourceRef": "https://github.com/microsoft/markitdown",
-      "installHint": "按仓库官方说明安装 MarkItDown，并验证 markitdown 命令可用。该仓库本身不含 SKILL.md；PsyClaw 将其作为可调用的外部工具推荐。"
+      "installHint": "按上游说明使用 Python 3.10+ 安装：`pip install 'markitdown[all]'`，并验证 markitdown 命令可用。该仓库本身不含 SKILL.md；PsyClaw 将其作为外部工具推荐。"
     },
     {
       "id": "nirapost",
       "name": "NIRApost / NodeIdentifyR",
       "kind": "external-tool",
       "stage": "网络分析",
-      "description": "用于横断面心理网络模拟干预、置换检验和稳定性分析的 R 工具及复现材料；不是 PsyClaw Skill。",
+      "description": "NIRApost 1.2.0：用于横断面心理网络模拟干预、置换检验和稳定性分析的 R 包及复现材料；不是 PsyClaw Skill。依赖 nodeIdentifyR 1.0.0（MIT）。",
       "sourceRef": "https://github.com/kingfly51/NIRA_post",
-      "installHint": "请按仓库说明安装 NIRApost，并同时安装依赖 https://github.com/JasperNaberman/nodeIdentifyR。该条目仅作为外部 R 工具推荐。"
+      "installHint": "使用 `devtools::install_github(\"kingfly51/NIRA_post\")` 安装；其 DESCRIPTION 已声明 JasperNaberman/nodeIdentifyR 为远程依赖。该条目仅作为 GPL-3.0-or-later 外部 R 工具推荐。",
+      "license": "GPL-3.0-or-later"
     }
   ],
   "installPrep": [
     {
       "id": "academic-reference-matcher",
       "sourceKind": "github",
-      "sourceUrl": "https://github.com/keros68/academic-reference-matcher.git",
-      "ref": "189a5ddbeaca8e1a594c28ac5d4c694741c01db9",
-      "skillPath": ".",
+      "sourceUrl": "https://github.com/keros68/xiaoyu-skill.git",
+      "ref": "55ea21f099e0bcee79d493e750d80d006c3a5a85",
+      "skillPath": "skills/academic-reference-matcher",
       "skillName": "academic-reference-matcher",
       "license": "MIT",
       "target": ".psyclaw/imports/recommended/academic-reference-matcher",
@@ -416,22 +421,22 @@
       "id": "psytrainer-ml",
       "sourceKind": "github",
       "sourceUrl": "https://github.com/Exekiel179/psytrainer-ml-skill.git",
-      "ref": "16afe7ad5cf6fcd6d0fe259c4ee1fc10c0cce388",
+      "ref": "459474ea7706c71464827ebfe770f2652e3b50d1",
       "skillPath": ".",
       "skillName": "psytrainer-ml",
       "license": "MIT",
       "target": ".psyclaw/imports/recommended/psytrainer-ml",
       "dependencies": [
-        "Python 3.10+ (Windows: py launcher)",
+        "CPython 3.12–3.14",
         "scripts/install_runtime.py|.ps1|.cmd",
-        "PsyTrainer wheel via --wheel or PSYTRAINER_WHEEL",
+        "optional PsyTrainer wheel only for --legacy compatibility",
         "pandas",
         "numpy",
         "joblib"
       ],
       "status": "review-required",
       "requiresApproval": true,
-      "blockedReason": "After clone, run install_runtime (py/ps1/cmd) with the PsyTrainer wheel at install time on the target OS; prediction still requires trusted local model.pkl paths."
+      "blockedReason": "After clone, run the current cross-platform install_runtime entrypoint on the target OS; prediction still requires trusted local model.pkl paths."
     }
   ]
 }
