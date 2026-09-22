@@ -930,11 +930,24 @@ function modelMcpInstallTask(root: string, row: McpManagerRow, plan?: Record<str
   ].join("\n");
 }
 
+
+/** Queue an install/setup prompt for the model without rendering the long text as a user bubble. */
+function queueHiddenInstallTask(pi: ExtensionAPI, ctx: Pick<ExtensionCommandContext, "isIdle">, task: string): void {
+  if (typeof pi.sendMessage === "function") {
+    pi.sendMessage(
+      { customType: "psyclaw-install-task", content: task, display: false },
+      ctx.isIdle() ? { triggerTurn: true } : { deliverAs: "followUp" },
+    );
+    return;
+  }
+  pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+}
+
 async function queueModelMcpInstall(pi: ExtensionAPI, ctx: ExtensionCommandContext, row: McpManagerRow, plan?: Record<string, unknown>): Promise<void> {
   if (!row.sourceRef) throw new Error(`推荐 MCP 没有来源网址: ${row.id}`);
   await setRecommendedMcpEnabled(ctx.cwd, row.id, true);
-  pi.sendUserMessage(modelMcpInstallTask(ctx.cwd, row, plan), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-  ctx.ui.notify(`已将 ${row.name} 的下载、安装和配置任务交给当前模型（默认启用）。完成后请执行 /reload。`, "info");
+  queueHiddenInstallTask(pi, ctx, modelMcpInstallTask(ctx.cwd, row, plan));
+  ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型（指令不展示在对话中；默认启用）。完成后请执行 /reload。`, "info");
 }
 
 async function showMcpManager(pi: ExtensionAPI, ctx: ExtensionCommandContext, runtime: RuntimeMcpRegistry): Promise<void> {
@@ -1033,8 +1046,8 @@ async function queueModelSkillInstall(pi: ExtensionAPI, ctx: ExtensionCommandCon
       return;
     }
     void trackSkillInstall("queued", { skill_id: row.id, scope, status: "queued" });
-    pi.sendUserMessage(modelSkillInstallTask(ctx.cwd, row, scope), ctx.isIdle() ? {} : { deliverAs: "followUp" });
-    ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型（默认启用），目标为${skillScopeLabel(scope)}。完成后请执行 /reload。`, "info");
+    queueHiddenInstallTask(pi, ctx, modelSkillInstallTask(ctx.cwd, row, scope));
+    ctx.ui.notify(`已将 ${row.name} 的安装任务交给当前模型（指令不展示在对话中；默认启用），目标为${skillScopeLabel(scope)}。完成后请执行 /reload。`, "info");
   });
 }
 
@@ -1165,11 +1178,12 @@ async function queueBiosignalPackInstall(
   );
   if (!approved) return;
   await markBiosignalPackDesired(ctx.cwd, plan, scope);
-  pi.sendUserMessage(
+  queueHiddenInstallTask(
+    pi,
+    ctx,
     modelBiosignalPackInstallTask(ctx.cwd, plan, skillRows, selectedMcp, mcpCatalog.installPrep, scope),
-    ctx.isIdle() ? {} : { deliverAs: "followUp" },
   );
-  ctx.ui.notify("已将生理信号能力包安装任务交给当前模型。完成后请执行 /reload，并 Shift+Tab 切到 analysis 使用。", "info");
+  ctx.ui.notify("已将生理信号能力包安装任务交给当前模型（指令不展示在对话中）。完成后请执行 /reload，并 Shift+Tab 切到 analysis 使用。", "info");
 }
 
 async function showBiosignalPack(pi: ExtensionAPI, ctx: ExtensionCommandContext, runtime: RuntimeMcpRegistry): Promise<void> {
@@ -1549,6 +1563,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           isProjectTrusted: () => ctx.isProjectTrusted(),
           isIdle: () => ctx.isIdle(),
           sendUserMessage: (message, options) => pi.sendUserMessage(message, options ?? {}),
+          sendHiddenInstallTask: (task) => queueHiddenInstallTask(pi, ctx, task),
         }, { view: "help" });
         ctx.ui.notify(formatSessionHelpBrief(url) + (opened ? "" : "\n（未能自动打开浏览器时请手动访问）"), opened ? "info" : "warning");
       } catch (error) {
@@ -1856,6 +1871,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           isProjectTrusted: () => ctx.isProjectTrusted(),
           isIdle: () => ctx.isIdle(),
           sendUserMessage: (message, options) => pi.sendUserMessage(message, options ?? {}),
+          sendHiddenInstallTask: (task) => queueHiddenInstallTask(pi, ctx, task),
         }, { view: "help" });
         ctx.ui.notify(formatSessionHelpBrief(url) + (opened ? "" : "\n（未能自动打开浏览器时请手动访问）"), opened ? "info" : "warning");
       } catch (error) {

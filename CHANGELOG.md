@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.9 - 2026-09-22
+
+- Hide Skill/MCP/biosignal install prompts from the chat transcript while still sending them to the model
+- Keep a short notify for install progress; Panel install path uses the same hidden delivery
+
 ## 0.30.8 - 2026-09-21
 
 - Support `/exit` as a graceful alias for `/quit`

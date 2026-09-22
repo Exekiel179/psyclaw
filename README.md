@@ -2,7 +2,7 @@
 
 面向社会科学研究的智能体工作台：把研究项目、证据账本、完整性门禁、可恢复工作流和本地面板接到内置运行时上。它不替代统计软件，也不会把未经核验的引用、结果或审稿意见写成事实。
 
-当前版本：`0.30.8` · 命令与用户目录：`psyclaw` / `~/.psyclaw` · 许可证：MIT
+当前版本：`0.30.9` · 命令与用户目录：`psyclaw` / `~/.psyclaw` · 许可证：MIT
 内置 Academic Research Skills（`vendor/ars`）遵循上游 CC BY-NC 4.0，仅限非商业用途。
 
 ## 安装
@@ -10,13 +10,13 @@
 需要 Node.js `>=22.19.0`。
 
 ```bash
-npm install -g psyclaw@0.30.8
+npm install -g psyclaw@0.30.9
 ```
 
 中国大陆可用镜像或安装脚本：
 
 ```bash
-npm install -g psyclaw@0.30.8 --registry=https://registry.npmmirror.com
+npm install -g psyclaw@0.30.9 --registry=https://registry.npmmirror.com
 # 或
 PSYCLAW_CN=1 curl -fsSL https://exekiel179.github.io/psyclaw/install.sh | sh
 ```
@@ -109,7 +109,7 @@ RELEASE_MESSAGE="release: describe the change" pnpm release:push
 
 ```bash
 npm uninstall -g psyclaw
-npm install -g psyclaw@0.30.8
+npm install -g psyclaw@0.30.9
 ```
 
 仅卸载程序：`npm uninstall -g psyclaw`  

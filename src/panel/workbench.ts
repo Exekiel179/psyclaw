@@ -38,7 +38,17 @@ export type WorkbenchHost = {
   isProjectTrusted: () => boolean;
   isIdle: () => boolean;
   sendUserMessage: (message: string, options?: { deliverAs?: "followUp" }) => void;
+  /** Queue Skill/MCP/tool install prompts without rendering them as a user chat bubble. */
+  sendHiddenInstallTask?: (task: string) => void;
 };
+
+function queueWorkbenchInstallTask(host: WorkbenchHost, task: string): void {
+  if (host.sendHiddenInstallTask) {
+    host.sendHiddenInstallTask(task);
+    return;
+  }
+  host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
+}
 
 /** Start or reuse the loopback workbench; optional `view` opens a named Panel page (e.g. help). */
 export async function openResearchWorkbench(
@@ -63,13 +73,13 @@ export async function openResearchWorkbench(
         };
       },
       installSkill: async (task) => {
-        host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
+        queueWorkbenchInstallTask(host, task);
       },
       installMcp: async (task) => {
-        host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
+        queueWorkbenchInstallTask(host, task);
       },
       installExternalTool: async (task) => {
-        host.sendUserMessage(task, host.isIdle() ? {} : { deliverAs: "followUp" });
+        queueWorkbenchInstallTask(host, task);
       },
       installPlugin: async (source, scope) => {
         await packageManager().installAndPersist(source, { local: scope === "project" });

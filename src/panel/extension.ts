@@ -24,6 +24,16 @@ export default function psyclawPanelExtension(pi: ExtensionAPI): void {
           isProjectTrusted: () => ctx.isProjectTrusted(),
           isIdle: () => ctx.isIdle(),
           sendUserMessage: (message, options) => pi.sendUserMessage(message, options ?? {}),
+          sendHiddenInstallTask: (task) => {
+            if (typeof pi.sendMessage === "function") {
+              pi.sendMessage(
+                { customType: "psyclaw-install-task", content: task, display: false },
+                ctx.isIdle() ? { triggerTurn: true } : { deliverAs: "followUp" },
+              );
+              return;
+            }
+            pi.sendUserMessage(task, ctx.isIdle() ? {} : { deliverAs: "followUp" });
+          },
         }, help ? { view: "help" } : {});
         ctx.ui.notify(
           opened ? `科研工作台已打开：${url}` : `工作台已启动，请手动访问：${url}`,
