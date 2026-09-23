@@ -112,5 +112,5 @@ jobs:
             release/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
             --title "PsyClaw $RELEASE_TAG" \
-            --prerelease \
+            --latest \
             --generate-notes

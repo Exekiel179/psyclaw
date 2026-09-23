@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.8.6",
-  "syncedAt": "2026-09-21",
+  "documentVersion": "0.8.8",
+  "syncedAt": "2026-09-23",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
   "items": [
@@ -21,7 +21,7 @@
       "stage": "科研绘图",
       "description": "K-Dense 科研可视化（v1.2）：用 Matplotlib / Seaborn / Plotly 创建并审计真实、可访问、可投稿图稿（多面板、不确定性与缺失展示、对比度、导出规划）。需要 Python 3.11+；Plotly 静态导出可能依赖 Chrome/Chromium + Kaleido。只安装 skills/scientific-visualization，勿整仓克隆。",
       "sourceRef": "https://github.com/K-Dense-AI/scientific-agent-skills",
-      "installHint": "只安装仓库中的 skills/scientific-visualization 完整目录（SKILL.md、scripts、assets、references）；不要安装整个 scientific-agent-skills。"
+      "installHint": "只安装 skills/scientific-visualization（SKILL.md、scripts、references）；可保留小体积 assets，跳过演示大图。优先 codeload，勿整仓克隆；安装阶段不做上游自检脚本。"
     },
     {
       "id": "academic-figure-skill",
@@ -30,7 +30,7 @@
       "stage": "科研绘图",
       "description": "面向 Nature / Cell / Science 等投稿规范的学术图稿制作、润色、复核与导出。适用于明确要出版级矢量图/图版的场景；不适用于交互仪表盘（Plotly/Bokeh）、无投稿意图的探索图、纯数学函数图或 PPT/Figma 优先流程。安装根目录完整 Skill 包。",
       "sourceRef": "https://github.com/TingxiYu/academic-figure-skill",
-      "installHint": "安装仓库根目录完整 Skill（SKILL.md、references、assets 与脚本）。"
+      "installHint": "codeload 安装：只留 SKILL.md + references/ + scripts/ + LICENSE；整棵 assets/ 跳过。不要跑 check_*.py。"
     },
     {
       "id": "figure-generation",

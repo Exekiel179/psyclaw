@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../src/tui/skill-manager.js";
 
 const items: SkillManagerItem[] = [
@@ -73,6 +74,18 @@ describe("SkillManagerComponent", () => {
     expect(text).toContain("[ ] Disabled");
     expect(text).toContain("[↓] Missing");
     expect(text).toContain("[!] Blocked");
+  });
+
+  it("truncates footer and details to the terminal width", () => {
+    const { component } = createComponent();
+    const width = 78;
+    const contentWidth = width - 4;
+    for (const line of component.render(width)) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(contentWidth);
+    }
+    // Reproduce the crash case: default footer is ~100 cols without truncation.
+    const footer = "↑/↓ 移动 · Enter 先看介绍再确认安装 · Space 启停/直接安装 · a 全部启用 · d 全部停用 · Esc 关闭";
+    expect(visibleWidth(footer)).toBeGreaterThan(contentWidth);
   });
 
   it("keeps core Skills locked and explains why", () => {

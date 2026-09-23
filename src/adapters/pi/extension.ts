@@ -30,6 +30,7 @@ import {
   type RecommendedSkillScope,
   type RecommendationState,
 } from "../../skills/recommended.js";
+import { buildRecommendedSkillInstallTask } from "../../skills/install-guidance.js";
 import { SkillManagerComponent, type SkillManagerAction, type SkillManagerItem } from "../../tui/skill-manager.js";
 import { BiosignalWizardComponent, type BiosignalWizardResult } from "../../tui/biosignal-wizard.js";
 import {
@@ -989,20 +990,15 @@ async function showMcpManager(pi: ExtensionAPI, ctx: ExtensionCommandContext, ru
 }
 
 function modelSkillInstallTask(root: string, row: SkillManagerRow, scope: RecommendedSkillScope): string {
-  const target = recommendedSkillTarget(root, row.id, scope);
-  return [
-    `安装推荐 Skill：${row.name} (${row.id})。`,
-    `来源网址：${row.sourceRef}`,
-    ...(row.installHint ? [`仓库入口提示：${row.installHint}`] : []),
-    `安装位置：${skillScopeLabel(scope)}。`,
-    `唯一允许的最终目标目录：${target}`,
-    "用户已通过 Skill 管理页授权本次安装。请使用当前会话的联网、文件和命令工具读取来源仓库，并直接下载、安装所需依赖和完成 Skill 安装；不要再次要求安装权限。不要写入其他 Skill 目录，不要修改 .psyclaw/data/raw、data/raw、.git 或研究产物。",
-    row.collection
-      ? "这是多 Skill 套件：目标目录自身无需 SKILL.md，但其子目录必须包含一个或多个有效 SKILL.md。保留套件内共享目录和相对路径，不得包含 .git、符号链接或凭据。"
-      : "目标目录最终必须直接包含有效 SKILL.md（YAML frontmatter 至少包含 name 和 description），不得包含 .git、符号链接、凭据或二进制大文件。",
-    "如果仓库包含多个 Skill，只安装与此推荐项相符的部分；如果它不是 Skill 或无法合理适配，停止并说明原因，不要伪造 SKILL.md。",
-    "安装完成后检查目标目录结构。该项已在推荐状态中默认启用；完成后执行 /reload 即可加载，无需再手动启用。",
-  ].join("\n");
+  return buildRecommendedSkillInstallTask({
+    name: row.name,
+    id: row.id,
+    sourceRef: row.sourceRef ?? "",
+    target: recommendedSkillTarget(root, row.id, scope),
+    scopeLabel: skillScopeLabel(scope),
+    installHint: row.installHint,
+    collection: Boolean(row.collection),
+  });
 }
 
 async function chooseSkillScope(ctx: ExtensionCommandContext): Promise<RecommendedSkillScope | undefined> {

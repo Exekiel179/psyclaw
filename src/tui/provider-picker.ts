@@ -38,7 +38,7 @@ export class ProviderPickerComponent {
       Math.max(0, this.items.length - MAX_VISIBLE),
     );
     const visible = this.items.slice(start, start + MAX_VISIBLE);
-    const lines = [this.theme.fg("accent", this.theme.bold(this.title)), ""];
+    const lines = [this.theme.fg("accent", this.theme.bold(truncateToWidth(this.title, contentWidth))), ""];
     for (const [offset, item] of visible.entries()) {
       const selected = start + offset === this.selectedIndex;
       const marker = selected ? this.theme.fg("accent", ">") : " ";
@@ -49,9 +49,9 @@ export class ProviderPickerComponent {
       // terminals; details are presented after selection.
     }
     if (this.items.length > MAX_VISIBLE) {
-      lines.push(this.theme.fg("dim", `  ${this.selectedIndex + 1}/${this.items.length}`));
+      lines.push(this.theme.fg("dim", truncateToWidth(`  ${this.selectedIndex + 1}/${this.items.length}`, contentWidth)));
     }
-    lines.push("", this.theme.fg("dim", "↑/↓ 移动 · Enter 确认 · Esc 关闭"));
+    lines.push("", this.theme.fg("dim", truncateToWidth("↑/↓ 移动 · Enter 确认 · Esc 关闭", contentWidth)));
     return lines;
   }
 
@@ -102,12 +102,12 @@ export class SecretInputComponent {
     const contentWidth = Math.max(24, width - 4);
     const mask = this.value ? "•".repeat(Math.min(this.value.length, Math.max(8, contentWidth - 8))) : "（留空则使用已有本地 Key）";
     return [
-      this.theme.fg("accent", this.theme.bold(this.title)),
+      this.theme.fg("accent", this.theme.bold(truncateToWidth(this.title, contentWidth))),
       "",
       truncateToWidth(`API Key: ${mask}`, contentWidth),
-      this.theme.fg("dim", `凭据名称：${this.envName}`),
+      this.theme.fg("dim", truncateToWidth(`凭据名称：${this.envName}`, contentWidth)),
       "",
-      this.theme.fg("dim", "直接输入或粘贴 · Enter 保存 · Esc 返回"),
+      this.theme.fg("dim", truncateToWidth("直接输入或粘贴 · Enter 保存 · Esc 返回", contentWidth)),
     ];
   }
 
@@ -162,12 +162,12 @@ export class TextInputComponent {
     const contentWidth = Math.max(24, width - 4);
     const shown = this.value || this.theme.fg("dim", "（在此输入）");
     return [
-      this.theme.fg("accent", this.theme.bold(this.title)),
+      this.theme.fg("accent", this.theme.bold(truncateToWidth(this.title, contentWidth))),
       "",
       truncateToWidth(shown, contentWidth),
-      this.theme.fg("dim", this.hint),
+      this.theme.fg("dim", truncateToWidth(this.hint, contentWidth)),
       "",
-      this.theme.fg("dim", "直接输入或粘贴 · Enter 确认 · Esc 返回"),
+      this.theme.fg("dim", truncateToWidth("直接输入或粘贴 · Enter 确认 · Esc 返回", contentWidth)),
     ];
   }
 

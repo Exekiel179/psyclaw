@@ -61,8 +61,8 @@ export class BiosignalWizardComponent {
     );
     const visible = this.domains.slice(start, start + MAX_VISIBLE);
     const lines = [
-      this.theme.fg("accent", this.theme.bold("生理信号分析 · 选择研究域")),
-      this.theme.fg("dim", "可多选；装好后仍在 analysis 模式中使用，不是第四种 Shift+Tab 模式。"),
+      this.theme.fg("accent", this.theme.bold(truncateToWidth("生理信号分析 · 选择研究域", contentWidth))),
+      this.theme.fg("dim", truncateToWidth("可多选；装好后仍在 analysis 模式中使用，不是第四种 Shift+Tab 模式。", contentWidth)),
       "",
     ];
     for (const [offset, domain] of visible.entries()) {
@@ -77,10 +77,13 @@ export class BiosignalWizardComponent {
     if (focused?.description) {
       lines.push("", this.theme.fg("dim", truncateToWidth(focused.description, contentWidth)));
     }
-    if (this.notice) lines.push("", this.theme.fg("warning", this.notice));
+    if (this.notice) lines.push("", this.theme.fg("warning", truncateToWidth(this.notice, contentWidth)));
     lines.push(
       "",
-      this.theme.fg("dim", `已选 ${this.selected.size} 项 · ↑/↓ 移动 · Space 勾选 · Enter 下一步 · Esc 取消`),
+      this.theme.fg("dim", truncateToWidth(
+        `已选 ${this.selected.size} 项 · ↑/↓ 移动 · Space 勾选 · Enter 下一步 · Esc 取消`,
+        contentWidth,
+      )),
     );
     return lines;
   }
@@ -88,13 +91,13 @@ export class BiosignalWizardComponent {
   private renderConfirm(contentWidth: number): string[] {
     const plan = this.plan!;
     const lines = [
-      this.theme.fg("accent", this.theme.bold("生理信号分析 · 确认安装清单")),
-      this.theme.fg("dim", `研究域：${plan.domainNames.join("、")}`),
+      this.theme.fg("accent", this.theme.bold(truncateToWidth("生理信号分析 · 确认安装清单", contentWidth))),
+      this.theme.fg("dim", truncateToWidth(`研究域：${plan.domainNames.join("、")}`, contentWidth)),
       "",
-      this.theme.bold("将安装 / 配置："),
+      this.theme.bold(truncateToWidth("将安装 / 配置：", contentWidth)),
     ];
     if (plan.mcpIds.length === 0 && plan.skillIds.length === 0) {
-      lines.push(this.theme.fg("warning", "  （空清单）"));
+      lines.push(this.theme.fg("warning", truncateToWidth("  （空清单）", contentWidth)));
     } else {
       for (const id of plan.mcpIds) {
         lines.push(truncateToWidth(`  MCP  ${id}`, contentWidth));
@@ -105,8 +108,8 @@ export class BiosignalWizardComponent {
     }
     lines.push(
       "",
-      this.theme.fg("dim", "确认后交给当前模型，按现有 /mcp 与 /skill 安装约定完成配置。"),
-      this.theme.fg("dim", "Enter 开始安装 · Esc 返回选型"),
+      this.theme.fg("dim", truncateToWidth("确认后交给当前模型，按现有 /mcp 与 /skill 安装约定完成配置。", contentWidth)),
+      this.theme.fg("dim", truncateToWidth("Enter 开始安装 · Esc 返回选型", contentWidth)),
     );
     return lines;
   }

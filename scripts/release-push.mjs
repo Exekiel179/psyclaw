@@ -36,9 +36,11 @@ const nextVersion = `${major}.${minor}.${patch + 1}`;
 run("npm", ["version", nextVersion, "--no-git-tag-version", "--allow-same-version"]);
 const readmePath = "README.md";
 const readme = fs.readFileSync(readmePath, "utf8");
-if (!readme.includes(previousVersion)) fail(`README.md 未包含当前版本 ${previousVersion}`);
-fs.writeFileSync(readmePath, readme.replaceAll(previousVersion, nextVersion));
-
+if (readme.includes(previousVersion)) {
+  fs.writeFileSync(readmePath, readme.replaceAll(previousVersion, nextVersion));
+} else if (!readme.includes("psyclaw@latest")) {
+  fail(`README.md 未包含当前版本 ${previousVersion}，也未使用 psyclaw@latest`);
+}
 const changelogPath = "CHANGELOG.md";
 const changelog = fs.readFileSync(changelogPath, "utf8");
 const releaseNotes = (process.env.RELEASE_NOTES || "Updated PsyClaw research workflow and integrations.")

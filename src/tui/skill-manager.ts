@@ -80,9 +80,12 @@ export class SkillManagerComponent {
       Math.max(0, this.items.length - MAX_VISIBLE),
     );
     const visible = this.items.slice(start, start + MAX_VISIBLE);
+    const summary = `${enabled} 个启用 · ${this.items.length - enabled - issues} 个可管理 · ${issues} 个需处理`;
+    const footer = this.options.footer
+      ?? "↑/↓ 移动 · Enter 先看介绍再确认安装 · Space 启停/直接安装 · a 全部启用 · d 全部停用 · Esc 关闭";
     const lines = [
-      this.theme.fg("accent", this.theme.bold(this.options.title ?? "Skill 管理")),
-      this.theme.fg("dim", `${enabled} 个启用 · ${this.items.length - enabled - issues} 个可管理 · ${issues} 个需处理`),
+      this.theme.fg("accent", this.theme.bold(truncateToWidth(this.options.title ?? "Skill 管理", contentWidth))),
+      this.theme.fg("dim", truncateToWidth(summary, contentWidth)),
       "",
     ];
 
@@ -111,7 +114,7 @@ export class SkillManagerComponent {
       if (selected.reason) lines.push(this.theme.fg("warning", truncateToWidth(`原因：${selected.reason}`, contentWidth)));
     }
     if (this.notice) lines.push("", this.theme.fg("warning", truncateToWidth(this.notice, contentWidth)));
-    lines.push("", this.theme.fg("dim", this.options.footer ?? "↑/↓ 移动 · Enter 先看介绍再确认安装 · Space 启停/直接安装 · a 全部启用 · d 全部停用 · Esc 关闭"));
+    lines.push("", this.theme.fg("dim", truncateToWidth(footer, contentWidth)));
     return lines;
   }
 

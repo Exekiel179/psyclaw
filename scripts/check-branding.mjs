@@ -89,7 +89,16 @@ async function collectFiles(path) {
   return files;
 }
 
-const candidates = rootFiles.map((path) => join(root, path));
+const { access } = await import("node:fs/promises");
+const candidates = [];
+for (const path of rootFiles.map((path) => join(root, path))) {
+  try {
+    await access(path);
+    candidates.push(path);
+  } catch {
+    // Optional root docs may be absent in trimmed public trees.
+  }
+}
 for (const path of scanRoots) {
   candidates.push(...await collectFiles(join(root, path)));
 }
@@ -139,13 +148,10 @@ if (governance.apiVersion !== manifest.version.split(".").slice(0, 2).join("."))
   contractFailures.push("package governance apiVersion must match the package major/minor version");
 }
 
-const versionSurfaces = [
-  ["README.md", `\`${manifest.version}\``],
-  ["CHANGELOG.md", `## ${manifest.version}`],
-];
-for (const [path, marker] of versionSurfaces) {
-  const content = await readFile(join(root, path), "utf8");
-  if (!content.includes(marker)) contractFailures.push(`${path} is missing ${marker}`);
+// README installs via @latest; pinned version lives in CHANGELOG / package.json.
+const changelog = await readFile(join(root, "CHANGELOG.md"), "utf8");
+if (!changelog.includes(`## ${manifest.version}`)) {
+  contractFailures.push(`CHANGELOG.md is missing ## ${manifest.version}`);
 }
 
 const whitepaperIndex = await readFile(join(root, "docs", "使用白皮书.md"), "utf8");

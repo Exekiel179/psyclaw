@@ -23,6 +23,7 @@ import {
   rewriteGithubHttpsThroughMirror,
   selectNetworkRoute,
 } from "../network-routing.js";
+import { shouldSkipSkillInstallAsset } from "./install-guidance.js";
 
 const execFileAsync = promisify(execFile);
 const INSTALL_MANIFEST = "psyclaw-install.json";
@@ -219,20 +220,38 @@ function isSensitiveName(name: string): boolean {
     lower.endsWith(".pem") || lower.endsWith(".key");
 }
 
-async function copySkillTree(source: string, target: string): Promise<void> {
+async function copySkillTree(source: string, target: string, relativeFromSkill = ""): Promise<{ copied: number; skipped: number }> {
   await mkdir(target, { recursive: false });
+  let copied = 0;
+  let skipped = 0;
   for (const entry of await readdir(source, { withFileTypes: true })) {
     if (isSensitiveName(entry.name)) continue;
     const from = join(source, entry.name);
     const to = join(target, entry.name);
+    const rel = relativeFromSkill ? `${relativeFromSkill}/${entry.name}` : entry.name;
     if (entry.isSymbolicLink()) throw new Error(`Symlink is not allowed in recommended Skill: ${entry.name}`);
-    if (entry.isDirectory()) await copySkillTree(from, to);
-    else if (entry.isFile()) {
+    if (entry.isDirectory()) {
+      if (shouldSkipSkillInstallAsset(rel, entry.name, 0)) {
+        skipped += 1;
+        continue;
+      }
+      const nested = await copySkillTree(from, to, rel);
+      copied += nested.copied;
+      skipped += nested.skipped;
+      continue;
+    }
+    if (entry.isFile()) {
       const stat = await lstat(from);
+      if (shouldSkipSkillInstallAsset(rel, entry.name, stat.size)) {
+        skipped += 1;
+        continue;
+      }
       if (stat.size > 16 * 1024 * 1024) throw new Error(`Skill file exceeds 16 MiB: ${entry.name}`);
       await copyFile(from, to);
+      copied += 1;
     }
   }
+  return { copied, skipped };
 }
 
 async function findLicense(repoRoot: string): Promise<string> {
@@ -243,7 +262,16 @@ async function findLicense(repoRoot: string): Promise<string> {
 }
 
 async function runGit(args: string[]): Promise<void> {
-  await execFileAsync("git", args, { maxBuffer: 4 * 1024 * 1024 });
+  await execFileAsync("git", args, {
+    maxBuffer: 4 * 1024 * 1024,
+    env: {
+      ...process.env,
+      // Fail fast when GitHub is unreachable instead of hanging for minutes.
+      GIT_HTTP_LOW_SPEED_LIMIT: process.env.GIT_HTTP_LOW_SPEED_LIMIT ?? "1000",
+      GIT_HTTP_LOW_SPEED_TIME: process.env.GIT_HTTP_LOW_SPEED_TIME ?? "15",
+    },
+    timeout: 120_000,
+  });
 }
 
 function installPlan(catalog: RecommendedCatalog, requestedId: string): { item: RecommendedCatalogItem; plan: RecommendedInstallPlan } {
@@ -386,7 +414,8 @@ export async function installRecommendedSkill(root: string, requestedId: string,
     const skillBytes = await readFile(join(sourceReal, "SKILL.md"));
     const skillName = parseSkillName(skillBytes.toString("utf8"));
     if (skillName !== plan.skillName) throw new Error(`Catalog Skill name '${plan.skillName}' does not match '${skillName}'`);
-    await copySkillTree(sourceReal, staging);
+    const { copied } = await copySkillTree(sourceReal, staging);
+    if (copied < 1) throw new Error(`Recommended Skill copy produced 0 files: ${id}`);
     const licenseSource = await findLicense(repo);
     const licenseName = basename(licenseSource);
     if (resolve(licenseSource) !== resolve(join(sourceReal, licenseName))) await copyFile(licenseSource, join(staging, licenseName));

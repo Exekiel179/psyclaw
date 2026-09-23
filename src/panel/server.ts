@@ -33,6 +33,7 @@ export { verifyDoi } from "../core/doi.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
 import { sessionHelpDocument } from "../session/help.js";
 import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
+import { buildRecommendedSkillInstallTask } from "../skills/install-guidance.js";
 import {
   readUserSkillState,
   scanLocalSkills,
@@ -524,17 +525,16 @@ function panelSkillInstallTask(root: string, item: Record<string, unknown>, scop
   const id = String(item.id ?? "");
   const name = String(item.name ?? id);
   const sourceRef = String(item.sourceRef ?? "");
-  const target = recommendedSkillTarget(root, id, scope);
-  return [
-    `安装推荐 Skill：${name} (${id})。`,
-    `来源网址：${sourceRef}`,
-    `安装位置：${scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）"}。`,
-    `唯一允许的最终目标目录：${target}`,
-    "请使用当前会话的工具检查来源仓库并完成安装。不要写入其他 Skill 目录，不要修改 .psyclaw/data/raw、data/raw、.git 或研究产物。",
-    "目标目录最终必须直接包含有效 SKILL.md（YAML frontmatter 至少包含 name 和 description），不得包含 .git、符号链接、凭据或二进制大文件。",
-    "如果仓库包含多个 Skill，只安装与此推荐项相符的部分；如果它不是 Skill 或无法合理适配，停止并说明原因，不要伪造 SKILL.md。",
-    "安装完成后检查目标目录结构，并提醒用户执行 /reload（安装时已默认启用，无需再手动启用）。",
-  ].join("\n");
+  const installHint = typeof item.installHint === "string" ? item.installHint : undefined;
+  return buildRecommendedSkillInstallTask({
+    name,
+    id,
+    sourceRef,
+    target: recommendedSkillTarget(root, id, scope),
+    scopeLabel: scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）",
+    installHint,
+    collection: item.skillLayout === "collection",
+  });
 }
 
 function panelExternalToolInstallTask(root: string, item: Record<string, unknown>): string {

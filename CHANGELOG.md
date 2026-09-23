@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.30.10 - 2026-09-23
+
+- Fix Skill manager TUI crash on narrow terminals.
+- Simplify Academic Figure Skill install: codeload only, skip assets demos, no check_*.py.
+- Align README/LICENSE to CC BY-NC 4.0 and npm @latest.
+- Mark GitHub releases as Latest.
+
 ## 0.30.9 - 2026-09-22
 
 - Hide Skill/MCP/biosignal install prompts from the chat transcript while still sending them to the model

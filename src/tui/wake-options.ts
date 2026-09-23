@@ -48,7 +48,7 @@ export class WakeOptionsComponent {
     );
     const visible = this.items.slice(start, start + MAX_VISIBLE);
     const lines = [
-      this.theme.fg("accent", this.theme.bold(`唤醒选项 · ${this.title}`)),
+      this.theme.fg("accent", this.theme.bold(truncateToWidth(`唤醒选项 · ${this.title}`, contentWidth))),
       "",
     ];
     if (this.prompt) {
@@ -69,12 +69,12 @@ export class WakeOptionsComponent {
       }
     }
     if (this.items.length > MAX_VISIBLE) {
-      lines.push(this.theme.fg("dim", `  ${this.selectedIndex + 1}/${this.items.length}`));
+      lines.push(this.theme.fg("dim", truncateToWidth(`  ${this.selectedIndex + 1}/${this.items.length}`, contentWidth)));
     }
     const hint = this.mode === "checklist" || this.allowMultiple
       ? "↑/↓ 移动 · Space 勾选 · Enter 提交 · Esc 取消"
       : "↑/↓ 移动 · Enter 确认 · Esc 取消";
-    lines.push("", this.theme.fg("dim", hint));
+    lines.push("", this.theme.fg("dim", truncateToWidth(hint, contentWidth)));
     return lines;
   }
 
