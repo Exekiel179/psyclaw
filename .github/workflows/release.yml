@@ -108,7 +108,15 @@ jobs:
           if npm view "psyclaw@${version}" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
             echo "psyclaw@${version} already on registry; skipping publish"
           else
-            npm publish "$tarball" --access public --registry=https://registry.npmjs.org/
+            latest="$(npm view psyclaw version --registry=https://registry.npmjs.org/ 2>/dev/null || true)"
+            # Publishing an older missing version must not steal the `latest` dist-tag.
+            if [ -z "$latest" ] || [ "$(printf '%s\n%s\n' "$latest" "$version" | sort -V | tail -1)" = "$version" ]; then
+              npm publish "$tarball" --access public --registry=https://registry.npmjs.org/
+            else
+              recover_tag="recover-${version//./-}"
+              echo "publishing ${version} under dist-tag ${recover_tag} (latest stays ${latest})"
+              npm publish "$tarball" --access public --tag "$recover_tag" --registry=https://registry.npmjs.org/
+            fi
           fi
       - name: Verify package is visible on npm
         shell: bash
