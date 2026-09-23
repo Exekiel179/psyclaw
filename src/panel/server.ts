@@ -532,7 +532,7 @@ function panelSkillInstallTask(root: string, item: Record<string, unknown>, scop
     sourceRef,
     target: recommendedSkillTarget(root, id, scope),
     scopeLabel: scope === "user" ? "系统目录（所有项目）" : "项目目录（仅当前项目）",
-    installHint,
+    ...(installHint ? { installHint } : {}),
     collection: item.skillLayout === "collection",
   });
 }

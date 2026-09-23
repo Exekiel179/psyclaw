@@ -996,7 +996,7 @@ function modelSkillInstallTask(root: string, row: SkillManagerRow, scope: Recomm
     sourceRef: row.sourceRef ?? "",
     target: recommendedSkillTarget(root, row.id, scope),
     scopeLabel: skillScopeLabel(scope),
-    installHint: row.installHint,
+    ...(row.installHint ? { installHint: row.installHint } : {}),
     collection: Boolean(row.collection),
   });
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.30.11 - 2026-09-23
+
+- Fix exactOptionalPropertyTypes in skill install guidance call sites so 0.30.10 can publish.
+
 ## 0.30.10 - 2026-09-23
 
 - Fix Skill manager TUI crash on narrow terminals.
