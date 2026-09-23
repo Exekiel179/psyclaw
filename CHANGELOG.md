@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.13 - 2026-09-23
+
+- Clarify credential guidance so agents verify local skill/MCP status without dumping secrets
+- Document PsyClaw paper2zotero install paths under ~/.psyclaw/agent/skills
+
 ## 0.30.12 - 2026-09-23
 
 - Replace the paper2local recommendation with the verified paper2zotero source and current collection layout.

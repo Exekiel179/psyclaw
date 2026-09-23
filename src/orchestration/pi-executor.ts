@@ -119,7 +119,7 @@ function taskPrompt(task: TaskNode, context: WorkerContext, effects: readonly Ef
       ? `You are a psyclaw research worker with explicitly approved effects: ${formatEffects(effects)}.`
       : "You are a read-only psyclaw research worker.",
     elevated
-      ? "Stay within the approved effects. Do not read credentials or bypass project gates."
+      ? "Stay within the approved effects. Do not surface credential values or bypass project gates."
       : "Do not write, edit, delete, execute shell commands, access network services, or modify credentials.",
     elevated
       ? "Use only the tools enabled for this run."

@@ -56,8 +56,8 @@ function buildDefaultInstallTask(options: RecommendedSkillInstallGuidanceOptions
     "优先 codeload 源码包；不通再镜像。Windows 临时目录用 %TEMP% 绝对路径，禁止 /tmp 混用；拷完文件数必须 > 0。",
     "跳过演示大图与 >1MiB 媒体。安装阶段不要跑上游 check_*/e2e/eval。",
     options.collection
-      ? "套件：子目录含 SKILL.md 即可；保留相对结构；无 .git/符号链接/凭据。"
-      : "叶子：目标直接含有效 SKILL.md；无 .git/符号链接/凭据。",
+      ? "套件：子目录含 SKILL.md 即可；保留相对结构；无 .git/符号链接/凭据文件。"
+      : "叶子：目标直接含有效 SKILL.md；无 .git/符号链接/凭据文件。",
     "只装本推荐项相关子树。完成后 /reload（已默认启用）。",
   ].join("\n");
 }
