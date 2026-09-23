@@ -22,9 +22,9 @@ describe("skill install guidance", () => {
 
   it("keeps a compact default path for other skills", () => {
     const text = buildRecommendedSkillInstallTask({
-      name: "paper2local",
-      id: "paper2local",
-      sourceRef: "https://github.com/Exekiel179/paper2local",
+      name: "Paper to Zotero",
+      id: "paper2zotero",
+      sourceRef: "https://github.com/Timisic/paper2zotero-skill",
       target: "/tmp/x",
       scopeLabel: "项目目录",
     });

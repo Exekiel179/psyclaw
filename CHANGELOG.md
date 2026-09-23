@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.12 - 2026-09-23
+
+- Replace the paper2local recommendation with the verified paper2zotero source and current collection layout.
+- Prefer academic mode for explicit literature requests that also mention analysis concepts.
+
 ## 0.30.11 - 2026-09-23
 
 - Fix exactOptionalPropertyTypes in skill install guidance call sites so 0.30.10 can publish.

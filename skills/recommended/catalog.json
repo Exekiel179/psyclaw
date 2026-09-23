@@ -1,6 +1,6 @@
 {
   "schemaVersion": "psyclaw/recommended-skills/v1",
-  "documentVersion": "0.8.8",
+  "documentVersion": "0.8.9",
   "syncedAt": "2026-09-23",
   "sourceDocument": "学术AI_Skill分享资料.pdf",
   "sourceRef": "local-user-curated",
@@ -69,13 +69,15 @@
       "installHint": "只安装仓库中的 skills/scansci-pdf 完整目录（含 SKILL.md）；该叶子主要路由到仓库配套的 scansci-pdf MCP server，单独复制目录不会安装或配置服务器。启用前须按上游说明配置并验证 MCP；不要整仓当单一 Skill 混装。"
     },
     {
-      "id": "paper2local",
-      "name": "paper2local",
+      "id": "paper2zotero",
+      "name": "Paper to Zotero",
       "kind": "skill",
-      "stage": "全文获取",
-      "description": "把用户已选定的 DOI、URL、arXiv id 或直链 PDF 下载到本地目录（PsyClaw 默认 literature/pdfs），并报告路径与哈希。轻量落盘专用：不做 Zotero 写入、不做 MinerU/OCR、不做发现与筛选流水线；付费墙无法简单 HTTP 获取时请用户本地放置或另授浏览器会话。",
-      "sourceRef": "https://github.com/Exekiel179/paper2local",
-      "installHint": "安装仓库根目录完整 Skill（SKILL.md + scripts/）。不要安装 Timisic/paper2zotero-skill 全量依赖栈。"
+      "stage": "文献入库",
+      "description": "Timisic paper2zotero-skill 套件：自然语言意图或 DOI/URL/PDF → 检索筛选 → 用户确认 → 获取源 PDF、可选 MinerU 转 Markdown、按论文语种写结构化阅读笔记，并写入/核验 Zotero；另含 discussion-drafter，基于指定 Zotero 集合撰写讨论与 APA 参考文献。适用于需要可审计入库与阅读笔记的文献整理；不负责跨文献综述写作。依赖 OpenAlex、Zotero Web API，以及可选 MinerU / Kimi WebBridge 机构全文。",
+      "sourceRef": "https://github.com/Timisic/paper2zotero-skill",
+      "installHint": "从 https://github.com/Timisic/paper2zotero-skill 安装多 Skill 套件：保留 paper-to-zotero/（SKILL.md、scripts、references、agents）与 discussion-drafter/（SKILL.md、agents）各自完整目录；不要只拷贝 README。配置请参照 install/AGENT_SETUP.md，按实际所用功能准备 Zotero、OpenAlex 及可选 MinerU / Kimi WebBridge；不要在安装阶段读取或上传凭据。上游未发布 Release 或 tag；截至 2026-09-23 最新 main 提交为 2294e7f79b109953a0b77d6e8e35df9e34377c4f；仓库未检出许可证文件，license=unknown。",
+      "skillLayout": "collection",
+      "license": "unknown"
     },
     {
       "id": "scholarbridge",

@@ -44,16 +44,20 @@ export interface ModeMismatchReminder {
  * Never auto-switches; callers must remind and leave mode unchanged.
  */
 export function detectChatModeMismatch(text: string): ModeMismatchReminder | null {
-  if (resolveStatsIntent(text)) {
-    return {
-      target: "analysis",
-      notify: "当前是 chat 模式，但请求像是数据分析。请按 Shift+Tab 切到 analysis 后再继续（不会自动切换）。",
-    };
-  }
+  // Explicit literature/writing/review intent wins when the same request also
+  // mentions an analysis construct (for example, a literature review about
+  // multiple mediation). The research topic must not reroute the requested
+  // academic task into analysis mode.
   if (resolveAcademicSoftRoute(text)) {
     return {
       target: "academic",
-      notify: "当前是 chat 模式，但请求像是文献/写作/审稿。请按 Shift+Tab 切到 academic 后再继续（不会自动切换）。",
+      notify: "当前是 chat 模式，但请求像是文献调研/写作/审稿。请按 Shift+Tab 直到底部显示 academic 后再继续（不会自动切换）。",
+    };
+  }
+  if (resolveStatsIntent(text)) {
+    return {
+      target: "analysis",
+      notify: "当前是 chat 模式，但请求像是数据分析。请按 Shift+Tab 直到底部显示 analysis 后再继续（不会自动切换）。",
     };
   }
   return null;

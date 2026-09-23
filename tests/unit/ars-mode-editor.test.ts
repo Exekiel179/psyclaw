@@ -33,6 +33,12 @@ describe("session modes", () => {
     const academic = detectChatModeMismatch("帮我写论文终稿");
     expect(academic?.target).toBe("academic");
 
+    const literatureWithAnalysisTopic = detectChatModeMismatch(
+      "请围绕集体主义对离婚率的影响，以及心理幸福感的多重中介作用开展文献调研",
+    );
+    expect(literatureWithAnalysisTopic?.target).toBe("academic");
+    expect(literatureWithAnalysisTopic?.notify).toContain("底部显示 academic");
+
     expect(detectChatModeMismatch("今天天气怎么样")).toBeNull();
     expect(detectChatModeMismatch("/plan status")).toBeNull();
 
