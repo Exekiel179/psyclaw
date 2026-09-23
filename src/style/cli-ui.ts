@@ -91,6 +91,7 @@ export function formatCliUsage(): string {
     `  ${c.gray("快捷键：")} ${c.teal("Shift+Tab")} ${c.gray("模式 chat→analysis→academic")} ${c.darkGray("·")} ${c.teal("Ctrl+Shift+T")} ${c.gray("Thinking")}`,
     "",
     `  ${c.gray("终端：")} ${c.teal("psyclaw --continue")} ${c.darkGray("/")} ${c.teal("psyclaw -c")} ${c.gray("续接最近会话")}`,
+    `          ${c.teal("psyclaw --session <id>")} ${c.gray("续接指定会话（退出时提示的命令）")}`,
     `          ${c.teal("psyclaw --continuously-work")} ${c.gray("持续自动推进（红字警告：费 token、不保质量）")}`,
     `          ${c.teal("psyclaw -v")} ${c.darkGray("/")} ${c.teal("psyclaw --version")} ${c.gray("版本号")}`,
     `          ${c.teal("psyclaw telemetry on|off|status")} ${c.gray("管理匿名产品遥测")}`,

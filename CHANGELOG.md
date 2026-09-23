@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.14 - 2026-09-23
+
+- Forward Pi --session / --session-dir / --resume flags so exit resume hints work
+- Document psyclaw --session in CLI help
+
 ## 0.30.13 - 2026-09-23
 
 - Clarify credential guidance so agents verify local skill/MCP status without dumping secrets

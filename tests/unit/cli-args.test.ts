@@ -14,9 +14,23 @@ describe("continueSessionArgs", () => {
     expect(continueSessionArgs("-c", [])).toEqual(["-c"]);
   });
 
+  it("forwards explicit session resume flags printed on exit", () => {
+    expect(continueSessionArgs("--session-dir", ["/tmp/sessions", "--session", "01abc"])).toEqual([
+      "--session-dir",
+      "/tmp/sessions",
+      "--session",
+      "01abc",
+    ]);
+    expect(continueSessionArgs("--session", ["01abc"])).toEqual(["--session", "01abc"]);
+    expect(continueSessionArgs("--session-id", ["01abc"])).toEqual(["--session-id", "01abc"]);
+    expect(continueSessionArgs("--resume", [])).toEqual(["--resume"]);
+    expect(continueSessionArgs("-r", ["note"])).toEqual(["-r", "note"]);
+  });
+
   it("does not claim other CLI commands", () => {
     expect(continueSessionArgs("chat", ["--continue"])).toBeUndefined();
     expect(continueSessionArgs(undefined, [])).toBeUndefined();
+    expect(continueSessionArgs("--help", [])).toBeUndefined();
   });
 });
 
