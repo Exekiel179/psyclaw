@@ -101,16 +101,51 @@ jobs:
           (cd release && sha256sum "$artifact" > SHA256SUMS.txt)
       - name: Publish to npm with Trusted Publishing
         shell: bash
-        run: npm publish "./release/psyclaw-${RELEASE_TAG#v}.tgz" --access public --registry=https://registry.npmjs.org/
-      - name: Create GitHub release
+        run: |
+          version="${RELEASE_TAG#v}"
+          tarball="./release/psyclaw-${version}.tgz"
+          test -f "$tarball" || { echo "missing tarball: $tarball" >&2; exit 1; }
+          if npm view "psyclaw@${version}" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
+            echo "psyclaw@${version} already on registry; skipping publish"
+          else
+            npm publish "$tarball" --access public --registry=https://registry.npmjs.org/
+          fi
+      - name: Verify package is visible on npm
+        shell: bash
+        run: |
+          version="${RELEASE_TAG#v}"
+          for attempt in $(seq 1 18); do
+            if published="$(npm view "psyclaw@${version}" version --registry=https://registry.npmjs.org/ 2>/dev/null)" && [ "$published" = "$version" ]; then
+              echo "verified psyclaw@${version} on registry"
+              npm dist-tag ls psyclaw --registry=https://registry.npmjs.org/ || true
+              # Ensure installable latest points at this release when it is the newest published.
+              latest="$(npm view psyclaw version --registry=https://registry.npmjs.org/)"
+              echo "registry latest=${latest}"
+              exit 0
+            fi
+            echo "attempt ${attempt}: psyclaw@${version} not visible yet"
+            sleep 10
+          done
+          echo "ERROR: psyclaw@${version} not found on https://registry.npmjs.org/ after publish" >&2
+          exit 1
+      - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create "$RELEASE_TAG" \
-            release/psyclaw-*.tgz \
-            release/SHA256SUMS.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "PsyClaw $RELEASE_TAG" \
-            --latest \
-            --generate-notes
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              release/psyclaw-*.tgz \
+              release/SHA256SUMS.txt \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --latest
+          else
+            gh release create "$RELEASE_TAG" \
+              release/psyclaw-*.tgz \
+              release/SHA256SUMS.txt \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "PsyClaw $RELEASE_TAG" \
+              --latest \
+              --generate-notes
+          fi
