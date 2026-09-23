@@ -271,6 +271,26 @@ const MODE_PATCHES = [
     next: 'then restart PsyClaw.',
   },
   {
+    // Exit hint must use the real CLI bin name. APP_NAME is "PsyClaw" and is not
+    // an executable; without this patch users paste a command that PsyClaw rejects.
+    old: `    const args = [APP_NAME];
+    if (!sessionManager.usesDefaultSessionDir()) {
+        args.push("--session-dir", quoteIfNeeded(sessionManager.getSessionDir()));
+    }
+    args.push("--session", sessionManager.getSessionId());
+    return args.join(" ");`,
+    next: `    const args = ["psyclaw"];
+    if (!sessionManager.usesDefaultSessionDir()) {
+        args.push("--session-dir", quoteIfNeeded(sessionManager.getSessionDir()));
+    }
+    args.push("--session", sessionManager.getSessionId());
+    return args.join(" ");`,
+  },
+  {
+    old: 'process.stdout.write(`${chalk.dim("To resume this session:")} ${resumeCommand}\\n`);',
+    next: 'process.stdout.write(`${chalk.dim("续接本会话：")} ${resumeCommand}\\n`);',
+  },
+  {
     old: `if (text === "/login" || text.startsWith("/login ")) {
                 const providerRef = text.startsWith("/login ") ? text.slice(7).trim() : undefined;
                 this.editor.setText("");

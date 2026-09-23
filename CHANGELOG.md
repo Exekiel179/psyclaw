@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.30.15 - 2026-09-23
+
+- Rewrite Pi exit resume hint to lowercase psyclaw CLI and Chinese label via rebrand-pi
+
 ## 0.30.14 - 2026-09-23
 
 - Forward Pi --session / --session-dir / --resume flags so exit resume hints work
