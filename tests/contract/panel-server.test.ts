@@ -14,6 +14,8 @@ describe("read-only panel server", () => {
     await bootstrapProject({ root, goal: "Bounded", paradigm: "qualitative-thematic" });
     await mkdir(join(root, "outputs"), { recursive: true });
     await writeFile(join(root, "outputs", "research-export.json"), JSON.stringify({ result: "exported" }), "utf8");
+    await mkdir(join(root, "analysis", "results"), { recursive: true });
+    await writeFile(join(root, "analysis", "results", "analysis_report.md"), "# Awaiting human review", "utf8");
     const log = new RunEventLog(root, "run-server");
     await log.append({ type: "planned", at: "2026-01-01T00:00:00.000Z" });
     await log.append({ type: "started", at: "2026-01-01T00:00:01.000Z" });
@@ -42,6 +44,14 @@ describe("read-only panel server", () => {
       const filesRes = await fetch(`${base}/api/project-files`);
       const files = (await filesRes.json()) as { files: string[] };
       expect(files.files).toContain("outputs/research-export.json");
+      expect(files.files).toContain("analysis/results/analysis_report.md");
+      const reportRes = await fetch(`${base}/api/project-file?path=analysis%2Fresults%2Fanalysis_report.md`);
+      expect(reportRes.status).toBe(200);
+      expect(await reportRes.json()).toMatchObject({ format: "markdown", content: "# Awaiting human review" });
+      const checklistRes = await fetch(`${base}/api/crosscheck`);
+      expect(checklistRes.status).toBe(200);
+      const checklist = (await checklistRes.json()) as { checklist: { items: Array<{ id: string; status: string }> } };
+      expect(checklist.checklist.items).toContainEqual(expect.objectContaining({ id: "primary-effect", status: "unverified" }));
       const exportRes = await fetch(`${base}/api/project-file?path=outputs%2Fresearch-export.json`);
       expect(exportRes.status).toBe(200);
       expect(await exportRes.json()).toMatchObject({ format: "json", content: expect.stringContaining("exported") });

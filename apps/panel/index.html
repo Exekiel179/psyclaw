@@ -2573,6 +2573,7 @@ function groupFiles(files) {
     "核心文档": ordered.filter(path => priority.includes(path)),
     "Export 导出结果": ordered.filter(path => path.startsWith("outputs/")),
     "论文与报告": ordered.filter(path => /^(paper|docs)\//.test(path) && !priority.includes(path)),
+    "分析报告与核查": ordered.filter(path => path.startsWith("analysis/results/")),
     "研究记录": ordered.filter(path => /^(notes|logs)\//.test(path) && !priority.includes(path))
   };
 }

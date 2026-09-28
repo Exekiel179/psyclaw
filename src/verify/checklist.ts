@@ -112,6 +112,22 @@ export async function loadVerifyChecklist(root: string): Promise<VerifyChecklist
   }
 }
 
+export async function recordHumanVerification(root: string, scope: HumanVerifyGateScope, statement: string): Promise<VerifyChecklist> {
+  const checklist = await ensureDefaultVerifyChecklist(root);
+  const now = new Date().toISOString();
+  const phases = new Set(SCOPE_PHASES[scope]);
+  for (const item of checklist.items) {
+    if (!phases.has(item.phase ?? "general")) continue;
+    item.status = "verified";
+    item.approvedBy = "human";
+    item.updatedAt = now;
+    item.notes = `用户在当前会话明确确认（${now}；范围：${scope}）：${statement}`;
+  }
+  checklist.updatedAt = now;
+  await saveVerifyChecklist(root, checklist);
+  return checklist;
+}
+
 export async function saveVerifyChecklist(root: string, checklist: VerifyChecklist): Promise<void> {
   const path = await assertSafeProjectPath(root, VERIFY_CHECKLIST_PATH);
   await atomicWriteFile(path, `${JSON.stringify(checklist, null, 2)}\n`);
@@ -267,9 +283,9 @@ export function evaluateHumanVerifyGate(
     checklist,
     pending,
     message: [
-      `人审硬门禁（${scopeLabel}）：须先完成 AI /crosscheck 与/或 /verify，再由人在 Panel「核实」或唤醒选项中批准。`,
+      `人审硬门禁（${scopeLabel}）：须先完成 AI /crosscheck 与/或 /verify，再由人在 Panel「核实」、唤醒选项或当前会话明确确认。`,
       `未过人审：${pendingText}`,
-      "跳过/AI 已核不算通过。人审不经斜杠命令，由收尾门禁自动要求。",
+      "跳过/AI 已核不算通过。Panel 不可用时，用户可在会话中明确说「我已核验分析报告」或「我已核验论文定稿」；不会自动交接。",
     ].join("\n"),
   };
 }

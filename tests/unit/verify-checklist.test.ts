@@ -7,6 +7,7 @@ import {
   defaultVerifyChecklist,
   evaluateHumanVerifyGate,
   markVerifyItem,
+  recordHumanVerification,
   resolveVerifyMark,
 } from "../../src/verify/checklist.js";
 
@@ -46,6 +47,19 @@ describe("human verify gate", () => {
       item.approvedBy = "human";
     }
     expect(evaluateHumanVerifyGate(checklist, "academic-finalize").ok).toBe(false);
+  });
+
+  it("records an explicit user's analysis review without requiring the Panel", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-verify-"));
+    try {
+      const checklist = await recordHumanVerification(root, "analysis-complete", "我已核验分析报告");
+      expect(checklist.items.filter((item) => item.phase !== "general").every((item) => item.status === "verified" && item.approvedBy === "human")).toBe(true);
+      expect(checklist.items.find((item) => item.id === "citations")?.status).toBe("unverified");
+      expect((await assertHumanVerifyGate(root, "analysis-complete")).ok).toBe(true);
+      expect((await assertHumanVerifyGate(root, "academic-finalize")).ok).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("persists AI marks as ai-checked and human marks as verified", async () => {

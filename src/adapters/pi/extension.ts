@@ -117,7 +117,7 @@ import {
   continuouslyWorkWarningText,
   isContinuouslyWorkEnabled,
 } from "../../session/continuously-work.js";
-import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, isPlanRitualConfirm, PLAN_RITUAL_PHRASE, ensureDefaultVerifyChecklist, loadVerifyChecklist } from "../../verify/checklist.js";
+import { assertHumanVerifyGate, formatVerifyChecklist, isNaturalPlanConfirm, isPlanRitualConfirm, PLAN_RITUAL_PHRASE, ensureDefaultVerifyChecklist, loadVerifyChecklist, recordHumanVerification } from "../../verify/checklist.js";
 import { formatSessionHelp, formatSessionHelpBrief } from "../../session/help.js";
 import { openResearchWorkbench } from "../../panel/workbench.js";
 import {
@@ -1570,6 +1570,24 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
 
     const mode = arsModeEditor?.getMode() ?? sessionMode;
     const trimmed = event.text.trim();
+    // A direct user statement is a valid human-review route when Panel is unavailable.
+    // Do not infer approval from assistant output, quoted text, or a question about verification.
+    if (/^我(?:已核验|已核实|已审阅并确认|核验了)(?:分析报告|论文定稿)?[。！!]?$/u.test(trimmed)) {
+      const scope = trimmed.includes("论文定稿") ? "academic-finalize"
+        : trimmed.includes("分析报告") ? "analysis-complete"
+          : mode === "academic" ? "academic-finalize" : mode === "analysis" ? "analysis-complete" : undefined;
+      if (!scope || !(await readActiveProject(ctx.cwd))) {
+        ctx.ui.notify("请先进入已初始化项目的 analysis 或 academic 模式，或明确说「我已核验分析报告」/「我已核验论文定稿」。", "warning");
+        return { action: "handled" };
+      }
+      try {
+        await recordHumanVerification(ctx.cwd, scope, trimmed);
+        ctx.ui.notify(`已记录用户人审确认（${scope}）；不会自动将分析标为完成或交接。`, "info");
+      } catch (error) {
+        ctx.ui.notify(`人审记录失败：${error instanceof Error ? error.message : String(error)}`, "error");
+      }
+      return { action: "handled" };
+    }
 
     // Chat must not soft-takeover; when intent fits analysis/academic, remind only.
     if (mode === "chat") {

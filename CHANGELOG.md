@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.16 - 2026-09-24
+
+- Show analysis reports and verification records from analysis/results in the Panel.
+- Accept an explicit user review confirmation in the current session when the Panel is unavailable, with a dated human-review record; do not auto-complete or hand off.
+
 ## 0.30.15 - 2026-09-23
 
 - Rewrite Pi exit resume hint to lowercase psyclaw CLI and Chinese label via rebrand-pi

@@ -40,7 +40,7 @@ import {
   setLocalSkillEnabled,
   userSkillId,
 } from "../skills/user-skills.js";
-import { loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../verify/checklist.js";
+import { defaultVerifyChecklist, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../verify/checklist.js";
 import { readActiveAnalysisPlan } from "../analysis/plan.js";
 import { browserConfigForPreference, injectBrowserObservabilityConfig } from "../observability/config.js";
 import { readTelemetryPreference, telemetryPreferenceOptions, writeTelemetryPreference } from "../observability/preference.js";
@@ -404,7 +404,7 @@ async function panelStats(root: string): Promise<unknown> {
   return { schemaVersion: "psyclaw/panel-stats/v1", runs: (await listRuns(root)).length, evidence: await countLines(paths.evidence), claims: await countLines(paths.claims), auditEvents: await countLines(paths.audit), trackedFiles: files.length, outputs: files.filter((path) => path.startsWith("outputs/")).length, generatedAt: new Date().toISOString() };
 }
 
-const PANEL_FILE_ROOTS = ["notes/", "paper/", "docs/", "outputs/", "logs/"] as const;
+const PANEL_FILE_ROOTS = ["notes/", "paper/", "docs/", "outputs/", "logs/", "analysis/results/"] as const;
 const PANEL_FILE_EXTENSIONS = /\.(md|markdown|txt|json|csv)$/i;
 
 function panelFileAllowed(relative: string): boolean {
@@ -1318,7 +1318,15 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
       }
       if (url.pathname === "/api/crosscheck") {
         if (request.method === "GET") {
-          const checklist = await loadVerifyChecklist(root);
+          const existing = await loadVerifyChecklist(root);
+          const defaults = defaultVerifyChecklist();
+          const checklist = {
+            ...existing,
+            items: [
+              ...existing.items,
+              ...defaults.items.filter((item) => !existing.items.some((row) => row.id === item.id)),
+            ],
+          };
           response.writeHead(200, { "content-type": "application/json" });
           response.end(JSON.stringify({ schemaVersion: "psyclaw/crosscheck/v1", checklist }));
           return;
