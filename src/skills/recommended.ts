@@ -51,6 +51,43 @@ export interface RecommendationState {
 
 export type RecommendedSkillScope = "project" | "user";
 
+export type RecommendedSkillUnavailableCode = "not-installed" | "missing-files" | "invalid";
+
+/** Install is absent or unusable. Enable must not treat this as a crash. */
+export class RecommendedSkillUnavailableError extends Error {
+  readonly code: RecommendedSkillUnavailableCode;
+  readonly id: string;
+  readonly scope: RecommendedSkillScope;
+  readonly target: string;
+
+  constructor(
+    code: RecommendedSkillUnavailableCode,
+    id: string,
+    scope: RecommendedSkillScope,
+    target: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "RecommendedSkillUnavailableError";
+    this.code = code;
+    this.id = id;
+    this.scope = scope;
+    this.target = target;
+  }
+}
+
+export type RecommendedSkillEnableResult =
+  | { ok: true; id: string; enabled: boolean }
+  | {
+      ok: false;
+      id: string;
+      enabled: false;
+      code: RecommendedSkillUnavailableCode;
+      needsInstall: boolean;
+      target: string;
+      message: string;
+    };
+
 export interface RecommendedCatalogItem {
   id: string;
   name: string;
@@ -333,6 +370,47 @@ async function assertNoNestedGitOrSymlink(directory: string): Promise<void> {
   }
 }
 
+function unavailable(
+  code: RecommendedSkillUnavailableCode,
+  id: string,
+  scope: RecommendedSkillScope,
+  target: string,
+  message: string,
+): RecommendedSkillUnavailableError {
+  return new RecommendedSkillUnavailableError(code, id, scope, target, message);
+}
+
+async function readSkillMarkdown(
+  path: string,
+  id: string,
+  scope: RecommendedSkillScope,
+  target: string,
+): Promise<string> {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR" || code === "EISDIR") {
+      throw unavailable(
+        "missing-files",
+        id,
+        scope,
+        target,
+        `Recommended Skill files are missing in ${scope} scope: ${id}; expected SKILL.md at ${path}`,
+      );
+    }
+    throw error;
+  }
+}
+
+function parseInstalledSkillName(text: string, id: string, scope: RecommendedSkillScope, target: string): string {
+  try {
+    return parseSkillName(text);
+  } catch (error) {
+    throw unavailable("invalid", id, scope, target, error instanceof Error ? error.message : String(error));
+  }
+}
+
 export async function validateModelInstalledRecommendedSkill(
   root: string,
   requestedId: string,
@@ -340,11 +418,21 @@ export async function validateModelInstalledRecommendedSkill(
 ): Promise<{ id: string; skillName: string; skillNames: string[]; path: string }> {
   const id = normalizedId(requestedId);
   const target = recommendedSkillTarget(root, id, scope);
-  const stat = await lstat(target).catch(() => undefined);
-  if (!stat?.isDirectory() || stat.isSymbolicLink()) {
-    throw new Error(`Recommended Skill is not installed in ${scope} scope: ${id}`);
+  let stat: Awaited<ReturnType<typeof lstat>> | undefined;
+  try {
+    stat = await lstat(target);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") stat = undefined;
+    else throw error;
   }
-  await assertNoNestedGitOrSymlink(target);
+  if (!stat?.isDirectory() || stat.isSymbolicLink()) {
+    throw unavailable("not-installed", id, scope, target, `Recommended Skill is not installed in ${scope} scope: ${id}`);
+  }
+  try {
+    await assertNoNestedGitOrSymlink(target);
+  } catch (error) {
+    throw unavailable("invalid", id, scope, target, error instanceof Error ? error.message : String(error));
+  }
   const catalog = await readRecommendedCatalog();
   const item = catalog.items.find((candidate) => normalizedId(candidate.id) === id);
   if (item?.skillLayout === "collection") {
@@ -354,15 +442,66 @@ export async function validateModelInstalledRecommendedSkill(
         if (entry.name.startsWith(".")) continue;
         const path = join(directory, entry.name);
         if (entry.isDirectory()) await visit(path);
-        else if (entry.isFile() && entry.name === "SKILL.md") skillNames.push(parseSkillName(await readFile(path, "utf8")));
+        else if (entry.isFile() && entry.name === "SKILL.md") {
+          skillNames.push(parseInstalledSkillName(await readSkillMarkdown(path, id, scope, target), id, scope, target));
+        }
       }
     };
     await visit(target);
-    if (skillNames.length === 0) throw new Error(`Recommended Skill collection contains no SKILL.md: ${id}`);
+    if (skillNames.length === 0) {
+      throw unavailable("missing-files", id, scope, target, `Recommended Skill collection contains no SKILL.md: ${id}`);
+    }
     return { id, skillName: id, skillNames: [...new Set(skillNames)].sort(), path: target };
   }
-  const skillName = parseSkillName(await readFile(join(target, "SKILL.md"), "utf8"));
+  const skillFile = join(target, "SKILL.md");
+  const skillName = parseInstalledSkillName(await readSkillMarkdown(skillFile, id, scope, target), id, scope, target);
   return { id, skillName, skillNames: [skillName], path: target };
+}
+
+function enableRefusalMessage(error: RecommendedSkillUnavailableError): string {
+  if (error.code === "missing-files" || error.code === "not-installed") {
+    return `推荐 Skill「${error.id}」还不能启用：${error.target} 下没有可用的 SKILL.md。请在 Skill 管理中安装；安装完成前不会记为已启用。`;
+  }
+  return `推荐 Skill「${error.id}」未通过校验，未改为启用：${error.message}`;
+}
+
+/**
+ * Persist enablement only after the install validates.
+ * A missing directory or SKILL.md does not throw and does not flip state.
+ */
+export async function setRecommendedSkillEnabled(
+  root: string,
+  requestedId: string,
+  enabled: boolean,
+  requestedScope?: RecommendedSkillScope,
+): Promise<RecommendedSkillEnableResult> {
+  const id = normalizedId(requestedId);
+  const state = await readRecommendationState(root);
+  const scope = requestedScope ?? state.skillScopes?.[id] ?? "project";
+  if (enabled) {
+    try {
+      await validateModelInstalledRecommendedSkill(root, id, scope);
+    } catch (error) {
+      if (error instanceof RecommendedSkillUnavailableError) {
+        return {
+          ok: false,
+          id,
+          enabled: false,
+          code: error.code,
+          needsInstall: error.code === "missing-files" || error.code === "not-installed",
+          target: error.target,
+          message: enableRefusalMessage(error),
+        };
+      }
+      throw error;
+    }
+  }
+  const current = new Set(state.skills);
+  if (enabled) current.add(id); else current.delete(id);
+  state.skills = [...current];
+  state.skillScopes = { ...(state.skillScopes ?? {}), [id]: scope };
+  await saveRecommendationState(root, state);
+  return { ok: true, id, enabled };
 }
 
 async function readInstallManifest(path: string): Promise<RecommendedInstallManifest> {

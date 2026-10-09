@@ -26,7 +26,9 @@ import {
   readRecommendedCatalog,
   recommendedSkillTarget,
   saveRecommendationState,
+  setRecommendedSkillEnabled,
   validateModelInstalledRecommendedSkill,
+  RecommendedSkillUnavailableError,
   type RecommendedSkillScope,
   type RecommendationState,
 } from "../../skills/recommended.js";
@@ -615,16 +617,20 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         source: "recommended" as const,
       };
     } catch (validationError) {
-      // A managed target that exists on disk but fails validation (e.g. a URL
-      // install whose manifest/hash does not match the pinned catalog) is still
-      // shown as installed so the user sees it; enabling it only takes effect
-      // once the install is repaired through /skill.
+      // A directory without SKILL.md is not installed: Space/Enter must start
+      // the existing install flow. A present tree that fails content checks
+      // stays visible so the user can repair it.
+      const unavailable = validationError instanceof RecommendedSkillUnavailableError ? validationError : undefined;
+      const missing = unavailable?.code === "missing-files" || unavailable?.code === "not-installed";
       let onDisk = false;
-      try {
-        const target = recommendedSkillTarget(root, id, scope);
-        const stat = await lstat(target);
-        onDisk = stat.isDirectory();
-      } catch { /* target missing */ }
+      if (!missing) {
+        try {
+          const target = recommendedSkillTarget(root, id, scope);
+          const stat = await lstat(target);
+          onDisk = stat.isDirectory() && !stat.isSymbolicLink();
+        } catch { /* target missing */ }
+      }
+      const hasSource = typeof item.sourceRef === "string" && /^https:\/\//.test(item.sourceRef);
       return {
         id,
         name: item.name,
@@ -632,15 +638,17 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         ...(item.sourceRef === undefined ? {} : { sourceRef: item.sourceRef }),
         ...(typeof item.installHint === "string" ? { installHint: item.installHint } : {}),
         collection: item.skillLayout === "collection",
-        installed: onDisk,
-        enabled: onDisk && state.skills.includes(id),
+        installed: !missing && onDisk,
+        enabled: !missing && onDisk && state.skills.includes(id),
         scope,
-        blocked: typeof item.sourceRef !== "string" || !/^https:\/\//.test(item.sourceRef),
-        reason: onDisk
-          ? `已检测到目录但未通过来源/许可/哈希校验${state.skills.includes(id) ? "（当前配置为启用，但校验失败不会加载）" : ""}；可按 r 重新安装修复`
-          : typeof item.sourceRef === "string" && /^https:\/\//.test(item.sourceRef)
-            ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
-            : "没有可交给模型检查的来源网址",
+        blocked: !hasSource,
+        reason: unavailable?.code === "missing-files"
+          ? "目录存在但缺少 SKILL.md，尚未安装完成；按 Enter 选择安装范围并交给当前模型处理。完成前不会记为已启用。"
+          : !missing && onDisk
+            ? `已检测到目录但未通过来源/许可/哈希校验${state.skills.includes(id) ? "（当前配置为启用，但校验失败不会加载）" : ""}；可按 r 重新安装修复`
+            : hasSource
+              ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
+              : "没有可交给模型检查的来源网址",
         source: "recommended" as const,
       };
     }
@@ -730,18 +738,6 @@ async function mcpManagerRows(root: string, state: RecommendationState, runtime:
 function skillRowLabel(row: SkillManagerRow): string {
   const state = row.blocked ? "× 阻断" : row.enabled ? "● 已启用" : row.installed ? "○ 未启用" : "↓ 未安装";
   return `${state}  ${row.name}  [${row.id}]`;
-}
-
-async function setRecommendedSkillEnabled(root: string, requestedId: string, enabled: boolean, requestedScope?: RecommendedSkillScope): Promise<void> {
-  const id = normalizeRecommendedSkillId(requestedId);
-  const state = await readRecommendationState(root);
-  const scope = requestedScope ?? state.skillScopes?.[id] ?? "project";
-  if (enabled) await validateModelInstalledRecommendedSkill(root, id, scope);
-  const current = new Set(state.skills);
-  if (enabled) current.add(id); else current.delete(id);
-  state.skills = [...current];
-  state.skillScopes = { ...(state.skillScopes ?? {}), [id]: scope };
-  await saveRecommendationState(root, state);
 }
 
 function skillManagerItems(rows: SkillManagerRow[]): SkillManagerItem[] {
@@ -1242,8 +1238,10 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
       if (action.enabled) {
         const failed: string[] = [];
         for (const row of managed) {
-          try { await setRecommendedSkillEnabled(ctx.cwd, row.id, true); }
-          catch { failed.push(row.name); }
+          try {
+            const result = await setRecommendedSkillEnabled(ctx.cwd, row.id, true);
+            if (!result.ok) failed.push(row.name);
+          } catch { failed.push(row.name); }
         }
         if (locals.length > 0) {
           const ids = locals.map((row) => row.name);
@@ -1251,7 +1249,7 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
         }
         ctx.ui.notify(
           failed.length > 0
-            ? `已启用全部可管理的 Skill（${failed.join("、")} 启用失败：可能未通过来源、许可或依赖预检）。请运行 /reload 重新加载。`
+            ? `已启用其余可管理的 Skill（${failed.join("、")} 未启用：缺少 SKILL.md 或未通过校验，请在列表中单独安装或修复）。请运行 /reload 重新加载。`
             : `已启用全部可管理的 Skill。请运行 /reload 重新加载。`,
           failed.length > 0 ? "warning" : "info",
         );
@@ -1279,7 +1277,17 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
         await setLocalSkillEnabled(ctx.cwd, row.name, action.enabled);
         ctx.ui.notify(`已${action.enabled ? "启用" : "停用"}本地 Skill ${row.name}。请运行 /reload 重新加载。`, "info");
       } else {
-        await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
+        const result = await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
+        if (!result.ok) {
+          const canInstall = action.enabled && result.needsInstall && !row.blocked && typeof row.sourceRef === "string" && row.sourceRef.length > 0;
+          if (canInstall) {
+            ctx.ui.notify(result.message, "warning");
+            await queueModelSkillInstall(pi, ctx, row);
+            return;
+          }
+          ctx.ui.notify(result.message, "error");
+          continue;
+        }
         ctx.ui.notify(`已${action.enabled ? "启用" : "停用"} ${row.name}。请运行 /reload 重新加载。`, "info");
       }
     }
