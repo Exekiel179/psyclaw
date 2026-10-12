@@ -4,6 +4,11 @@
 
 import Fastify from "fastify";
 import { loadConfig } from "./config.js";
+import { createDbPool } from "./db/client.js";
+import { JwtTokenService } from "./auth/token.js";
+import { createAuthMiddleware } from "./auth/middleware.js";
+import { PgBalanceService } from "./billing/balance.js";
+import { OpenAIProxyHandler } from "./proxy/handler.js";
 
 const config = loadConfig();
 const fastify = Fastify({
@@ -23,48 +28,52 @@ await fastify.register(import("@fastify/rate-limit"), {
   timeWindow: "1 minute",
 });
 
+// 初始化服务
+const db = await createDbPool(config);
+const tokenService = new JwtTokenService(config.jwt.secret);
+const balanceService = new PgBalanceService(db);
+const proxyHandler = new OpenAIProxyHandler(config, balanceService, db);
+const authMiddleware = createAuthMiddleware(tokenService);
+
 // 健康检查
 fastify.get("/health", async () => {
   return { status: "ok", timestamp: new Date().toISOString() };
 });
 
-// TODO: 注册路由模块
-// - /auth/* - 认证相关（登录、token）
-// - /account/* - 账户查询（余额、订阅）
-// - /v1/chat/completions - OpenAI 兼容代理
-// - /payment/* - 支付相关（充值、订阅）
-// - /webhooks/* - 支付回调
-
-// 临时占位路由（待实现）
+// 认证相关
 fastify.post("/auth/login", async () => {
   throw new Error("登录功能待实现：微信扫码/手机号验证码");
 });
 
-fastify.get("/account/balance", async (request) => {
-  const authHeader = request.headers.authorization;
-  if (!authHeader) {
-    return { error: "Missing Authorization header" };
-  }
-  // TODO: 验证 token，查询余额
+// 账户查询（需要认证）
+fastify.get("/account/balance", { preHandler: authMiddleware }, async (request) => {
+  const userId = (request as never as { userId: string }).userId;
+  const balance = await balanceService.getBalance(userId);
+
   return {
-    balance: 12345,
-    subscription: null,
+    balance: balance.balance,
+    subscription: balance.subscription
+      ? {
+        plan_id: balance.subscription.planId,
+        status: "active",
+        expire_at: balance.subscription.expireAt.toISOString(),
+        quota: {
+          used: balance.subscription.quotaUsed,
+          total: balance.subscription.quotaTotal,
+          unit: "tokens",
+        },
+      }
+      : null,
   };
 });
 
-fastify.post("/v1/chat/completions", async (request, reply) => {
-  const authHeader = request.headers.authorization;
-  if (!authHeader) {
-    reply.code(401);
-    return { error: { message: "Missing Authorization header", type: "invalid_request_error" } };
-  }
-
-  // TODO: 代理逻辑
-  reply.code(501);
-  return { error: { message: "Proxy not implemented yet", type: "server_error" } };
+// OpenAI 兼容代理（需要认证）
+fastify.post("/v1/chat/completions", { preHandler: authMiddleware }, async (request, reply) => {
+  await proxyHandler.handle(request, reply);
 });
 
-fastify.post("/payment/topup", async (request, reply) => {
+// 支付相关（临时占位）
+fastify.post("/payment/topup", { preHandler: authMiddleware }, async (request, reply) => {
   const body = request.body as { amount: number; paymentMethod: "wechat" | "alipay" };
 
   if (!body.amount || !body.paymentMethod) {
@@ -72,24 +81,21 @@ fastify.post("/payment/topup", async (request, reply) => {
     return { error: "Missing required fields: amount, paymentMethod" };
   }
 
-  // TODO: 创建支付订单
   reply.code(501);
   return { error: "Payment not implemented yet" };
 });
 
-fastify.get("/payment/order/:orderId", async (request) => {
+fastify.get("/payment/order/:orderId", { preHandler: authMiddleware }, async (request) => {
   const { orderId } = request.params as { orderId: string };
-  // TODO: 查询订单状态
   return { orderId, status: "unpaid" };
 });
 
+// 支付回调（无需认证）
 fastify.post("/webhooks/wechat", async (request) => {
-  // TODO: 处理微信支付回调
   return { code: "SUCCESS", message: "ok" };
 });
 
 fastify.post("/webhooks/alipay", async (request) => {
-  // TODO: 处理支付宝回调
   return "success"; // 支付宝要求返回纯文本 "success"
 });
 
@@ -107,6 +113,7 @@ try {
 // 优雅退出
 const shutdown = async () => {
   fastify.log.info("收到退出信号，正在关闭服务...");
+  await db.end();
   await fastify.close();
   process.exit(0);
 };

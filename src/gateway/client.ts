@@ -62,7 +62,13 @@ export class HttpGatewayClient implements GatewayClient {
           planId: data.subscription.plan_id,
           status: data.subscription.status as "active" | "expired",
           expireAt: data.subscription.expire_at,
-          quota: data.subscription.quota,
+          quota: data.subscription.quota
+            ? {
+              used: data.subscription.quota.used,
+              total: data.subscription.quota.total,
+              unit: "tokens" as const,
+            }
+            : undefined,
         }
         : undefined,
     };
