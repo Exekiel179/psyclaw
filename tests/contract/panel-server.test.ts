@@ -223,11 +223,27 @@ describe("read-only panel server", () => {
       expect(queued.some((item) => item.startsWith("mcp:") && item.includes(String(mcpId)))).toBe(true);
 
       const enabled = (await (await fetch(`${base}/api/enabled-capabilities`)).json()) as {
-        skills: Array<{ id: string }>;
-        mcp: Array<{ id: string }>;
+        skills: Array<{ id: string; installed?: boolean; enabled?: boolean }>;
+        mcp: Array<{ id: string; installed?: boolean; enabled?: boolean }>;
       };
       expect(enabled.skills.map((item) => item.id)).toContain(skillId);
       expect(enabled.mcp.map((item) => item.id)).toContain(mcpId);
+      // Queued install updates desire, but local files/config are not present yet.
+      expect(enabled.skills.find((item) => item.id === skillId)).toMatchObject({
+        installed: false,
+        enabled: false,
+      });
+      expect(enabled.mcp.find((item) => item.id === mcpId)).toMatchObject({
+        installed: false,
+        enabled: false,
+      });
+
+      const enableMissing = await fetch(`${base}/api/recommendation-state`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "skills", id: skillId, enabled: true }),
+      });
+      expect(enableMissing.status).toBe(500);
 
       const unavailable = createPanelServer(root, { panelHtmlPath: htmlPath });
       await new Promise<void>((resolve) => unavailable.listen(0, "127.0.0.1", resolve));

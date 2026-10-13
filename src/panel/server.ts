@@ -32,7 +32,15 @@ import { readPublishedVersions } from "../workflows/publish.js";
 export { verifyDoi } from "../core/doi.js";
 import { PSYCLAW_IDENTITY_PROMPT } from "../branding.js";
 import { sessionHelpDocument } from "../session/help.js";
-import { recommendedSkillTarget, type RecommendedSkillScope } from "../skills/recommended.js";
+import {
+  normalizeRecommendedSkillId,
+  readMergedRecommendationState,
+  readRecommendationState as readCanonicalRecommendationState,
+  recommendedSkillTarget,
+  saveRecommendationState,
+  validateModelInstalledRecommendedSkill,
+  type RecommendedSkillScope,
+} from "../skills/recommended.js";
 import { buildRecommendedSkillInstallTask } from "../skills/install-guidance.js";
 import {
   readUserSkillState,
@@ -40,6 +48,7 @@ import {
   setLocalSkillEnabled,
   userSkillId,
 } from "../skills/user-skills.js";
+import { RuntimeMcpRegistry } from "../integrations/mcp-runtime.js";
 import { defaultVerifyChecklist, loadVerifyChecklist, markVerifyItem, skipUnverifiedItems, type CrosscheckKind, type VerifyStatus } from "../verify/checklist.js";
 import { readActiveAnalysisPlan } from "../analysis/plan.js";
 import { browserConfigForPreference, injectBrowserObservabilityConfig } from "../observability/config.js";
@@ -59,6 +68,67 @@ async function readRecommendationState(root: string): Promise<RecommendationStat
 
 async function writeRecommendationState(root: string, state: RecommendationState): Promise<void> {
   await atomicWriteFile(await assertSafeProjectPath(root, ".psyclaw/recommendations.json"), `${JSON.stringify({ ...state, skills: [...new Set(state.skills)].sort(), mcp: [...new Set(state.mcp)].sort() }, null, 2)}\n`);
+}
+
+type PanelCapabilityStatus = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  installed: boolean;
+  scope?: RecommendedSkillScope;
+};
+
+/** Resolve Skill installed/enabled the same way the TUI /skill manager does. */
+async function panelRecommendedSkillStatuses(root: string): Promise<PanelCapabilityStatus[]> {
+  const state = await readMergedRecommendationState(root);
+  const catalog = await recommendedSkills() as { items?: Array<Record<string, unknown>> };
+  return Promise.all((catalog.items ?? []).map(async (item) => {
+    const id = normalizeRecommendedSkillId(String(item.id ?? ""));
+    const name = typeof item.name === "string" ? item.name : id;
+    const scope = state.skillScopes?.[id] ?? "project";
+    const desired = state.skills.includes(id);
+    try {
+      await validateModelInstalledRecommendedSkill(root, id, scope);
+      return { id, name, installed: true, enabled: desired, scope };
+    } catch {
+      let onDisk = false;
+      try {
+        const target = recommendedSkillTarget(root, id, scope);
+        const stat = await lstat(target);
+        onDisk = stat.isDirectory();
+      } catch { /* missing */ }
+      if (!onDisk && scope === "project") {
+        try {
+          const userTarget = recommendedSkillTarget(root, id, "user");
+          const stat = await lstat(userTarget);
+          if (stat.isDirectory()) {
+            return { id, name, installed: true, enabled: desired, scope: "user" };
+          }
+        } catch { /* missing */ }
+      }
+      return { id, name, installed: onDisk, enabled: onDisk && desired, scope };
+    }
+  }));
+}
+
+/** Resolve MCP installed/enabled from config files + recommendation desire. */
+async function panelRecommendedMcpStatuses(root: string): Promise<PanelCapabilityStatus[]> {
+  const state = await readMergedRecommendationState(root);
+  const catalog = await recommendedMcps() as { items?: Array<Record<string, unknown>> };
+  const configured = await new RuntimeMcpRegistry().listUserConfigs(root);
+  const byId = new Map<string, { enabled: boolean }>();
+  for (const entry of configured) {
+    const previous = byId.get(entry.id);
+    if (!previous || entry.enabled) byId.set(entry.id, { enabled: entry.enabled });
+  }
+  return (catalog.items ?? []).map((item) => {
+    const id = String(item.id ?? "");
+    const name = typeof item.name === "string" ? item.name : id;
+    const installed = byId.has(id);
+    const desired = state.mcp.includes(id);
+    // Match TUI recommended rows: installed = config present; enabled = desire.
+    return { id, name, installed, enabled: installed && desired };
+  });
 }
 
 /** Bundled capabilities, listed separately from the downloadable ecosystem. */
@@ -1245,16 +1315,11 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
         return;
       }
       if (url.pathname === "/api/enabled-capabilities") {
-        const state = await readRecommendationState(root);
         const disabled = await readDisabledCapabilities(root);
-        const [skills, mcps] = await Promise.all([recommendedSkills(), recommendedMcps()]);
-        const skillIds = new Set(((skills as { items?: Array<Record<string, unknown>> }).items ?? []).map((item) => String(item.id ?? "")));
-        const mcpIds = new Set(((mcps as { items?: Array<Record<string, unknown>> }).items ?? []).map((item) => String(item.id ?? "")));
-        const nameOf = (kind: "skill" | "mcp", id: string): string => {
-          const catalog = kind === "skill" ? skills : mcps;
-          const item = ((catalog as { items?: Array<Record<string, unknown>> }).items ?? []).find((candidate) => candidate.id === id);
-          return typeof item?.name === "string" ? item.name : id;
-        };
+        const [skillStatuses, mcpStatuses] = await Promise.all([
+          panelRecommendedSkillStatuses(root),
+          panelRecommendedMcpStatuses(root),
+        ]);
         // User-installed (non-catalog) skills from the expanded discovery
         // roots, with their individual enable state.
         const userSkillState = await readUserSkillState(root);
@@ -1265,6 +1330,7 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           description: skill.description,
           path: skill.path,
           enabled: !disabledUserSkills.has(skill.name),
+          installed: true,
         }));
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({
@@ -1272,9 +1338,10 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           coreSkills: CORE_SKILLS.map((skill) => ({
             ...skill,
             enabled: "locked" in skill && skill.locked ? true : !disabled.coreSkills.includes(skill.id),
+            installed: true,
           })),
-          skills: state.skills.filter((id) => skillIds.has(id)).map((id) => ({ id, name: nameOf("skill", id), enabled: true })),
-          mcp: state.mcp.filter((id) => mcpIds.has(id)).map((id) => ({ id, name: nameOf("mcp", id), enabled: true })),
+          skills: skillStatuses,
+          mcp: mcpStatuses,
           localSkills,
         }));
         return;
@@ -1553,11 +1620,25 @@ export function createPanelServer(root: string, options: PanelServerOptions = {}
           response.end(JSON.stringify({ schemaVersion: "psyclaw/local-skill-state-receipt/v1", ok: true, id, enabled: body.enabled, disabled: state.disabled }));
           return;
         }
-        const state = await readRecommendationState(root);
+        const state = await readCanonicalRecommendationState(root);
+        if (kind === "skills" && body.enabled) {
+          const scope = state.skillScopes?.[id] ?? "project";
+          try {
+            await validateModelInstalledRecommendedSkill(root, id, scope);
+          } catch {
+            throw new Error(`Skill 尚未安装到本地，无法启用：${id}。请先安装或重新安装。`);
+          }
+        }
+        if (kind === "mcp" && body.enabled) {
+          const configs = await new RuntimeMcpRegistry().listUserConfigs(root);
+          if (!configs.some((entry) => entry.id === id)) {
+            throw new Error(`MCP 尚未安装到本地，无法启用：${id}。请先安装或重新安装。`);
+          }
+        }
         const values = new Set(state[kind]);
         if (body.enabled) values.add(id); else values.delete(id);
         state[kind] = [...values];
-        await writeRecommendationState(root, state);
+        await saveRecommendationState(root, state);
         response.writeHead(200, { "content-type": "application/json" });
         response.end(JSON.stringify({ schemaVersion: "psyclaw/recommendation-state-receipt/v1", ok: true, state }));
         return;

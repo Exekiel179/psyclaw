@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.30.17 - 2026-10-13
+
+- Distinguish installed vs enabled Skill/MCP status in the Panel using local disk and config state.
+- Merge project and user `recommendations.json` so user-scoped enablement stays visible in a project Panel.
+- Add a reinstall option for recommended Skills/MCPs in the Panel and TUI (`r`).
+- Reject enabling a Skill/MCP from the Panel when it is not installed locally.
+
 ## 0.30.16 - 2026-09-24
 
 - Show analysis reports and verification records from analysis/results in the Panel.

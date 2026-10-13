@@ -174,6 +174,16 @@ describe("SkillManagerComponent", () => {
     expect(actions).toEqual([{ type: "install", id: "missing" }]);
   });
 
+  it("offers reinstall for an installed Skill via r", () => {
+    const { component, actions } = createComponent();
+    component.handleInput("DOWN"); // enabled
+    component.handleInput("r");
+    expect(actions).toEqual([]);
+    expect(component.render(100).join("\n")).toContain("再按 r 确认重新安装");
+    component.handleInput("r");
+    expect(actions).toEqual([{ type: "install", id: "enabled" }]);
+  });
+
   it("toggles an enabled MCP off instead of reinstalling", () => {
     const actions: SkillManagerAction[] = [];
     const component = new SkillManagerComponent(

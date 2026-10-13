@@ -11,7 +11,7 @@ import {
   rename,
   rm,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -153,6 +153,30 @@ export async function readRecommendationState(root: string): Promise<Recommendat
   } catch {
     return { schemaVersion: "psyclaw/recommendation-state/v1", skills: [], mcp: [] };
   }
+}
+
+/**
+ * Project enablement plus ~/.psyclaw/recommendations.json.
+ * User-scoped installs toggled while cwd is $HOME must still appear in a project Panel.
+ */
+export async function readMergedRecommendationState(root: string): Promise<RecommendationState> {
+  const project = await readRecommendationState(root);
+  const home = resolve(homedir());
+  const resolvedRoot = resolve(root);
+  if (resolvedRoot === home || resolvedRoot === join(home, ".psyclaw")) {
+    return project;
+  }
+  const user = await readRecommendationState(home);
+  if (user.skills.length === 0 && user.mcp.length === 0) return project;
+  const skillScopes = { ...(user.skillScopes ?? {}), ...(project.skillScopes ?? {}) };
+  const skillSources = { ...(user.skillSources ?? {}), ...(project.skillSources ?? {}) };
+  return {
+    schemaVersion: "psyclaw/recommendation-state/v1",
+    skills: [...new Set([...project.skills, ...user.skills].map(normalizedId))].sort(),
+    mcp: [...new Set([...project.mcp, ...user.mcp])].sort(),
+    ...(Object.keys(skillScopes).length > 0 ? { skillScopes } : {}),
+    ...(Object.keys(skillSources).length > 0 ? { skillSources } : {}),
+  };
 }
 
 export async function saveRecommendationState(root: string, state: RecommendationState): Promise<void> {
@@ -440,7 +464,7 @@ export async function installRecommendedSkill(root: string, requestedId: string,
 }
 
 export async function enabledRecommendedSkillPaths(root: string): Promise<EnabledSkillPaths> {
-  const state = await readRecommendationState(root);
+  const state = await readMergedRecommendationState(root);
   const catalog = await readRecommendedCatalog();
   const catalogIds = new Set(catalog.items.map((item) => normalizedId(item.id)));
   const paths: string[] = [];

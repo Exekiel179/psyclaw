@@ -2673,14 +2673,20 @@ async function loadEcosystem() {
       json("/api/recommended-agents"),
       json("/api/enabled-capabilities")
     ]);
-    const skillSet = new Set((enabled.skills || []).map(item => item.id));
-    const mcpSet = new Set((enabled.mcp || []).map(item => item.id));
+    const skillStatus = new Map((enabled.skills || []).map(item => [item.id, item]));
+    const mcpStatus = new Map((enabled.mcp || []).map(item => [item.id, item]));
     state.eco = [
       ...(enabled.coreSkills || []).map(item => ({ ...item, kind: "core", description: item.description || "PsyClaw 内置科研核心 Skill", sourceRef: "bundled", enabled: item.enabled, installed: true })),
-      ...(skills.items || []).map(item => ({ ...item, kind: "skill", enabled: skillSet.has(item.id), installed: skillSet.has(item.id) })),
+      ...(skills.items || []).map(item => {
+        const status = skillStatus.get(item.id) || {};
+        return { ...item, kind: "skill", enabled: Boolean(status.enabled), installed: Boolean(status.installed) };
+      }),
       ...(plugins.items || []).map(item => ({ ...item, kind: "plugin", enabled: Boolean(item.enabled), installed: Boolean(item.installed) })),
       ...(enabled.localSkills || []).map(item => ({ ...item, kind: "local", sourceRef: item.path || "用户配置目录", installed: true })),
-      ...(mcps.items || []).map(item => ({ ...item, kind: "mcp", enabled: mcpSet.has(item.id), installed: mcpSet.has(item.id) })),
+      ...(mcps.items || []).map(item => {
+        const status = mcpStatus.get(item.id) || {};
+        return { ...item, kind: "mcp", enabled: Boolean(status.enabled), installed: Boolean(status.installed) };
+      }),
       ...(agents.items || []).map(item => ({ ...item, kind: "agent", enabled: Boolean(item.enabled), installed: Boolean(item.installed), locked: Boolean(item.locked) })),
       ...(skills.externalTools || []).map(item => ({ ...item, kind: "external", enabled: false, installed: false }))
     ];
@@ -2724,7 +2730,13 @@ function renderEcosystem() {
   $("ecosystem-body").innerHTML = items.map(item => {
     const prereqs = itemPrereqs(item);
     const busy = Boolean(state.installing[item.id]);
-    const installLabel = busy ? "正在安装…" : item.kind === "plugin" && item.installed ? "重新安装" : item.kind === "core" ? "启用" : "安装";
+    const statusLabel = busy ? "正在安装…"
+      : item.locked ? "内置可用"
+      : item.enabled ? (item.kind === "plugin" ? "已安装" : "已启用")
+      : item.installed ? "已安装未启用"
+      : item.kind === "plugin" && item.configured ? "配置存在，文件缺失"
+      : item.kind === "external" ? "可安装外部工具"
+      : "未安装";
     return `
     <tr>
       <td>
@@ -2747,23 +2759,44 @@ function renderEcosystem() {
         </span>
       </td>
       <td>
-        <span class="tag ${item.enabled ? "ok" : item.configured ? "warn" : ""}">
-          ${busy ? "正在安装…" : item.locked ? "内置可用" : item.enabled ? (item.kind === "plugin" ? "已安装" : "已启用") : item.kind === "plugin" && item.configured ? "配置存在，文件缺失" : item.kind === "external" ? "可安装外部工具" : "未启用"}
+        <span class="tag ${item.enabled ? "ok" : item.installed || item.configured ? "warn" : ""}">
+          ${esc(statusLabel)}
         </span>
       </td>
       <td style="text-align:right">
-        ${item.locked || item.kind === "agent" ? "—" :
-          item.kind === "plugin" && item.local ? "—" :
-          item.kind === "plugin" ? `<button class="button small ${item.installed ? "" : "primary"}" ${busy ? "disabled" : ""} onclick="installCapability('plugin','${esc(item.id)}')">${installLabel}</button>` :
-          item.kind === "external" ? `<button class="button small primary" ${busy ? "disabled" : ""} onclick="installCapability('external','${esc(item.id)}')">${installLabel}</button>` :
-          item.enabled ? `<button class="button small" onclick="toggleCapability('${item.kind}','${esc(item.id)}',false)">停用</button>` :
-          item.kind === "local" ? `<button class="button small primary" onclick="toggleCapability('local','${esc(item.id)}',true)">启用</button>` :
-          `<button class="button small primary" ${busy ? "disabled" : ""} onclick="installCapability('${item.kind}','${esc(item.id)}')">${installLabel}</button>`
-        }
+        ${capabilityActionButtons(item, busy)}
       </td>
     </tr>
   `;
   }).join("") || '<tr><td colspan="5" class="empty" style="min-height:100px">未找到匹配的能力项</td></tr>';
+}
+
+function capabilityActionButtons(item, busy) {
+  if (item.locked || item.kind === "agent") return "—";
+  if (item.kind === "plugin" && item.local) return "—";
+  if (item.kind === "plugin") {
+    const label = busy ? "正在安装…" : item.installed ? "重新安装" : "安装";
+    return `<button class="button small ${item.installed ? "" : "primary"}" ${busy ? "disabled" : ""} onclick="installCapability('plugin','${esc(item.id)}')">${label}</button>`;
+  }
+  if (item.kind === "external") {
+    return `<button class="button small primary" ${busy ? "disabled" : ""} onclick="installCapability('external','${esc(item.id)}')">${busy ? "正在安装…" : "安装"}</button>`;
+  }
+  if (item.kind === "core" || item.kind === "local") {
+    return item.enabled
+      ? `<button class="button small" onclick="toggleCapability('${item.kind}','${esc(item.id)}',false)">停用</button>`
+      : `<button class="button small primary" onclick="toggleCapability('${item.kind}','${esc(item.id)}',true)">启用</button>`;
+  }
+  // Recommended Skill / MCP: keep enable/disable separate from install/reinstall.
+  const buttons = [];
+  if (item.installed) {
+    buttons.push(item.enabled
+      ? `<button class="button small" onclick="toggleCapability('${item.kind}','${esc(item.id)}',false)">停用</button>`
+      : `<button class="button small primary" onclick="toggleCapability('${item.kind}','${esc(item.id)}',true)">启用</button>`);
+    buttons.push(`<button class="button small" ${busy ? "disabled" : ""} onclick="installCapability('${item.kind}','${esc(item.id)}')">${busy ? "正在安装…" : "重新安装"}</button>`);
+  } else {
+    buttons.push(`<button class="button small primary" ${busy ? "disabled" : ""} onclick="installCapability('${item.kind}','${esc(item.id)}')">${busy ? "正在安装…" : "安装"}</button>`);
+  }
+  return buttons.join(" ");
 }
 
 async function toggleCapability(kind, id, enabled) {
@@ -2790,14 +2823,15 @@ async function installCapability(kind, id) {
   const scope = kind === "skill" || kind === "plugin"
     ? (confirm("安装到系统全局还是当前项目？\n确定：全局所有项目可用；取消：仅当前项目。") ? "user" : "project")
     : undefined;
-  let confirmText = `确认安装「${item?.name || id}」？`;
+  const reinstall = Boolean(item?.installed);
+  let confirmText = `确认${reinstall ? "重新安装" : "安装"}「${item?.name || id}」？`;
   if (kind === "external") {
     confirmText += "\n\n系统将按官方可信来源安装；任务会交给当前 PsyClaw 对话中的模型执行。请保持终端会话打开。";
   } else if (kind === "mcp" || kind === "skill") {
     if (prereqs.length) {
       confirmText += `\n\n前置依赖也将一并排队安装：${prereqs.join("、")}。\n安装任务会交给当前 PsyClaw 对话中的模型执行；请保持终端会话打开，完成后执行 /reload。`;
     } else {
-      confirmText += "\n\n安装任务会交给当前 PsyClaw 对话中的模型执行；请保持终端会话打开，完成后执行 /reload。";
+      confirmText += `\n\n${reinstall ? "将覆盖当前安装目录并重新交给模型安装" : "安装任务会交给当前 PsyClaw 对话中的模型执行"}；请保持终端会话打开，完成后执行 /reload。`;
     }
   } else {
     confirmText += "\n\n安装完成后需要执行 /reload 生效。";

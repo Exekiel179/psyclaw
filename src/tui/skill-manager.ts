@@ -82,7 +82,7 @@ export class SkillManagerComponent {
     const visible = this.items.slice(start, start + MAX_VISIBLE);
     const summary = `${enabled} 个启用 · ${this.items.length - enabled - issues} 个可管理 · ${issues} 个需处理`;
     const footer = this.options.footer
-      ?? "↑/↓ 移动 · Enter 先看介绍再确认安装 · Space 启停/直接安装 · a 全部启用 · d 全部停用 · Esc 关闭";
+      ?? "↑/↓ 移动 · Enter 先看介绍再确认安装 · Space 启停/直接安装 · r 重新安装 · a 全部启用 · d 全部停用 · Esc 关闭";
     const lines = [
       this.theme.fg("accent", this.theme.bold(truncateToWidth(this.options.title ?? "Skill 管理", contentWidth))),
       this.theme.fg("dim", truncateToWidth(summary, contentWidth)),
@@ -154,6 +154,30 @@ export class SkillManagerComponent {
     }
 
     const item = this.items[this.selectedIndex]!;
+    // `r` reinstalls an already-present recommended item without changing the
+    // Space/Enter enable-disable path.
+    if (matchesKey(data, "r") && this.options.toggleEnabled !== false) {
+      if (item.status === "core") {
+        this.notice = this.options.lockedMessage ?? "核心 Skill 始终启用，不能重新安装。";
+        this.tui.requestRender();
+        return;
+      }
+      if (item.status === "missing") {
+        this.notice = "尚未安装；请用 Enter/Space 安装，而不是重新安装。";
+        this.tui.requestRender();
+        return;
+      }
+      if (this.pendingInstallId !== item.id) {
+        this.pendingInstallId = item.id;
+        this.notice = `再按 r 确认重新安装「${item.name}」；↑/↓ 取消本次确认。`;
+        this.tui.requestRender();
+        return;
+      }
+      this.pendingInstallId = undefined;
+      this.done({ type: "install", id: item.id });
+      return;
+    }
+
     // Space: immediate install/toggle. Enter on missing: first shows intro,
     // second confirms install. Plugins may force Enter to install-only.
     if (matchesKey(data, Key.space) || this.keybindings.matches(data, "tui.select.confirm")) {

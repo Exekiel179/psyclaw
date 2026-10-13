@@ -637,7 +637,7 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         scope,
         blocked: typeof item.sourceRef !== "string" || !/^https:\/\//.test(item.sourceRef),
         reason: onDisk
-          ? `已检测到目录但未通过来源/许可/哈希校验${state.skills.includes(id) ? "（当前配置为启用，但校验失败不会加载）" : ""}；可按 Enter 重新安装修复`
+          ? `已检测到目录但未通过来源/许可/哈希校验${state.skills.includes(id) ? "（当前配置为启用，但校验失败不会加载）" : ""}；可按 r 重新安装修复`
           : typeof item.sourceRef === "string" && /^https:\/\//.test(item.sourceRef)
             ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
             : "没有可交给模型检查的来源网址",
@@ -793,7 +793,7 @@ async function openMcpManager(ctx: ExtensionCommandContext, rows: McpManagerRow[
     new SkillManagerComponent(mcpManagerItems(rows), tui, theme, keybindings, done, {
       title: "MCP 管理",
       itemLabel: "MCP",
-      footer: "↑/↓ 移动 · Space/Enter 安装或启停 · a 全部开启 · d 全部关闭 · Esc 关闭",
+      footer: "↑/↓ 移动 · Space/Enter 安装或启停 · r 重新安装 · a 全部开启 · d 全部关闭 · Esc 关闭",
       enabledText: "已开启；再次点击可关闭",
       disabledText: "已安装，当前未启用；点击可开启",
       missingMessage: "尚未安装；点击交给模型安装并默认启用",
