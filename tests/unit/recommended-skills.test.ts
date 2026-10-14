@@ -153,6 +153,30 @@ describe("recommended Skill lifecycle", () => {
     await expect(validateModelInstalledRecommendedSkill(project, id, "project")).resolves.toMatchObject({ path: target });
   });
 
+  it("lets users disable stale enablement when a previous install left the id in recommendations.json but the target lacks SKILL.md", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-skill-enable-"));
+    const project = join(root, "stale-config");
+    const id = "literature-review";
+    await mkdir(project, { recursive: true });
+    await saveRecommendationState(project, {
+      schemaVersion: "psyclaw/recommendation-state/v1",
+      skills: [id],
+      mcp: [],
+      skillScopes: { [id]: "project" },
+    });
+
+    const target = recommendedSkillTarget(project, id, "project");
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, "README.md"), "partial install\n", "utf8");
+
+    await expect(validateModelInstalledRecommendedSkill(project, id, "project")).rejects.toBeInstanceOf(RecommendedSkillUnavailableError);
+    await expect(enabledRecommendedSkillPaths(project)).resolves.toMatchObject({ paths: [] });
+
+    const disabled = await setRecommendedSkillEnabled(project, id, false, "project");
+    expect(disabled).toEqual({ ok: true, id, enabled: false });
+    await expect(readRecommendationState(project)).resolves.toMatchObject({ skills: [] });
+  });
+
   it("keeps the recommended catalog academic-facing without author branding", async () => {
     const catalog = await readRecommendedCatalog();
     const blob = JSON.stringify(catalog);

@@ -489,6 +489,8 @@ interface SkillManagerRow {
   /** `recommended` rows come from the catalog; `local` rows are user-installed skills. */
   source: "recommended" | "local";
   duplicatePaths?: string[];
+  /** Present when the skill is missing but configured as enabled in recommendations.json. */
+  configuredEnabled?: boolean;
 }
 
 interface McpManagerRow {
@@ -631,6 +633,7 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         } catch { /* target missing */ }
       }
       const hasSource = typeof item.sourceRef === "string" && /^https:\/\//.test(item.sourceRef);
+      const configuredEnabled = state.skills.includes(id);
       return {
         id,
         name: item.name,
@@ -639,17 +642,20 @@ async function skillManagerRows(root: string, state: RecommendationState): Promi
         ...(typeof item.installHint === "string" ? { installHint: item.installHint } : {}),
         collection: item.skillLayout === "collection",
         installed: !missing && onDisk,
-        enabled: !missing && onDisk && state.skills.includes(id),
+        enabled: !missing && onDisk && configuredEnabled,
         scope,
-        blocked: !hasSource,
+        blocked: (missing && configuredEnabled) || !hasSource,
         reason: unavailable?.code === "missing-files"
           ? "目录存在但缺少 SKILL.md，尚未安装完成；按 Enter 选择安装范围并交给当前模型处理。完成前不会记为已启用。"
           : !missing && onDisk
-            ? `已检测到目录但未通过来源/许可/哈希校验${state.skills.includes(id) ? "（当前配置为启用，但校验失败不会加载）" : ""}；可按 r 重新安装修复`
-            : hasSource
-              ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
-              : "没有可交给模型检查的来源网址",
+            ? `已检测到目录但未通过来源/许可/哈希校验${configuredEnabled ? "（当前配置为启用，但校验失败不会加载）" : ""}；可按 r 重新安装修复`
+            : missing && configuredEnabled
+              ? `配置中标记为启用但本地文件缺失；按 Space 可禁用此配置，按 Enter${hasSource ? " 可重新安装" : " 但无可用来源"}`
+              : hasSource
+                ? "尚未安装；按 Enter 选择安装范围并交给当前模型处理"
+                : "没有可交给模型检查的来源网址",
         source: "recommended" as const,
+        ...(missing && configuredEnabled ? { configuredEnabled: true } : {}),
       };
     }
   }));
@@ -762,6 +768,7 @@ function skillManagerItems(rows: SkillManagerRow[]): SkillManagerItem[] {
           : []),
       ],
       ...(row.reason === undefined ? {} : { reason: row.reason }),
+      ...(row.configuredEnabled === true ? { configuredEnabled: true } : {}),
     })),
   ];
 }
