@@ -43,8 +43,8 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     api: "openai-completions",
     apiKeyEnv: "DEEPSEEK_API_KEY",
     models: [
-      { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
-      { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", reasoning: true },
+      { id: "deepseek-chat", name: "DeepSeek Chat" },
+      { id: "deepseek-reasoner", name: "DeepSeek Reasoner", reasoning: true },
     ],
   },
   {
@@ -65,8 +65,8 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     api: "openai-completions",
     apiKeyEnv: "OPENCODE_API_KEY",
     models: [
-      { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", reasoning: true },
-      { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", reasoning: true },
+      { id: "deepseek-chat", name: "DeepSeek Chat" },
+      { id: "deepseek-reasoner", name: "DeepSeek Reasoner", reasoning: true },
       { id: "glm-5.1", name: "GLM-5.1", reasoning: true },
     ],
   },

@@ -31,7 +31,7 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
     maxRetries: 3,
     initialDelayMs: 1000,
     maxDelayMs: 8000,
-    fallbackModel: { provider: "deepseek", id: "deepseek-v4-flash" },
+    fallbackModel: { provider: "deepseek", id: "deepseek-chat" },
   },
   context: {
     enabled: true,

@@ -251,12 +251,12 @@ describe("observability runtime gate", () => {
     await trackSkillInstall("queued", { skill_id: "session-handoff", scope: "user" });
     const perm = Object.assign(new Error("EPERM: mkdir"), { code: "EPERM", errno: -1, syscall: "mkdir", path: "/tmp/project/.psyclaw" });
     await captureAgentError(perm, { phase: "cli", cwd: `${homedir()}/secret-lab` });
-    await trackLlmGeneration({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 3, output: 2 } });
+    await trackLlmGeneration({ provider: "deepseek", model: "deepseek-chat", usage: { input: 3, output: 2 } });
     expect(events).toEqual([
       { name: "research_run_started", properties: { phase: "brief", status: "started" } },
       { name: "gate_waiting_for_human", properties: { phase: "gate", gate: "plan_approval", status: "waiting" } },
       { name: "skill_install_queued", properties: { phase: "skill_install", status: "queued", skill_id: "session-handoff", scope: "user" } },
-      { name: "$ai_generation", properties: { model: "deepseek-v4-flash" } },
+      { name: "$ai_generation", properties: { model: "deepseek-chat" } },
     ]);
     expect(errors).toHaveLength(1);
     const errorContext = (errors[0] as { context?: Record<string, string> }).context;
@@ -321,12 +321,12 @@ describe("observability runtime gate", () => {
       async flush() {},
     });
     const span = await startAgentSpan("cli.llm_call", { phase: "pi_turn", provider: "deepseek" });
-    finishAgentSpan(span, { phase: "pi_turn", model: "deepseek-v4-flash" });
+    finishAgentSpan(span, { phase: "pi_turn", model: "deepseek-chat" });
     expect(spans).toEqual([
       {
         name: "cli.llm_call",
         attributes: { phase: "pi_turn", provider: "deepseek" },
-        ended: { phase: "pi_turn", model: "deepseek-v4-flash" },
+        ended: { phase: "pi_turn", model: "deepseek-chat" },
       },
     ]);
   });
@@ -401,12 +401,12 @@ describe("LLM and Langfuse payloads", () => {
   it("builds PostHog $ai_generation properties without prompts or completions", () => {
     const properties = posthogAiGenerationProperties({
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-chat",
       usage: { input: 10, output: 4, cacheRead: 2, cost: { total: 0.001 } },
       latencyMs: 1500,
     }, { distinctId: "psyclaw:id", sessionId: "session-1" });
     expect(properties.$ai_provider).toBe("deepseek");
-    expect(properties.$ai_model).toBe("deepseek-v4-flash");
+    expect(properties.$ai_model).toBe("deepseek-chat");
     expect(properties.$ai_input_tokens).toBe(10);
     expect(properties.$ai_output_tokens).toBe(4);
     expect(properties.$ai_latency).toBe(1.5);
@@ -421,19 +421,19 @@ describe("LLM and Langfuse payloads", () => {
       type: "message",
       message: {
         provider: "deepseek",
-        model: "deepseek-v4-flash",
+        model: "deepseek-chat",
         usage: { input: 8, output: 2 },
       },
-    })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 8, output: 2 } });
+    })).toMatchObject({ provider: "deepseek", model: "deepseek-chat", usage: { input: 8, output: 2 } });
     expect(extractPiGeneration({ type: "message", message: { role: "user", content: "研究目标" } })).toBeUndefined();
     expect(extractPiGeneration({
       type: "message_end",
       message: {
         provider: "deepseek",
-        model: "deepseek-v4-flash",
+        model: "deepseek-chat",
         usage: { input: 4, output: 1 },
       },
-    })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 4, output: 1 } });
+    })).toMatchObject({ provider: "deepseek", model: "deepseek-chat", usage: { input: 4, output: 1 } });
   });
 
   it("reads usage from turn_end, message_end, and agent_end message lists", () => {
@@ -443,15 +443,15 @@ describe("LLM and Langfuse payloads", () => {
     })).toMatchObject({ provider: "openai", model: "gpt-5", usage: { input: 4, output: 1 }, spanName: "pi-turn" });
     expect(extractPiGeneration({
       type: "message_end",
-      message: { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 2, output: 3 } },
-    })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 2, output: 3 } });
+      message: { provider: "deepseek", model: "deepseek-chat", usage: { input: 2, output: 3 } },
+    })).toMatchObject({ provider: "deepseek", model: "deepseek-chat", usage: { input: 2, output: 3 } });
     expect(extractPiGeneration({
       type: "agent_end",
       messages: [
         { role: "user", content: "研究目标" },
-        { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 9, output: 5 } },
+        { provider: "deepseek", model: "deepseek-chat", usage: { input: 9, output: 5 } },
       ],
-    })).toMatchObject({ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 9, output: 5 } });
+    })).toMatchObject({ provider: "deepseek", model: "deepseek-chat", usage: { input: 9, output: 5 } });
     expect(lastPiGeneration([
       { type: "message_end", message: { provider: "a", model: "m1", usage: { input: 1, output: 1 } } },
       { type: "agent_settled" },
@@ -480,7 +480,7 @@ describe("LLM and Langfuse payloads", () => {
       },
     );
     handle.captureGeneration(
-      { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 2, output: 1 }, latencyMs: 10 },
+      { provider: "deepseek", model: "deepseek-chat", usage: { input: 2, output: 1 }, latencyMs: 10 },
       { sessionId: "session-1", userId: "psyclaw:id" },
     );
     await handle.flush();

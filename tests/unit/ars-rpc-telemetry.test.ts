@@ -39,7 +39,7 @@ vi.mock("../../src/adapters/pi/rpc.js", () => {
           role: "assistant",
           content: [{ type: "text", text }],
           provider: "deepseek",
-          model: "deepseek-v4-flash",
+          model: "deepseek-chat",
           usage: { input: 6, output: 2 },
         },
       }];
@@ -73,7 +73,7 @@ function textEvents(text: string, usage?: { input: number; output: number }): Pi
       role: "assistant",
       content: [{ type: "text", text }],
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-chat",
       ...(usage === undefined ? {} : { usage }),
     },
   }];
@@ -132,17 +132,17 @@ describe("ARS RPC LLM telemetry", () => {
     const events = await observePiRpcPromptAndWait(
       { promptAndWait: async () => textEvents("ok", { input: 8, output: 3 }) },
       SECRET_PROMPT,
-      { phase: "ars_review_seat_phase1", spanName: "ars-review-seat-phase1", provider: "deepseek", model: "deepseek-v4-flash" },
+      { phase: "ars_review_seat_phase1", spanName: "ars-review-seat-phase1", provider: "deepseek", model: "deepseek-chat" },
     );
     expect(events).toHaveLength(1);
     expect(spans).toEqual([{
       name: "cli.llm_call",
-      attributes: { phase: "ars_review_seat_phase1", provider: "deepseek", model: "deepseek-v4-flash" },
+      attributes: { phase: "ars_review_seat_phase1", provider: "deepseek", model: "deepseek-chat" },
     }]);
     expect(generations).toHaveLength(1);
     expect(generations[0]).toMatchObject({
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-chat",
       usage: { input: 8, output: 3 },
       surface: "cli",
       spanName: "ars-review-seat-phase1",
@@ -187,7 +187,7 @@ describe("ARS RPC LLM telemetry", () => {
       root,
       runRoot: join(root, "run"),
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-chat",
     });
     expect(result.outcome).toBe("succeeded");
     expect(result.phase1).toBe("phase1-artifact");
@@ -221,18 +221,18 @@ describe("ARS RPC LLM telemetry", () => {
       ARS_REVIEW_SEATS.map((seat) => seatResult(seat, runRoot)),
       contractPath,
       manuscriptPath,
-      { root, runRoot, provider: "deepseek", model: "deepseek-v4-flash" },
+      { root, runRoot, provider: "deepseek", model: "deepseek-chat" },
     );
     expect(synthesis).toBe("synthesis-artifact");
     expect(spans).toEqual([{
       name: "cli.llm_call",
-      attributes: { phase: "ars_synthesis", provider: "deepseek", model: "deepseek-v4-flash" },
+      attributes: { phase: "ars_synthesis", provider: "deepseek", model: "deepseek-chat" },
     }]);
     expect(generations).toEqual([expect.objectContaining({
       surface: "cli",
       spanName: "ars-synthesis",
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-chat",
     })]);
   });
 
@@ -248,7 +248,7 @@ describe("ARS RPC LLM telemetry", () => {
     }, {
       root,
       provider: "deepseek",
-      model: "deepseek-v4-flash",
+      model: "deepseek-chat",
       adapters: {
         createClient: () => fakeReReviewClient((prompt) => {
           if (prompt.includes("Phase 1")) return reReviewJson("1");

@@ -335,24 +335,24 @@ describe("Pi extension contract", () => {
       });
       const { api, handlers } = modernApi();
       extension(api);
-      const ctx = { hasUI: true, mode: "tui", model: { provider: "deepseek", id: "deepseek-v4-flash" } };
+      const ctx = { hasUI: true, mode: "tui", model: { provider: "deepseek", id: "deepseek-chat" } };
       await emit(handlers, "agent_start", { type: "agent_start" }, ctx);
       await emit(handlers, "turn_start", { type: "turn_start", turnIndex: 0, timestamp: Date.now() - 40 }, ctx);
       await emit(handlers, "turn_end", {
         type: "turn_end",
         turnIndex: 0,
-        message: { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 8, output: 2 } },
+        message: { provider: "deepseek", model: "deepseek-chat", usage: { input: 8, output: 2 } },
         toolResults: [],
       }, ctx);
       await emit(handlers, "agent_end", {
         type: "agent_end",
-        messages: [{ provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 8, output: 2 } }],
+        messages: [{ provider: "deepseek", model: "deepseek-chat", usage: { input: 8, output: 2 } }],
       }, ctx);
 
       expect(generations).toHaveLength(1);
       expect(generations[0]).toMatchObject({
         provider: "deepseek",
-        model: "deepseek-v4-flash",
+        model: "deepseek-chat",
         usage: { input: 8, output: 2 },
         surface: "cli",
         spanName: "pi-turn",
@@ -361,9 +361,9 @@ describe("Pi extension contract", () => {
       expect(spans).toHaveLength(1);
       expect(spans[0]).toMatchObject({
         name: "cli.llm_call",
-        attributes: { phase: "pi_turn", provider: "deepseek", model: "deepseek-v4-flash" },
+        attributes: { phase: "pi_turn", provider: "deepseek", model: "deepseek-chat" },
       });
-      expect(spans[0]?.ended).toMatchObject({ phase: "pi_turn", provider: "deepseek", model: "deepseek-v4-flash" });
+      expect(spans[0]?.ended).toMatchObject({ phase: "pi_turn", provider: "deepseek", model: "deepseek-chat" });
     });
 
     it("falls back to agent_end when turn_end has no usage metadata", async () => {
