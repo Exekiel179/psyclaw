@@ -365,8 +365,8 @@ export function deepSeekProviderSpec(options: {
     baseUrl: options.baseUrl ?? "https://api.deepseek.com/v1",
     apiKeyEnv: options.apiKeyEnv ?? "DEEPSEEK_API_KEY",
     models: options.models ?? [
-      { id: "deepseek-chat", name: "DeepSeek Chat" },
-      { id: "deepseek-reasoner", name: "DeepSeek Reasoner", reasoning: true },
+      { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+      { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", reasoning: true },
     ],
     api: "openai-completions",
     compat: { thinkingFormat: "deepseek" },

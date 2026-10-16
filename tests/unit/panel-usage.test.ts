@@ -10,7 +10,7 @@ describe("token usage aggregation", () => {
         message: {
           role: "assistant",
           provider: "deepseek",
-          model: "deepseek-chat",
+          model: "deepseek-v4-flash",
           timestamp: "2026-08-14T14:09:35.000Z",
           usage: { input: 100, output: 50, cacheRead: 10, cacheWrite: 5, cost: { total: 0.01 } },
         },
@@ -20,7 +20,7 @@ describe("token usage aggregation", () => {
         message: {
           role: "assistant",
           provider: "deepseek",
-          responseModel: "deepseek-chat",
+          responseModel: "deepseek-v4-flash",
           timestamp: "2026-08-15T10:00:00.000Z",
           usage: { input: 20, output: 30, cacheRead: 0, cacheWrite: 0, cost: { total: 0.002 } },
         },
@@ -37,7 +37,7 @@ describe("token usage aggregation", () => {
     expect(report.totals.tokens).toBe(100 + 50 + 10 + 5 + 20 + 30 + 500 + 10);
     expect(report.totals.cost).toBeCloseTo(0.01 + 0.002 + 0.05, 6);
 
-    const deepseek = report.byModel.find((row) => row.key === "deepseek/deepseek-chat")!;
+    const deepseek = report.byModel.find((row) => row.key === "deepseek/deepseek-v4-flash")!;
     expect(deepseek.tokens).toBe(100 + 50 + 10 + 5 + 20 + 30);
     expect(deepseek.provider).toBe("deepseek");
     // deepseek pricing: input 0.27, output 1.1, cacheRead 0.07, cacheWrite 0.27 per 1M tokens
@@ -58,7 +58,7 @@ describe("token usage aggregation", () => {
 
     // one daily row per (date, provider/model)
     expect(report.daily.length).toBe(3);
-    const day = report.daily.find((row) => row.date === "2026-08-15" && row.key === "deepseek/deepseek-chat")!;
+    const day = report.daily.find((row) => row.date === "2026-08-15" && row.key === "deepseek/deepseek-v4-flash")!;
     expect(day.tokens).toBe(50);
     expect(day.estimatedCost).toBeCloseTo((20 * 0.27 + 30 * 1.1) / 1e6, 10);
     expect(day.estimatedCostCny).toBeCloseTo((20 * 2 + 30 * 8) / 1e6, 10);
@@ -66,7 +66,7 @@ describe("token usage aggregation", () => {
 
   it("ignores entries without usage", () => {
     const report = aggregateUsageEntries([
-      { type: "model_change", provider: "deepseek", modelId: "deepseek-chat" },
+      { type: "model_change", provider: "deepseek", modelId: "deepseek-v4-flash" },
       { type: "session", version: 3 },
       { type: "message", message: { role: "toolResult", content: "ok" } },
     ]);
