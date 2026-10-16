@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.18 - 2026-10-17
+
+- Refuse enabling a recommended Skill when its install directory or `SKILL.md` is missing; show a clear reason and keep recommendation state unchanged (fixes PSYCLAW-8).
+- Let the Skill manager treat stale enabled-but-missing Skills as blocked so Space can clear the config.
+- Isolate recommended-skill unit tests from the developer's real `~/.psyclaw` when merging user recommendation state.
+
 ## 0.30.17 - 2026-10-13
 
 - Distinguish installed vs enabled Skill/MCP status in the Panel using local disk and config state.

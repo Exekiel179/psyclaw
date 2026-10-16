@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   enabledRecommendedSkillPaths,
   normalizeRecommendedSkillId,
@@ -17,6 +17,19 @@ import {
 } from "../../src/skills/recommended.js";
 
 const sha = (value: string): string => createHash("sha256").update(value).digest("hex");
+
+/** Isolate merged recommendation reads from the developer's real ~/.psyclaw. */
+let previousHome: string | undefined;
+
+beforeEach(async () => {
+  previousHome = process.env.HOME;
+  process.env.HOME = await mkdtemp(join(tmpdir(), "psyclaw-test-home-"));
+});
+
+afterEach(() => {
+  if (previousHome === undefined) delete process.env.HOME;
+  else process.env.HOME = previousHome;
+});
 
 async function managedFixture(root: string, id: string): Promise<string> {
   const catalog = await readRecommendedCatalog();
