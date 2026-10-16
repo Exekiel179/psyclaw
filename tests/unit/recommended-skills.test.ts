@@ -8,8 +8,12 @@ import {
   normalizeRecommendedSkillId,
   readRecommendationState,
   readRecommendedCatalog,
+  recommendedSkillTarget,
   saveRecommendationState,
+  setRecommendedSkillEnabled,
   validateInstalledRecommendedSkill,
+  validateModelInstalledRecommendedSkill,
+  RecommendedSkillUnavailableError,
 } from "../../src/skills/recommended.js";
 
 const sha = (value: string): string => createHash("sha256").update(value).digest("hex");
@@ -79,6 +83,98 @@ describe("recommended Skill lifecycle", () => {
     const manifest = JSON.parse(await readFile(join(path, "psyclaw-install.json"), "utf8")) as { source: { ref: string } };
     expect(manifest.source.ref).toMatch(/^[a-f0-9]{40}$/);
     await expect(readFile(join(path, ".git", "HEAD"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("refuses to enable a recommended skill whose SKILL.md is missing, including paths with spaces and non-ASCII", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-skill-enable-"));
+    const project = join(root, "practical psycology", "练习");
+    const id = "literature-review";
+    const target = recommendedSkillTarget(project, id, "project");
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, "README.md"), "partial install\n", "utf8");
+
+    const missingFile = await setRecommendedSkillEnabled(project, id, true);
+    expect(missingFile.ok).toBe(false);
+    if (!missingFile.ok) {
+      expect(missingFile.code).toBe("missing-files");
+      expect(missingFile.needsInstall).toBe(true);
+      expect(missingFile.enabled).toBe(false);
+      expect(missingFile.target).toBe(target);
+      expect(missingFile.target).toContain(join("practical psycology", "练习"));
+      expect(missingFile.message).toContain("SKILL.md");
+      expect(missingFile.message).toContain(target);
+      expect(missingFile.message).not.toMatch(/ENOENT/);
+    }
+    await expect(readFile(join(project, ".psyclaw", "recommendations.json"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(validateModelInstalledRecommendedSkill(project, id, "project")).rejects.toBeInstanceOf(RecommendedSkillUnavailableError);
+
+    const absent = join(root, "practical psycology", "未安装");
+    const notInstalled = await setRecommendedSkillEnabled(absent, id, true, "project");
+    expect(notInstalled.ok).toBe(false);
+    if (!notInstalled.ok) {
+      expect(notInstalled.code).toBe("not-installed");
+      expect(notInstalled.needsInstall).toBe(true);
+      expect(notInstalled.target).toBe(recommendedSkillTarget(absent, id, "project"));
+      expect(notInstalled.target).toContain("未安装");
+      expect(notInstalled.message).toContain("SKILL.md");
+    }
+    await expect(readRecommendationState(absent)).resolves.toMatchObject({ skills: [] });
+
+    await saveRecommendationState(project, {
+      schemaVersion: "psyclaw/recommendation-state/v1",
+      skills: [id],
+      mcp: [],
+      skillScopes: { [id]: "project" },
+    });
+    const loaded = await enabledRecommendedSkillPaths(project);
+    expect(loaded.paths).toEqual([]);
+    expect(loaded.warnings.join("\n")).toContain("SKILL.md");
+    expect(loaded.warnings.join("\n")).not.toMatch(/ENOENT/);
+
+    const disabled = await setRecommendedSkillEnabled(project, id, false, "project");
+    expect(disabled).toEqual({ ok: true, id, enabled: false });
+    await expect(readRecommendationState(project)).resolves.toMatchObject({ skills: [] });
+  });
+
+  it("enables a recommended skill whose SKILL.md is present under a non-ASCII project path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-skill-enable-"));
+    const project = join(root, "practical psycology", "练习");
+    const id = "literature-review";
+    const target = recommendedSkillTarget(project, id, "project");
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, "SKILL.md"), "---\nname: literature-review\ndescription: Fixture\n---\n\n# Fixture\n", "utf8");
+
+    const enabled = await setRecommendedSkillEnabled(project, id, true);
+    expect(enabled).toEqual({ ok: true, id, enabled: true });
+    await expect(readRecommendationState(project)).resolves.toMatchObject({
+      skills: [id],
+      skillScopes: { [id]: "project" },
+    });
+    await expect(validateModelInstalledRecommendedSkill(project, id, "project")).resolves.toMatchObject({ path: target });
+  });
+
+  it("lets users disable stale enablement when a previous install left the id in recommendations.json but the target lacks SKILL.md", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-skill-enable-"));
+    const project = join(root, "stale-config");
+    const id = "literature-review";
+    await mkdir(project, { recursive: true });
+    await saveRecommendationState(project, {
+      schemaVersion: "psyclaw/recommendation-state/v1",
+      skills: [id],
+      mcp: [],
+      skillScopes: { [id]: "project" },
+    });
+
+    const target = recommendedSkillTarget(project, id, "project");
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, "README.md"), "partial install\n", "utf8");
+
+    await expect(validateModelInstalledRecommendedSkill(project, id, "project")).rejects.toBeInstanceOf(RecommendedSkillUnavailableError);
+    await expect(enabledRecommendedSkillPaths(project)).resolves.toMatchObject({ paths: [] });
+
+    const disabled = await setRecommendedSkillEnabled(project, id, false, "project");
+    expect(disabled).toEqual({ ok: true, id, enabled: false });
+    await expect(readRecommendationState(project)).resolves.toMatchObject({ skills: [] });
   });
 
   it("keeps the recommended catalog academic-facing without author branding", async () => {
