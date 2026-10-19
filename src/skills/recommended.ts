@@ -23,7 +23,7 @@ import {
   rewriteGithubHttpsThroughMirror,
   selectNetworkRoute,
 } from "../network-routing.js";
-import { shouldSkipSkillInstallAsset } from "./install-guidance.js";
+import { isSkillRuntimeArtifactDir, shouldSkipSkillInstallAsset } from "./install-guidance.js";
 
 const execFileAsync = promisify(execFile);
 const INSTALL_MANIFEST = "psyclaw-install.json";
@@ -364,7 +364,7 @@ export function recommendedSkillTarget(root: string, requestedId: string, scope:
 
 async function assertNoNestedGitOrSymlink(directory: string): Promise<void> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (entry.name === ".git") throw new Error("Installed Skill contains nested Git metadata");
+    if (entry.name === ".git" || isSkillRuntimeArtifactDir(entry.name)) continue;
     if (entry.isSymbolicLink()) throw new Error(`Installed Skill contains a symbolic link: ${entry.name}`);
     if (entry.isDirectory()) await assertNoNestedGitOrSymlink(join(directory, entry.name));
   }

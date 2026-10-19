@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRecommendedSkillInstallTask,
+  isSkillRuntimeArtifactDir,
   shouldSkipSkillInstallAsset,
 } from "../../src/skills/install-guidance.js";
 
@@ -36,5 +37,14 @@ describe("skill install guidance", () => {
     expect(shouldSkipSkillInstallAsset("assets/figures/demo/a.png", "a.png", 100)).toBe(true);
     expect(shouldSkipSkillInstallAsset("scripts/check_dimensions.py", "check_dimensions.py", 12_000)).toBe(false);
     expect(shouldSkipSkillInstallAsset("assets/icon.png", "icon.png", 2 * 1024 * 1024)).toBe(true);
+  });
+
+  it("treats Python venv and node_modules as runtime artifact dirs", () => {
+    expect(isSkillRuntimeArtifactDir(".venv")).toBe(true);
+    expect(isSkillRuntimeArtifactDir("venv")).toBe(true);
+    expect(isSkillRuntimeArtifactDir("node_modules")).toBe(true);
+    expect(isSkillRuntimeArtifactDir("scripts")).toBe(false);
+    expect(shouldSkipSkillInstallAsset(".venv/bin/python", "python", 0)).toBe(true);
+    expect(shouldSkipSkillInstallAsset("node_modules/pkg/index.js", "index.js", 100)).toBe(true);
   });
 });

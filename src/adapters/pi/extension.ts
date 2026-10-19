@@ -187,6 +187,24 @@ async function notifyError(ctx: ExtensionCommandContext, error: unknown, extra: 
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 }
 
+/** Reload Pi skills/prompts after enablement changes; fall back to asking for /reload. */
+async function notifyAfterSkillChange(ctx: ExtensionCommandContext, summary: string, level: "info" | "warning" = "info"): Promise<void> {
+  if (typeof ctx.reload === "function") {
+    try {
+      await ctx.reload();
+      ctx.ui.notify(`${summary}已自动重新加载。`, level);
+      return;
+    } catch (error) {
+      ctx.ui.notify(
+        `${summary}自动加载失败（${error instanceof Error ? error.message : String(error)}）。请执行 /reload。`,
+        "warning",
+      );
+      return;
+    }
+  }
+  ctx.ui.notify(`${summary}请执行 /reload 重新加载。`, level);
+}
+
 const activeAgentRuns = new Set<string>();
 const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "analysis-plan"]);
 
@@ -1254,10 +1272,11 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
           const ids = locals.map((row) => row.name);
           await setLocalSkillsEnabled(ctx.cwd, ids, true);
         }
-        ctx.ui.notify(
+        await notifyAfterSkillChange(
+          ctx,
           failed.length > 0
-            ? `已启用其余可管理的 Skill（${failed.join("、")} 未启用：缺少 SKILL.md 或未通过校验，请在列表中单独安装或修复）。请运行 /reload 重新加载。`
-            : `已启用全部可管理的 Skill。请运行 /reload 重新加载。`,
+            ? `已启用其余可管理的 Skill（${failed.join("、")} 未启用：缺少 SKILL.md 或未通过校验，请在列表中单独安装或修复）。`
+            : "已启用全部可管理的 Skill。",
           failed.length > 0 ? "warning" : "info",
         );
       } else {
@@ -1269,7 +1288,7 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
           const ids = locals.map((row) => row.name);
           await setLocalSkillsEnabled(ctx.cwd, ids, false);
         }
-        ctx.ui.notify("已停用全部可管理的 Skill。请运行 /reload 重新加载。", "info");
+        await notifyAfterSkillChange(ctx, "已停用全部可管理的 Skill。");
       }
       continue;
     }
@@ -1282,7 +1301,7 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
     if (action.type === "toggle") {
       if (row.source === "local") {
         await setLocalSkillEnabled(ctx.cwd, row.name, action.enabled);
-        ctx.ui.notify(`已${action.enabled ? "启用" : "停用"}本地 Skill ${row.name}。请运行 /reload 重新加载。`, "info");
+        await notifyAfterSkillChange(ctx, `已${action.enabled ? "启用" : "停用"}本地 Skill ${row.name}。`);
       } else {
         const result = await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
         if (!result.ok) {
@@ -1295,7 +1314,7 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
           ctx.ui.notify(result.message, "error");
           continue;
         }
-        ctx.ui.notify(`已${action.enabled ? "启用" : "停用"} ${row.name}。请运行 /reload 重新加载。`, "info");
+        await notifyAfterSkillChange(ctx, `已${action.enabled ? "启用" : "停用"} ${row.name}。`);
       }
     }
   }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.19 - 2026-10-19
+
+- Ignore `.venv` / `venv` / `node_modules` when validating recommended Skills so Python venv interpreter symlinks no longer block enablement.
+- Auto-reload session resources after Skill enable/disable in the Skill manager; fall back to `/reload` only if auto-reload fails.
+- Clarify model-driven install guidance: source trees stay symlink-free, runtime venvs are allowed, and one manual `/reload` is still needed after model installs.
+
 ## 0.30.18 - 2026-10-17
 
 - Refuse enabling a recommended Skill when its install directory or `SKILL.md` is missing; show a clear reason and keep recommendation state unchanged (fixes PSYCLAW-8).

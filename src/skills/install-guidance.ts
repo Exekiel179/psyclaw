@@ -41,7 +41,7 @@ function buildAcademicFigureInstallTask(options: RecommendedSkillInstallGuidance
     "3) 临时目录用 Windows `%TEMP%` / PowerShell `$env:TEMP` 绝对路径；禁止 Bash `/tmp` 交给 Windows Python。拷完断言目标文件数 > 0。",
     "4) 完成判据：目标下有可读 SKILL.md。不要跑 check_dimensions.py / check_*.py / e2e / eval，不要写 install-notes，不要二次自检。",
     "",
-    "完成后提醒 /reload。已默认启用。",
+    "完成后提醒用户执行一次 /reload（模型侧无法替会话刷新）。已默认启用。",
   ].join("\n");
 }
 
@@ -56,9 +56,9 @@ function buildDefaultInstallTask(options: RecommendedSkillInstallGuidanceOptions
     "优先 codeload 源码包；不通再镜像。Windows 临时目录用 %TEMP% 绝对路径，禁止 /tmp 混用；拷完文件数必须 > 0。",
     "跳过演示大图与 >1MiB 媒体。安装阶段不要跑上游 check_*/e2e/eval。",
     options.collection
-      ? "套件：子目录含 SKILL.md 即可；保留相对结构；无 .git/符号链接/凭据文件。"
-      : "叶子：目标直接含有效 SKILL.md；无 .git/符号链接/凭据文件。",
-    "只装本推荐项相关子树。完成后 /reload（已默认启用）。",
+      ? "套件：子目录含 SKILL.md 即可；保留相对结构；源码无 .git/符号链接/凭据文件。允许随后创建 .venv（PsyClaw 校验会忽略）。"
+      : "叶子：目标直接含有效 SKILL.md；源码无 .git/符号链接/凭据文件。允许随后创建 .venv（PsyClaw 校验会忽略）。",
+    "只装本推荐项相关子树。完成后提醒用户执行一次 /reload（模型侧无法替会话刷新；已默认启用）。",
   ].join("\n");
 }
 
@@ -74,11 +74,22 @@ const LARGE_MEDIA_RE = /\.(png|jpe?g|gif|webp|bmp|tiff?|mp4|mov|webm)$/i;
 const LARGE_MEDIA_BYTES = 1 * 1024 * 1024;
 
 /**
+ * Runtime dirs created by Skill installers (Python venv, npm).
+ * They often contain interpreter/bin symlinks that point outside the Skill tree;
+ * validation and discovery must ignore them without weakening source-tree checks.
+ */
+export function isSkillRuntimeArtifactDir(name: string): boolean {
+  return name === ".venv" || name === "venv" || name === "node_modules";
+}
+
+/**
  * Whether a path under a Skill tree is a skippable demo/media asset.
  * `relativePath` uses `/` separators from the skill root.
  */
 export function shouldSkipSkillInstallAsset(relativePath: string, fileName: string, sizeBytes: number): boolean {
   const norm = relativePath.replaceAll("\\", "/").replace(/^\/+/, "").toLocaleLowerCase();
+  const top = norm.split("/")[0] ?? "";
+  if (isSkillRuntimeArtifactDir(top) || isSkillRuntimeArtifactDir(fileName)) return true;
   if (DEMO_DIR_MARKERS.some((marker) => norm === marker || norm.startsWith(`${marker}/`))) return true;
   if (LARGE_MEDIA_RE.test(fileName) && sizeBytes > LARGE_MEDIA_BYTES) return true;
   return false;

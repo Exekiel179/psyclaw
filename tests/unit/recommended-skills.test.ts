@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -188,6 +188,37 @@ describe("recommended Skill lifecycle", () => {
     const disabled = await setRecommendedSkillEnabled(project, id, false, "project");
     expect(disabled).toEqual({ ok: true, id, enabled: false });
     await expect(readRecommendationState(project)).resolves.toMatchObject({ skills: [] });
+  });
+
+  it("allows a Python .venv with interpreter symlinks under an installed recommended Skill", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-skill-venv-"));
+    const project = join(root, "study");
+    const id = "literature-review";
+    const target = recommendedSkillTarget(project, id, "project");
+    const bin = join(target, ".venv", "bin");
+    await mkdir(bin, { recursive: true });
+    await writeFile(join(target, "SKILL.md"), "---\nname: literature-review\ndescription: Fixture\n---\n\n# Fixture\n", "utf8");
+    // Mimic `python -m venv`: launcher links that point outside the Skill tree.
+    await symlink("/usr/bin/true", join(bin, "python3.12"));
+    await symlink("python3.12", join(bin, "python"));
+    await symlink("python3.12", join(bin, "python3"));
+
+    await expect(validateModelInstalledRecommendedSkill(project, id, "project")).resolves.toMatchObject({ path: target });
+    await expect(setRecommendedSkillEnabled(project, id, true, "project")).resolves.toEqual({ ok: true, id, enabled: true });
+    await expect(enabledRecommendedSkillPaths(project)).resolves.toMatchObject({ paths: [target], warnings: [] });
+  });
+
+  it("still rejects source-tree symlinks outside runtime artifact dirs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-skill-symlink-"));
+    const project = join(root, "study");
+    const id = "literature-review";
+    const target = recommendedSkillTarget(project, id, "project");
+    await mkdir(target, { recursive: true });
+    await writeFile(join(target, "SKILL.md"), "---\nname: literature-review\ndescription: Fixture\n---\n\n# Fixture\n", "utf8");
+    await symlink("/usr/bin/true", join(target, "helper"));
+
+    await expect(validateModelInstalledRecommendedSkill(project, id, "project")).rejects.toBeInstanceOf(RecommendedSkillUnavailableError);
+    await expect(setRecommendedSkillEnabled(project, id, true, "project")).resolves.toMatchObject({ ok: false, id, enabled: false });
   });
 
   it("keeps the recommended catalog academic-facing without author branding", async () => {

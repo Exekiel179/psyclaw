@@ -194,6 +194,8 @@ async function walkSkillFiles(root: { source: string; resolved: string }, diagno
       return;
     }
     for (const entry of entries) {
+      // Runtime dirs (.venv/venv/node_modules) hold interpreter/package links; skip them.
+      if (entry.name === ".venv" || entry.name === "venv" || entry.name === "node_modules") continue;
       const candidate = resolve(directory, entry.name);
       try {
         assertContained(root.resolved, await realpath(directory));

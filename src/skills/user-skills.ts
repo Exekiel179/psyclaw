@@ -329,7 +329,7 @@ export function userSkillId(name: string): string {
 
 async function assertNoSymlinks(directory: string): Promise<void> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (entry.name === ".git" || entry.name === "node_modules") continue;
+    if (entry.name === ".git" || entry.name === "node_modules" || entry.name === ".venv" || entry.name === "venv") continue;
     const path = join(directory, entry.name);
     if (entry.isSymbolicLink()) throw new Error(`Local Skill contains a symbolic link: ${path}`);
     if (entry.isDirectory()) await assertNoSymlinks(path);
@@ -361,7 +361,10 @@ export async function installLocalSkill(
     await cp(sourcePath, target, {
       recursive: true,
       errorOnExist: true,
-      filter: (path) => basename(path) !== ".git" && basename(path) !== "node_modules",
+      filter: (path) => {
+        const name = basename(path);
+        return name !== ".git" && name !== "node_modules" && name !== ".venv" && name !== "venv";
+      },
     });
   } catch (error) {
     await rm(target, { recursive: true, force: true }).catch(() => undefined);
