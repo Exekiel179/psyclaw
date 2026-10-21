@@ -93,6 +93,8 @@ export * from "./branding.js";
 export * from "./adapters/pi/resources.js";
 export * from "./adapters/pi/session.js";
 export * from "./adapters/pi/rpc.js";
+export * from "./headless/run.js";
+export * from "./headless/cli.js";
 export * from "./orchestration/pi-executor.js";
 export * from "./orchestration/research-agents.js";
 export * from "./orchestration/personas.js";

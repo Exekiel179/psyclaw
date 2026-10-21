@@ -401,4 +401,33 @@ describe("Pi extension contract", () => {
       });
     });
   });
+
+  it("hard-blocks wsl --unregister on tool_call even without an active project", async () => {
+    const handlers = new Map<string, Array<(event: any, ctx: any) => Promise<unknown>>>();
+    const api = {
+      registerCommand() {},
+      registerTool() {},
+      on(event: string, handler: (event: any, ctx: any) => Promise<unknown>) {
+        const list = handlers.get(event) ?? [];
+        list.push(handler);
+        handlers.set(event, list);
+      },
+    } as any;
+    extension(api);
+    const toolHandlers = handlers.get("tool_call") ?? [];
+    expect(toolHandlers.length).toBeGreaterThan(0);
+    const notifications: string[] = [];
+    const result = await toolHandlers[0]!({
+      toolName: "bash",
+      toolCallId: "call_wsl",
+      input: { command: "wsl --unregister Ubuntu" },
+    }, {
+      cwd: await mkdtemp(join(tmpdir(), "psyclaw-wsl-block-")),
+      hasUI: true,
+      ui: { notify: (message: string) => notifications.push(message) },
+    });
+    expect(result).toMatchObject({ block: true, terminate: true });
+    expect(String((result as { reason?: string }).reason)).toContain("不可逆主机操作");
+    expect(notifications.some((n) => n.includes("wsl --unregister"))).toBe(true);
+  });
 });

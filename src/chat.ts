@@ -28,12 +28,12 @@ export function toImportSpecifier(modulePath: string): string {
 }
 
 /** Package root of the installed psyclaw package (dist/src/chat.js -> root). */
-function packageRoot(): string {
+export function packageRoot(): string {
   return join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 }
 
 /** Resolve the bundled Pi CLI shipped as a dependency of psyclaw. */
-function resolvePiCli(): string {
+export function resolvePiCli(): string {
   try {
     // The Pi package is ESM-only (its `exports` map has only an `import`
     // condition), so we resolve through `import.meta.resolve` rather than a
@@ -61,6 +61,128 @@ async function applyRuntimeBranding(root: string): Promise<void> {
   if (exitCode !== 0) {
     throw new Error("Unable to prepare the bundled PsyClaw runtime. Reinstall psyclaw or run `psyclaw rebrand` from its package directory.");
   }
+}
+
+export const FULL_AGENT_TOOLS =
+  "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp" as const;
+export const READ_ONLY_AGENT_TOOLS = "read,grep,find,ls,psyclaw_skill,psyclaw_workbench,psyclaw_mcp" as const;
+
+export interface AgentLaunchPrepareOptions {
+  cwd?: string;
+  extensionPath?: string;
+  skillsPath?: string;
+  continuouslyWork?: boolean;
+  /** Restrict built-in mutating tools (eval safety cases). Default: full tools. */
+  readOnly?: boolean;
+  /** Show telemetry notice / branding side effects. Default true for interactive. */
+  quietPrep?: boolean;
+}
+
+export interface PreparedAgentLaunch {
+  piCli: string;
+  cwd: string;
+  root: string;
+  agentDir: string;
+  sessionDir: string;
+  networkPreloadPath: string;
+  /** Pi argv without trailing user messages / print flags. */
+  baseArgs: string[];
+  spawnEnv: NodeJS.ProcessEnv;
+  identityPrompt: string;
+  nodeArgvPrefix: string[];
+}
+
+/**
+ * Shared runtime prep for interactive chat and headless `--print` eval runs.
+ * Loads PsyClaw extensions, core skills, identity prompt, and provider env.
+ */
+export async function prepareAgentLaunch(options: AgentLaunchPrepareOptions = {}): Promise<PreparedAgentLaunch> {
+  const piCli = resolvePiCli();
+  const root = packageRoot();
+  const networkPreloadPath = join(root, "dist", "src", "network-routing.js");
+  const extensionPath = options.extensionPath ?? join(root, "dist", "src", "extension.js");
+  const panelExtensionPath = join(root, "dist", "src", "panel", "extension.js");
+  const skillsPath = options.skillsPath ?? join(root, "skills", "core");
+  const cwd = options.cwd ?? process.cwd();
+  await applyRuntimeBranding(root);
+
+  const continuouslyWork = options.continuouslyWork === true;
+  const toolAllowlist = options.readOnly === true ? READ_ONLY_AGENT_TOOLS : FULL_AGENT_TOOLS;
+  let identityPrompt = PSYCLAW_IDENTITY_PROMPT;
+  try {
+    const supplement = (await readFile(join(cwd, ".psyclaw", "system-prompt.md"), "utf8")).trim();
+    if (supplement) identityPrompt = `${identityPrompt}\n\n${supplement}`;
+  } catch { /* no user supplement */ }
+  if (continuouslyWork) {
+    identityPrompt = `${identityPrompt}\n\n${continuouslyWorkPrompt()}`;
+  }
+
+  const baseArgs = [
+    // Disable Pi's ambient Skill scan. PsyClaw's resources_discover handler
+    // adds only existing, deduplicated Skill paths after core Skills.
+    "--no-skills",
+    "--extension", extensionPath,
+    "--extension", panelExtensionPath,
+    "--skill", skillsPath,
+    "--tools", toolAllowlist,
+    ...systemPromptLaunchArgs(identityPrompt),
+  ];
+
+  const quietPrep = options.quietPrep === true;
+  const manifest = await resolvePsyClawManifest();
+  if (!quietPrep) {
+    await ensureQuietStartup();
+    await ensurePsyClawTheme();
+    await maybeShowTelemetryNotice();
+    if (manifest?.piVersion !== undefined) {
+      await acknowledgeBundledPiChangelog(manifest.piVersion);
+    }
+  }
+
+  const agentDir = process.env.PSYCLAW_CODING_AGENT_DIR || join(homedir(), ".psyclaw", "agent");
+  await ensureAcademicModeKeybindings(agentDir);
+  const sessionDir = process.env.PSYCLAW_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
+
+  let spawnEnv: NodeJS.ProcessEnv = withBundledWindowsTools({
+    ...process.env,
+    PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
+    PSYCLAW_CODING_AGENT_DIR: agentDir,
+    PSYCLAW_CODING_AGENT_SESSION_DIR: sessionDir,
+    PI_CODING_AGENT_DIR: agentDir,
+    PI_CODING_AGENT_SESSION_DIR: sessionDir,
+    PSYCLAW_NETWORK_PRELOAD: "1",
+    ...(continuouslyWork ? { [CONTINUOUSLY_WORK_ENV]: "1" } : {}),
+  }, root);
+  if (!continuouslyWork) delete spawnEnv[CONTINUOUSLY_WORK_ENV];
+  if (process.platform === "darwin") {
+    const missing = PROVIDER_PRESETS.filter((preset) => !spawnEnv[preset.apiKeyEnv]);
+    const values = await Promise.all(missing.map((preset) => readMacOsLaunchctlCredential(preset.apiKeyEnv)));
+    for (const [index, preset] of missing.entries()) {
+      const value = values[index];
+      if (value) spawnEnv[preset.apiKeyEnv] = value;
+    }
+  }
+  if (manifest?.version !== undefined) spawnEnv.PSYCLAW_VERSION = manifest.version;
+  try {
+    const settings = JSON.parse(await readFile(join(getAgentDir(), "psyclaw-settings.json"), "utf8")) as { psyclawPet?: unknown };
+    if (settings.psyclawPet === true) spawnEnv.PSYCLAW_PET = "1";
+    else delete spawnEnv.PSYCLAW_PET;
+  } catch {
+    delete spawnEnv.PSYCLAW_PET;
+  }
+
+  return {
+    piCli,
+    cwd,
+    root,
+    agentDir,
+    sessionDir,
+    networkPreloadPath,
+    baseArgs,
+    spawnEnv,
+    identityPrompt,
+    nodeArgvPrefix: ["--import", toImportSpecifier(networkPreloadPath), piCli],
+  };
 }
 
 export interface ChatLaunchOptions {
@@ -92,104 +214,22 @@ export function systemPromptLaunchArgs(identityPrompt: string): string[] {
  * commands and model-callable tools. Developer-only commands remain hidden.
  */
 export async function launchChat(options: ChatLaunchOptions = {}): Promise<number> {
-  const piCli = resolvePiCli();
-  const root = packageRoot();
-  const networkPreloadPath = join(root, "dist", "src", "network-routing.js");
-  const extensionPath = options.extensionPath ?? join(root, "dist", "src", "extension.js");
-  const panelExtensionPath = join(root, "dist", "src", "panel", "extension.js");
-  const skillsPath = options.skillsPath ?? join(root, "skills", "core");
-  const cwd = options.cwd ?? process.cwd();
-  // Branding is applied on first launch, not during npm installation, so the
-  // package install itself never mutates dependency files.
-  await applyRuntimeBranding(root);
-  const developerMode = process.env.PSYCLAW_DEVELOPER_COMMANDS === "1";
-  const toolAllowlist = developerMode
-    ? "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp"
-    : "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp";
-  // The base identity is fixed; the user may only append a project supplement
-  // (managed from the panel), never rewrite the base.
-  // continuously-work is launch-only via `psyclaw --continuously-work` (not env alone).
-  const continuouslyWork = options.continuouslyWork === true;
-  let identityPrompt = PSYCLAW_IDENTITY_PROMPT;
-  try {
-    const supplement = (await readFile(join(cwd, ".psyclaw", "system-prompt.md"), "utf8")).trim();
-    if (supplement) identityPrompt = `${identityPrompt}\n\n${supplement}`;
-  } catch { /* no user supplement */ }
-  if (continuouslyWork) {
-    identityPrompt = `${identityPrompt}\n\n${continuouslyWorkPrompt()}`;
-  }
-  const args = [
-    // Disable Pi's ambient Skill scan. PsyClaw's resources_discover handler
-    // adds only existing, deduplicated Skill paths after core Skills.
-    "--no-skills",
-    "--extension", extensionPath,
-    "--extension", panelExtensionPath,
-    "--skill", skillsPath,
-    "--tools", toolAllowlist,
-    // Replace the default "coding assistant inside pi" identity entirely.
-    ...systemPromptLaunchArgs(identityPrompt),
-    ...(options.args ?? []),
-  ];
-
-  // Brand the startup: psyclaw theme plus the native ASCII banner. quietStartup
-  // hides Skills/Extensions/Themes inventories; PSYCLAW_VERBOSE_STARTUP=1 shows them.
-  // Keep the model's identity as psyclaw rather than "pi".
-  const manifest = await resolvePsyClawManifest();
-  await ensureQuietStartup();
-  await ensurePsyClawTheme();
-  await maybeShowTelemetryNotice();
-  if (manifest?.piVersion !== undefined) {
-    await acknowledgeBundledPiChangelog(manifest.piVersion);
-  }
-
-  // The header banner renders psyclaw's own version (not the bundled pi 0.84.x).
-  const agentDir = process.env.PSYCLAW_CODING_AGENT_DIR || join(homedir(), ".psyclaw", "agent");
-  // Free Shift+Tab for academic mode; move Pi thinking-cycle to Ctrl+Shift+Tab.
-  await ensureAcademicModeKeybindings(agentDir);
-  const sessionDir = process.env.PSYCLAW_CODING_AGENT_SESSION_DIR || join(agentDir, "sessions");
-  if (continuouslyWork) {
+  const prepared = await prepareAgentLaunch({
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    ...(options.extensionPath === undefined ? {} : { extensionPath: options.extensionPath }),
+    ...(options.skillsPath === undefined ? {} : { skillsPath: options.skillsPath }),
+    ...(options.continuouslyWork === undefined ? {} : { continuouslyWork: options.continuouslyWork }),
+  });
+  if (options.continuouslyWork === true) {
     process.stderr.write(`${c.red(continuouslyWorkWarningText())}\n\n`);
   }
-  let spawnEnv: NodeJS.ProcessEnv = withBundledWindowsTools({
-    ...process.env,
-    PI_SKIP_VERSION_CHECK: process.env.PI_SKIP_VERSION_CHECK ?? "1",
-    PSYCLAW_CODING_AGENT_DIR: agentDir,
-    PSYCLAW_CODING_AGENT_SESSION_DIR: sessionDir,
-    // Compatibility for any locked Pi module that was bundled before the
-    // PsyClaw application name was applied.
-    PI_CODING_AGENT_DIR: agentDir,
-    PI_CODING_AGENT_SESSION_DIR: sessionDir,
-    PSYCLAW_NETWORK_PRELOAD: "1",
-    ...(continuouslyWork ? { [CONTINUOUSLY_WORK_ENV]: "1" } : {}),
-  }, root);
-  if (!continuouslyWork) delete spawnEnv[CONTINUOUSLY_WORK_ENV];
-  if (process.platform === "darwin") {
-    const missing = PROVIDER_PRESETS.filter((preset) => !spawnEnv[preset.apiKeyEnv]);
-    const values = await Promise.all(missing.map((preset) => readMacOsLaunchctlCredential(preset.apiKeyEnv)));
-    for (const [index, preset] of missing.entries()) {
-      const value = values[index];
-      if (value) spawnEnv[preset.apiKeyEnv] = value;
-    }
-  }
-  if (manifest?.version !== undefined) spawnEnv.PSYCLAW_VERSION = manifest.version;
-  try {
-    const settings = JSON.parse(await readFile(join(getAgentDir(), "psyclaw-settings.json"), "utf8")) as { psyclawPet?: unknown };
-    if (settings.psyclawPet === true) spawnEnv.PSYCLAW_PET = "1";
-    else delete spawnEnv.PSYCLAW_PET;
-  } catch {
-    delete spawnEnv.PSYCLAW_PET;
-  }
-
+  const args = [...prepared.baseArgs, ...(options.args ?? [])];
   return new Promise<number>((resolve, reject) => {
-    const importSpecifier = toImportSpecifier(networkPreloadPath);
-    const child = (options.spawnProcess ?? spawn)(process.execPath, ["--import", importSpecifier, piCli, ...args], {
-      cwd,
+    const child = (options.spawnProcess ?? spawn)(process.execPath, [...prepared.nodeArgvPrefix, ...args], {
+      cwd: prepared.cwd,
       stdio: "inherit",
       shell: false,
-      // psyclaw owns the update surface (`psyclaw check-updates` / `psyclaw update`),
-      // so silence Pi's own "new version available" banner to avoid a second
-      // prompt. An explicit env override still wins.
-      env: spawnEnv,
+      env: prepared.spawnEnv,
     });
     child.on("error", reject);
     child.on("close", (code) => resolve(code ?? 1));

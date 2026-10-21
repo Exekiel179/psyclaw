@@ -69,6 +69,11 @@ import {
   type UserMcpConfigEntry,
 } from "../../integrations/mcp-runtime.js";
 import {
+  classifyIrreversibleHostCommand,
+  extractToolCommandText,
+  irreversibleHostBlockReason,
+} from "../../safety/irreversible-host-ops.js";
+import {
   SecretInputComponent,
   TextInputComponent,
   ProviderPickerComponent,
@@ -187,22 +192,31 @@ async function notifyError(ctx: ExtensionCommandContext, error: unknown, extra: 
   ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
 }
 
-/** Reload Pi skills/prompts after enablement changes; fall back to asking for /reload. */
-async function notifyAfterSkillChange(ctx: ExtensionCommandContext, summary: string, level: "info" | "warning" = "info"): Promise<void> {
+/**
+ * Reload Pi skills/prompts after enablement changes.
+ * Pi treats `ctx.reload()` as terminal for the current handler: notify first,
+ * then reload, and never use the old ctx afterward (`"reloaded"` = stop).
+ */
+async function notifyAfterSkillChange(
+  ctx: ExtensionCommandContext,
+  summary: string,
+  level: "info" | "warning" = "info",
+): Promise<"reloaded" | "manual-reload"> {
   if (typeof ctx.reload === "function") {
     try {
+      ctx.ui.notify(`${summary}正在重新加载资源…`, level);
       await ctx.reload();
-      ctx.ui.notify(`${summary}已自动重新加载。`, level);
-      return;
+      return "reloaded";
     } catch (error) {
       ctx.ui.notify(
         `${summary}自动加载失败（${error instanceof Error ? error.message : String(error)}）。请执行 /reload。`,
         "warning",
       );
-      return;
+      return "manual-reload";
     }
   }
   ctx.ui.notify(`${summary}请执行 /reload 重新加载。`, level);
+  return "manual-reload";
 }
 
 const activeAgentRuns = new Set<string>();
@@ -1272,13 +1286,14 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
           const ids = locals.map((row) => row.name);
           await setLocalSkillsEnabled(ctx.cwd, ids, true);
         }
-        await notifyAfterSkillChange(
+        const outcome = await notifyAfterSkillChange(
           ctx,
           failed.length > 0
             ? `已启用其余可管理的 Skill（${failed.join("、")} 未启用：缺少 SKILL.md 或未通过校验，请在列表中单独安装或修复）。`
             : "已启用全部可管理的 Skill。",
           failed.length > 0 ? "warning" : "info",
         );
+        if (outcome === "reloaded") return;
       } else {
         for (const row of managed) {
           try { await setRecommendedSkillEnabled(ctx.cwd, row.id, false); }
@@ -1288,7 +1303,7 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
           const ids = locals.map((row) => row.name);
           await setLocalSkillsEnabled(ctx.cwd, ids, false);
         }
-        await notifyAfterSkillChange(ctx, "已停用全部可管理的 Skill。");
+        if ((await notifyAfterSkillChange(ctx, "已停用全部可管理的 Skill。")) === "reloaded") return;
       }
       continue;
     }
@@ -1301,7 +1316,7 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
     if (action.type === "toggle") {
       if (row.source === "local") {
         await setLocalSkillEnabled(ctx.cwd, row.name, action.enabled);
-        await notifyAfterSkillChange(ctx, `已${action.enabled ? "启用" : "停用"}本地 Skill ${row.name}。`);
+        if ((await notifyAfterSkillChange(ctx, `已${action.enabled ? "启用" : "停用"}本地 Skill ${row.name}。`)) === "reloaded") return;
       } else {
         const result = await setRecommendedSkillEnabled(ctx.cwd, row.id, action.enabled);
         if (!result.ok) {
@@ -1314,7 +1329,7 @@ async function showSkillManager(pi: ExtensionAPI, ctx: ExtensionCommandContext):
           ctx.ui.notify(result.message, "error");
           continue;
         }
-        await notifyAfterSkillChange(ctx, `已${action.enabled ? "启用" : "停用"} ${row.name}。`);
+        if ((await notifyAfterSkillChange(ctx, `已${action.enabled ? "启用" : "停用"} ${row.name}。`)) === "reloaded") return;
       }
     }
   }
@@ -1760,6 +1775,16 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     }
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
+    // Host-teardown hard block runs even without /init — project approvals do not cover this.
+    const commandText = extractToolCommandText(event.toolName, event.input);
+    if (commandText) {
+      const hostOp = classifyIrreversibleHostCommand(commandText);
+      if (hostOp) {
+        const reason = irreversibleHostBlockReason(hostOp);
+        ctx.ui.notify(reason, "error");
+        return { block: true, terminate: true, reason };
+      }
+    }
     const run = await readActiveProject(ctx.cwd);
     if (!run || !toolNeedsApproval(event.toolName, event.input)) return;
     const summary = toolApprovalSummary(event.toolName, event.input);

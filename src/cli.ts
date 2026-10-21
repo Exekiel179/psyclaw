@@ -26,6 +26,7 @@ import { access } from "node:fs/promises";
 import type { ResearchParadigm } from "./core/contracts.js";
 import { formatCliUsage, renderSuccessCard, renderProductUpdateSummary, c } from "./style/cli-ui.js";
 import { continueSessionArgs, peelContinuouslyWorkFlag } from "./cli-args.js";
+import { dispatchHeadlessRun, headlessRunUsage } from "./headless/cli.js";
 import {
   captureAgentError,
   ExpectedUserError,
@@ -295,6 +296,16 @@ async function dispatch(args: string[], opts: { continuouslyWork: boolean }): Pr
   }
   if (command === "telemetry") {
     await dispatchTelemetry(args);
+    return;
+  }
+  if (command === "run") {
+    if (args.includes("--help") || args.includes("-h")) {
+      process.stdout.write(`${headlessRunUsage()}\n`);
+      return;
+    }
+    const result = await dispatchHeadlessRun(args, root);
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    if (!result.ok) process.exitCode = 1;
     return;
   }
   if (command === "setup") {

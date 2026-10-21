@@ -19,6 +19,7 @@ describe("cli usage", () => {
     expect(text).toContain("/crosscheck");
     expect(text).toMatch(/AI 核查|人审/);
     expect(text).toContain("--continuously-work");
+    expect(text).toContain("psyclaw run");
     expect(text).toContain("/ars");
     expect(text).toContain("/biosignal");
   });

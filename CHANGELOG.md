@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.20 - 2026-10-21
+
+- Fix Skill manager stale ctx after reload (exit handler instead of reusing old ctx)
+- Hard-block irreversible host teardown commands such as wsl --unregister, disk format, and rm -rf of / or $HOME even without /init
+- Add full headless agent runs via psyclaw run (same stack as chat, Pi --print) for evaluation
+
 ## 0.30.19 - 2026-10-19
 
 - Ignore `.venv` / `venv` / `node_modules` when validating recommended Skills so Python venv interpreter symlinks no longer block enablement.
