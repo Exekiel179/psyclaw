@@ -102,7 +102,7 @@ describe("analysis runtime tools", () => {
         names.push(definition.name);
       },
     } as ExtensionAPI);
-    expect(names).toEqual(["psyclaw_data_profile", "psyclaw_run_analysis", "psyclaw_read_results"]);
+    expect(names).toEqual(["psyclaw_data_profile", "psyclaw_run_analysis", "psyclaw_read_results", "psyclaw_recall_output"]);
     const prompt = sessionModePrompt("analysis");
     expect(prompt).toContain("psyclaw_data_profile");
     expect(prompt).toContain("psyclaw_run_analysis");

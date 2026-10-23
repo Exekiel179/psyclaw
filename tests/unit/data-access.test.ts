@@ -49,6 +49,9 @@ describe("data access display levels", () => {
     expect(scriptOnlyBlock("edit", { path: ".psyclaw/data-access.json" }, defaults)).toContain("/data-access");
     expect(scriptOnlyBlock("bash", { command: "printf full > .psyclaw/data-access.json" }, defaults)).toContain("/data-access");
     expect(scriptOnlyBlock("read", { path: ".psyclaw/data-access.json" }, defaults)).toBeUndefined();
+    expect(scriptOnlyBlock("read", { path: ".psyclaw/cache/tool-output/call.txt" }, defaults)).toContain("psyclaw_recall_output");
+    expect(scriptOnlyBlock("psyclaw_recall_output", { path: ".psyclaw/cache/tool-output/call.txt" }, defaults)).toBeUndefined();
+    expect(scriptOnlyBlock("bash", { command: "cat .psyclaw/cache/tool-output/call.txt" }, defaults)).toContain("psyclaw_recall_output");
   });
 
   it("drops grep lines that point at a script-only file", () => {
@@ -56,11 +59,13 @@ describe("data access display levels", () => {
       "data/clean/ready.csv:1: id,score",
       "data/secret/scores.csv:2: 1,99",
       "data/raw/scores.csv:1: visible",
+      ".psyclaw/cache/tool-output/call.txt:40: hidden-middle",
     ].join("\n"), defaults);
     expect(text).toContain("data/clean/ready.csv:1: id,score");
     expect(text).toContain("data/raw/scores.csv:1: visible");
     expect(text).not.toContain("99");
-    expect(text).toContain("withheld 1");
+    expect(text).not.toContain("hidden-middle");
+    expect(text).toContain("withheld 2");
   });
 
   it("does not let a broken config replace the data/secret default", async () => {

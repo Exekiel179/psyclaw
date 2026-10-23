@@ -11,6 +11,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { sha256File } from "../core/hash.js";
 import { requirePython } from "../platform/python.js";
+import { recallToolOutput } from "./output-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -391,6 +392,25 @@ export function registerAnalysisRuntimeTools(pi: ExtensionAPI): void {
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       try {
         return toolText(await readAnalysisResults(ctx.cwd, params.path));
+      } catch (error) {
+        return toolText(error instanceof Error ? error.message : String(error), true);
+      }
+    },
+  });
+
+  pi.registerTool({
+    name: "psyclaw_recall_output",
+    label: "Recall tool output",
+    description: "Read a line range from a saved tool-output log under .psyclaw/cache/tool-output. Use the path printed at the tail of a clipped bash or read result. Returns at most 80 lines and 1600 characters, so the slice can stay in context. Does not compute statistics.",
+    parameters: Type.Object({
+      path: Type.String({ description: "Project-relative log path from the output-log footer." }),
+      startLine: Type.Optional(Type.Number({ description: "First line to return, counting from 1." })),
+      lineCount: Type.Optional(Type.Number({ description: "How many lines to return, at most 80." })),
+    }),
+    executionMode: "sequential",
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      try {
+        return toolText(await recallToolOutput(ctx.cwd, params.path, params.startLine, params.lineCount));
       } catch (error) {
         return toolText(error instanceof Error ? error.message : String(error), true);
       }

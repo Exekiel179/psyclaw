@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.22 - 2026-10-23
+
+- Clip older bash output once so the prompt prefix stays cacheable across turns
+- Keep profile, analysis-run, and saved-table results intact instead of dropping their middle
+- Save long tool output under .psyclaw/cache/tool-output and recall a line range with psyclaw_recall_output
+
 ## 0.30.21 - 2026-10-23
 
 - Add dataset profile, one-shot analysis entrypoint, and confirmatory table preview tools

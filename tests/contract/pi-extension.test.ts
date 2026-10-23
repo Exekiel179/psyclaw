@@ -79,6 +79,17 @@ describe("Pi extension contract", () => {
     );
     expect(redacted.content[0].text).toContain("data/clean/ready.csv:1: ok");
     expect(redacted.content[0].text).not.toContain("99");
+
+    const long = `HEAD\n${"m".repeat(3_000)}\nBETA 0.42\n${"z".repeat(3_000)}\nTAIL`;
+    const saved = await handlers.get("tool_result")!({
+      toolName: "bash",
+      toolCallId: "call-middle",
+      content: [{ type: "text", text: long }],
+      isError: false,
+    }, ctx);
+    expect(saved.content[0].text).toContain("BETA 0.42");
+    expect(saved.content[0].text).toContain(".psyclaw/cache/tool-output/call-middle.txt");
+    expect(await readFile(join(root, ".psyclaw/cache/tool-output/call-middle.txt"), "utf8")).toContain("BETA 0.42");
   });
 
   it("supports /exit as a graceful alias for /quit", async () => {

@@ -1,5 +1,6 @@
 import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { maskToolObservations } from "./observation-mask.js";
+import { isObservationEvidence, maskToolObservationsStable, observationSettledLimit } from "./observation-mask.js";
+import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
 import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlock, setDataAccess, type DataAccessLevel } from "../../safety/data-access.js";
 import { Type } from "typebox";
@@ -1778,7 +1779,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     }
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("context", (event) => {
-    const messages = maskToolObservations(event.messages);
+    const messages = maskToolObservationsStable(event.messages);
     if (messages === event.messages) return;
     return { messages };
   });
@@ -1849,6 +1850,20 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         changed = true;
         return { ...part, text };
       });
+      if (!isObservationEvidence(event.toolName)) {
+        const body = content.filter((part) => part.type === "text").map((part) => part.text).join("\n");
+        const saved = await persistToolOutput(ctx.cwd, event.toolCallId, body, observationSettledLimit());
+        if (saved) {
+          const footer = outputLogFooter(saved, body);
+          for (let index = content.length - 1; index >= 0; index -= 1) {
+            const part = content[index];
+            if (part?.type !== "text") continue;
+            content[index] = { ...part, text: `${part.text}\n${footer}` };
+            changed = true;
+            break;
+          }
+        }
+      }
       if (!changed) return;
       return { content };
     } catch {

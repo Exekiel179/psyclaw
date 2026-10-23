@@ -10,6 +10,8 @@ import { extractToolCommandText } from "./irreversible-host-ops.js";
 
 export const DATA_ACCESS_VERSION = "psyclaw/data-access/v1" as const;
 export const DATA_ACCESS_CONFIG = ".psyclaw/data-access.json";
+/** Full tool stdout saved for a later bounded recall. Not a researcher data directory. */
+export const TOOL_OUTPUT_LOG_DIR = ".psyclaw/cache/tool-output";
 export type DataAccessLevel = "full" | "script-only";
 
 export interface DataAccessEntry {
@@ -154,8 +156,14 @@ export function scriptOnlyBlock(toolName: string, input: unknown, entries: reado
   if (command && mentions(command, DATA_ACCESS_CONFIG)) {
     return `展示级别只能由研究者用 /data-access 修改。模型的 shell 不处理 ${DATA_ACCESS_CONFIG}；需要查看时用 read。`;
   }
+  if (relativePath && isToolOutputLog(relativePath) && name !== "psyclaw_recall_output" && (CONTENT_TOOLS.has(name) || name === "write" || name === "edit")) {
+    return "工具输出缓存不能整段读入模型。需要中段时用 psyclaw_recall_output 按行取回。";
+  }
   if (CONTENT_TOOLS.has(name) && relativePath && accessFor(relativePath, entries) === "script-only") {
     return blockReason(relativePath);
+  }
+  if (command && isDirectDisplay(command) && mentions(command, TOOL_OUTPUT_LOG_DIR)) {
+    return "工具输出缓存不能整段读入模型。需要中段时用 psyclaw_recall_output 按行取回。";
   }
   if (!command || !isDirectDisplay(command)) return undefined;
   for (const entry of entries) {
@@ -164,12 +172,16 @@ export function scriptOnlyBlock(toolName: string, input: unknown, entries: reado
   return undefined;
 }
 
+function isToolOutputLog(path: string): boolean {
+  return path === TOOL_OUTPUT_LOG_DIR || path.startsWith(`${TOOL_OUTPUT_LOG_DIR}/`);
+}
+
 function blockReason(path: string): string {
   return `${path} 的展示级别是 script-only，不能把文件内容直接读入模型。请用分析脚本处理；行数、列名和缺失可以用 psyclaw_data_profile。`;
 }
 
 export function redactScriptOnlyOutput(text: string, entries: readonly DataAccessEntry[]): string {
-  const prefixes = entries.filter((entry) => entry.access === "script-only").map((entry) => entry.path);
+  const prefixes = [...entries.filter((entry) => entry.access === "script-only").map((entry) => entry.path), TOOL_OUTPUT_LOG_DIR];
   if (prefixes.length === 0 || !text) return text;
   let removed = 0;
   const kept = text.split("\n").filter((line) => {
