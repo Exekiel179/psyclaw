@@ -159,7 +159,9 @@ export function scriptOnlyBlock(toolName: string, input: unknown, entries: reado
   if (relativePath && isToolOutputLog(relativePath) && name !== "psyclaw_recall_output" && (CONTENT_TOOLS.has(name) || name === "write" || name === "edit")) {
     return "工具输出缓存不能整段读入模型。需要中段时用 psyclaw_recall_output 按行取回。";
   }
-  if (CONTENT_TOOLS.has(name) && relativePath && accessFor(relativePath, entries) === "script-only") {
+  // A profile without query returns only counts; with query it returns codebook rows, so it reads content.
+  const readsContent = CONTENT_TOOLS.has(name) || (name === "psyclaw_data_profile" && Boolean((input as { query?: unknown } | undefined)?.query));
+  if (readsContent && relativePath && accessFor(relativePath, entries) === "script-only") {
     return blockReason(relativePath);
   }
   if (command && isDirectDisplay(command) && mentions(command, TOOL_OUTPUT_LOG_DIR)) {

@@ -144,6 +144,19 @@ describe("stable observation mask", () => {
     expect(text(masked[1])).toContain("BETA 0.42");
   });
 
+  it("keeps a loaded skill body whole after later turns, while bash output of the same size is clipped", () => {
+    const skill = `${"S".repeat(2_000)}2. From hypotheses to models${"S".repeat(2_000)}`;
+    const masked = maskToolObservationsStable([
+      { role: "assistant", content: "1" },
+      tool("psyclaw_skill", skill),
+      tool("bash", skill),
+      { role: "assistant", content: "2" },
+      tool("bash", "next"),
+    ]);
+    expect(text(masked[1])).toBe(skill);
+    expect(text(masked[2])).not.toContain("From hypotheses to models");
+  });
+
   it("stubs the new duplicate and keeps the earlier result", () => {
     const body = "Z".repeat(4_000);
     const masked = maskToolObservationsStable([

@@ -5,6 +5,7 @@ import { assertSafeProjectPath, ensureProjectDirectories, projectPaths } from ".
 
 export const PSYCLAW_MD = "psyclaw.md" as const;
 export const ANALYSIS_HANDOFF = "analysis/HANDOFF.md" as const;
+export const ANALYSIS_PLAN_TEMPLATE = "analysis/plans/plan.md" as const;
 
 export function defaultPsyClawMarkdown(projectLabel = "未命名研究项目"): string {
   return [
@@ -55,6 +56,28 @@ export function defaultAnalysisHandoff(): string {
   ].join("\n");
 }
 
+/** Starting plan with the analysis-plan hypotheses-to-models table already laid out. */
+export function defaultAnalysisPlan(): string {
+  return [
+    "# Analysis plan",
+    "",
+    "## Hypotheses to models",
+    "",
+    "One row per hypothesis and one per exploratory variable. Scope as worded: whole sample, restricted to <group>, moderation, or exploratory, no direction.",
+    "Implied tests: restricted to <group> → focal term × group in the pooled model and the slope in each group; moderation with a grouping factor → the three-way term; exploratory → main effect and moderation of each focal exposure.",
+    "",
+    "| ID | Scope as worded | Outcome | Focal term | Implied tests | Status |",
+    "| --- | --- | --- | --- | --- | --- |",
+    "",
+    "## Variables and coding",
+    "",
+    "## Decisions",
+    "",
+    "## Multiplicity and robustness",
+    "",
+  ].join("\n");
+}
+
 /**
  * Does not run academic-grill or force a separate run command.
  */
@@ -79,6 +102,14 @@ export async function scaffoldWorkspace(root: string, options?: { label?: string
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     await mkdir(join(root, "analysis"), { recursive: true });
     await atomicWriteFile(handoffPath, defaultAnalysisHandoff());
+  }
+  const planPath = await assertSafeProjectPath(root, ANALYSIS_PLAN_TEMPLATE);
+  try {
+    await readFile(planPath, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    await mkdir(join(root, "analysis", "plans"), { recursive: true });
+    await atomicWriteFile(planPath, defaultAnalysisPlan());
   }
   // Ensure paper/ exists for manuscripts.
   await mkdir(join(root, "paper"), { recursive: true });

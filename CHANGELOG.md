@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.31.0 - 2026-10-23
+
+- Require a hypotheses-to-models table before analysis approval, with the implied tests for group-specific effects, moderation, and wave-to-wave change
+- When approval is option-only, offer approve plus one revise option per plan element, each with a concrete alternative
+- Let psyclaw_data_profile look up xlsx codebook rows; a codebook query against a script-only file stays blocked
+- Keep skill instructions in context, restore analysis mode on headless resume, and drop streaming deltas from headless JSON receipts
+
 ## 0.30.22 - 2026-10-23
 
 - Clip older bash output once so the prompt prefix stays cacheable across turns

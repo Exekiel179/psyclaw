@@ -92,6 +92,31 @@ describe("Pi extension contract", () => {
     expect(await readFile(join(root, ".psyclaw/cache/tool-output/call-middle.txt"), "utf8")).toContain("BETA 0.42");
   });
 
+  it("reads the persisted analysis mode on input when no mode editor exists (headless)", async () => {
+    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+    const api = {
+      registerCommand() {},
+      registerTool() {},
+      on(name: string, handler: (event: any, ctx: any) => Promise<any>) {
+        handlers.set(name, handler);
+      },
+    } as any;
+    extension(api);
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-headless-mode-"));
+    await bootstrapProject({ root, goal: "headless mode", paradigm: "survey-observational" });
+    const ctxWith = (branch: unknown[]) => ({ cwd: root, hasUI: false, ui: { notify() {} }, sessionManager: { getBranch: () => branch } });
+    const event = { text: "帮我分析数据 data/wave.csv", source: "interactive" };
+
+    const analysis = await handlers.get("input")!(event, ctxWith([
+      { type: "custom", customType: "psyclaw-session-mode", data: { mode: "analysis" } },
+    ]));
+    expect(analysis.text).toContain("/skill:analysis-plan");
+    expect(analysis.text).not.toContain("PsyClaw mode notice");
+
+    const chat = await handlers.get("input")!(event, ctxWith([]));
+    expect(chat.text).toContain("PsyClaw mode notice");
+  });
+
   it("supports /exit as a graceful alias for /quit", async () => {
     let exitHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     const api = {

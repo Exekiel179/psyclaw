@@ -40,6 +40,7 @@ describe("data access display levels", () => {
     expect(scriptOnlyBlock("grep", { path: "data/secret", pattern: "score" }, defaults)).toContain("script-only");
     expect(scriptOnlyBlock("grep", { pattern: "score" }, defaults)).toBeUndefined();
     expect(scriptOnlyBlock("psyclaw_data_profile", { path: secret }, defaults)).toBeUndefined();
+    expect(scriptOnlyBlock("psyclaw_data_profile", { path: "data/secret/codebook.xlsx", query: "age" }, defaults)).toContain("script-only");
     expect(scriptOnlyBlock("psyclaw_read_results", { path: secret }, defaults)).toContain("script-only");
     expect(scriptOnlyBlock("bash", { command: `head -n 5 ${secret}` }, defaults)).toContain("script-only");
     expect(scriptOnlyBlock("bash", { command: `python3 -c 'print(open("${secret}").read())'` }, defaults)).toContain("script-only");

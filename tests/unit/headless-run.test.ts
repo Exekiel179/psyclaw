@@ -138,4 +138,34 @@ describe("headless full agent run", () => {
     expect(onDisk.schemaVersion).toBe("psyclaw/headless-agent-run/v1");
     expect(onDisk.ok).toBe(true);
   });
+
+  it("drops streaming message_update lines from json receipts, even when split across chunks", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-headless-run-"));
+    const spawnProcess = vi.fn(() => {
+      const stdout = new EventEmitter() as EventEmitter & { setEncoding: (enc: string) => void };
+      const stderr = new EventEmitter() as EventEmitter & { setEncoding: (enc: string) => void };
+      stdout.setEncoding = () => undefined;
+      stderr.setEncoding = () => undefined;
+      const child = Object.assign(new EventEmitter(), { stdout, stderr, killed: false, kill: () => true });
+      queueMicrotask(() => {
+        stdout.emit("data", '{"type":"tool_execution_start","toolCallId":"a"}\n{"type":"message_upd');
+        stdout.emit("data", 'ate","delta":"x"}\n{"type":"message_end","message":{"role":"assistant"}}\n');
+        stdout.emit("data", '{"type":"agent_settled"}');
+        child.emit("close", 0);
+      });
+      return child;
+    });
+    const result = await runHeadlessAgent({
+      cwd: root,
+      prompt: "x",
+      timeoutMs: 10_000,
+      prepare: async ({ cwd, readOnly }) => mockPrepared(cwd, readOnly),
+      spawnProcess: spawnProcess as never,
+    });
+
+    expect(result.stdout).not.toContain("message_update");
+    expect(result.stdout).toContain('"type":"tool_execution_start"');
+    expect(result.stdout).toContain('"type":"message_end"');
+    expect(result.parsedJson).toEqual({ type: "agent_settled" });
+  });
 });

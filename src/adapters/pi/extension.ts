@@ -1,5 +1,5 @@
 import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { isObservationEvidence, maskToolObservationsStable, observationSettledLimit } from "./observation-mask.js";
+import { isInstructionResult, isObservationEvidence, maskToolObservationsStable, observationSettledLimit } from "./observation-mask.js";
 import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
 import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlock, setDataAccess, type DataAccessLevel } from "../../safety/data-access.js";
@@ -1452,6 +1452,14 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   let arsModeEditor: ArsModeEditor | undefined;
   let arsUiContext: { sessionManager: Parameters<typeof isArsPiActive>[0]; isIdle: () => boolean; hasUI: boolean; ui: { setStatus: (key: string, text: string | undefined) => void } } | undefined;
   let sessionMode: PsyClawSessionMode = "chat";
+  // Sticky mode as persisted on the session branch. Headless runs have no mode editor, so the input
+  // handler must read it here too; otherwise a restored analysis session is treated as chat.
+  const restoreSessionMode = (sessionManager: Parameters<typeof isArsPiActive>[0]): PsyClawSessionMode => {
+    const modeEntry = [...(sessionManager?.getBranch?.() ?? [])].reverse().find((entry) =>
+      entry.type === "custom" && (entry as { customType?: string }).customType === "psyclaw-session-mode");
+    return parseSessionMode((modeEntry as { data?: { mode?: unknown } } | undefined)?.data?.mode)
+      ?? (isArsPiActive(sessionManager) ? "academic" : sessionMode);
+  };
   let turnStartedAt: number | undefined;
   let llmTurnSpan: AgentSpanHandle | undefined;
   let capturedTurnGeneration = false;
@@ -1553,10 +1561,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     if (prompt) return { systemPrompt: `${event.systemPrompt}\n\n${prompt}` };
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", (event, ctx) => {
-    const modeEntry = [...(ctx?.sessionManager?.getBranch?.() ?? [])].reverse().find((entry) =>
-      entry.type === "custom" && (entry as { customType?: string }).customType === "psyclaw-session-mode");
-    const restored = parseSessionMode((modeEntry as { data?: { mode?: unknown } } | undefined)?.data?.mode)
-      ?? (isArsPiActive(ctx?.sessionManager) ? "academic" : sessionMode);
+    const restored = restoreSessionMode(ctx?.sessionManager);
     sessionMode = restored;
     const modeBlock = sessionModePrompt(restored);
     if (restored === "academic" || isArsPiTurn(event.systemPrompt) || isArsPiActive(ctx?.sessionManager)) {
@@ -1621,7 +1626,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       return { action: "handled" };
     }
 
-    const mode = arsModeEditor?.getMode() ?? sessionMode;
+    const mode = arsModeEditor?.getMode() ?? restoreSessionMode(ctx.sessionManager);
     const trimmed = event.text.trim();
     // A direct user statement is a valid human-review route when Panel is unavailable.
     // Do not infer approval from assistant output, quoted text, or a question about verification.
@@ -1850,7 +1855,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         changed = true;
         return { ...part, text };
       });
-      if (!isObservationEvidence(event.toolName)) {
+      if (!isObservationEvidence(event.toolName) && !isInstructionResult(event.toolName)) {
         const body = content.filter((part) => part.type === "text").map((part) => part.text).join("\n");
         const saved = await persistToolOutput(ctx.cwd, event.toolCallId, body, observationSettledLimit());
         if (saved) {

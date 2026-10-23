@@ -64,7 +64,7 @@ async function applyRuntimeBranding(root: string): Promise<void> {
 }
 
 export const FULL_AGENT_TOOLS =
-  "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp" as const;
+  "read,grep,find,ls,edit,write,bash,psyclaw_skill,psyclaw_workbench,psyclaw_mcp,psyclaw_data_profile,psyclaw_run_analysis,psyclaw_read_results,psyclaw_recall_output" as const;
 export const READ_ONLY_AGENT_TOOLS = "read,grep,find,ls,psyclaw_skill,psyclaw_workbench,psyclaw_mcp" as const;
 
 export interface AgentLaunchPrepareOptions {

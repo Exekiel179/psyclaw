@@ -12,6 +12,7 @@ import {
   type CommandRunner,
 } from "../../src/analysis/runtime-tools.js";
 import { sessionModePrompt } from "../../src/session/modes.js";
+import { FULL_AGENT_TOOLS } from "../../src/chat.js";
 
 async function project(): Promise<string> {
   return mkdtemp(join(tmpdir(), "psyclaw-analysis-runtime-"));
@@ -46,6 +47,47 @@ describe("analysis runtime tools", () => {
     expect(script).not.toContain("pandas");
     expect(calls).toHaveLength(1);
     expect(calls[0]).toContain("psyclaw_profile_data.py");
+  });
+
+  it("looks up only the matching rows of an xlsx codebook", async () => {
+    const root = await project();
+    await mkdir(join(root, "codebooks"), { recursive: true });
+    await writeFile(join(root, "codebooks", "W1.xlsx"), "", "utf8");
+    const calls: string[] = [];
+    const text = await profileDataset(root, "codebooks/W1.xlsx", {
+      query: "NCE_T2, subgroup",
+      python: { command: "python3" },
+      run: runner({
+        exitCode: 0,
+        stderr: "",
+        stdout: JSON.stringify({
+          sheets: [{ name: "W1", rows: 400, header: "Variable | Label" }],
+          matches: [{ sheet: "W1", row: 12, text: "subgroup_FF | 1 = cis-het" }],
+          total: 1,
+        }),
+      }, calls),
+    });
+    expect(text).toContain("matching: nce_t2, subgroup");
+    expect(text).toContain("[W1] row 12: subgroup_FF | 1 = cis-het");
+    expect(calls[0]).toContain("psyclaw_codebook_lookup.py");
+    expect(calls[0]).toContain("nce_t2,subgroup");
+  });
+
+  it("shows only the matching columns of a data file when a query is given", async () => {
+    const root = await project();
+    await mkdir(join(root, "data"), { recursive: true });
+    await writeFile(join(root, "data", "wave.csv"), "id,NCE_T2,score\n1,2,3\n", "utf8");
+    const text = await profileDataset(root, "data/wave.csv", {
+      query: "nce",
+      python: { command: "python3" },
+      run: runner({
+        exitCode: 0,
+        stderr: "",
+        stdout: JSON.stringify({ rows: 1, columns: [{ name: "id", missing: 0 }, { name: "NCE_T2", missing: 0 }, { name: "score", missing: 0 }] }),
+      }, []),
+    });
+    expect(text).toContain("NCE_T2: missing 0/1");
+    expect(text).not.toContain("score: missing");
   });
 
   it("rejects a dataset path outside the project", async () => {
@@ -103,6 +145,8 @@ describe("analysis runtime tools", () => {
       },
     } as ExtensionAPI);
     expect(names).toEqual(["psyclaw_data_profile", "psyclaw_run_analysis", "psyclaw_read_results", "psyclaw_recall_output"]);
+    // Pi only exposes tools named in --tools, so a registered tool missing here is never callable.
+    expect(FULL_AGENT_TOOLS.split(",")).toEqual(expect.arrayContaining(names));
     const prompt = sessionModePrompt("analysis");
     expect(prompt).toContain("psyclaw_data_profile");
     expect(prompt).toContain("psyclaw_run_analysis");

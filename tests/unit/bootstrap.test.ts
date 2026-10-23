@@ -29,6 +29,7 @@ describe("project bootstrap 0.29", () => {
     expect(existsSync(join(root, ".psyclaw", "skills"))).toBe(true);
     expect(await readFile(join(root, "psyclaw.md"), "utf8")).toContain("Shift+Tab");
     expect(await readFile(join(root, "analysis", "HANDOFF.md"), "utf8")).toContain("Analysis → Academic");
+    expect(await readFile(join(root, "analysis", "plans", "plan.md"), "utf8")).toContain("| ID | Scope as worded | Outcome | Focal term | Implied tests | Status |");
     expect(existsSync(join(root, "notes", "research-spec.md"))).toBe(false);
     await writeHandoff(root, {
       projectId: project.id,

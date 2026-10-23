@@ -123,6 +123,25 @@ export async function runHeadlessAgent(options: HeadlessAgentRunOptions): Promis
   let stdout = "";
   let stderr = "";
   let exitCode = 1;
+  // In json mode, message_update lines are streaming deltas (~90% of bytes) whose content is
+  // repeated in message_end. Dropping them keeps long runs under the cap below, so the receipt
+  // keeps the whole trajectory instead of only its tail.
+  let pendingLine = "";
+  const appendStdout = (text: string) => {
+    stdout += text;
+    if (stdout.length > 32 * 1024 * 1024) stdout = `${stdout.slice(-16 * 1024 * 1024)}\n…[truncated]…\n`;
+  };
+  const captureStdout = (chunk: string, final = false) => {
+    if (mode !== "json") {
+      appendStdout(chunk);
+      return;
+    }
+    const lines = (pendingLine + chunk).split("\n");
+    pendingLine = final ? "" : lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith('{"type":"message_update"')) appendStdout(`${line}\n`);
+    }
+  };
 
   try {
     exitCode = await new Promise<number>((resolvePromise, reject) => {
@@ -147,10 +166,7 @@ export async function runHeadlessAgent(options: HeadlessAgentRunOptions): Promis
       if (!inherit) {
         child.stdout?.setEncoding("utf8");
         child.stderr?.setEncoding("utf8");
-        child.stdout?.on("data", (chunk: string) => {
-          stdout += chunk;
-          if (stdout.length > 32 * 1024 * 1024) stdout = `${stdout.slice(-16 * 1024 * 1024)}\n…[truncated]…\n`;
-        });
+        child.stdout?.on("data", (chunk: string) => captureStdout(chunk));
         child.stderr?.on("data", (chunk: string) => {
           stderr += chunk;
           if (stderr.length > 8 * 1024 * 1024) stderr = `${stderr.slice(-4 * 1024 * 1024)}\n…[truncated]…\n`;
@@ -162,6 +178,7 @@ export async function runHeadlessAgent(options: HeadlessAgentRunOptions): Promis
       });
       child.on("close", (code) => {
         clearTimeout(timer);
+        if (pendingLine) captureStdout("", true);
         resolvePromise(code ?? 1);
       });
     });

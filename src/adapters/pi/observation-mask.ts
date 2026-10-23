@@ -43,6 +43,13 @@ export function isObservationEvidence(toolName: string | undefined): boolean {
   return toolName !== undefined && OBSERVATION_EVIDENCE_TOOLS.has(toolName);
 }
 
+/** Skill bodies are standing instructions, not observations; clipping their middle drops the stage rules. */
+export const OBSERVATION_INSTRUCTION_TOOLS = new Set(["psyclaw_skill"]);
+
+export function isInstructionResult(toolName: string | undefined): boolean {
+  return toolName !== undefined && OBSERVATION_INSTRUCTION_TOOLS.has(toolName);
+}
+
 type ContentPart = { type?: string; text?: string };
 
 export type MaskableMessage = {
@@ -213,6 +220,8 @@ export function maskToolObservationsStable<T extends MaskableMessage>(
     let replacement: string | undefined;
     if (duplicate.has(slot)) {
       replacement = `${MARK} duplicate ${message.toolName ?? "tool"} omitted ${text.length} chars; the earlier identical result is unchanged]`;
+    } else if (isInstructionResult(message.toolName)) {
+      continue;
     } else if (isObservationEvidence(message.toolName) || fresh) {
       const clipped = clip(text, recentHead, recentTail);
       if (clipped !== text) replacement = clipped;

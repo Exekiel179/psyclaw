@@ -16,6 +16,7 @@ import { recallToolOutput } from "./output-log.js";
 const execFileAsync = promisify(execFile);
 
 const PROFILE_SCRIPT = "analysis/scripts/psyclaw_profile_data.py";
+const LOOKUP_SCRIPT = "analysis/scripts/psyclaw_codebook_lookup.py";
 const RUN_RECEIPT = "analysis/results/psyclaw-run-receipt.json";
 const RUN_LOG = "analysis/results/psyclaw-run.log";
 const RECEIPT_VERSION = "psyclaw/analysis-run/v1";
@@ -29,6 +30,7 @@ const ENTRY_CANDIDATES = [
 ] as const;
 const RESULT_ROOTS = ["analysis/results", "results/tables", "results"] as const;
 const PROFILE_COLUMN_CAP = 40;
+const LOOKUP_MATCH_CAP = 60;
 const RESULT_FILE_CAP = 3;
 const RESULT_LINE_CAP = 40;
 const RESULT_CHAR_CAP = 4_000;
@@ -58,6 +60,37 @@ with path.open(newline="", encoding="utf-8-sig") as handle:
             if value in missing_tokens:
                 missing[name] += 1
 print(json.dumps({"rows": rows, "columns": [{"name": name, "missing": missing[name]} for name in fields]}, ensure_ascii=False))
+`;
+
+const LOOKUP_SOURCE = `import json, re, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+terms = [t.lower() for t in re.split(r"[,\\s]+", sys.argv[2]) if t] if len(sys.argv) > 2 else []
+cap = int(sys.argv[3]) if len(sys.argv) > 3 else 60
+try:
+    import openpyxl
+except ImportError:
+    sys.exit("openpyxl is not installed; this Python cannot read xlsx codebooks.")
+book = openpyxl.load_workbook(path, read_only=True, data_only=True)
+sheets, matches, total = [], [], 0
+for sheet in book.worksheets:
+    rows = 0
+    header = ""
+    for number, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+        text = " | ".join(" ".join(str(cell).split()) for cell in row if cell is not None and str(cell).strip())
+        if not text:
+            continue
+        rows += 1
+        if not header:
+            header = text[:300]
+        # A term matches at the start of a word, so "nce" finds nce1_T1 but not "vaccine".
+        if terms and any(re.search(r"(?<![a-z0-9])" + re.escape(term), text.lower()) for term in terms):
+            total += 1
+            if len(matches) < cap:
+                matches.append({"sheet": sheet.title, "row": number, "text": text[:300]})
+    sheets.append({"name": sheet.title, "rows": rows, "header": header})
+print(json.dumps({"sheets": sheets, "matches": matches, "total": total}, ensure_ascii=False))
 `;
 
 export interface CommandResult {
@@ -150,14 +183,54 @@ function formatProfile(relativePath: string, payload: { rows: number; columns: {
   return lines.join("\n");
 }
 
+function queryTerms(query: string | undefined): string[] {
+  return (query ?? "").split(/[,\s]+/).map((term) => term.trim().toLowerCase()).filter(Boolean);
+}
+
+function formatLookup(
+  relativePath: string,
+  terms: string[],
+  payload: { sheets: { name: string; rows: number; header: string }[]; matches: { sheet: string; row: number; text: string }[]; total: number },
+): string {
+  if (terms.length === 0) {
+    return [
+      `Sheets in ${relativePath}`,
+      `Script: ${LOOKUP_SCRIPT}`,
+      ...payload.sheets.map((sheet) => `- ${sheet.name}: ${sheet.rows} rows; first row: ${sheet.header}`),
+      "Pass query with variable names or keywords to get only the matching rows.",
+    ].join("\n");
+  }
+  return [
+    `Codebook rows in ${relativePath} matching: ${terms.join(", ")}`,
+    `Matches: ${payload.total}${payload.total > payload.matches.length ? ` (showing ${payload.matches.length})` : ""}`,
+    `Script: ${LOOKUP_SCRIPT}`,
+    ...payload.matches.map((match) => `- [${match.sheet}] row ${match.row}: ${match.text}`),
+  ].join("\n");
+}
+
 export async function profileDataset(
   root: string,
-  csvPath: string,
-  options: { run?: CommandRunner; python?: { command: string; prefixArgs?: readonly string[] } } = {},
+  dataPath: string,
+  options: { query?: string; run?: CommandRunner; python?: { command: string; prefixArgs?: readonly string[] } } = {},
 ): Promise<string> {
-  const file = await resolveProjectRead(root, csvPath);
+  const file = await resolveProjectRead(root, dataPath);
+  const terms = queryTerms(options.query);
+  if (/\.(xlsx|xlsm)$/i.test(file.relativePath)) {
+    const scriptPath = resolve(root, LOOKUP_SCRIPT);
+    await mkdir(resolve(root, "analysis/scripts"), { recursive: true });
+    await writeFile(scriptPath, LOOKUP_SOURCE, "utf8");
+    const python = options.python ?? await requirePython();
+    const run = options.run ?? defaultRunner;
+    const result = await run(python.command, [...(python.prefixArgs ?? []), scriptPath, file.absolute, terms.join(","), String(LOOKUP_MATCH_CAP)], { cwd: root, timeoutMs: 60_000 });
+    if (result.exitCode !== 0) {
+      throw new Error(clip(result.stderr || result.stdout || "codebook lookup failed", 2_000));
+    }
+    const payload = JSON.parse(result.stdout) as Parameters<typeof formatLookup>[2];
+    if (!Array.isArray(payload.sheets) || !Array.isArray(payload.matches)) throw new Error("Codebook lookup returned an unreadable summary.");
+    return formatLookup(file.relativePath, terms, payload);
+  }
   if (!/\.(csv|tsv)$/i.test(file.relativePath)) {
-    throw new Error("psyclaw_data_profile reads CSV or TSV files. Read xlsx codebooks with the read tool.");
+    throw new Error("psyclaw_data_profile reads CSV or TSV data files and xlsx codebooks.");
   }
   const scriptPath = resolve(root, PROFILE_SCRIPT);
   await mkdir(resolve(root, "analysis/scripts"), { recursive: true });
@@ -170,6 +243,9 @@ export async function profileDataset(
   }
   const payload = JSON.parse(result.stdout) as { rows: number; columns: { name: string; missing: number }[] };
   if (!Number.isInteger(payload.rows) || !Array.isArray(payload.columns)) throw new Error("Profile script returned an unreadable summary.");
+  if (terms.length > 0) {
+    payload.columns = payload.columns.filter((column) => terms.some((term) => column.name.toLowerCase().includes(term)));
+  }
   return formatProfile(file.relativePath, payload);
 }
 
@@ -346,14 +422,15 @@ export function registerAnalysisRuntimeTools(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "psyclaw_data_profile",
     label: "Profile dataset",
-    description: "Profile one CSV or TSV already in the project: row count, column names, and missing counts. Writes analysis/scripts/psyclaw_profile_data.py and runs it with the system Python. Use this instead of python -c, head, or codebook dumps. Does not fit models.",
+    description: "Profile one CSV or TSV data file (row count, column names, missing counts), or look up an xlsx codebook. With query, a data file shows only the matching columns and a codebook returns only the matching rows with sheet and row number. Writes the script it runs under analysis/scripts/ and runs it with the system Python. Use this instead of python -c, head, grep, or dumping a codebook. Does not fit models.",
     parameters: Type.Object({
-      path: Type.String({ description: "Project-relative CSV or TSV path, for example data/OSF_Data_T1T2.csv" }),
+      path: Type.String({ description: "Project-relative CSV/TSV data file or xlsx codebook, for example data/OSF_Data_T1T2.csv or codebooks/W1.xlsx" }),
+      query: Type.Optional(Type.String({ description: "Variable names or keywords, separated by commas or spaces, for example: NCE_T2, subgroup, cortisol" })),
     }),
     executionMode: "sequential",
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       try {
-        return toolText(await profileDataset(ctx.cwd, params.path));
+        return toolText(await profileDataset(ctx.cwd, params.path, params.query ? { query: params.query } : {}));
       } catch (error) {
         return toolText(error instanceof Error ? error.message : String(error), true);
       }
@@ -363,9 +440,9 @@ export function registerAnalysisRuntimeTools(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "psyclaw_run_analysis",
     label: "Run analysis entrypoint",
-    description: "Run one existing R or Python analysis entrypoint once. Defaults to analysis/scripts/run_all.R, results/analysis.R, or results/analysis.py when present. If that script tree is unchanged and the last run succeeded, returns the saved log tail without executing again. Pass force=true only after the script changed or the last run failed. Do not rerun the same entrypoint through bash.",
+    description: "Run one project R or Python script, an exploration script or the full pipeline, and return the tail of its output; the whole output is saved to analysis/results/psyclaw-run.log. Defaults to analysis/scripts/run_all.R, results/analysis.R, or results/analysis.py when present. If the script tree is unchanged and the last run of that script succeeded, returns the saved tail without executing again. Pass force=true only after the script changed or the last run failed. Use this instead of running scripts through bash.",
     parameters: Type.Object({
-      entrypoint: Type.Optional(Type.String({ description: "Project-relative R or Python script. Omit to use the default entrypoint." })),
+      entrypoint: Type.Optional(Type.String({ description: "Project-relative R or Python script, for example analysis/scripts/explore_codebook.py. Omit to use the default entrypoint." })),
       force: Type.Optional(Type.Boolean({ description: "Run again even when the script tree is unchanged." })),
     }),
     executionMode: "sequential",
