@@ -1,4 +1,7 @@
 import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { maskToolObservations } from "./observation-mask.js";
+import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
+import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlock, setDataAccess, type DataAccessLevel } from "../../safety/data-access.js";
 import { Type } from "typebox";
 import { appendApproval, approvalInputDigest, assertResearchDecision, bootstrapProject, ensureProjectBinding, hasCanonicalWorkspace, resolveResearchDecision, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview } from "../../index.js";
 import type { ResearchDecisionImpact } from "../../research/decision.js";
@@ -1774,6 +1777,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       };
     }
   });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("context", (event) => {
+    const messages = maskToolObservations(event.messages);
+    if (messages === event.messages) return;
+    return { messages };
+  });
+  let dataAccessWarningShown = false;
   if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
     // Host-teardown hard block runs even without /init — project approvals do not cover this.
     const commandText = extractToolCommandText(event.toolName, event.input);
@@ -1784,6 +1793,20 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         ctx.ui.notify(reason, "error");
         return { block: true, terminate: true, reason };
       }
+    }
+    try {
+      const access = await loadDataAccess(ctx.cwd);
+      if (access.warning && !dataAccessWarningShown) {
+        dataAccessWarningShown = true;
+        ctx.ui.notify(access.warning, "warning");
+      }
+      const privacyReason = scriptOnlyBlock(event.toolName, event.input, access.entries, ctx.cwd);
+      if (privacyReason) {
+        ctx.ui.notify(privacyReason, "warning");
+        return { block: true, reason: privacyReason };
+      }
+    } catch {
+      // A broken checker must not take down unrelated tools. Defaults still apply on the next call.
     }
     const run = await readActiveProject(ctx.cwd);
     if (!run || !toolNeedsApproval(event.toolName, event.input)) return;
@@ -1815,6 +1838,23 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     });
     return undefined;
   });
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_result", async (event, ctx) => {
+    try {
+      const access = await loadDataAccess(ctx.cwd);
+      let changed = false;
+      const content = event.content.map((part) => {
+        if (part.type !== "text") return part;
+        const text = redactScriptOnlyOutput(part.text, access.entries);
+        if (text === part.text) return part;
+        changed = true;
+        return { ...part, text };
+      });
+      if (!changed) return;
+      return { content };
+    } catch {
+      return;
+    }
+  });
   pi.registerCommand("exit", {
     description: "完整退出 PsyClaw（等同 /quit）",
     handler: async (_args, ctx) => {
@@ -1843,13 +1883,36 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         ctx.ui.notify(
           [
             `工作仓库已初始化：${project.id}`,
-            "已创建 data/raw|clean、analysis/、literature/、paper/、psyclaw.md、.psyclaw/",
+            "已创建 data/raw|clean|secret、analysis/、literature/、paper/、psyclaw.md、.psyclaw/",
+            "data/secret 默认 script-only：模型不能直接读内容，分析脚本可以打开。/data-access 可改级别或指定其他文件。",
             "Shift+Tab：chat → analysis → academic",
             "Thinking：Ctrl+Shift+T",
             "澄清与分析请切到 analysis；写作审稿请切到 academic。输入 /help 查看速览。",
           ].join("\n"),
           "info",
         );
+      } catch (error) {
+        await notifyError(ctx, error);
+      }
+    },
+  });
+  pi.registerCommand("data-access", {
+    description: "查看或设置文件展示级别（full 或 script-only）",
+    handler: async (args, ctx) => {
+      try {
+        const parts = args.trim().split(/\s+/).filter(Boolean);
+        if (parts.length === 0) {
+          const loaded = await loadDataAccess(ctx.cwd);
+          ctx.ui.notify([formatDataAccess(loaded.entries), loaded.warning].filter(Boolean).join("\n"), loaded.warning ? "warning" : "info");
+          return;
+        }
+        const access = parts.at(-1);
+        if (parts[0] !== "set" || parts.length < 3 || (access !== "full" && access !== "script-only")) {
+          ctx.ui.notify("用法：/data-access 或 /data-access set <相对路径> <full|script-only>", "error");
+          return;
+        }
+        const entries = await setDataAccess(ctx.cwd, parts.slice(1, -1).join(" "), access);
+        ctx.ui.notify(formatDataAccess(entries), "info");
       } catch (error) {
         await notifyError(ctx, error);
       }
@@ -2374,6 +2437,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   });
 
   if (typeof pi.registerTool === "function") {
+  registerAnalysisRuntimeTools(pi);
   pi.registerTool({
     name: "psyclaw_research_decision",
     label: "Research decision",

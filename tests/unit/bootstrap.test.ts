@@ -23,6 +23,7 @@ describe("project bootstrap 0.29", () => {
     expect(paths.raw).toBe(join(root, "data", "raw"));
     expect(existsSync(paths.raw)).toBe(true);
     expect(existsSync(join(root, "data", "clean"))).toBe(true);
+    expect(existsSync(join(root, "data", "secret"))).toBe(true);
     expect(existsSync(join(root, "paper"))).toBe(true);
     expect(existsSync(join(root, "analysis", "results"))).toBe(true);
     expect(existsSync(join(root, ".psyclaw", "skills"))).toBe(true);

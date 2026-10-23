@@ -15,6 +15,7 @@ export function defaultPsyClawMarkdown(projectLabel = "未命名研究项目"): 
     "## 目录",
     "",
     "- `data/raw/` — 原始数据（只读；指纹仅用于防篡改，不作学术核验）",
+    "- `data/secret/` — 不进入模型上下文；分析脚本可在磁盘上打开。/data-access 可改级别",
     "- `data/clean/` — 可分析派生数据",
     "- `analysis/scripts|configs|results|plans/` — 脚本、规格、结果、分析方案",
     "- `analysis/HANDOFF.md` — 分析→学术交接",

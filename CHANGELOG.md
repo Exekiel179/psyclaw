@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.21 - 2026-10-23
+
+- Add dataset profile, one-shot analysis entrypoint, and confirmatory table preview tools
+- Mask older tool observations before they are resent to the model
+- Default data/secret to script-only so the model cannot read it directly; analysis scripts can still open it
+
 ## 0.30.20 - 2026-10-21
 
 - Fix Skill manager stale ctx after reload (exit handler instead of reusing old ctx)

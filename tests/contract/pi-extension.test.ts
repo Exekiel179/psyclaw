@@ -20,7 +20,7 @@ describe("Pi extension contract", () => {
     // research surface: /verify and /model stay reachable for the CLI/simple
     // hosts, while UI-gated research commands (agents/grill/...) are not
     // registered at all.
-    expect([...commands.keys()]).toEqual(["exit", "init", "crosscheck", "verify", "help", "plan", "handoff", "model"]);
+    expect([...commands.keys()]).toEqual(["exit", "init", "data-access", "crosscheck", "verify", "help", "plan", "handoff", "model"]);
   });
 
   it("registers the full research command surface on a modern Pi API", () => {
@@ -31,12 +31,54 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     expect(commands).toEqual([
-      "exit", "init", "crosscheck", "verify", "help", "plan", "handoff", "grill", "brainstorm", "review", "loop",
+      "exit", "init", "data-access", "crosscheck", "verify", "help", "plan", "handoff", "grill", "brainstorm", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
       "skill", "biosignal", "ars", "plugin", "mcp", "provider", "pet", "telemetry", "agents",
     ]);
     expect(commands).not.toContain("run");
     expect(commands).not.toContain("brief");
+  });
+
+  it("blocks a direct read of script-only data and redacts grep lines", async () => {
+    let command: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "data-access") command = options.handler;
+      },
+      registerTool() {},
+      on(name: string, handler: (event: any, ctx: any) => Promise<any>) {
+        handlers.set(name, handler);
+      },
+    } as any;
+    extension(api);
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-data-access-hook-"));
+    await mkdir(join(root, "data/secret"), { recursive: true });
+    await writeFile(join(root, "data/secret/scores.csv"), "id,score\n1,99\n", "utf8");
+    const notes: string[] = [];
+    const ctx = { cwd: root, hasUI: true, ui: { notify(message: string) { notes.push(message); } } };
+    const blocked = await handlers.get("tool_call")!({ toolName: "read", toolCallId: "1", input: { path: "data/secret/scores.csv" } }, ctx);
+    expect(blocked).toMatchObject({ block: true });
+    expect(blocked.reason).toContain("script-only");
+    expect(blocked.terminate).toBeUndefined();
+    expect(notes.join("\n")).not.toContain("99");
+
+    await command!("set data/scores.csv script-only", ctx);
+    const script = await handlers.get("tool_call")!(
+      { toolName: "bash", toolCallId: "2", input: { command: "Rscript analysis/scripts/run_all.R data/scores.csv" } },
+      ctx,
+    );
+    expect(script).toBeUndefined();
+    const redacted = await handlers.get("tool_result")!(
+      {
+        toolName: "grep",
+        content: [{ type: "text", text: "data/clean/ready.csv:1: ok\ndata/secret/scores.csv:2: 1,99" }],
+        isError: false,
+      },
+      ctx,
+    );
+    expect(redacted.content[0].text).toContain("data/clean/ready.csv:1: ok");
+    expect(redacted.content[0].text).not.toContain("99");
   });
 
   it("supports /exit as a graceful alias for /quit", async () => {

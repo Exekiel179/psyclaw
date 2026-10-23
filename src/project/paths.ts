@@ -67,6 +67,7 @@ export async function ensureProjectDirectories(root: string): Promise<void> {
     `${PSYCLAW_DIR}/data/raw`,
     "data",
     "data/raw",
+    "data/secret",
     "data/clean",
     "analysis",
     "analysis/scripts",
