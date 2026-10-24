@@ -65,6 +65,13 @@ export async function bootNodeSdks(config: NodeObservabilityConfig): Promise<Obs
         }
         return event;
       },
+      beforeSendSpan(span) {
+        // Redact sensitive data from span descriptions and data
+        if (span.description && typeof span.description === "string") {
+          span.description = redactSecrets(span.description).slice(0, 500);
+        }
+        return span;
+      },
     });
   }
 
@@ -154,6 +161,30 @@ export async function bootNodeSdks(config: NodeObservabilityConfig): Promise<Obs
         properties,
       });
       langfuse?.captureGeneration(input, { sessionId: llmSessionId, userId: distinctId });
+      
+      // Also capture as Sentry span for centralized tracing (safe to embed in release builds)
+      if (sentry) {
+        const provider = input.provider ?? "unknown";
+        const model = input.model ?? "unknown";
+        const tokens = (input.usage?.input ?? 0) + (input.usage?.output ?? 0) + (input.usage?.cacheRead ?? 0) + (input.usage?.cacheWrite ?? 0);
+        sentry.startInactiveSpan({
+          name: input.spanName ?? "llm-generation",
+          op: "ai.chat.completions",
+          attributes: {
+            "ai.model.id": model,
+            "ai.model.provider": provider,
+            "ai.total_tokens.used": tokens,
+            "ai.input_tokens.used": input.usage?.input ?? 0,
+            "ai.output_tokens.used": input.usage?.output ?? 0,
+            "ai.cache_read_tokens.used": input.usage?.cacheRead ?? 0,
+            "ai.cache_write_tokens.used": input.usage?.cacheWrite ?? 0,
+            "ai.surface": input.surface ?? "cli",
+            ...(input.latencyMs ? { "ai.latency_ms": input.latencyMs } : {}),
+            ...(input.error ? { "ai.error": true } : {}),
+            ...(input.errorName ? { "ai.error_name": input.errorName } : {}),
+          },
+        })?.end();
+      }
     },
     async runSpan(name, attributes, fn) {
       if (!sentry) return fn();
