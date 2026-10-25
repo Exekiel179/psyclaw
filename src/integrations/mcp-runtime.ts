@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { McpClient, StdioMcpTransport, type McpServerConfig, type McpTool } from "./mcp.js";
+import { McpClient, StdioMcpTransport, type McpServerConfig, type McpSpawn, type McpTool } from "./mcp.js";
 import { atomicWriteFile } from "../project/jsonl.js";
 
 interface RuntimeMcpConfig extends McpServerConfig {
@@ -47,6 +47,7 @@ function asRuntimeConfig(value: unknown): RuntimeMcpConfig | undefined {
     trusted: true,
     enabled: true,
     ...(typeof value.name === "string" ? { name: value.name } : {}),
+    ...(typeof value.requestTimeoutMs === "number" && value.requestTimeoutMs > 0 ? { requestTimeoutMs: value.requestTimeoutMs } : {}),
     transport: "stdio",
   };
 }
@@ -115,8 +116,18 @@ export async function setUserMcpConfigEnabled(entry: UserMcpConfigEntry, enabled
   await atomicWriteFile(entry.path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+/** Tool calls may wrap slow backends (model calls, MNE pipelines); listing stays on the client default. */
+const DEFAULT_CALL_TIMEOUT_MS = 120000;
+
+function callTimeoutMs(config: RuntimeMcpConfig): number {
+  const configured = config.requestTimeoutMs;
+  return configured !== undefined && Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : DEFAULT_CALL_TIMEOUT_MS;
+}
+
 export class RuntimeMcpRegistry {
   private readonly connections = new Map<string, RuntimeConnection>();
+
+  public constructor(private readonly spawn?: McpSpawn) {}
 
   public async list(root: string, serverId?: string): Promise<Array<{ serverId: string; serverName: string; tools: McpTool[] }>> {
     const configs = await this.configs(root);
@@ -135,7 +146,7 @@ export class RuntimeMcpRegistry {
     const connection = await this.connection(root, config);
     connection.tools ??= await connection.client.listTools();
     if (!connection.tools.some((candidate) => candidate.name === tool)) throw new Error(`MCP tool is not available: ${serverId}.${tool}`);
-    return connection.client.callTool(tool, input);
+    return connection.client.callTool(tool, input, callTimeoutMs(config));
   }
 
   public close(): void {
@@ -164,12 +175,23 @@ export class RuntimeMcpRegistry {
     const key = `${root}\u0000${config.id}\u0000${config.command}\u0000${JSON.stringify(config.args)}`;
     const existing = this.connections.get(key);
     if (existing) return existing;
-    const transport = new StdioMcpTransport(config);
+    const transport = new StdioMcpTransport(config, this.spawn);
     const client = new McpClient(transport);
-    await client.initialize({ name: "psyclaw", version: process.env.PSYCLAW_VERSION ?? "development" });
+    try {
+      await client.initialize({ name: "psyclaw", version: process.env.PSYCLAW_VERSION ?? "development" });
+    } catch (error) {
+      client.close();
+      throw error;
+    }
     client.initialized();
     const connection = { config, transport, client };
     this.connections.set(key, connection);
+    // A timeout or child exit closes the transport. Drop the cached connection
+    // so the next call starts a fresh server instead of failing forever. The
+    // failed call itself is never retried.
+    transport.onClose(() => {
+      if (this.connections.get(key) === connection) this.connections.delete(key);
+    });
     return connection;
   }
 }
