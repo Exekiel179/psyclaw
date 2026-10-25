@@ -22,10 +22,11 @@ Use this skill only in **analysis** mode. Do not start academic/ARS writing from
      - `moderation` in a design that also has a grouping factor: the three-way term (moderation × group), so you can tell whether the moderation holds in each group.
      - `exploratory, no direction`: the main effect, and the variable as a moderator of each focal exposure or condition, each with a one-sentence theoretical reason. An exploratory moderator interacts with the exposure, not only with group.
      - A measured predictor in a design with several conditions: the predictor × each condition contrast, not only × a pooled condition code.
-     - Several treatment arms: each arm against the reference as the primary contrasts; a pooled arms-versus-reference contrast as a supplementary test, labelled as such.
+     - Several treatment arms: each arm against the reference as the primary contrasts, also when the hypothesis names the arms together; a pooled arms-versus-reference contrast as a supplementary test, labelled as such.
      - Change between waves: name the primary specification (difference score or baseline-adjusted) and keep the other as a robustness check. Test the overall change first (intercept-only model of the difference score, or a paired test), then add group, then the remaining terms step by step.
-   - Apply the implied tests to every outcome, and fit them together in one pooled model per outcome, with all lower-order terms and continuous predictors mean-centred. Read within-group slopes from that model; separate subgroup models are supplementary.
-   - Repeated stimuli or items within participants: add a robustness model with a crossed random intercept for the stimulus.
+   - Apply the implied tests to every outcome, and fit them together in one pooled model per outcome, with all lower-order terms and continuous predictors mean-centred. Read within-group slopes from that model; separate subgroup models are supplementary. Add the exploratory terms to the same model and report it as the full model.
+   - Repeated stimuli or items within participants: add a robustness model with a crossed random intercept for the stimulus; without an explicit stimulus id, use the item or trial index.
+   - Difference scores: state the sign convention once and check each coefficient's verbal interpretation against it.
    - Report every model term in the text with estimate, direction and p, covariates included, not only the focal terms.
    - **Status**: `confirmatory` or `exploratory`; every implied test enters the multiplicity plan.
 
