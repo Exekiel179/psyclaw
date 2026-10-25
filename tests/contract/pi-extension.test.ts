@@ -117,6 +117,33 @@ describe("Pi extension contract", () => {
     expect(chat.text).toContain("PsyClaw mode notice");
   });
 
+  it("adds the unattended-run rules to the analysis system prompt only without a UI", async () => {
+    const handlers = new Map<string, (event: any, ctx: any) => any>();
+    const api = {
+      registerCommand() {},
+      registerTool() {},
+      on(name: string, handler: (event: any, ctx: any) => any) {
+        handlers.set(name, handler);
+      },
+    } as any;
+    extension(api);
+    const analysisBranch = [{ type: "custom", customType: "psyclaw-session-mode", data: { mode: "analysis" } }];
+    const ctxWith = (hasUI: boolean, branch: unknown[]) => ({ cwd: tmpdir(), hasUI, ui: { notify() {} }, sessionManager: { getBranch: () => branch } });
+    const event = { systemPrompt: "base" };
+
+    const headless = await handlers.get("before_agent_start")!(event, ctxWith(false, analysisBranch));
+    expect(headless.systemPrompt).toContain("## PsyClaw mode: analysis");
+    expect(headless.systemPrompt).toContain("## Unattended run");
+
+    const interactive = await handlers.get("before_agent_start")!(event, ctxWith(true, analysisBranch));
+    expect(interactive.systemPrompt).toContain("## PsyClaw mode: analysis");
+    expect(interactive.systemPrompt).not.toContain("## Unattended run");
+
+    const chatBranch = [{ type: "custom", customType: "psyclaw-session-mode", data: { mode: "chat" } }];
+    const chat = await handlers.get("before_agent_start")!(event, ctxWith(false, chatBranch));
+    expect(chat.systemPrompt).not.toContain("## Unattended run");
+  });
+
   it("supports /exit as a graceful alias for /quit", async () => {
     let exitHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
     const api = {

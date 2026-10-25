@@ -12,9 +12,11 @@
  * last assistant message stay long, because the model has not answered them yet.
  * A result that has already been answered is clipped once to a head and a tail;
  * later turns reproduce that same clip from the original text. A repeated
- * success stubs the new copy and leaves the earlier message unchanged.
- * Bounded research tools (profile, run, saved table, recall) stay intact so a
- * confirmatory number is not dropped from the middle on the next turn.
+ * success stubs the new copy and leaves the earlier message unchanged, unless
+ * the earlier copy was clipped. Bounded research tools (profile, run, saved
+ * table, recall) and reads of a text document a user message names (the task
+ * brief) stay intact so a confirmatory number or a hypothesis is not dropped
+ * from the middle on the next turn.
  */
 
 const MARK = "[psyclaw:observation-masked";
@@ -50,11 +52,15 @@ export function isInstructionResult(toolName: string | undefined): boolean {
   return toolName !== undefined && OBSERVATION_INSTRUCTION_TOOLS.has(toolName);
 }
 
-type ContentPart = { type?: string; text?: string };
+/** Text documents a user message names (e.g. "Read BRIEF.md") hold the task itself; their middle must not be dropped. */
+const TASK_DOCUMENT = /\.(?:md|markdown|txt)$/i;
+
+type ContentPart = { type?: string; text?: string; id?: string; name?: string; arguments?: unknown };
 
 export type MaskableMessage = {
   role: string;
   toolName?: string;
+  toolCallId?: string;
   isError?: boolean;
   content?: unknown;
 };
@@ -66,6 +72,31 @@ function contentParts(message: MaskableMessage): ContentPart[] | undefined {
 
 function textOf(parts: ContentPart[]): string {
   return parts.filter((part) => part.type === "text" && typeof part.text === "string").map((part) => part.text).join("\n");
+}
+
+/** Indexes of `read` results for a text document that a user message names. */
+function taskDocumentResults(messages: readonly MaskableMessage[]): Set<number> {
+  const userText = messages
+    .filter((message) => message.role === "user")
+    .map((message) => (typeof message.content === "string" ? message.content : textOf(contentParts(message) ?? [])))
+    .join("\n");
+  const readPaths = new Map<string, string>();
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+    for (const part of contentParts(message) ?? []) {
+      const path = (part.arguments as { path?: unknown } | undefined)?.path;
+      if (part.type === "toolCall" && part.name === "read" && typeof part.id === "string" && typeof path === "string") {
+        readPaths.set(part.id, path);
+      }
+    }
+  }
+  const found = new Set<number>();
+  messages.forEach((message, index) => {
+    if (message.role !== "toolResult" || message.toolCallId === undefined) return;
+    const base = readPaths.get(message.toolCallId)?.split("/").pop();
+    if (base && TASK_DOCUMENT.test(base) && userText.includes(base)) found.add(index);
+  });
+  return found;
 }
 
 function alreadyMasked(text: string): boolean {
@@ -195,7 +226,17 @@ export function maskToolObservationsStable<T extends MaskableMessage>(
   }
   if (indexes.length === 0) return messages as T[];
 
-  const earliest = new Map<string, number>();
+  const taskDocuments = taskDocumentResults(messages);
+  const keptLong = (message: T, index: number) =>
+    isObservationEvidence(message.toolName) || index > lastAssistant || taskDocuments.has(index);
+  // Whether this copy reaches the model with its full text.
+  const sentWhole = (message: T, index: number, text: string) =>
+    isInstructionResult(message.toolName)
+    || text.length <= (keptLong(message, index) ? recentChars : staleHeadChars + staleTailChars);
+
+  // A repeat is stubbed only when an earlier copy is still whole; if the earlier one was
+  // clipped, the repeat is how the model gets the middle back.
+  const wholeSeen = new Set<string>();
   const duplicate = new Set<number>();
   for (let slot = 0; slot < indexes.length; slot += 1) {
     const index = indexes[slot];
@@ -204,8 +245,8 @@ export function maskToolObservationsStable<T extends MaskableMessage>(
     const message = messages[index];
     if (!message || message.isError) continue;
     const key = `${message.toolName ?? ""}\0${text}`;
-    if (!earliest.has(key)) earliest.set(key, slot);
-    else duplicate.add(slot);
+    if (wholeSeen.has(key)) duplicate.add(slot);
+    else if (sentWhole(message, index, text)) wholeSeen.add(key);
   }
 
   let changed = false;
@@ -216,13 +257,12 @@ export function maskToolObservationsStable<T extends MaskableMessage>(
     if (text === undefined || index === undefined || alreadyMasked(text)) continue;
     const message = messages[index];
     if (!message) continue;
-    const fresh = index > lastAssistant;
     let replacement: string | undefined;
     if (duplicate.has(slot)) {
       replacement = `${MARK} duplicate ${message.toolName ?? "tool"} omitted ${text.length} chars; the earlier identical result is unchanged]`;
     } else if (isInstructionResult(message.toolName)) {
       continue;
-    } else if (isObservationEvidence(message.toolName) || fresh) {
+    } else if (keptLong(message, index)) {
       const clipped = clip(text, recentHead, recentTail);
       if (clipped !== text) replacement = clipped;
     } else {

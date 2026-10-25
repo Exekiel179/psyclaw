@@ -80,6 +80,20 @@ export function formatChatModeMismatchNotice(mismatch: ModeMismatchReminder, use
   ].join("\n");
 }
 
+/** Extra analysis-mode guidance for unattended runs (no UI, e.g. `psyclaw run` / Pi --print). */
+export function unattendedAnalysisPrompt(): string {
+  return [
+    "## Unattended run (no interactive UI)",
+    "Nobody can review intermediate files in this run, so skip the steps that only serve an interactive reviewer. These rules take precedence over the analysis workflow above where they conflict.",
+    "- Take the task from the brief and the files it names; do not explore the PsyClaw scaffolding (.psyclaw/, plan or HANDOFF templates) to understand the task.",
+    "- If the task names where deliverables go, write the analysis script there and run it from there. Do not keep a second copy under analysis/scripts/ and do not add a run_all wrapper.",
+    "- One-off exploratory checks (value counts, cross-tabs, a variable's range) may run inline through bash with `Rscript -e` or `python3 -c`. Write a script file only for analyses that belong in the reproducible pipeline.",
+    "- Do not run /crosscheck, /verify or a re-implementation of the analysis in a second language unless the task asks for it. State in the report that the results were not cross-checked (未经核对).",
+    "- Do not produce figures unless the task asks for them.",
+    "- Fill in analysis/plans/plan.md once, before executing. Do not write analysis/HANDOFF.md unless the task asks for it.",
+  ].join("\n");
+}
+
 /** Mode-specific guidance appended while that sticky mode is active. */
 export function sessionModePrompt(mode: PsyClawSessionMode): string {
   if (mode === "chat") {

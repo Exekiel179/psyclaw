@@ -157,17 +157,49 @@ describe("stable observation mask", () => {
     expect(text(masked[2])).not.toContain("From hypotheses to models");
   });
 
-  it("stubs the new duplicate and keeps the earlier result", () => {
-    const body = "Z".repeat(4_000);
+  it("stubs the new duplicate when the earlier result is still whole", () => {
+    const body = "Z".repeat(2_000);
     const masked = maskToolObservationsStable([
       { role: "assistant", content: "1" },
       tool("bash", body),
       { role: "assistant", content: "2" },
       tool("bash", body),
     ]);
-    expect(text(masked[1])).toContain("ZZZ");
+    expect(text(masked[1])).toBe(body);
     expect(text(masked[3])).toContain("duplicate bash omitted");
     expect(text(masked[3])).not.toContain("ZZZ");
+  });
+
+  it("sends a repeat whole when the earlier copy was clipped, so a re-read recovers the middle", () => {
+    const body = `${"Z".repeat(2_000)}H1a: hypothesis${"Z".repeat(2_000)}`;
+    const masked = maskToolObservationsStable([
+      { role: "assistant", content: "1" },
+      tool("read", body),
+      { role: "assistant", content: "2" },
+      tool("read", body),
+    ]);
+    expect(text(masked[1])).not.toContain("H1a: hypothesis");
+    expect(text(masked[3])).toBe(body);
+  });
+
+  it("keeps the read of a document the user named whole after later turns", () => {
+    const brief = `${"B".repeat(2_000)}H1a: hypothesis${"B".repeat(2_000)}`;
+    const readCall = (id: string, path: string): MaskableMessage => ({
+      role: "assistant",
+      content: [{ type: "toolCall", id, name: "read", arguments: { path } }],
+    });
+    const masked = maskToolObservationsStable([
+      { role: "user", content: "Read BRIEF.md and complete the task." },
+      readCall("c1", "/work/BRIEF.md"),
+      { ...tool("read", brief), toolCallId: "c1" },
+      readCall("c2", "/work/notes.md"),
+      { ...tool("read", brief.replaceAll("B", "N")), toolCallId: "c2" },
+      { role: "assistant", content: "next" },
+      tool("bash", "small"),
+    ]);
+    expect(text(masked[2])).toBe(brief);
+    expect(text(masked[4])).toContain("psyclaw:observation-masked omitted");
+    expect(text(masked[4])).not.toContain("H1a: hypothesis");
   });
 
   it("keeps a longer cache prefix than the sliding window on a 16-call trajectory", () => {

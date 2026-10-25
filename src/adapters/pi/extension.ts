@@ -123,6 +123,7 @@ import {
   nextSessionMode,
   parseSessionMode,
   sessionModePrompt,
+  unattendedAnalysisPrompt,
 } from "../../session/modes.js";
 import {
   continuouslyWorkWarningText,
@@ -1563,7 +1564,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", (event, ctx) => {
     const restored = restoreSessionMode(ctx?.sessionManager);
     sessionMode = restored;
-    const modeBlock = sessionModePrompt(restored);
+    const modeBlock = restored === "analysis" && ctx && !ctx.hasUI
+      ? `${sessionModePrompt(restored)}\n\n${unattendedAnalysisPrompt()}`
+      : sessionModePrompt(restored);
     if (restored === "academic" || isArsPiTurn(event.systemPrompt) || isArsPiActive(ctx?.sessionManager)) {
       return {
         systemPrompt: `${event.systemPrompt}\n\n${modeBlock}\n\n${psyclawArsPatch({
