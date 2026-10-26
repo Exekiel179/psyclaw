@@ -56,6 +56,21 @@ describe("method topic detection", () => {
     expect(methodTopicsIn("帮我分析这个 csv")).toEqual([]);
   });
 
+  it("does not match a stem inside another word", () => {
+    expect(methodTopicsIn("questionnaires immediately after the program")).toEqual([]);
+    expect(methodTopicsIn("I moderately agree")).toEqual([]);
+    expect(methodTopicsIn("semester grades")).toEqual([]);
+  });
+
+  it("reads design cues in a task description", () => {
+    expect(methodTopicsIn("Participants completed a questionnaire each night for 14 days.")).toEqual(["multilevel"]);
+    expect(methodTopicsIn("On each trial the participant chose an action.")).toEqual(["multilevel"]);
+    expect(methodTopicsIn("Longitudinal survey: Time 1 before the campaign, Time 2 during it.")).toEqual(["change-scores"]);
+    expect(methodTopicsIn("Exposure to X will moderate the effect of Y.")).toEqual(["interactions"]);
+    expect(methodTopicsIn("A single-order three-factor model explains the item covariance.")).toEqual(["sem"]);
+    expect(methodTopicsIn("an indirect effect via self-efficacy")).toEqual(["mediation"]);
+  });
+
   it("skips soft routing when the message names a loaded user skill", () => {
     expect(resolveStatsIntent("用 my-moderation 做调节分析", { userSkillNames: ["my-moderation"] })).toBeNull();
     expect(resolveStatsIntent("/skill:my-moderation 做调节")).toBeNull();

@@ -47,12 +47,15 @@ export const RESIDENT_METHOD_RULES = [
   "Report every model term, covariates included.",
 ].join(" ");
 
+// English stems are anchored at a word start so that "immediately" is not mediation and
+// "moderately" is not moderation. Cues name the design (nesting, repeated measures, latent
+// variables), not any one study.
 const TOPIC_PATTERNS: Record<MethodTopic, RegExp> = {
-  "change-scores": /差分|变化分数|difference score|ancova|前后测|配对样本|总体变化|change score|baseline-adjust|lord/i,
-  interactions: /交互|调节|moderat|interaction|简单斜率|simple slope|三阶|中心化|mean-cent|centering|johnson[- ]?neyman/i,
-  mediation: /中介|mediat/i,
-  multilevel: /多层|混合效应|混合模型|multilevel|mixed[- ](?:effect|model)|随机截距|random intercept/i,
-  sem: /\bSEM\b|结构方程|路径分析|验证性因子|confirmatory factor/i,
+  "change-scores": /差分|变化分数|前后测|前测|后测|基线|随访|配对样本|总体变化|纵向|两期|\b(?:longitudinal|time [12]|at each wave|each wave|difference scores?|change scores?|ancova|pre-?post|pre-?test|post-?test|baseline|follow-?up|baseline-adjust\w*|lord'?s paradox|across (?:the )?waves|two waves|paired (?:samples?|t-?test))\b/i,
+  interactions: /交互|调节|简单斜率|三阶|中心化|\b(?:moderates? the (?:effect|association|relationship|link)|(?:stronger|weaker) (?:for|among|in)|moderat(?:or|ors|ion|ing|es)|moderated by|interactions?|simple slopes?|mean-cent\w*|centering|centred|johnson[- ]?neyman|differs? (?:by|between|across)|depends? on)\b/i,
+  mediation: /中介|间接效应|\b(?:mediat\w*|indirect effects?)\b/i,
+  multilevel: /多层|混合效应|混合模型|随机截距|随机斜率|嵌套|重复测量|被试内|日记|经验取样|逐试次|每个试次|每天|每晚|\b(?:on each trial|each trial|trial-by-trial|per trial|trials per (?:condition|block|participant)|each (?:day|night|evening|morning)|daily|every day|for \d+ (?:days|weeks)|multilevel|multi-level|hierarchical linear|mixed[- ](?:effects?|models?)|random (?:intercepts?|slopes?|effects?)|nested (?:with)?in|repeated measures?|within-(?:person|subjects?|participants?)|clustered|daily diary|diary study|experience sampling|ecological momentary|ema|trial-level|each (?:participant|person) completed (?:several|multiple|many))\b/i,
+  sem: /结构方程|路径分析|验证性因子|因子分析|因子结构|因子模型|潜变量|测量模型|\b(?:[\w-]+-factor model|factor (?:model|structure)|SEM|structural equation|path (?:model|analysis)|confirmatory factor|factor analysis|latent (?:variables?|factors?)|measurement (?:model|invariance)|lavaan)\b/i,
   report: /写报告|结果报告|report\.md|\/paper\/|HANDOFF|handoff/i,
 };
 
