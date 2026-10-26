@@ -260,6 +260,15 @@ describe("resident method rules", () => {
     expect(prompt).toContain("HANDOFF");
   });
 
+  it("asks an approver one decision per question and splits a rejected bundle", () => {
+    const prompt = unattendedAnalysisPrompt();
+    expect(prompt).not.toContain("Group related decisions into one question");
+    expect(prompt).toContain("Settle one decision per question");
+    expect(prompt).toContain("split the rejected options into single components");
+    expect(prompt).toContain("each exclusion rule, not which N");
+    expect(prompt).toContain("a latent or measurement model and its estimator");
+  });
+
   it("ships a core skill body for each method topic", async () => {
     const skills = await loadCoreMethodSkills();
     const byTopic = new Map(skills.map((skill) => [skill.topic, skill.body]));
