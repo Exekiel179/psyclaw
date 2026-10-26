@@ -1,6 +1,7 @@
 import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { isInstructionResult, isObservationEvidence, maskToolObservationsStable, observationSettledLimit } from "./observation-mask.js";
 import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js";
+import { applyShellTimeout, isShellTimeout, SHELL_TIMEOUT_HINT } from "../../analysis/shell-timeout.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
 import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlock, setDataAccess, type DataAccessLevel } from "../../safety/data-access.js";
 import { Type } from "typebox";
@@ -1803,6 +1804,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         return { block: true, terminate: true, reason };
       }
     }
+    applyShellTimeout(event.toolName, event.input);
     try {
       const access = await loadDataAccess(ctx.cwd);
       if (access.warning && !dataAccessWarningShown) {
@@ -1858,6 +1860,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         changed = true;
         return { ...part, text };
       });
+      const timedOutIndex = content.findIndex((part) => part.type === "text" && isShellTimeout(event.toolName, part.text));
+      const timedOut = content[timedOutIndex];
+      if (timedOut?.type === "text") {
+        content[timedOutIndex] = { ...timedOut, text: `${timedOut.text}\n${SHELL_TIMEOUT_HINT}` };
+        changed = true;
+      }
       if (!isObservationEvidence(event.toolName) && !isInstructionResult(event.toolName)) {
         const body = content.filter((part) => part.type === "text").map((part) => part.text).join("\n");
         const saved = await persistToolOutput(ctx.cwd, event.toolCallId, body, observationSettledLimit());

@@ -535,4 +535,38 @@ describe("Pi extension contract", () => {
     expect(String((result as { reason?: string }).reason)).toContain("不可逆主机操作");
     expect(notifications.some((n) => n.includes("wsl --unregister"))).toBe(true);
   });
+
+  it("gives shell commands a default time limit and explains a timeout to the agent", async () => {
+    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+    const api = {
+      registerCommand() {},
+      registerTool() {},
+      on(name: string, handler: (event: any, ctx: any) => Promise<any>) {
+        handlers.set(name, handler);
+      },
+    } as any;
+    extension(api);
+    const ctx = { cwd: await mkdtemp(join(tmpdir(), "psyclaw-shell-timeout-")), hasUI: true, ui: { notify() {} } };
+    const plain = { command: "Rscript results/analysis.R" };
+    await handlers.get("tool_call")!({ toolName: "bash", toolCallId: "t1", input: plain }, ctx);
+    expect(plain).toMatchObject({ timeout: 600 });
+    const long = { command: "Rscript boot.R", timeout: 7_200 };
+    await handlers.get("tool_call")!({ toolName: "bash", toolCallId: "t2", input: long }, ctx);
+    expect(long.timeout).toBe(1_800);
+    const short = { command: "ls", timeout: 30 };
+    await handlers.get("tool_call")!({ toolName: "bash", toolCallId: "t3", input: short }, ctx);
+    expect(short.timeout).toBe(30);
+    const read = { path: "results/report.md" } as Record<string, unknown>;
+    await handlers.get("tool_call")!({ toolName: "read", toolCallId: "t4", input: read }, ctx);
+    expect(read.timeout).toBeUndefined();
+
+    const result = await handlers.get("tool_result")!({
+      toolName: "bash",
+      toolCallId: "t1",
+      content: [{ type: "text", text: "fitting...\n\nCommand timed out after 600 seconds" }],
+      isError: true,
+    }, ctx);
+    expect(result.content[0].text).toContain("Command timed out after 600 seconds");
+    expect(result.content[0].text).toContain("subsample");
+  });
 });
