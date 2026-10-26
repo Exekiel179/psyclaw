@@ -24,6 +24,7 @@ export interface LocalSkillInfo {
   root: string;
   scope: "user" | "project";
   duplicatePaths: string[];
+  topics: string[];
 }
 
 export interface UserSkillState {
@@ -91,7 +92,19 @@ export function managedSkillRoots(cwd: string): string[] {
   ];
 }
 
-function parseSkillFrontmatter(text: string): { name?: string; description?: string } | null {
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean);
+}
+
+export interface SkillDocument {
+  name: string;
+  description: string;
+  topics: string[];
+  body: string;
+}
+
+export function parseSkillFrontmatter(text: string): { name?: string; description?: string; topics: string[] } | null {
   const normalized = text.replace(/^\uFEFF/, "");
   const match = normalized.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/);
   if (!match?.[1]) return null;
@@ -101,7 +114,24 @@ function parseSkillFrontmatter(text: string): { name?: string; description?: str
     const name = typeof metadata.name === "string" ? metadata.name.trim() : undefined;
     const description = typeof metadata.description === "string" ? metadata.description.trim() : undefined;
     if (!name) return null;
-    return { name, ...(description === undefined ? {} : { description }) };
+    return { name, topics: stringList(metadata.topics), ...(description === undefined ? {} : { description }) };
+  } catch {
+    return null;
+  }
+}
+
+export async function readSkillDocument(dir: string): Promise<SkillDocument | null> {
+  try {
+    const text = await readFile(join(dir, "SKILL.md"), "utf8");
+    const meta = parseSkillFrontmatter(text);
+    if (!meta?.name) return null;
+    const body = (text.replace(/^\uFEFF/, "").match(/^---[ \t]*\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/)?.[0]);
+    return {
+      name: meta.name,
+      description: meta.description ?? "",
+      topics: meta.topics,
+      body: (body ? text.replace(/^\uFEFF/, "").slice(body.length) : text).trim(),
+    };
   } catch {
     return null;
   }
@@ -116,6 +146,7 @@ async function readLocalSkill(dir: string, root: string, scope: "user" | "projec
       id: meta.name!,
       name: meta.name!,
       description: meta.description ?? "",
+      topics: meta.topics,
       path: dir,
       root,
       scope,
@@ -276,9 +307,17 @@ export async function setLocalSkillsEnabled(root: string, ids: readonly string[]
   await saveUserSkillState(root, { schemaVersion: USER_SKILL_STATE, disabled: [...current] });
 }
 
+export interface SkippedLocalSkill {
+  name: string;
+  path: string;
+  reason: "core-name" | "duplicate";
+}
+
 export interface EnabledLocalSkillPaths {
   paths: string[];
   warnings: string[];
+  loaded: LocalSkillInfo[];
+  skipped: SkippedLocalSkill[];
 }
 
 /**
@@ -292,11 +331,14 @@ export async function enabledLocalSkillPaths(
 ): Promise<EnabledLocalSkillPaths> {
   const state = await readUserSkillState(cwd);
   const disabled = new Set(state.disabled);
-  const selectedNames = new Set(
+  const excluded = new Set(
     [...(options.excludedNames ?? [])].map((name) => name.trim().toLocaleLowerCase()),
   );
+  const selectedNames = new Set(excluded);
   const paths: string[] = [];
   const warnings: string[] = [];
+  const loaded: LocalSkillInfo[] = [];
+  const skipped: SkippedLocalSkill[] = [];
   const seen = new Set<string>();
   for (const root of localSkillRoots(cwd)) {
     const exists = await lstat(root).then((stat) => stat.isDirectory()).catch(() => false);
@@ -307,7 +349,10 @@ export async function enabledLocalSkillPaths(
     if (skills.length === 0) continue;
     for (const skill of skills) {
       const nameKey = skill.name.trim().toLocaleLowerCase();
-      if (selectedNames.has(nameKey)) continue;
+      if (selectedNames.has(nameKey)) {
+        skipped.push({ name: skill.name, path: skill.path, reason: excluded.has(nameKey) ? "core-name" : "duplicate" });
+        continue;
+      }
       if (disabled.has(skill.id)) {
         warnings.push(`User Skill '${skill.id}' is disabled and was not loaded.`);
         continue;
@@ -317,10 +362,11 @@ export async function enabledLocalSkillPaths(
         seen.add(key);
         selectedNames.add(nameKey);
         paths.push(skill.path);
+        loaded.push(skill);
       }
     }
   }
-  return { paths, warnings };
+  return { paths, warnings, loaded, skipped };
 }
 
 export function userSkillId(name: string): string {

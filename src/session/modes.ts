@@ -1,3 +1,4 @@
+import { RESIDENT_METHOD_RULES } from "../analysis/method-rules.js";
 import { analysisSoftRoutePrompt, resolveStatsIntent } from "../analysis/stats-router.js";
 import { academicSoftRoutePrompt, resolveAcademicSoftRoute } from "../ars/academic-router.js";
 
@@ -85,7 +86,7 @@ export function unattendedAnalysisPrompt(): string {
   return [
     "## Unattended run (no interactive UI)",
     "Nobody can review intermediate files in this run, so skip the steps that only serve an interactive reviewer. These rules take precedence over the analysis workflow above where they conflict.",
-    "- Take the task from the brief and the files it names; do not explore the PsyClaw scaffolding (.psyclaw/, plan or HANDOFF templates) to understand the task.",
+    "- Take the task from the brief and the files it names. Do not explore plan or HANDOFF templates to understand the task. Skills listed in the system prompt may be read.",
     "- If the task names where deliverables go, write the analysis script there and run it from there. Do not keep a second copy under analysis/scripts/ and do not add a run_all wrapper.",
     "- One-off exploratory checks (value counts, cross-tabs, a variable's range) may run inline through bash with `Rscript -e` or `python3 -c`. Write a script file only for analyses that belong in the reproducible pipeline.",
     "- Explore the data in one or two batched checks (structure, codings, value counts, missingness, group cross-tabs together), not one variable per call.",
@@ -119,6 +120,7 @@ export function sessionModePrompt(mode: PsyClawSessionMode): string {
       "Use psyclaw_data_profile for row counts, columns, and missingness, and with query to look up variables in an xlsx codebook; psyclaw_run_analysis to run any project R or Python script, exploratory or the full pipeline; psyclaw_read_results for a saved confirmatory table. Those results stay in context. A long bash or read result is clipped after you reply; its tail names a log under .psyclaw/cache/tool-output. Use psyclaw_recall_output with a line range to bring that middle back. Edit scripts with edit or write. Do not use bash for cat, sed, ls, grep, find, or python/heredoc file patches. bash is only for a command none of those tools can run.",
       "data/secret is script-only unless .psyclaw/data-access.json sets it to full: do not read, cat, head, or grep its contents. Analysis scripts may open it on disk. data/raw stays readable. The researcher sets other files with /data-access; do not edit that config.",
       "Soft「可以」only settles the current choice card. Script execution requires the typed ritual (unless /plan auto).",
+      `Standing method rules: ${RESIDENT_METHOD_RULES}`,
       "Before asking for plan approval, fill in the hypotheses-to-models table already laid out in analysis/plans/plan.md (one row per hypothesis and exploratory variable; keep its columns). When the approver can only pick options, the approval card lists approve plus one revise_<element> option per element, each with its concrete alternative.",
       "Do not auto-start `/crosscheck` or `/verify`. Ask first; only run after explicit agreement. Final human approval remains via Panel「核实」or wake-options.",
       "Do not claim analysis complete, write final HANDOFF as done, or invite academic mode until the human verify gate passes.",

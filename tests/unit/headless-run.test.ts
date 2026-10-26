@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -167,5 +167,37 @@ describe("headless full agent run", () => {
     expect(result.stdout).toContain('"type":"tool_execution_start"');
     expect(result.stdout).toContain('"type":"message_end"');
     expect(result.parsedJson).toEqual({ type: "agent_settled" });
+  });
+
+  it("attaches the skill-resolution record to the receipt", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-headless-resolution-"));
+    await mkdir(join(root, ".psyclaw"), { recursive: true });
+    await writeFile(join(root, ".psyclaw/skill-resolution.json"), `${JSON.stringify({
+      schemaVersion: "psyclaw/skill-resolution/v1",
+      loaded: [{ name: "project-moderation", source: "local", path: join(root, "skills", "project-moderation") }],
+      skipped: [{ name: "analysis-plan", path: join(root, "skills", "analysis-plan"), reason: "core-name" }],
+      injected: [],
+    })}\n`, "utf8");
+    const spawnProcess = vi.fn(() => {
+      const stdout = new EventEmitter() as EventEmitter & { setEncoding: (enc: string) => void };
+      const stderr = new EventEmitter() as EventEmitter & { setEncoding: (enc: string) => void };
+      stdout.setEncoding = () => undefined;
+      stderr.setEncoding = () => undefined;
+      const child = Object.assign(new EventEmitter(), { stdout, stderr, killed: false, kill: () => true });
+      queueMicrotask(() => {
+        stdout.emit("data", "{\"type\":\"agent_settled\"}\n");
+        child.emit("close", 0);
+      });
+      return child;
+    });
+    const result = await runHeadlessAgent({
+      cwd: root,
+      prompt: "x",
+      timeoutMs: 10_000,
+      prepare: async ({ cwd, readOnly }) => mockPrepared(cwd, readOnly),
+      spawnProcess: spawnProcess as never,
+    });
+    expect(result.skillResolution?.skipped[0]?.name).toBe("analysis-plan");
+    expect(result.skillResolution?.loaded[0]?.source).toBe("local");
   });
 });

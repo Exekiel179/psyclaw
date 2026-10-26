@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { RESIDENT_METHOD_RULES } from "../analysis/method-rules.js";
 import { atomicWriteFile } from "../project/jsonl.js";
 import { assertSafeProjectPath, ensureProjectDirectories, projectPaths } from "../project/paths.js";
 
@@ -64,13 +65,8 @@ export function defaultAnalysisPlan(): string {
     "## Hypotheses to models",
     "",
     "One row per hypothesis and one per exploratory variable. Scope as worded: whole sample, restricted to <group>, moderation, or exploratory, no direction.",
-    "Implied tests: restricted to <group> → focal term × group in the pooled model and the slope in each group; moderation with a grouping factor → the three-way term; exploratory → main effect and the variable × each focal exposure or condition (an exploratory moderator interacts with the exposure, not only with group); a measured predictor in a design with several conditions → predictor × each condition contrast. Apply the implied tests to every outcome.",
-    "Several treatment arms: test each arm against the reference as the primary contrasts, also when the hypothesis names the arms together; a pooled arms-versus-reference contrast is a supplementary test, labelled as such.",
-    "Change between waves: test the overall change first (intercept-only model of the difference score, or a paired test), then add group, then the remaining terms step by step.",
-    "Fit the implied terms together in one pooled model per outcome, with all lower-order terms and continuous predictors mean-centred; read within-group slopes from that model. Separate subgroup models are supplementary. Add the exploratory terms to that same model as well and report it as the full model.",
-    "Repeated stimuli or items within participants: add a robustness model with a crossed random intercept for the stimulus; without an explicit stimulus id, use the item or trial index.",
-    "Difference scores: state the sign convention once and check each coefficient's verbal interpretation against it.",
-    "Report every model term in the text with estimate, direction and p, covariates included, not only the focal terms.",
+    `Standing method rules: ${RESIDENT_METHOD_RULES}`,
+    "Topic detail (change scores, interactions, mediation, multilevel models, SEM, reporting) is injected with the matching method skill. Do not re-derive it when that block is present.",
     "",
     "| ID | Scope as worded | Outcome | Focal term | Implied tests | Status |",
     "| --- | --- | --- | --- | --- | --- |",

@@ -7,9 +7,27 @@
     "research-intake",
     "evidence-capture",
     "citation-audit",
-    "analysis-plan"
+    "analysis-plan",
+    "method-change-scores",
+    "method-interactions",
+    "method-mediation",
+    "method-multilevel",
+    "method-sem",
+    "report-checklist"
   ],
-  "enabledByDefault": ["academic-grill", "research-intake", "evidence-capture", "citation-audit", "analysis-plan"],
+  "enabledByDefault": [
+    "academic-grill",
+    "research-intake",
+    "evidence-capture",
+    "citation-audit",
+    "analysis-plan",
+    "method-change-scores",
+    "method-interactions",
+    "method-mediation",
+    "method-multilevel",
+    "method-sem",
+    "report-checklist"
+  ],
   "source": {"kind": "workspace", "ref": "initial-mvp"},
   "license": {"spdx": "MIT", "evidenceRef": "../../LICENSE"},
   "dependencyStatus": "ready"

@@ -3,10 +3,12 @@
  * When matched in analysis mode, soft-takeover into the analysis-plan skill.
  * Does not compete with academic ARS soft-routing.
  */
+import { mentionsLoadedSkill, methodTopicsIn, type MethodTopic } from "./method-rules.js";
 
 export interface StatsIntentMatch {
   kind: "stats-analysis";
   reason: string;
+  topics: MethodTopic[];
 }
 
 const STATS_INTENT = /统计|分析数据|数据分析|跑(一下)?(检验|回归|方差|anova|相关)|t\s*检验|方差分析|回归分析|中介|调节|SEM|因子(分析)?|生存分析|功效|样本量|描述统计|探索性|EDA|analysis plan|统计方案|帮我分析|看一下(这个)?数据|dataset|csv|\.sav\b|独立样本|配对样本|重复测量|混合设计|多层(模型|线性)|meta[- ]?analysis|元分析/i;
@@ -16,15 +18,19 @@ const EXPLICIT_SKIP = /^\/(?:skill:|plan\b|ars(?:-|\b)|init\b|verify\b|grill\b|r
 /** Academic writing intents should not steal analysis-plan takeover. */
 const ACADEMIC_DOMINANT = /写论文|成稿|审稿|文献综述|润色终稿|\/ars-|academic-paper|同行评审/i;
 
-export function resolveStatsIntent(text: string): StatsIntentMatch | null {
+export function resolveStatsIntent(
+  text: string,
+  options: { userSkillNames?: readonly string[] } = {},
+): StatsIntentMatch | null {
   const trimmed = text.trim();
   if (!trimmed || EXPLICIT_SKIP.test(trimmed)) return null;
+  if (mentionsLoadedSkill(trimmed, options.userSkillNames ?? [])) return null;
   if (ACADEMIC_DOMINANT.test(trimmed) && !/先分析|先跑|数据分析|统计方案/.test(trimmed)) return null;
   if (!STATS_INTENT.test(trimmed)) return null;
-  return { kind: "stats-analysis", reason: "statistical / data-analysis intent" };
+  return { kind: "stats-analysis", reason: "statistical / data-analysis intent", topics: methodTopicsIn(trimmed) };
 }
 
-export function formatAnalysisPlanTakeover(userText: string): string {
+export function formatAnalysisPlanTakeover(userText: string, methodBlock?: string): string {
   return [
     "/skill:analysis-plan",
     "",
@@ -36,6 +42,8 @@ export function formatAnalysisPlanTakeover(userText: string): string {
     "Overall execute authorization requires the typed ritual: 我已审阅并批准本方案 (unless /plan auto).",
     "Do not auto-start /crosscheck or /verify — ask first.",
     "Persist structured state with /plan (new|status|confirm|review|run|defer|handoff).",
+    "When a method-skill block is present, follow that body for the topic. It is already in this turn; do not skip it because a skill file was not opened.",
+    ...(methodBlock ? ["", methodBlock] : []),
     "User request:",
     userText.trim(),
   ].join("\n");
@@ -49,7 +57,7 @@ export function analysisSoftRoutePrompt(): string {
     "Stages: clarify + light EDA → **per-analysis choices** (first option = concrete new method; 「已经足够」only as last option) → soft「可以」per card → overall typed ritual「我已审阅并批准本方案」→ execute → ask before /crosscheck|/verify → handoff.",
     "Optional `/plan auto` skips ritual but every result must disclose 未经人审批.",
     "Do not merge this with academic/ARS planning. After an accepted/completed plan (and results), update `analysis/HANDOFF.md` before switching to academic.",
-    "Explicit `/skill:` or `/plan` always wins over soft routing. Academic writing intents belong in academic mode.",
+    "Explicit `/skill:` or `/plan` always wins over soft routing. A request that names a loaded user skill is not taken over. Academic writing intents belong in academic mode.",
     "Never auto-initiate `/crosscheck` or `/verify`. Propose the block, wait for explicit user agreement, then run. Final human Panel/wake approval still gates completion.",
   ].join("\n");
 }

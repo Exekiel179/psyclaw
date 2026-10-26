@@ -110,6 +110,16 @@ import {
   syncHandoffFromAnalysisPlan,
   writeAnalysisPlan,
 } from "../../analysis/plan.js";
+import { mentionsLoadedSkill, methodTopicsIn } from "../../analysis/method-rules.js";
+import {
+  composeMethodInjection,
+  injectedTopicsFor,
+  readSkillPreferences,
+  refreshSkillResolution,
+  SKILL_RESOLUTION_ENTRY,
+  userSkillsOutsideScriptOnly,
+  writeSkillPreferences,
+} from "../../analysis/skill-resolution.js";
 import {
   formatAnalysisPlanTakeover,
   resolveStatsIntent,
@@ -1499,17 +1509,20 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     });
   }
   if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event) => {
-    const enabled = await enabledRecommendedSkillPaths(event.cwd);
-    const local = await enabledLocalSkillPaths(event.cwd, {
-      excludedNames: [...coreSkillNames(), ...await skillNamesInPaths(enabled.paths)],
-    });
-    // Return only existing Skill directories. Same-name local/core candidates
-    // are resolved before Pi sees them. Discovery warnings belong in /skill;
-    // they should not interrupt every startup.
-    return {
-      skillPaths: [...enabled.paths, ...local.paths],
-      promptPaths: await enabledLocalPromptPaths(event.cwd),
-    };
+    try {
+      const discovered = await refreshSkillResolution(event.cwd);
+      try { pi.appendEntry(SKILL_RESOLUTION_ENTRY, discovered.resolution); } catch { /* session may not be open */ }
+      return { skillPaths: [...discovered.recommendedPaths, ...discovered.localPaths], promptPaths: discovered.promptPaths };
+    } catch {
+      const enabled = await enabledRecommendedSkillPaths(event.cwd);
+      const local = await enabledLocalSkillPaths(event.cwd, {
+        excludedNames: [...coreSkillNames(), ...await skillNamesInPaths(enabled.paths)],
+      });
+      return {
+        skillPaths: [...enabled.paths, ...local.paths],
+        promptPaths: await enabledLocalPromptPaths(event.cwd),
+      };
+    }
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("session_shutdown", () => {
     finishAgentSpan(llmTurnSpan);
@@ -1578,8 +1591,22 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     }
     return { systemPrompt: `${event.systemPrompt}\n\n${modeBlock}` };
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_start", (_event, ctx) => {
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("session_start", async (_event, ctx) => {
     arsUiContext = ctx;
+    if (typeof ctx.cwd === "string") {
+      try {
+        const discovered = await refreshSkillResolution(ctx.cwd);
+        try { pi.appendEntry(SKILL_RESOLUTION_ENTRY, discovered.resolution); } catch { /* session may not be open */ }
+        if (ctx.hasUI) {
+          for (const row of discovered.resolution.skipped.filter((item) => item.reason === "core-name")) {
+            ctx.ui.notify(
+              row.warning ?? `核心 skill「${row.name}」不能被同名 skill 覆盖，已跳过 ${row.path}。请改名后再启用。`,
+              "warning",
+            );
+          }
+        }
+      } catch { /* discovery must not block the session */ }
+    }
     if (isContinuouslyWorkEnabled() && ctx.hasUI) {
       ctx.ui.setStatus("cw", "continuously-work");
       ctx.ui.notify(continuouslyWorkWarningText(), "error");
@@ -1779,12 +1806,37 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       };
     }
     if (mode === "analysis") {
-      const match = resolveStatsIntent(event.text);
-      if (!match) return;
-      return {
-        action: "transform",
-        text: formatAnalysisPlanTakeover(event.text),
-      };
+      const userSkills = await userSkillsOutsideScriptOnly(ctx.cwd).catch(() => []);
+      const userSkillNames = userSkills.map((skill) => skill.name);
+      const match = resolveStatsIntent(event.text, { userSkillNames });
+      const reportOnly = !match
+        && methodTopicsIn(event.text).includes("report")
+        && !mentionsLoadedSkill(event.text, userSkillNames);
+      if (!match && !reportOnly) return;
+      let block = "";
+      try {
+        const branch = typeof ctx.sessionManager?.getBranch === "function" ? ctx.sessionManager.getBranch() : [];
+        const select = typeof ctx.ui.select === "function"
+          ? (title: string, labels: string[]) => ctx.ui.select(title, labels, { timeout: 60_000 })
+          : undefined;
+        const composed = await composeMethodInjection({
+          cwd: ctx.cwd,
+          topics: match?.topics ?? ["report"],
+          seen: injectedTopicsFor(ctx.cwd, branch),
+          hasUI: ctx.hasUI === true,
+          userSkills,
+          ...(select ? { select } : {}),
+        });
+        block = composed.text;
+        if (composed.resolution) {
+          try { pi.appendEntry(SKILL_RESOLUTION_ENTRY, composed.resolution); } catch { /* session may not be open */ }
+        }
+      } catch { /* the process takeover still applies */ }
+      if (match) {
+        return { action: "transform", text: formatAnalysisPlanTakeover(event.text, block || undefined) };
+      }
+      if (block) return { action: "transform", text: `${event.text.trim()}\n\n${block}` };
+      return;
     }
   });
   if (!legacyTestApi && typeof pi.on === "function") pi.on("context", (event) => {
@@ -2226,6 +2278,25 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     description: "打开 Skill 管理页",
     handler: async (_args, ctx) => {
       try { await showSkillManager(pi, ctx); } catch (error) { await notifyError(ctx, error); }
+    },
+  });
+
+  if (!legacyTestApi) pi.registerCommand("skill-preference", {
+    description: "查看或重置方法主题与用户 skill 的冲突选择",
+    handler: async (args, ctx) => {
+      try {
+        if (args.trim() === "reset") {
+          await writeSkillPreferences(ctx.cwd, { schemaVersion: "psyclaw/skill-preferences/v1", choices: {} });
+          ctx.ui.notify("已重置方法主题的 skill 选择。下次冲突会再问。", "info");
+          return;
+        }
+        const preferences = await readSkillPreferences(ctx.cwd);
+        const lines = Object.entries(preferences.choices);
+        ctx.ui.notify(
+          lines.length === 0 ? "没有已保存的方法 skill 选择。" : lines.map(([key, value]) => `${key}: ${value}`).join("\n"),
+          "info",
+        );
+      } catch (error) { await notifyError(ctx, error); }
     },
   });
 

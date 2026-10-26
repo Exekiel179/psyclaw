@@ -33,7 +33,7 @@ describe("Pi extension contract", () => {
     expect(commands).toEqual([
       "exit", "init", "data-access", "crosscheck", "verify", "help", "plan", "handoff", "grill", "brainstorm", "review", "loop",
       "create-skill", "create-hook", "create-rule", "create-subagent",
-      "skill", "biosignal", "ars", "plugin", "mcp", "provider", "pet", "telemetry", "agents",
+      "skill", "skill-preference", "biosignal", "ars", "plugin", "mcp", "provider", "pet", "telemetry", "agents",
     ]);
     expect(commands).not.toContain("run");
     expect(commands).not.toContain("brief");
@@ -568,5 +568,77 @@ describe("Pi extension contract", () => {
     }, ctx);
     expect(result.content[0].text).toContain("Command timed out after 600 seconds");
     expect(result.content[0].text).toContain("subsample");
+  });
+
+  it("loads a user skill headlessly and records a same-name skip", async () => {
+    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+    const entries: unknown[] = [];
+    const api = {
+      registerCommand() {},
+      registerTool() {},
+      appendEntry(type: string, data: unknown) { entries.push({ type, data }); },
+      on(name: string, handler: (event: any, ctx: any) => Promise<any>) { handlers.set(name, handler); },
+    } as any;
+    extension(api);
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-skill-resolution-"));
+    const userSkill = join(root, "skills", "project-moderation");
+    const sameName = join(root, ".psyclaw", "skills", "analysis-plan");
+    await mkdir(userSkill, { recursive: true });
+    await mkdir(sameName, { recursive: true });
+    await writeFile(join(userSkill, "SKILL.md"), "---\nname: project-moderation\ndescription: Project moderation\ntopics:\n  - interactions\n---\n", "utf8");
+    await writeFile(join(sameName, "SKILL.md"), "---\nname: analysis-plan\ndescription: Duplicate\n---\n", "utf8");
+
+    const discovered = await handlers.get("resources_discover")!({ cwd: root });
+    expect(discovered.skillPaths).toContain(userSkill);
+    expect(discovered.skillPaths).not.toContain(sameName);
+
+    const notes: string[] = [];
+    await handlers.get("session_start")!({}, {
+      cwd: root,
+      hasUI: true,
+      ui: { notify(message: string) { notes.push(message); }, setStatus() {} },
+    });
+    expect(notes.join("\n")).toContain(sameName);
+    expect(entries.some((entry) => (entry as { type: string }).type === "psyclaw-skill-resolution")).toBe(true);
+
+    const quiet: string[] = [];
+    const headlessRoot = await mkdtemp(join(tmpdir(), "psyclaw-skill-resolution-quiet-"));
+    const quietSkill = join(headlessRoot, ".psyclaw", "skills", "method-interactions");
+    await mkdir(quietSkill, { recursive: true });
+    await writeFile(join(quietSkill, "SKILL.md"), "---\nname: method-interactions\ndescription: Duplicate\n---\n", "utf8");
+    await handlers.get("session_start")!({}, {
+      cwd: headlessRoot,
+      hasUI: false,
+      ui: { notify(message: string) { quiet.push(message); } },
+    });
+    expect(quiet).toEqual([]);
+    const saved = JSON.parse(await readFile(join(headlessRoot, ".psyclaw/skill-resolution.json"), "utf8")) as {
+      skipped: Array<{ path: string; reason: string }>;
+    };
+    expect(saved.skipped).toContainEqual({ name: "method-interactions", path: quietSkill, reason: "core-name" });
+  });
+
+  it("injects the interactions skill into an analysis-mode turn and does not inject it again", async () => {
+    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+    const api = {
+      registerCommand() {},
+      registerTool() {},
+      appendEntry() {},
+      on(name: string, handler: (event: any, ctx: any) => Promise<any>) { handlers.set(name, handler); },
+    } as any;
+    extension(api);
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-method-inject-"));
+    await bootstrapProject({ root, goal: "method injection", paradigm: "survey-observational" });
+    const ctx = {
+      cwd: root,
+      hasUI: false,
+      ui: { notify() {} },
+      sessionManager: { getBranch: () => [{ type: "custom", customType: "psyclaw-session-mode", data: { mode: "analysis" } }] },
+    };
+    const first = await handlers.get("input")!({ text: "做一下调节分析", source: "interactive" }, ctx);
+    expect(first.text).toContain("/skill:analysis-plan");
+    expect(first.text).toContain("topic=interactions");
+    const second = await handlers.get("input")!({ text: "再做一次调节分析", source: "interactive" }, ctx);
+    expect(second.text).not.toContain("[psyclaw:method-skill");
   });
 });

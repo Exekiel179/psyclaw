@@ -6,6 +6,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { readSkillResolution, type SkillResolution } from "../analysis/skill-resolution.js";
 import { prepareAgentLaunch, type PreparedAgentLaunch } from "../chat.js";
 
 export type HeadlessOutputMode = "text" | "json" | "rpc";
@@ -51,6 +52,8 @@ export interface HeadlessAgentRunResult {
   /** First JSON object found on stdout when mode=json (best-effort). */
   parsedJson?: unknown;
   error?: string;
+  /** Skills loaded, skipped, and injected during the run, when the child wrote one. */
+  skillResolution?: SkillResolution;
 }
 
 export function buildHeadlessPiArgs(
@@ -215,6 +218,8 @@ export async function runHeadlessAgent(options: HeadlessAgentRunOptions): Promis
     ...(parsedJson === undefined ? {} : { parsedJson }),
     ...(exitCode === 0 ? {} : { error: `agent exited with code ${exitCode}` }),
   };
+  const skillResolution = await readSkillResolution(cwd);
+  if (skillResolution) result.skillResolution = skillResolution;
   if (options.outPath) await writeReceipt(options.outPath, result);
   return result;
 }
