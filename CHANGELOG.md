@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.31.1 - 2026-10-26
+
+- Inject method-rule skills for change scores, interactions, mediation, multilevel models, SEM, and reporting when an analysis turn matches that topic, and keep six short standing rules in the plan and the analysis prompt
+- A same-name user skill cannot replace a core skill. A different-name topic conflict injects the user skill unless a saved choice says otherwise, and headless receipts record what was loaded, skipped, and injected
+- Default shell commands to 600 seconds (1800 maximum) and point at a narrower rerun after a timeout
+- Honour MCP call timeouts and reconnect after a dead transport
+- Narrow unattended analysis: read the brief and listed skills, and do not explore plan or HANDOFF templates to understand the task
+- Bump package governance apiVersion to 0.31
+
 ## 0.31.0 - 2026-10-23
 
 - Require a hypotheses-to-models table before analysis approval, with the implied tests for group-specific effects, moderation, and wave-to-wave change

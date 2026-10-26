@@ -1,7 +1,7 @@
 {
   "schemaVersion": "psyclaw/package-governance/v1",
   "id": "psyclaw",
-  "apiVersion": "0.30",
+  "apiVersion": "0.31",
   "capabilities": ["evidence-ledger", "integrity-gates", "session-modes", "soft-verify"],
   "permissions": {
     "read": ["project-root"],
