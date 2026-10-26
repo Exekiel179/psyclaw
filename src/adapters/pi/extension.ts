@@ -110,11 +110,12 @@ import {
   syncHandoffFromAnalysisPlan,
   writeAnalysisPlan,
 } from "../../analysis/plan.js";
-import { mentionsLoadedSkill, methodTopicsIn } from "../../analysis/method-rules.js";
+import { METHOD_TOPICS, mentionsLoadedSkill, methodTopicsIn, type MethodTopic } from "../../analysis/method-rules.js";
 import {
   composeMethodInjection,
   injectedTopicsFor,
   readSkillPreferences,
+  referencedDocumentTopics,
   refreshSkillResolution,
   SKILL_RESOLUTION_ENTRY,
   userSkillsOutsideScriptOnly,
@@ -1510,8 +1511,8 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
   }
   if (!legacyTestApi && typeof pi.on === "function") pi.on("resources_discover", async (event) => {
     try {
+      // session_start appends the session record; here only the file is refreshed.
       const discovered = await refreshSkillResolution(event.cwd);
-      try { pi.appendEntry(SKILL_RESOLUTION_ENTRY, discovered.resolution); } catch { /* session may not be open */ }
       return { skillPaths: [...discovered.recommendedPaths, ...discovered.localPaths], promptPaths: discovered.promptPaths };
     } catch {
       const enabled = await enabledRecommendedSkillPaths(event.cwd);
@@ -1809,10 +1810,18 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       const userSkills = await userSkillsOutsideScriptOnly(ctx.cwd).catch(() => []);
       const userSkillNames = userSkills.map((skill) => skill.name);
       const match = resolveStatsIntent(event.text, { userSkillNames });
-      const reportOnly = !match
-        && methodTopicsIn(event.text).includes("report")
-        && !mentionsLoadedSkill(event.text, userSkillNames);
-      if (!match && !reportOnly) return;
+      const namesUserSkill = mentionsLoadedSkill(event.text, userSkillNames);
+      // The task often lives in a document the message names ("Read BRIEF.md"), not in the message itself.
+      const documents = namesUserSkill
+        ? { documents: [], topics: [] as MethodTopic[] }
+        : await referencedDocumentTopics(ctx.cwd, event.text).catch(() => ({ documents: [], topics: [] as MethodTopic[] }));
+      const messageTopics: MethodTopic[] = match?.topics
+        ?? (!namesUserSkill && methodTopicsIn(event.text).includes("report") ? ["report"] : []);
+      // An unattended run writes its report with no reviewer: add the reporting checklist when it works from a task document.
+      const unattendedReport: MethodTopic[] = ctx.hasUI !== true && documents.documents.length > 0 ? ["report"] : [];
+      const wanted = new Set<MethodTopic>([...messageTopics, ...documents.topics, ...unattendedReport]);
+      const topics = METHOD_TOPICS.filter((topic) => wanted.has(topic));
+      if (!match && topics.length === 0) return;
       let block = "";
       try {
         const branch = typeof ctx.sessionManager?.getBranch === "function" ? ctx.sessionManager.getBranch() : [];
@@ -1821,7 +1830,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           : undefined;
         const composed = await composeMethodInjection({
           cwd: ctx.cwd,
-          topics: match?.topics ?? ["report"],
+          topics,
           seen: injectedTopicsFor(ctx.cwd, branch),
           hasUI: ctx.hasUI === true,
           userSkills,

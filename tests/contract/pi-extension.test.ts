@@ -641,4 +641,40 @@ describe("Pi extension contract", () => {
     const second = await handlers.get("input")!({ text: "再做一次调节分析", source: "interactive" }, ctx);
     expect(second.text).not.toContain("[psyclaw:method-skill");
   });
+
+  it("injects topics from the task document an unattended prompt names, plus the reporting checklist", async () => {
+    const handlers = new Map<string, (event: any, ctx: any) => Promise<any>>();
+    const api = {
+      registerCommand() {},
+      registerTool() {},
+      appendEntry() {},
+      on(name: string, handler: (event: any, ctx: any) => Promise<any>) { handlers.set(name, handler); },
+    } as any;
+    extension(api);
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-method-brief-"));
+    await bootstrapProject({ root, goal: "brief injection", paradigm: "survey-observational" });
+    await writeFile(join(root, "BRIEF.md"), "# Brief\nParticipants completed a diary for 14 days. Fit multilevel models.\n", "utf8");
+    const ctx = {
+      cwd: root,
+      hasUI: false,
+      ui: { notify() {} },
+      sessionManager: { getBranch: () => [{ type: "custom", customType: "psyclaw-session-mode", data: { mode: "analysis" } }] },
+    };
+    const prompt = "You are the data analyst for the study in this folder. Read BRIEF.md and complete the task it describes.";
+    // User-level skills under the real HOME could win a topic conflict; keep this test to the core bodies.
+    const previousHome = process.env.HOME;
+    process.env.HOME = await mkdtemp(join(tmpdir(), "psyclaw-method-brief-home-"));
+    let result: any;
+    try {
+      result = await handlers.get("input")!({ text: prompt, source: "interactive" }, ctx);
+    } finally {
+      process.env.HOME = previousHome;
+    }
+    expect(result.action).toBe("transform");
+    expect(result.text.startsWith(prompt)).toBe(true);
+    expect(result.text).toContain("topic=multilevel");
+    expect(result.text).toContain("maximal random-effects structure");
+    expect(result.text).toContain("topic=report");
+    expect(result.text).not.toContain("/skill:analysis-plan");
+  });
 });

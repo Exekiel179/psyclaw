@@ -6,6 +6,7 @@ import {
   METHOD_INJECT_CHAR_BUDGET,
   RESIDENT_METHOD_RULES,
   loadCoreMethodSkills,
+  mentionsLoadedSkill,
   methodTopicsIn,
   renderMethodBlocks,
   type InjectionBlock,
@@ -13,7 +14,10 @@ import {
 import {
   composeMethodInjection,
   preferenceKey,
+  injectedTopicsFor,
   readSkillPreferences,
+  recordInjection,
+  referencedDocumentTopics,
   resetInjectedTopicsForTests,
   selectOrDefault,
   userSkillsOutsideScriptOnly,
@@ -56,6 +60,26 @@ describe("method topic detection", () => {
     expect(resolveStatsIntent("用 my-moderation 做调节分析", { userSkillNames: ["my-moderation"] })).toBeNull();
     expect(resolveStatsIntent("/skill:my-moderation 做调节")).toBeNull();
     expect(resolveStatsIntent("做一下调节分析")?.topics).toEqual(["interactions"]);
+  });
+
+  it("matches a skill name only as a whole word", () => {
+    expect(mentionsLoadedSkill("run the analysis plan", ["analysis"])).toBe(true);
+    expect(mentionsLoadedSkill("semester data 数据分析", ["sem"])).toBe(false);
+    expect(mentionsLoadedSkill("用sem做路径分析", ["sem"])).toBe(true);
+    expect(mentionsLoadedSkill("my-moderation-v2 rules", ["my-moderation"])).toBe(false);
+    expect(resolveStatsIntent("semester 成绩的数据分析", { userSkillNames: ["sem"] })).not.toBeNull();
+  });
+
+  it("finds topics in a task document the message names, but not in script-only or outside files", async () => {
+    const cwd = await tempRoot();
+    await writeFile(join(cwd, "BRIEF.md"), "Days nested within people; fit a multilevel model. The effect runs through a mediator.", "utf8");
+    await mkdir(join(cwd, "data", "secret"), { recursive: true });
+    await writeFile(join(cwd, "data", "secret", "notes.md"), "structural equation model", "utf8");
+    await setDataAccess(cwd, "data/secret", "script-only");
+    const found = await referencedDocumentTopics(cwd, "Read BRIEF.md, data/secret/notes.md and ../outside.md and complete the task.");
+    expect(found.documents).toEqual(["BRIEF.md"]);
+    expect(found.topics).toEqual(["mediation", "multilevel"]);
+    expect((await referencedDocumentTopics(cwd, "no files named here")).documents).toEqual([]);
   });
 });
 
@@ -121,7 +145,8 @@ describe("method injection", () => {
     expect(first.text).toContain("项目中有用户 skill my-moderation");
     expect(first.text).toContain("USER BODY slopes");
     expect(first.text).not.toContain("Gelman");
-    expect((await readSkillPreferences(cwd)).choices[preferenceKey("interactions", "my-moderation")]).toBe("user");
+    // A headless default is not a choice: nothing is saved, so an interactive session still asks.
+    expect((await readSkillPreferences(cwd)).choices[preferenceKey("interactions", "my-moderation")]).toBeUndefined();
 
     resetInjectedTopicsForTests();
     await writeSkillPreferences(cwd, {
@@ -159,6 +184,7 @@ describe("method injection", () => {
       userSkills,
     });
     expect(timedOut.text).toContain("USER AFTER TIMEOUT");
+    expect((await readSkillPreferences(cwd)).choices[preferenceKey("interactions", "my-moderation")]).toBeUndefined();
 
     await writeSkillPreferences(cwd, { schemaVersion: "psyclaw/skill-preferences/v1", choices: {} });
     let asked = 0;
@@ -181,6 +207,20 @@ describe("method injection", () => {
     expect((await readSkillPreferences(cwd)).choices[preferenceKey("interactions", "my-moderation")]).toBe("both");
   });
 
+  it("keeps a catalog-only topic pending so a later turn can inject its body", async () => {
+    const cwd = await tempRoot();
+    await recordInjection(cwd, [
+      { topic: "sem", skill: "method-sem", path: "/skills/method-sem", source: "catalog", chars: 0 },
+      { topic: "mediation", skill: "method-mediation", path: "/skills/method-mediation", source: "core", chars: 10 },
+    ]);
+    const branch = [{ type: "custom", customType: "psyclaw-skill-resolution", data: { injected: [
+      { topic: "sem", source: "catalog" }, { topic: "mediation", source: "core" },
+    ] } }];
+    const seen = injectedTopicsFor(cwd, branch);
+    expect(seen.has("mediation")).toBe(true);
+    expect(seen.has("sem")).toBe(false);
+  });
+
   it("returns undefined when select never settles", async () => {
     await expect(selectOrDefault(() => new Promise(() => undefined), 20)).resolves.toBeUndefined();
   });
@@ -188,7 +228,10 @@ describe("method injection", () => {
 
 describe("resident method rules", () => {
   it("keeps the standing rules short and in the plan and the analysis prompt", () => {
-    expect(RESIDENT_METHOD_RULES.length).toBeLessThan(900);
+    // About 300 tokens at most (doc: 技能兼容与方法规则开发要点 A1).
+    expect(RESIDENT_METHOD_RULES.length).toBeLessThan(1_200);
+    expect(RESIDENT_METHOD_RULES).toContain("maximal random-effects structure");
+    expect(RESIDENT_METHOD_RULES).toContain("covariates included");
     expect(defaultAnalysisPlan()).toContain(RESIDENT_METHOD_RULES);
     expect(defaultAnalysisPlan()).not.toContain("Repeated stimuli");
     expect(sessionModePrompt("analysis")).toContain(RESIDENT_METHOD_RULES);

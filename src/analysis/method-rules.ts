@@ -39,6 +39,12 @@ export const RESIDENT_METHOD_RULES = [
   "Run every implied test for every outcome.",
   "Change across waves: test overall change first, then add terms.",
   "One pooled model per outcome; mean-centre continuous predictors that enter a product.",
+  "Several treatment arms: each arm against the reference is primary; a pooled contrast is supplementary.",
+  "Cross a measured predictor with each condition contrast.",
+  "Clustered or repeated data: use the maximal random-effects structure the design justifies; simplify only when it fails to converge, and say what was dropped.",
+  "Stimuli repeated within participants: add a crossed random intercept for the stimulus as a robustness model.",
+  "State the sign of a difference score and check each interpretation against it.",
+  "Report every model term, covariates included.",
 ].join(" ");
 
 const TOPIC_PATTERNS: Record<MethodTopic, RegExp> = {
@@ -54,11 +60,19 @@ export function methodTopicsIn(text: string): MethodTopic[] {
   return METHOD_TOPICS.filter((topic) => TOPIC_PATTERNS[topic].test(text));
 }
 
+/** True when the message names a loaded skill as a whole word (not inside another word such as "semester"). */
 export function mentionsLoadedSkill(text: string, names: readonly string[]): boolean {
   const lower = text.toLocaleLowerCase();
+  const wordChar = /[a-z0-9_-]/;
   return names.some((name) => {
     const token = name.trim().toLocaleLowerCase();
-    return token.length >= 2 && lower.includes(token);
+    if (token.length < 2) return false;
+    for (let at = lower.indexOf(token); at !== -1; at = lower.indexOf(token, at + 1)) {
+      const before = at === 0 ? "" : lower[at - 1]!;
+      const after = lower[at + token.length] ?? "";
+      if (!wordChar.test(before) && !wordChar.test(after)) return true;
+    }
+    return false;
   });
 }
 

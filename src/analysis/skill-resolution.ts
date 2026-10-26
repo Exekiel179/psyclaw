@@ -5,7 +5,7 @@
  * child exits. Injection dedup is the session, not the file: a new process
  * injects again.
  */
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { basename, relative, resolve } from "node:path";
 import { atomicWriteFile } from "../project/jsonl.js";
 import { accessFor, loadDataAccess } from "../safety/data-access.js";
@@ -14,6 +14,7 @@ import { enabledLocalPromptPaths, enabledLocalSkillPaths, readSkillDocument } fr
 import {
   bundledCoreSkillsDir,
   loadCoreMethodSkills,
+  METHOD_TOPICS,
   methodTopicsIn,
   renderMethodBlocks,
   userSkillWinsNote,
@@ -79,7 +80,7 @@ export function injectedTopicsFor(cwd: string, branch: readonly unknown[] = []):
     const data = isRecord(entry.data) ? entry.data : undefined;
     const injected = Array.isArray(data?.injected) ? data.injected : [];
     for (const row of injected) {
-      if (isRecord(row) && typeof row.topic === "string") seen.add(row.topic);
+      if (isRecord(row) && typeof row.topic === "string" && row.source !== "catalog") seen.add(row.topic);
     }
   }
   return seen;
@@ -137,7 +138,7 @@ export async function refreshSkillResolution(cwd: string): Promise<{
   const skipped: SkillResolutionSkipped[] = local.skipped.filter((row) => !isInside(row.path, bundled));
   for (const warning of recommended.warnings) {
     if (!warning.includes("conflicts with a PsyClaw core Skill")) continue;
-    skipped.push({ name: warning, path: "", reason: "core-name", warning });
+    skipped.push({ name: /Skill '([^']+)'/.exec(warning)?.[1] ?? warning, path: "", reason: "core-name", warning });
   }
   const loaded: SkillResolutionLoaded[] = [
     ...coreSkillNames().map((name) => ({ name, source: "core" as const, path: resolve(bundled, name) })),
@@ -206,10 +207,13 @@ export async function resolveTopicChoice(
   const key = preferenceKey(conflict.topic, conflict.skillName);
   const saved = preferences.choices[key];
   if (saved !== undefined) return saved;
+  // Only an explicit pick is remembered. The default (headless run, or a card that timed out)
+  // applies to this turn and leaves the conflict open, so an interactive session still asks.
   let choice: SkillBodyChoice = "user";
+  let picked: string | undefined;
   if (hasUI && select) {
     const labels = [CHOICE_LABELS.user, CHOICE_LABELS.core, CHOICE_LABELS.both];
-    const picked = await selectOrDefault(
+    picked = await selectOrDefault(
       () => select(
         `方法主题 ${conflict.topic} 与用户 skill ${conflict.skillName} 冲突。本回合注入哪一份？`,
         labels,
@@ -219,8 +223,10 @@ export async function resolveTopicChoice(
     if (picked === CHOICE_LABELS.core) choice = "core";
     else if (picked === CHOICE_LABELS.both) choice = "both";
   }
-  preferences.choices[key] = choice;
-  await writeSkillPreferences(cwd, preferences);
+  if (picked !== undefined && Object.values(CHOICE_LABELS).includes(picked)) {
+    preferences.choices[key] = choice;
+    await writeSkillPreferences(cwd, preferences);
+  }
   return choice;
 }
 
@@ -233,7 +239,8 @@ export async function recordInjection(cwd: string, rows: readonly SkillResolutio
   };
   const resolution: SkillResolution = { ...current, injected: [...current.injected, ...rows] };
   await writeSkillResolution(cwd, resolution);
-  for (const row of rows) rememberInjectedTopic(cwd, row.topic);
+  // A catalog line is not the body; the topic stays pending so a later turn can inject it.
+  for (const row of rows) if (row.source !== "catalog") rememberInjectedTopic(cwd, row.topic);
   return resolution;
 }
 
@@ -262,6 +269,35 @@ export async function userSkillsOutsideScriptOnly(cwd: string): Promise<Array<{
     });
   }
   return skills;
+}
+
+const DOCUMENT_REF = /(?:^|[\s`'"(（])((?:[\w.-]+\/)*[\w.-]+\.(?:md|txt))(?=$|[\s`'"),.;:，。；：）])/gi;
+const DOCUMENT_CHAR_CAP = 200_000;
+
+/**
+ * Method topics in the task documents a message names (for example "Read BRIEF.md").
+ * A request often names the task file rather than the method, so detection on the
+ * message alone misses the topic. Files outside the project or script-only are skipped.
+ */
+export async function referencedDocumentTopics(cwd: string, text: string): Promise<{ documents: string[]; topics: MethodTopic[] }> {
+  const root = resolve(cwd);
+  const rules = await loadDataAccess(cwd);
+  const documents: string[] = [];
+  const found = new Set<MethodTopic>();
+  for (const match of text.matchAll(DOCUMENT_REF)) {
+    const ref = match[1];
+    if (!ref) continue;
+    const absolute = resolve(root, ref);
+    const rel = relative(root, absolute);
+    if (rel.startsWith("..") || rel.startsWith("/") || documents.includes(rel)) continue;
+    if (accessFor(rel, rules.entries) === "script-only") continue;
+    const info = await stat(absolute).catch(() => undefined);
+    if (!info?.isFile()) continue;
+    const content = (await readFile(absolute, "utf8").catch(() => "")).slice(0, DOCUMENT_CHAR_CAP);
+    documents.push(rel);
+    for (const topic of methodTopicsIn(content)) found.add(topic);
+  }
+  return { documents, topics: METHOD_TOPICS.filter((topic) => found.has(topic)) };
 }
 
 async function skillNamesOf(paths: readonly string[]): Promise<string[]> {

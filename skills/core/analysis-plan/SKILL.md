@@ -17,7 +17,7 @@ Use this skill only in **analysis** mode. Do not start academic/ARS writing from
    | --- | --- | --- | --- | --- | --- |
 
    - **Scope as worded**: `whole sample`, `restricted to <group>` (wording such as "among X" or "no specific prediction for Y"), `moderation`, or `exploratory, no direction`.
-   - **Implied tests** follow the standing rules in the plan template (pooled × group, three-way moderation, exploratory main effect and moderation, every outcome, overall change first, one centred pooled model). Detail for change scores, interactions, mediation, multilevel models, SEM, and reporting is injected from the matching method skill. Do not treat this process skill as that reference.
+   - **Implied tests** follow the standing method rules in the plan template. Detail for change scores, interactions, mediation, multilevel models, SEM, and reporting is injected from the matching method skill. Do not treat this process skill as that reference.
    - **Status**: `confirmatory` or `exploratory`; every implied test enters the multiplicity plan.
 
    Re-read the table before writing the report and state, for each implied test, the result or why it was not run. These tests are the first candidates for the "concrete new method" option on the cards below, and the table goes into the plan you submit for approval.
