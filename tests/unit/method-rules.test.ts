@@ -269,6 +269,15 @@ describe("resident method rules", () => {
     expect(prompt).toContain("a latent or measurement model and its estimator");
   });
 
+  it("times costly computations: an unattended run settles them, an interactive one asks", () => {
+    const unattended = unattendedAnalysisPrompt();
+    expect(unattended).toContain("time a bootstrap, permutation test, simulation or repeated refit at a small size first");
+    expect(unattended).toContain("without asking, and record the timing and the choice in decisions.md");
+    const interactive = sessionModePrompt("analysis");
+    expect(interactive).toContain("estimate the full run time");
+    expect(interactive).toContain("do not decide yourself: present a choice card with the estimate");
+  });
+
   it("ships a core skill body for each method topic", async () => {
     const skills = await loadCoreMethodSkills();
     const byTopic = new Map(skills.map((skill) => [skill.topic, skill.body]));
