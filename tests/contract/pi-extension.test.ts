@@ -568,6 +568,7 @@ describe("Pi extension contract", () => {
     }, ctx);
     expect(result.content[0].text).toContain("Command timed out after 600 seconds");
     expect(result.content[0].text).toContain("subsample");
+    expect(result.content[0].text).not.toContain("run in full");
   });
 
   it("loads a user skill headlessly and records a same-name skip", async () => {

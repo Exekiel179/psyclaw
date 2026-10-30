@@ -1,7 +1,7 @@
 import { DefaultPackageManager, getAgentDir, SettingsManager, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { isInstructionResult, isObservationEvidence, maskToolObservationsStable, observationSettledLimit } from "./observation-mask.js";
 import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js";
-import { applyShellTimeout, isShellTimeout, SHELL_TIMEOUT_HINT } from "../../analysis/shell-timeout.js";
+import { applyShellTimeout, isShellTimeout, SHELL_TIMEOUT_HINT, ShellClock } from "../../analysis/shell-timeout.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
 import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlock, setDataAccess, type DataAccessLevel } from "../../safety/data-access.js";
 import { Type } from "typebox";
@@ -1854,6 +1854,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     return { messages };
   });
   let dataAccessWarningShown = false;
+  const shellClock = new ShellClock();
   if (!legacyTestApi && typeof pi.on === "function") pi.on("tool_call", async (event, ctx) => {
     // Host-teardown hard block runs even without /init — project approvals do not cover this.
     const commandText = extractToolCommandText(event.toolName, event.input);
@@ -1866,6 +1867,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       }
     }
     applyShellTimeout(event.toolName, event.input);
+    shellClock.start(event.toolName, event.toolCallId, commandText);
     try {
       const access = await loadDataAccess(ctx.cwd);
       if (access.warning && !dataAccessWarningShown) {
@@ -1925,6 +1927,13 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
       const timedOut = content[timedOutIndex];
       if (timedOut?.type === "text") {
         content[timedOutIndex] = { ...timedOut, text: `${timedOut.text}\n${SHELL_TIMEOUT_HINT}` };
+        changed = true;
+      }
+      const timing = shellClock.finish(event.toolCallId);
+      const lastText = content.map((part) => part.type).lastIndexOf("text");
+      const last = content[lastText];
+      if (timing && last?.type === "text") {
+        content[lastText] = { ...last, text: `${last.text}\n${timing}` };
         changed = true;
       }
       if (!isObservationEvidence(event.toolName) && !isInstructionResult(event.toolName)) {
