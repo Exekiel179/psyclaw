@@ -9,6 +9,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { PSYCLAW_VERSION } from "../branding.js";
 import { estimateUsageCost } from "../core/pricing.js";
 
 export interface LlmUsage {
@@ -146,6 +147,7 @@ export function posthogAiGenerationProperties(
     $ai_stream: input.stream === true,
     $ai_privacy_mode: true,
     surface: (input.surface ?? "cli").slice(0, 32),
+    package_version: PSYCLAW_VERSION,
     $process_person_profile: false,
   };
   if (latencySeconds !== undefined) properties.$ai_latency = latencySeconds;
