@@ -277,6 +277,10 @@ describe("resident method rules", () => {
     const interactive = sessionModePrompt("analysis");
     expect(interactive).toContain("estimate the full run time");
     expect(interactive).toContain("do not decide yourself: present a choice card with the estimate");
+    expect(unattended).toContain("Keep each timing probe under a minute");
+    expect(unattended).toContain("rerun only the section that changed, not the whole script");
+    expect(interactive).toContain("Keep the timing probe itself under a minute");
+    expect(interactive).toContain("rerun only the changed section");
   });
 
   it("ships a core skill body for each method topic", async () => {
