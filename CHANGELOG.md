@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.31.2 - 2026-10-30
+
+- Ask an approver one decision per question; split a rejected bundle into single components, and ask about standard elements (scoring, missing data, latent model and estimator, fit criteria, decision rules) before settling them
+- Time a bootstrap, permutation test, simulation or repeated refit at a small size first; an unattended run picks an analytic equivalent or fewer draws when the full run would take more than a few minutes, an interactive run asks with the estimate
+- Read method topics from task documents the message names, with word-anchored cues for the design; default to the maximal random-effects structure the design justifies
+- New standing rule: when the primary measure has a confound the agent names and a variant removes it, make the variant primary or report both side by side
+
 ## 0.31.1 - 2026-10-26
 
 - Inject method-rule skills for change scores, interactions, mediation, multilevel models, SEM, and reporting when an analysis turn matches that topic, and keep six short standing rules in the plan and the analysis prompt
