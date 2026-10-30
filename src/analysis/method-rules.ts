@@ -44,6 +44,7 @@ export const RESIDENT_METHOD_RULES = [
   "Clustered or repeated data: use the maximal random-effects structure the design justifies; simplify only when it fails to converge, and say what was dropped.",
   "Stimuli repeated within participants: add a crossed random intercept for the stimulus as a robustness model.",
   "State the sign of a difference score and check each interpretation against it.",
+  "If you name a confound in your primary measure and a variant removes it, make the variant primary or report both side by side, and say why.",
   "Report every model term, covariates included.",
 ].join(" ");
 

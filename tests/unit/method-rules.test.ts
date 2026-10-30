@@ -247,6 +247,7 @@ describe("resident method rules", () => {
     expect(RESIDENT_METHOD_RULES.length).toBeLessThan(1_200);
     expect(RESIDENT_METHOD_RULES).toContain("maximal random-effects structure");
     expect(RESIDENT_METHOD_RULES).toContain("covariates included");
+    expect(RESIDENT_METHOD_RULES).toContain("make the variant primary or report both side by side");
     expect(defaultAnalysisPlan()).toContain(RESIDENT_METHOD_RULES);
     expect(defaultAnalysisPlan()).not.toContain("Repeated stimuli");
     expect(sessionModePrompt("analysis")).toContain(RESIDENT_METHOD_RULES);
