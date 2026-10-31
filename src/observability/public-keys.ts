@@ -13,3 +13,11 @@ export const PUBLIC_SENTRY_DSN_WEB =
   "https://ccdf2394345c2a184955d005d49d5451@o4512050300911616.ingest.us.sentry.io/4512051822395392";
 
 export const PUBLIC_POSTHOG_KEY = "phc_zmztC3DEHRT88FVxaFF7ihK7TmBqrzvbDQF7DARzr4P5";
+
+/**
+ * Public Langfuse relay URL. When set, clients send traces to this proxy
+ * instead of directly to Langfuse Cloud, avoiding the need to embed the
+ * LANGFUSE_SECRET_KEY in release binaries. The relay holds the secret and
+ * forwards ingestion payloads to Langfuse. Leave undefined to disable relay.
+ */
+export const PUBLIC_LANGFUSE_RELAY_URL: string | undefined = undefined;

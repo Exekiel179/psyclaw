@@ -3,8 +3,15 @@
  *
  * Sentry Performance already owns the global OpenTelemetry TracerProvider
  * (`@sentry/node` init). Langfuse is therefore a separate REST client: no
- * second NodeSDK / TracerProvider is registered. When LANGFUSE_PUBLIC_KEY or
- * LANGFUSE_SECRET_KEY is unset, every call is a no-op.
+ * second NodeSDK / TracerProvider is registered.
+ *
+ * Two modes:
+ * 1. Direct ingestion (local dev): Requires LANGFUSE_PUBLIC_KEY and
+ *    LANGFUSE_SECRET_KEY. Uses Basic auth directly to Langfuse host.
+ * 2. Relay ingestion (production): Requires LANGFUSE_RELAY_URL. Posts to
+ *    the relay without auth; the relay adds credentials and forwards to Langfuse.
+ *
+ * When neither mode is configured, every call is a no-op.
  */
 
 import { PSYCLAW_VERSION } from "../branding.js";
@@ -20,12 +27,26 @@ export interface LangfuseConfig {
   host: string;
 }
 
+export interface LangfuseRelayConfig {
+  relayUrl: string;
+}
+
+export type LangfuseClientConfig = LangfuseConfig | LangfuseRelayConfig;
+
+function isRelayConfig(config: LangfuseClientConfig): config is LangfuseRelayConfig {
+  return "relayUrl" in config;
+}
+
 function trimEnv(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
 }
 
-export function readLangfuseConfig(env: NodeJS.ProcessEnv = process.env): LangfuseConfig | undefined {
+export function readLangfuseConfig(env: NodeJS.ProcessEnv = process.env): LangfuseClientConfig | undefined {
+  const relayUrl = trimEnv(env.LANGFUSE_RELAY_URL);
+  if (relayUrl) {
+    return { relayUrl: relayUrl.replace(/\/+$/, "") };
+  }
   const publicKey = trimEnv(env.LANGFUSE_PUBLIC_KEY);
   const secretKey = trimEnv(env.LANGFUSE_SECRET_KEY);
   if (!publicKey || !secretKey) return undefined;
@@ -40,22 +61,37 @@ export interface LangfuseHandle {
 }
 
 export function createLangfuseHandle(
-  config: LangfuseConfig,
+  config: LangfuseClientConfig,
   options: { fetchImpl?: typeof fetch } = {},
 ): LangfuseHandle {
   const pending = new Set<Promise<void>>();
   const fetchImpl = options.fetchImpl ?? fetch;
-  const authorization = `Basic ${Buffer.from(`${config.publicKey}:${config.secretKey}`).toString("base64")}`;
+
+  let endpoint: string;
+  let headers: Record<string, string>;
+
+  if (isRelayConfig(config)) {
+    endpoint = `${config.relayUrl}/ingestion`;
+    headers = {
+      "content-type": "application/json",
+      "x-langfuse-sdk-name": "psyclaw",
+      "x-langfuse-sdk-version": PSYCLAW_VERSION,
+    };
+  } else {
+    const authorization = `Basic ${Buffer.from(`${config.publicKey}:${config.secretKey}`).toString("base64")}`;
+    endpoint = `${config.host}/api/public/ingestion`;
+    headers = {
+      "content-type": "application/json",
+      authorization,
+      "x-langfuse-sdk-name": "psyclaw",
+      "x-langfuse-sdk-version": PSYCLAW_VERSION,
+    };
+  }
 
   const enqueue = (batch: unknown): void => {
-    const job = fetchImpl(`${config.host}/api/public/ingestion`, {
+    const job = fetchImpl(endpoint, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization,
-        "x-langfuse-sdk-name": "psyclaw",
-        "x-langfuse-sdk-version": PSYCLAW_VERSION,
-      },
+      headers,
       body: JSON.stringify({
         batch,
         metadata: { batch_size: Array.isArray(batch) ? batch.length : 1, sdk_integration: "psyclaw" },
