@@ -63,6 +63,18 @@ describe("observability config", () => {
     expect(readNodeObservabilityConfig({ POSTHOG_HOST: "https://eu.posthog.com" }).posthogHost).toBe("https://eu.posthog.com");
   });
 
+  it("reads LANGFUSE_RELAY_URL from env, falling back to public default when unset", () => {
+    // Runtime override
+    expect(readNodeObservabilityConfig({ LANGFUSE_RELAY_URL: "https://runtime.example.com" }).langfuseRelayUrl)
+      .toBe("https://runtime.example.com");
+    // No runtime override, no public default (publicDefaults: false)
+    expect(readNodeObservabilityConfig({}, { publicDefaults: false }).langfuseRelayUrl).toBeUndefined();
+    // No runtime override, public default used (publicDefaults: true is default)
+    const withPublicDefaults = readNodeObservabilityConfig({});
+    // PUBLIC_LANGFUSE_RELAY_URL may be undefined (no build-time env) or a string (build-time injected)
+    expect(withPublicDefaults.langfuseRelayUrl === undefined || typeof withPublicDefaults.langfuseRelayUrl === "string").toBe(true);
+  });
+
   it("reads browser keys from public aliases and does not use the Node DSN", () => {
     const config = readBrowserObservabilityConfig({
       SENTRY_DSN: "https://node-dsn@o/1",

@@ -70,7 +70,7 @@
     ]
   },
   "scripts": {
-    "build": "node scripts/rebrand-pi.mjs && tsc -p tsconfig.json && node scripts/copy-panel.mjs",
+    "build": "node scripts/rebrand-pi.mjs && tsc -p tsconfig.json && node scripts/inject-build-env.mjs && node scripts/copy-panel.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:ars": "vitest run tests/unit/bundled-ars.test.ts tests/unit/bundled-nature-compose.test.ts tests/unit/ars-profile.test.ts tests/unit/ars-mode-editor.test.ts tests/unit/ars-panel-plan.test.ts tests/unit/ars-bridge.test.ts",

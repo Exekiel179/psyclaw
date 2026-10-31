@@ -153,14 +153,14 @@ Once the relay is deployed, configure PsyClaw release builds:
 
 ### Build Time (embed in binary)
 
-Set in CI/CD or release script:
+Set `LANGFUSE_RELAY_URL` environment variable at build time:
 
 ```bash
 export LANGFUSE_RELAY_URL=https://your-relay.example.com
 pnpm build
 ```
 
-This embeds the relay URL in `src/observability/public-keys.ts` → `PUBLIC_LANGFUSE_RELAY_URL`.
+The build script (`scripts/inject-build-env.mjs`) automatically rewrites the compiled `PUBLIC_LANGFUSE_RELAY_URL` constant in `dist/src/observability/public-keys.js` after TypeScript compilation.
 
 ### Runtime Override (optional, for testing)
 
