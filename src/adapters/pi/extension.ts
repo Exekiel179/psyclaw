@@ -3,6 +3,8 @@ import { isInstructionResult, isObservationEvidence, maskToolObservationsStable,
 import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js";
 import { applyShellTimeout, isShellTimeout, SHELL_TIMEOUT_HINT, ShellClock } from "../../analysis/shell-timeout.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
+import { PSYCLAW_VERSION } from "../../branding.js";
+import { takeWhatsNew } from "../../updates/whats-new.js";
 import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlock, setDataAccess, type DataAccessLevel } from "../../safety/data-access.js";
 import { Type } from "typebox";
 import { appendApproval, approvalInputDigest, assertResearchDecision, bootstrapProject, ensureProjectBinding, hasCanonicalWorkspace, resolveResearchDecision, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview } from "../../index.js";
@@ -1607,6 +1609,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           }
         }
       } catch { /* discovery must not block the session */ }
+    }
+    if (ctx.hasUI) {
+      try {
+        const notice = await takeWhatsNew(PSYCLAW_VERSION, join(getAgentDir(), "psyclaw-whats-new.json"));
+        if (notice) ctx.ui.notify(notice, "info");
+      } catch { /* the notice must not block the session */ }
     }
     if (isContinuouslyWorkEnabled() && ctx.hasUI) {
       ctx.ui.setStatus("cw", "continuously-work");

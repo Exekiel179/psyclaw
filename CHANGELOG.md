@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.31.3 - 2026-10-31
+
+- Time costly computations at a small size first, cap timing probes, rerun only the changed section of a slow script, and flag repeated full runs of a slow script in the shell tool result
+- Record each analytic decision point with what settles it (brief, data, convention, intent) and lock verdict rules before outcome models; an intent row goes to the approver, or runs its main alternative as a labelled sensitivity analysis when unattended
+- Keep a group the brief asks about separately in its own model instead of pooling it
+- Show what's new the first time an interactive session starts on a new version
+- Embed the production Langfuse relay URL at build time
+
 ## 0.31.2 - 2026-10-30
 
 - Ask an approver one decision per question; split a rejected bundle into single components, and ask about standard elements (scoring, missing data, latent model and estimator, fit criteria, decision rules) before settling them
