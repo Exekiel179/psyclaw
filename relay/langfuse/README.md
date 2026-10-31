@@ -33,7 +33,96 @@ Langfuse Cloud
 
 ## Deployment Options
 
-### Option 1: Node.js Server (Standalone)
+### Option 1: Cloudflare Workers (Recommended)
+
+**Best for production**: Edge deployment with automatic global scaling, zero maintenance, and built-in DDoS protection.
+
+#### Prerequisites
+
+- Cloudflare account (free tier works)
+- Wrangler CLI: `npm install -g wrangler`
+
+#### Deploy Steps
+
+1. **Authenticate with Cloudflare**:
+   ```bash
+   wrangler login
+   ```
+
+2. **Navigate to relay directory**:
+   ```bash
+   cd relay/langfuse
+   ```
+
+3. **Set secrets** (one-time):
+   ```bash
+   # Will prompt for each value
+   wrangler secret put LANGFUSE_PUBLIC_KEY
+   # Enter: pk_lf_...
+
+   wrangler secret put LANGFUSE_SECRET_KEY
+   # Enter: sk_lf_...
+
+   # Optional: Override Langfuse host (defaults to us.cloud.langfuse.com)
+   wrangler secret put LANGFUSE_HOST
+   # Enter: https://cloud.langfuse.com
+
+   # Optional: Restrict CORS (defaults to *)
+   wrangler secret put ALLOWED_ORIGINS
+   # Enter: https://app.example.com,https://staging.example.com
+   ```
+
+4. **Deploy**:
+   ```bash
+   wrangler deploy
+   ```
+
+   Output will show your Worker URL:
+   ```
+   Published psyclaw-langfuse-relay
+   https://psyclaw-langfuse-relay.your-subdomain.workers.dev
+   ```
+
+5. **Test the deployed Worker**:
+   ```bash
+   curl -X POST https://psyclaw-langfuse-relay.your-subdomain.workers.dev/ingestion \
+     -H "Content-Type: application/json" \
+     -d '{"batch":[],"metadata":{"batch_size":0}}'
+   ```
+
+6. **Use the Worker URL** as `LANGFUSE_RELAY_URL`:
+   ```bash
+   export LANGFUSE_RELAY_URL=https://psyclaw-langfuse-relay.your-subdomain.workers.dev
+   pnpm build
+   ```
+
+#### Update Secrets
+
+To rotate keys or change configuration:
+
+```bash
+cd relay/langfuse
+wrangler secret put LANGFUSE_SECRET_KEY
+wrangler deploy  # Redeploy to pick up changes
+```
+
+#### Custom Domain (Optional)
+
+Add to `wrangler.toml`:
+
+```toml
+routes = [
+  { pattern = "langfuse-relay.example.com/*", zone_name = "example.com" }
+]
+```
+
+Then deploy with custom domain:
+
+```bash
+wrangler deploy
+```
+
+### Option 2: Node.js Server (Standalone)
 
 Simplest deployment for internal servers or VPCs.
 
@@ -45,7 +134,7 @@ LANGFUSE_PUBLIC_KEY=pk_lf_xxx LANGFUSE_SECRET_KEY=sk_lf_xxx node relay/langfuse/
 pm2 start relay/langfuse/server.mjs --name langfuse-relay --env production
 ```
 
-### Option 2: Docker
+### Option 3: Docker
 
 ```dockerfile
 # Dockerfile
@@ -67,32 +156,6 @@ docker run -d \
   --name langfuse-relay \
   psyclaw-langfuse-relay
 ```
-
-### Option 3: Cloudflare Workers
-
-For edge deployment with automatic scaling:
-
-1. Install Wrangler CLI: `npm install -g wrangler`
-2. Create `wrangler.toml`:
-   ```toml
-   name = "psyclaw-langfuse-relay"
-   main = "relay/langfuse/worker.js"
-   compatibility_date = "2024-10-31"
-
-   [env.production]
-   vars = { LANGFUSE_HOST = "https://cloud.langfuse.com" }
-   ```
-3. Set secrets:
-   ```bash
-   wrangler secret put LANGFUSE_PUBLIC_KEY
-   wrangler secret put LANGFUSE_SECRET_KEY
-   ```
-4. Deploy:
-   ```bash
-   wrangler deploy
-   ```
-
-(Note: Convert `server.mjs` to Cloudflare Worker format if using this option)
 
 ### Option 4: AWS Lambda / Google Cloud Functions
 
