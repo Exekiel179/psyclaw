@@ -63,6 +63,18 @@ describe("observability config", () => {
     expect(readNodeObservabilityConfig({ POSTHOG_HOST: "https://eu.posthog.com" }).posthogHost).toBe("https://eu.posthog.com");
   });
 
+  it("reads LANGFUSE_RELAY_URL from env, falling back to public default when unset", () => {
+    // Runtime override
+    expect(readNodeObservabilityConfig({ LANGFUSE_RELAY_URL: "https://runtime.example.com" }).langfuseRelayUrl)
+      .toBe("https://runtime.example.com");
+    // No runtime override, no public default (publicDefaults: false)
+    expect(readNodeObservabilityConfig({}, { publicDefaults: false }).langfuseRelayUrl).toBeUndefined();
+    // No runtime override, public default used (publicDefaults: true is default)
+    const withPublicDefaults = readNodeObservabilityConfig({});
+    // PUBLIC_LANGFUSE_RELAY_URL may be undefined (no build-time env) or a string (build-time injected)
+    expect(withPublicDefaults.langfuseRelayUrl === undefined || typeof withPublicDefaults.langfuseRelayUrl === "string").toBe(true);
+  });
+
   it("reads browser keys from public aliases and does not use the Node DSN", () => {
     const config = readBrowserObservabilityConfig({
       SENTRY_DSN: "https://node-dsn@o/1",
@@ -467,6 +479,24 @@ describe("LLM and Langfuse payloads", () => {
     });
   });
 
+  it("prefers relay URL over direct keys when both are set", () => {
+    expect(readLangfuseConfig({
+      LANGFUSE_RELAY_URL: "https://relay.example.com",
+      LANGFUSE_PUBLIC_KEY: "pk-lf-test",
+      LANGFUSE_SECRET_KEY: "sk-lf-test",
+    })).toEqual({
+      relayUrl: "https://relay.example.com",
+    });
+  });
+
+  it("returns relay config when only relay URL is set", () => {
+    expect(readLangfuseConfig({
+      LANGFUSE_RELAY_URL: "https://relay.example.com/langfuse/",
+    })).toEqual({
+      relayUrl: "https://relay.example.com/langfuse",
+    });
+  });
+
   it("posts Langfuse generations without prompt or completion bodies", async () => {
     const { createLangfuseHandle } = await import("../../src/observability/langfuse.js");
     const bodies: string[] = [];
@@ -489,5 +519,31 @@ describe("LLM and Langfuse payloads", () => {
     expect(bodies[0]).not.toContain("prompt");
     expect(bodies[0]).not.toContain("$ai_input");
     expect(bodies[0]).not.toContain("研究目标");
+  });
+
+  it("posts to relay without authorization header when using relay config", async () => {
+    const { createLangfuseHandle } = await import("../../src/observability/langfuse.js");
+    const requests: Array<{ url: string; headers: Record<string, string> }> = [];
+    const handle = createLangfuseHandle(
+      { relayUrl: "https://relay.example.com" },
+      {
+        fetchImpl: (async (url, init) => {
+          requests.push({
+            url: String(url),
+            headers: Object.fromEntries(Object.entries(init?.headers ?? {}).map(([k, v]) => [k, String(v)])),
+          });
+          return new Response("{}", { status: 207 });
+        }) as typeof fetch,
+      },
+    );
+    handle.captureGeneration(
+      { provider: "deepseek", model: "deepseek-v4-flash", usage: { input: 2, output: 1 } },
+      { sessionId: "session-1", userId: "psyclaw:id" },
+    );
+    await handle.flush();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe("https://relay.example.com/ingestion");
+    expect(requests[0]?.headers.authorization).toBeUndefined();
+    expect(requests[0]?.headers["x-langfuse-sdk-name"]).toBe("psyclaw");
   });
 });

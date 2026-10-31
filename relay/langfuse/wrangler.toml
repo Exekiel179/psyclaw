@@ -1,0 +1,20 @@
+name = "psyclaw-langfuse-relay"
+main = "worker.js"
+compatibility_date = "2024-10-31"
+
+# Workers deployed to *.workers.dev by default
+# For custom domain: add routes = ["langfuse-relay.example.com/*"]
+
+# Secrets (set via `wrangler secret put <SECRET_NAME>`):
+# - LANGFUSE_PUBLIC_KEY (required)
+# - LANGFUSE_SECRET_KEY (required)
+# - LANGFUSE_HOST (optional, default: https://us.cloud.langfuse.com)
+# - ALLOWED_ORIGINS (optional, default: *)
+
+# Environment-specific configuration
+[env.production]
+# Override host if using self-hosted Langfuse
+# vars = { LANGFUSE_HOST = "https://langfuse.example.com" }
+
+[env.staging]
+# vars = { ALLOWED_ORIGINS = "https://staging.example.com" }

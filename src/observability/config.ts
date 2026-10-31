@@ -10,6 +10,7 @@
 
 import { PSYCLAW_VERSION } from "../branding.js";
 import {
+  PUBLIC_LANGFUSE_RELAY_URL,
   PUBLIC_POSTHOG_KEY,
   PUBLIC_SENTRY_DSN,
   PUBLIC_SENTRY_DSN_WEB,
@@ -58,6 +59,7 @@ export interface NodeObservabilityConfig {
   langfusePublicKey?: string;
   langfuseSecretKey?: string;
   langfuseHost: string;
+  langfuseRelayUrl?: string;
   distinctId?: string;
 }
 
@@ -112,6 +114,7 @@ export function readNodeObservabilityConfig(
   const langfuseSecretKey = trimEnv(env.LANGFUSE_SECRET_KEY);
   const langfuseHost = (trimEnv(env.LANGFUSE_HOST) ?? trimEnv(env.LANGFUSE_BASE_URL) ?? DEFAULT_LANGFUSE_HOST)
     .replace(/\/+$/, "");
+  const langfuseRelayUrl = trimEnv(env.LANGFUSE_RELAY_URL) ?? (usePublic ? PUBLIC_LANGFUSE_RELAY_URL : undefined);
   const distinctId = trimEnv(env.PSYCLAW_DISTINCT_ID);
   return {
     ...(sentryDsn === undefined ? {} : { sentryDsn }),
@@ -122,6 +125,7 @@ export function readNodeObservabilityConfig(
     ...(langfusePublicKey === undefined ? {} : { langfusePublicKey }),
     ...(langfuseSecretKey === undefined ? {} : { langfuseSecretKey }),
     langfuseHost,
+    ...(langfuseRelayUrl === undefined ? {} : { langfuseRelayUrl }),
     ...(distinctId === undefined ? {} : { distinctId }),
   };
 }

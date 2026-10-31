@@ -79,10 +79,20 @@ export async function bootNodeSdks(config: NodeObservabilityConfig): Promise<Obs
 
   const distinctId = config.distinctId?.trim() || `psyclaw:${randomUUID()}`;
   const llmSessionId = randomUUID();
-  const langfuseConfig = config.langfusePublicKey && config.langfuseSecretKey
-    ? { publicKey: config.langfusePublicKey, secretKey: config.langfuseSecretKey, host: config.langfuseHost }
-    : readLangfuseConfig();
-  const langfuse: LangfuseHandle | undefined = langfuseConfig ? createLangfuseHandle(langfuseConfig) : undefined;
+
+  let langfuse: LangfuseHandle | undefined;
+  if (config.langfuseRelayUrl) {
+    langfuse = createLangfuseHandle({ relayUrl: config.langfuseRelayUrl });
+  } else if (config.langfusePublicKey && config.langfuseSecretKey) {
+    langfuse = createLangfuseHandle({
+      publicKey: config.langfusePublicKey,
+      secretKey: config.langfuseSecretKey,
+      host: config.langfuseHost,
+    });
+  } else {
+    const fallbackConfig = readLangfuseConfig();
+    if (fallbackConfig) langfuse = createLangfuseHandle(fallbackConfig);
+  }
 
   const runtimeTags = (): Record<string, string> => ({
     package_version: PSYCLAW_VERSION,

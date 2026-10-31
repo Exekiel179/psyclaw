@@ -1,0 +1,32 @@
+[Unit]
+Description=PsyClaw Langfuse Relay Server
+After=network.target
+
+[Service]
+Type=simple
+User=psyclaw
+WorkingDirectory=/opt/psyclaw/relay/langfuse
+ExecStart=/usr/bin/node /opt/psyclaw/relay/langfuse/server.mjs
+Restart=on-failure
+RestartSec=10
+
+# Environment variables (or use EnvironmentFile=/etc/psyclaw/langfuse-relay.env)
+Environment="LANGFUSE_PUBLIC_KEY=pk_lf_..."
+Environment="LANGFUSE_SECRET_KEY=sk_lf_..."
+Environment="LANGFUSE_HOST=https://cloud.langfuse.com"
+Environment="PORT=3000"
+Environment="ALLOWED_ORIGINS=*"
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=psyclaw-langfuse-relay
+
+[Install]
+WantedBy=multi-user.target

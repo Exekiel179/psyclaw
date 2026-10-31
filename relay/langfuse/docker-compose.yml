@@ -1,0 +1,22 @@
+# Docker Compose for local testing
+
+services:
+  langfuse-relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:?Required}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:?Required}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      PORT: 3000
+      ALLOWED_ORIGINS: "*"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
