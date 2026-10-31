@@ -21,6 +21,11 @@ Use this skill only in **analysis** mode. Do not start academic/ARS writing from
    - **Status**: `confirmatory` or `exploratory`; every implied test enters the multiplicity plan.
 
    Re-read the table before writing the report and state, for each implied test, the result or why it was not run. These tests are the first candidates for the "concrete new method" option on the cards below, and the table goes into the plan you submit for approval.
+2b. **Decision points and verdict rules (required, before any outcome model)** — Fill in the two tables under "Decision points" and "Verdict rules" in `analysis/plans/plan.md`.
+   - One row per analytic fork: sample and exclusion rules, coding and scoring keys, unit of analysis, groups analysed separately or pooled, model family and estimator, random effects and covariates, missing data, alpha, multiplicity family and method, criteria for support.
+   - **Settled by**: `brief`, `data`, `convention` (almost any competent analyst would choose it), or `intent` (the brief and data leave it open and reasonable analysts differ). A standing method rule or an injected method skill is a default, not a settlement: when the brief does not settle a fork that such a rule covers, the row is `intent`.
+   - Intent rows go on the choice cards below. With no one to ask (unattended), make the option closest to the brief's wording primary, run the main alternative as a labelled sensitivity analysis, and report both when their conclusions differ.
+   - Verdict rules (alpha, multiplicity family and method, what counts as support) are locked before the first outcome model. A later change is a deviation: record it with its reason in the decision log.
 3. **Per-analysis choices (required)** — Do **not** dump one mega-plan and stop. For **each** analysis you propose, present a short decision card:
    - Question (what this analysis answers)
    - Options: **first option must be a concrete new method**; you may add alternatives; put「已经足够，先执行已选」**last**, never as the default recommendation

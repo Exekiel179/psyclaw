@@ -33,12 +33,13 @@ export const METHOD_SKILL_NAMES: Record<MethodTopic, string> = {
 export const METHOD_INJECT_CHAR_BUDGET = 16_000;
 
 export const RESIDENT_METHOD_RULES = [
-  "Subgroup claims: test the focal term × group in one pooled model and report each group's slope.",
+  "Fill in the plan's decision points and verdict rules before outcome models; log deviations.",
+  "Group differences: focal × group in one pooled model; a group asked about alone also gets its own estimate.",
   "Moderation with a grouping factor: include the three-way term.",
   "Exploratory variables: test the main effect and moderation of each focal exposure.",
   "Run every implied test for every outcome.",
   "Change across waves: test overall change first, then add terms.",
-  "One pooled model per outcome; mean-centre continuous predictors that enter a product.",
+  "Mean-centre continuous predictors in a product.",
   "Several treatment arms: each arm against the reference is primary; a pooled contrast is supplementary.",
   "Cross a measured predictor with each condition contrast.",
   "Clustered or repeated data: use the maximal random-effects structure the design justifies; simplify only when it fails to converge, and say what was dropped.",

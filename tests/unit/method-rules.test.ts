@@ -254,6 +254,21 @@ describe("resident method rules", () => {
     expect(sessionModePrompt("chat")).not.toContain("Standing method rules");
   });
 
+  it("routes forks through the plan's decision points instead of a pooled-model default", () => {
+    expect(RESIDENT_METHOD_RULES).toContain("Fill in the plan's decision points and verdict rules before outcome models");
+    expect(RESIDENT_METHOD_RULES).toContain("a group asked about alone also gets its own estimate");
+    expect(RESIDENT_METHOD_RULES).not.toContain("One pooled model per outcome");
+    const plan = defaultAnalysisPlan();
+    expect(plan).toContain("## Decision points");
+    expect(plan).toContain("| ID | Decision | Options | Settled by | Primary | Alternative (sensitivity) |");
+    expect(plan).toContain("A framework default does not settle an intent row.");
+    expect(plan).toContain("## Verdict rules");
+    const unattended = unattendedAnalysisPrompt();
+    expect(unattended).toContain("run the main alternative as a labelled sensitivity analysis");
+    expect(unattended).toContain("Lock the verdict rules");
+    expect(sessionModePrompt("analysis")).toContain("Put each decision point settled by intent on a choice card");
+  });
+
   it("lets an unattended run read listed skills", () => {
     const prompt = unattendedAnalysisPrompt();
     expect(prompt).not.toContain(".psyclaw/");
@@ -288,6 +303,7 @@ describe("resident method rules", () => {
     const byTopic = new Map(skills.map((skill) => [skill.topic, skill.body]));
     expect(byTopic.get("change-scores")).toContain("Lord");
     expect(byTopic.get("interactions")).toContain("Johnson-Neyman");
+    expect(byTopic.get("interactions")).toContain("each group's own estimate (from a model within that group) is the primary answer");
     expect(byTopic.get("mediation")).toContain("bootstrap");
     expect(byTopic.get("multilevel")).toContain("random intercept");
     expect(byTopic.get("sem")).toContain("identified");

@@ -11,6 +11,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { sha256File } from "../core/hash.js";
 import { requirePython } from "../platform/python.js";
+import { decisionPointsNotice } from "./decision-points.js";
 import { recallToolOutput } from "./output-log.js";
 
 const execFileAsync = promisify(execFile);
@@ -359,7 +360,8 @@ export async function runAnalysisEntrypoint(
   const header = result.exitCode === 0
     ? `Ran ${entrypoint}`
     : `Ran ${entrypoint} (exit ${result.exitCode})`;
-  return [header, "Values below are script output, not numbers computed by PsyClaw.", `Log: ${RUN_LOG}`, tail || "(no output)"].join("\n");
+  const notice = await decisionPointsNotice(root);
+  return [header, "Values below are script output, not numbers computed by PsyClaw.", `Log: ${RUN_LOG}`, tail || "(no output)", ...(notice ? ["", notice] : [])].join("\n");
 }
 
 function resultScore(relativePath: string): number {

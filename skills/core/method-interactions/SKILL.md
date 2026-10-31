@@ -11,7 +11,8 @@ license: MIT
 Use this when the claim is that an effect differs by group, condition, or another measured variable.
 
 - Mean-centre continuous predictors before forming a product. The interaction coefficient does not depend on centering; the lower-order terms do. Say which variables were centred.
-- Fit one pooled model per outcome with every lower-order term that the product implies. Read each group's slope from that model. A separate regression per subgroup is a supplement, not the test of a difference.
+- To test whether groups differ, fit one pooled model per outcome with every lower-order term that the product implies, and read each group's slope from that model. A separate regression per subgroup is a supplement, not the test of a difference.
+- When the brief asks a question separately for each group, each group's own estimate (from a model within that group) is the primary answer for that group, and follow-up analyses of that question are run within each group as well; the pooled interaction answers whether the groups differ. If the brief does not say whether groups are analysed separately or pooled, that is a decision point settled by intent.
 - An effect that is significant in one group and not in another is not evidence that the groups differ (Gelman & Stern, 2006; Nieuwenhuis, Forstmann, & Wagenmakers, 2011). The interaction term is that test.
 - A moderator together with a grouping factor needs the three-way term, so the moderation can differ by group.
 - An exploratory variable gets its main effect and a product with each focal exposure or condition, each with one sentence of theoretical reason. It moderates the exposure, not only group membership.
