@@ -33,7 +33,8 @@ async function injectPublicKeys() {
 
   // Replace PUBLIC_LANGFUSE_RELAY_URL if set at build time
   if (langfuseRelayUrl !== undefined) {
-    const pattern = /export const PUBLIC_LANGFUSE_RELAY_URL = undefined;/;
+    // Match both undefined and existing URL patterns
+    const pattern = /export const PUBLIC_LANGFUSE_RELAY_URL = (?:undefined|"[^"]*");/;
     if (pattern.test(content)) {
       const replacement = `export const PUBLIC_LANGFUSE_RELAY_URL = "${langfuseRelayUrl.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}";`;
       content = content.replace(pattern, replacement);

@@ -18,6 +18,9 @@ export const PUBLIC_POSTHOG_KEY = "phc_zmztC3DEHRT88FVxaFF7ihK7TmBqrzvbDQF7DARzr
  * Public Langfuse relay URL. When set, clients send traces to this proxy
  * instead of directly to Langfuse Cloud, avoiding the need to embed the
  * LANGFUSE_SECRET_KEY in release binaries. The relay holds the secret and
- * forwards ingestion payloads to Langfuse. Leave undefined to disable relay.
+ * forwards ingestion payloads to Langfuse.
+ *
+ * This value can be overridden at build time by setting the LANGFUSE_RELAY_URL
+ * environment variable, or at runtime (for local testing).
  */
-export const PUBLIC_LANGFUSE_RELAY_URL: string | undefined = undefined;
+export const PUBLIC_LANGFUSE_RELAY_URL: string | undefined = "https://psyclaw-langfuse-relay.psyclaw.workers.dev";
