@@ -547,3 +547,37 @@ describe("LLM and Langfuse payloads", () => {
     expect(requests[0]?.headers["x-langfuse-sdk-name"]).toBe("psyclaw");
   });
 });
+
+describe("Client install tracking", () => {
+  it("parses client install info from settings", async () => {
+    const { parseClientInstallInfo } = await import("../../src/observability/preference.js");
+    
+    const empty = parseClientInstallInfo({});
+    expect(empty).toEqual({});
+    
+    const withVersion = parseClientInstallInfo({
+      client: { lastVersion: "0.31.0", firstInstalledAt: "2026-11-01T00:00:00.000Z" },
+    });
+    expect(withVersion).toEqual({
+      lastVersion: "0.31.0",
+      firstInstalledAt: "2026-11-01T00:00:00.000Z",
+    });
+    
+    const partial = parseClientInstallInfo({ client: { lastVersion: "0.31.0" } });
+    expect(partial).toEqual({ lastVersion: "0.31.0" });
+  });
+
+  it("writes client install info to settings", async () => {
+    const { writeClientInstallInfo, readClientInstallInfo } = await import("../../src/observability/preference.js");
+    const settingsPath = join(tmpdir(), `psyclaw-test-settings-${Math.random().toString(36).slice(2)}.json`);
+    
+    await writeClientInstallInfo(
+      { lastVersion: "0.31.3", firstInstalledAt: "2026-11-01T04:00:00.000Z" },
+      { settingsPath },
+    );
+    
+    const read = await readClientInstallInfo({ settingsPath });
+    expect(read.lastVersion).toBe("0.31.3");
+    expect(read.firstInstalledAt).toBe("2026-11-01T04:00:00.000Z");
+  });
+});
