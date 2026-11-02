@@ -2800,16 +2800,21 @@ function capabilityActionButtons(item, busy) {
 }
 
 async function toggleCapability(kind, id, enabled) {
-  await json("/api/recommendation-state", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      kind: kind === "core" ? "core-skill" : kind === "skill" ? "skills" : kind === "local" ? "local-skill" : kind,
-      id,
-      enabled
-    })
-  });
-  await loadEcosystem();
+  try {
+    await json("/api/recommendation-state", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: kind === "core" ? "core-skill" : kind === "skill" ? "skills" : kind === "local" ? "local-skill" : kind,
+        id,
+        enabled
+      })
+    });
+    await loadEcosystem();
+  } catch (error) {
+    console.error("toggleCapability failed:", error);
+    alert(`操作失败：${error.message || "panel request failed"}`);
+  }
 }
 
 async function installCapability(kind, id) {
