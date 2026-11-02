@@ -2,15 +2,19 @@
 
 Lightweight proxy server that forwards Langfuse ingestion payloads from production PsyClaw clients to Langfuse Cloud with authentication. This allows release binaries to embed only `LANGFUSE_RELAY_URL` (public) instead of `LANGFUSE_SECRET_KEY` (sensitive).
 
+**Important**: Updated for Langfuse OTEL v4 migration. The relay now converts legacy batch format to OTEL spans and forwards to `/api/public/otel/v1/traces`, maintaining backward compatibility with old clients.
+
 ## Architecture
 
 ```
 PsyClaw Client (release build)
-  ↓ POST /ingestion (no auth, LANGFUSE_RELAY_URL)
-Relay Server
-  ↓ POST /api/public/ingestion (Basic auth with LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY)
+  ↓ POST /ingestion (legacy batch format, no auth, LANGFUSE_RELAY_URL)
+Relay Server (converts to OTEL format)
+  ↓ POST /api/public/otel/v1/traces (OTEL spans, Basic auth, x-langfuse-ingestion-version: 4)
 Langfuse Cloud
 ```
+
+**Note**: The legacy `/api/public/ingestion` endpoint is deprecated and will stop accepting events after November 16, 2026.
 
 ## Setup
 
@@ -36,6 +40,8 @@ Langfuse Cloud
 ### Option 1: Cloudflare Workers (Recommended)
 
 **Best for production**: Edge deployment with automatic global scaling, zero maintenance, and built-in DDoS protection.
+
+**After merging PR #XX, the Worker must be redeployed** for the OTEL v4 migration to take effect.
 
 #### Prerequisites
 
@@ -174,7 +180,7 @@ Serverless deployment with API Gateway:
 curl http://localhost:3000/
 ```
 
-### Send Test Payload
+### Send Test Payload (Legacy Format)
 
 ```bash
 curl -X POST http://localhost:3000/ingestion \
@@ -186,6 +192,8 @@ curl -X POST http://localhost:3000/ingestion \
     "metadata": { "batch_size": 0, "sdk_integration": "psyclaw" }
   }'
 ```
+
+The relay will automatically convert the legacy format to OTEL spans.
 
 ### Verify Logs
 
@@ -200,15 +208,16 @@ docker logs langfuse-relay
 ## Production Checklist
 
 - [ ] Deploy relay to internal/private network (not publicly exposed)
+- [ ] **Redeploy Worker after merging this PR** to enable OTEL v4 migration
 - [ ] Set `ALLOWED_ORIGINS` to restrict CORS if needed
 - [ ] Store `LANGFUSE_SECRET_KEY` in secrets manager (AWS Secrets Manager, GCP Secret Manager, etc.)
 - [ ] Set up monitoring / alerting for relay health
+- [ ] Verify traces appear in Langfuse Cloud project (v4 ingestion)
 - [ ] Configure PsyClaw release builds with `LANGFUSE_RELAY_URL`:
   ```bash
   # Example: GitHub Actions secret / CI environment variable
   export LANGFUSE_RELAY_URL=https://langfuse-relay.internal.example.com
   ```
-- [ ] Verify traces appear in Langfuse Cloud project
 
 ## Client Configuration
 
@@ -239,6 +248,17 @@ LANGFUSE_RELAY_URL=http://localhost:3000 psyclaw chat
 - Relay forwards all payloads to Langfuse; no user PII is captured (PsyClaw telemetry uses privacy mode)
 - `LANGFUSE_SECRET_KEY` must never be committed to git or included in release artifacts
 - Consider rate limiting in production (e.g., via reverse proxy or API Gateway)
+
+## OTEL v4 Migration
+
+This relay has been updated to support Langfuse OTEL v4:
+
+- **Backward compatible**: Old clients can still send legacy batch format
+- **Automatic conversion**: Relay converts `trace-create` and `generation-create` events to OTEL spans
+- **New endpoint**: Forwards to `/api/public/otel/v1/traces` with `x-langfuse-ingestion-version: 4`
+- **Client updates**: New PsyClaw builds send OTEL format directly in direct mode (with keys set)
+
+See [Langfuse OTEL v4 Migration Guide](https://langfuse.com/integrations/native/opentelemetry/migration-to-v4) for details.
 
 ## Troubleshooting
 

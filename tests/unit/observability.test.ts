@@ -497,15 +497,19 @@ describe("LLM and Langfuse payloads", () => {
     });
   });
 
-  it("posts Langfuse generations without prompt or completion bodies", async () => {
+  it("posts Langfuse generations as OTEL spans in direct mode without prompt or completion bodies", async () => {
     const { createLangfuseHandle } = await import("../../src/observability/langfuse.js");
     const bodies: string[] = [];
+    const urls: string[] = [];
+    const headers: Array<Record<string, string>> = [];
     const handle = createLangfuseHandle(
       { publicKey: "pk-lf-test", secretKey: "sk-lf-test", host: "https://cloud.langfuse.com" },
       {
-        fetchImpl: (async (_url, init) => {
+        fetchImpl: (async (url, init) => {
+          urls.push(String(url));
           bodies.push(String(init?.body ?? ""));
-          return new Response("{}", { status: 207 });
+          headers.push(Object.fromEntries(Object.entries(init?.headers ?? {}).map(([k, v]) => [k, String(v)])));
+          return new Response("{}", { status: 200 });
         }) as typeof fetch,
       },
     );
@@ -515,15 +519,26 @@ describe("LLM and Langfuse payloads", () => {
     );
     await handle.flush();
     expect(bodies).toHaveLength(1);
-    expect(bodies[0]).toContain("generation-create");
+    // Direct mode should use OTEL endpoint
+    expect(urls[0]).toBe("https://cloud.langfuse.com/api/public/otel/v1/traces");
+    // Should include v4 header
+    expect(headers[0]?.["x-langfuse-ingestion-version"]).toBe("4");
+    // Should be OTLP format (resourceSpans instead of batch)
+    expect(bodies[0]).toContain("resourceSpans");
+    expect(bodies[0]).toContain("scopeSpans");
+    expect(bodies[0]).toContain("gen_ai.request.model");
+    expect(bodies[0]).toContain("deepseek-v4-flash");
+    // Should not contain legacy format
+    expect(bodies[0]).not.toContain("generation-create");
+    // Should not contain sensitive data
     expect(bodies[0]).not.toContain("prompt");
     expect(bodies[0]).not.toContain("$ai_input");
     expect(bodies[0]).not.toContain("研究目标");
   });
 
-  it("posts to relay without authorization header when using relay config", async () => {
+  it("posts legacy format to relay without authorization header when using relay config", async () => {
     const { createLangfuseHandle } = await import("../../src/observability/langfuse.js");
-    const requests: Array<{ url: string; headers: Record<string, string> }> = [];
+    const requests: Array<{ url: string; headers: Record<string, string>; body: string }> = [];
     const handle = createLangfuseHandle(
       { relayUrl: "https://relay.example.com" },
       {
@@ -531,6 +546,7 @@ describe("LLM and Langfuse payloads", () => {
           requests.push({
             url: String(url),
             headers: Object.fromEntries(Object.entries(init?.headers ?? {}).map(([k, v]) => [k, String(v)])),
+            body: String(init?.body ?? ""),
           });
           return new Response("{}", { status: 207 });
         }) as typeof fetch,
@@ -545,5 +561,10 @@ describe("LLM and Langfuse payloads", () => {
     expect(requests[0]?.url).toBe("https://relay.example.com/ingestion");
     expect(requests[0]?.headers.authorization).toBeUndefined();
     expect(requests[0]?.headers["x-langfuse-sdk-name"]).toBe("psyclaw");
+    // Relay mode should still use legacy batch format for backward compatibility
+    expect(requests[0]?.body).toContain("generation-create");
+    expect(requests[0]?.body).toContain("batch");
+    // Should NOT be OTLP format
+    expect(requests[0]?.body).not.toContain("resourceSpans");
   });
 });
