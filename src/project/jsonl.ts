@@ -1,4 +1,5 @@
-import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, rm, writeFile, access } from "node:fs/promises";
+import { constants } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -67,12 +68,16 @@ export async function atomicWriteFile(path: string, contents: string): Promise<v
       // only the exact destination, then complete the same-directory move.
       const code = (error as NodeJS.ErrnoException).code;
       if (code !== "EEXIST" && code !== "EPERM" && code !== "EACCES") throw error;
-      await rename(path, backup);
-      backedUp = true;
+      // Check if the destination file exists before trying to back it up.
+      const fileExists = await access(path, constants.F_OK).then(() => true, () => false);
+      if (fileExists) {
+        await rename(path, backup);
+        backedUp = true;
+      }
       try {
         await rename(temporary, path);
       } catch (replaceError) {
-        await rename(backup, path).catch(() => undefined);
+        if (backedUp) await rename(backup, path).catch(() => undefined);
         throw replaceError;
       }
     }
