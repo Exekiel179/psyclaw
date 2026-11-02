@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.31.4 - 2026-11-02
+
+- Fixed known errors around atomic file writes, panel request handling, and Sentry noise for benign shutdown / Anthropic 403 cases
+
 ## 0.31.3 - 2026-10-31
 
 - Time costly computations at a small size first, cap timing probes, rerun only the changed section of a slow script, and flag repeated full runs of a slow script in the shell tool result

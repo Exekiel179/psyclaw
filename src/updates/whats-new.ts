@@ -8,6 +8,9 @@ import { dirname } from "node:path";
 
 /** User-facing notes per version, newest first. Versions without an entry stay quiet. */
 export const WHATS_NEW: Record<string, readonly string[]> = {
+  "0.31.4": [
+    "修复了一些已知错误（文件写入、面板请求失败与部分遥测噪声）",
+  ],
   "0.31.3": [
     "修复任务超时问题：耗时计算先小规模计时，慢脚本只重跑改动部分，并提示重复的完整重跑",
     "优化学术决策细节：方案中逐项记录分析决策点及其依据，结果判定规则在跑结局模型前锁定；需要研究者意图的选择会先问你，无人审批时把替代方案作为敏感性分析一并报告",
