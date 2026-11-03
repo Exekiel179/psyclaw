@@ -8,6 +8,9 @@ import { dirname } from "node:path";
 
 /** User-facing notes per version, newest first. Versions without an entry stay quiet. */
 export const WHATS_NEW: Record<string, readonly string[]> = {
+  "0.31.5": [
+    "/init 参数用法错误时只提示用法，不再当成失败上报",
+  ],
   "0.31.4": [
     "修复了一些已知错误（文件写入、面板请求失败与部分遥测噪声）",
   ],

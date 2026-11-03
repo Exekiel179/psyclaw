@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.31.5 - 2026-11-03
+
+- /init usage mistakes show a friendly TUI hint instead of throwing into Sentry/agent_error
+
 ## 0.31.4 - 2026-11-02
 
 - Fixed known errors around atomic file writes, panel request handling, and Sentry noise for benign shutdown / Anthropic 403 cases
