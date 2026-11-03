@@ -9,7 +9,7 @@ import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlo
 import { Type } from "typebox";
 import { appendApproval, approvalInputDigest, assertResearchDecision, bootstrapProject, ensureProjectBinding, hasCanonicalWorkspace, resolveResearchDecision, runInstitutionalFulltext, runLiteratureReview, runExpertReview, runAnalysisDelegation, runWritingReview, runMetaAnalysis, createStageRunner, exportAcademicDocument, recordCitationUse, runParallelLiteratureResearch, runParallelPeerReview } from "../../index.js";
 import type { ResearchDecisionImpact } from "../../research/decision.js";
-import type { ResearchParadigm } from "../../core/contracts.js";
+import { parseInitArgs } from "./init-args.js";
 import { runPlanWithPi } from "../../orchestration/pi-executor.js";
 import { formatEffects, hasElevatedEffects, normalizeEffects, toolsForEffects } from "../../orchestration/effects.js";
 import { agentManagerRows } from "../../agents/recommended-personas.js";
@@ -197,13 +197,6 @@ async function emitPiTurnGeneration(
     spanName: "pi-turn",
   });
   return true;
-}
-
-/** Codex-style slash surface: bare command, or command + trailing free text. No subcommand trees. */
-function parseInitArgs(args: string): { goal?: string; paradigm?: ResearchParadigm } {
-  const goal = args.trim();
-  if (!goal) return {};
-  return { paradigm: "survey-observational", goal };
 }
 
 async function notifyError(ctx: ExtensionCommandContext, error: unknown, extra: Record<string, string> = {}): Promise<void> {
@@ -1975,9 +1968,17 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     handler: async (args, ctx) => {
       try {
         const parsed = parseInitArgs(args);
+        if (!parsed.ok) {
+          ctx.ui.notify(parsed.message, "error");
+          return;
+        }
         const already = await hasCanonicalWorkspace(ctx.cwd);
         const hadProject = Boolean(await readActiveProject(ctx.cwd).catch(() => null));
-        const project = await bootstrapProject({ root: ctx.cwd, ...parsed });
+        const project = await bootstrapProject({
+          root: ctx.cwd,
+          ...(parsed.goal === undefined ? {} : { goal: parsed.goal }),
+          ...(parsed.paradigm === undefined ? {} : { paradigm: parsed.paradigm }),
+        });
         if (already || hadProject) {
           ctx.ui.notify(
             [
