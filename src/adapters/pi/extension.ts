@@ -2448,6 +2448,66 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
         }
         if (!/^[A-Za-z0-9._:-]+$/.test(requested)) throw new Error("请使用 /provider 打开选择，或 /provider <provider-id>");
 
+        if (requested === "psyclaw") {
+          // PsyClaw 官方网关：引导用户登录并输入 token
+          const hasToken = await providerCredentialSource({ id: "psyclaw", apiKeyEnv: "PSYCLAW_GATEWAY_TOKEN" });
+          if (hasToken === "missing") {
+            const loginUrl = "https://console.psyclaw.ai/login";
+            ctx.ui.notify(
+              `PsyClaw 官方网关需要登录。请访问 ${loginUrl} 登录（微信扫码或手机号），复制 API Token 后粘贴到下方。`,
+              "info",
+            );
+            if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
+              ctx.ui.notify("请在交互式终端运行 /provider psyclaw 以输入 token", "error");
+              return;
+            }
+            const result = await ctx.ui.custom<SecretInputResult>((tui, theme, keybindings, done) =>
+              new SecretInputComponent("PsyClaw Gateway Token", "PSYCLAW_GATEWAY_TOKEN", tui, theme, keybindings, done));
+            if (result.type !== "submit" || !result.value) return;
+            await saveProviderConfig({
+              id: "psyclaw",
+              name: "PsyClaw 官方",
+              baseUrl: "https://api.psyclaw.ai/v1",
+              api: "openai-completions",
+              apiKeyEnv: "PSYCLAW_GATEWAY_TOKEN",
+              models: [
+                { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+                { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", reasoning: true },
+                { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+              ],
+              apiKey: result.value,
+            });
+          }
+          // 尝试查询余额并显示
+          try {
+            const { createGatewayClient } = await import("../../gateway/client.js");
+            const gatewayClient = createGatewayClient();
+            const tokenSource = await providerCredentialSource({ id: "psyclaw", apiKeyEnv: "PSYCLAW_GATEWAY_TOKEN" });
+            if (tokenSource !== "missing") {
+              const token = process.env.PSYCLAW_GATEWAY_TOKEN ?? "";
+              if (token) {
+                const balance = await gatewayClient.getBalance(token);
+                const subInfo = balance.subscription
+                  ? `\n订阅：${balance.subscription.planId}（额度 ${balance.subscription.quota?.used ?? 0}/${balance.subscription.quota?.total ?? 0} tokens，${balance.subscription.expireAt.slice(0, 10)} 到期）`
+                  : "";
+                ctx.ui.notify(`✓ 已连接 PsyClaw 官方网关\n当前余额：${balance.balanceCny}${subInfo}\n\n充值或订阅：https://console.psyclaw.ai/topup`, "info");
+              }
+            }
+          } catch (balanceError) {
+            // 余额查询失败不阻塞切换流程
+            ctx.ui.notify(`余额查询失败：${balanceError instanceof Error ? balanceError.message : "未知错误"}`, "warning");
+          }
+          const models = await pi.getAvailableModels();
+          const selected = models.find((model: { provider: string; id: string }) =>
+            model.provider === "psyclaw" && model.id === "deepseek-v4-flash");
+          if (!selected) throw new Error("PsyClaw 官方模型未出现在目录中，请检查配置");
+          const changed = await pi.setModel(selected);
+          if (!changed) throw new Error("未找到 psyclaw 的可用凭据");
+          await saveDefaultModel("psyclaw", selected.id);
+          ctx.ui.notify(`已切换并设为默认模型：psyclaw/${selected.id}`, "info");
+          return;
+        }
+
         if (requested === "custom") {
           const custom = await configureCustomProvider(ctx);
           if (!custom) return;
