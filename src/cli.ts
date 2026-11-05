@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
+import { arch, platform } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -32,9 +33,13 @@ import {
   ExpectedUserError,
   initNodeObservability,
   maybeShowTelemetryNotice,
+  readClientInstallInfo,
   readTelemetryEnvOverride,
   readTelemetryPreference,
   shutdownObservability,
+  trackClientInstall,
+  trackClientUpdate,
+  writeClientInstallInfo,
   writeTelemetryPreference,
 } from "./observability/index.js";
 import { useWindowsPackageManagerShell } from "./platform/windows-spawn.js";
@@ -240,6 +245,50 @@ async function dispatchTelemetry(args: string[]): Promise<void> {
   throw new Error("Usage: psyclaw telemetry [status|on|off]");
 }
 
+/**
+ * Track client install and update lifecycle events.
+ * Fires once per install/upgrade to avoid inflating counts on every process start.
+ */
+async function trackClientLifecycle(): Promise<void> {
+  try {
+    const currentVersion = PSYCLAW_VERSION;
+    const installInfo = await readClientInstallInfo();
+    const now = new Date();
+    const isFirstInstall = !installInfo.lastVersion;
+    const isUpdate = installInfo.lastVersion && installInfo.lastVersion !== currentVersion;
+
+    if (isFirstInstall) {
+      await trackClientInstall({
+        version: currentVersion,
+        platform: platform(),
+        arch: arch(),
+        node_version: process.version,
+        install_channel: "npm",
+      });
+      await writeClientInstallInfo({
+        lastVersion: currentVersion,
+        firstInstalledAt: now.toISOString(),
+      });
+    } else if (isUpdate) {
+      const firstInstalledAt = installInfo.firstInstalledAt;
+      await trackClientUpdate({
+        from_version: installInfo.lastVersion,
+        to_version: currentVersion,
+        platform: platform(),
+        arch: arch(),
+        node_version: process.version,
+        install_channel: "npm",
+      });
+      await writeClientInstallInfo({
+        lastVersion: currentVersion,
+        ...(firstInstalledAt === undefined ? {} : { firstInstalledAt }),
+      });
+    }
+  } catch {
+    // Telemetry must not block the CLI
+  }
+}
+
 async function main(): Promise<void> {
   const peeledLaunch = peelContinuouslyWorkFlag(process.argv.slice(2));
   const args = peeledLaunch.args;
@@ -256,6 +305,8 @@ async function main(): Promise<void> {
     await maybeShowTelemetryNotice();
     // Do not block first-run wizard / chat behind Sentry/PostHog SDK import.
     void initNodeObservability();
+    // Track client installs and updates asynchronously after observability init.
+    void trackClientLifecycle();
   }
   try {
     await dispatch(args, { continuouslyWork });
