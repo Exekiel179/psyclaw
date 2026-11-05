@@ -1,5 +1,16 @@
 # Cloudflare Workers Deployment Guide
 
+## Important: OTEL v4 Migration
+
+**The legacy `/api/public/ingestion` endpoint is deprecated and will stop accepting events after November 16, 2026.**
+
+This Worker has been updated to:
+- Convert legacy batch payloads from old clients to OTEL format
+- Forward to Langfuse's new `/api/public/otel/v1/traces` endpoint with `x-langfuse-ingestion-version: 4`
+- Maintain backward compatibility with existing PsyClaw releases
+
+**After merging this PR, the Worker must be redeployed** using `wrangler deploy` for the migration to take effect.
+
 ## Quick Start
 
 ### 1. Install Wrangler CLI
@@ -108,7 +119,7 @@ wrangler deploy
 - [ ] Worker deployed and tested
 - [ ] Secrets rotated from initial test values
 - [ ] `LANGFUSE_RELAY_URL` set in PsyClaw CI/release env
-- [ ] Traces verified in Langfuse Cloud dashboard
+- [ ] Traces verified in Langfuse Cloud dashboard (v4 ingestion)
 - [ ] Monitoring/alerting configured (optional, via Cloudflare dashboard)
 - [ ] Custom domain configured (optional)
 
@@ -119,7 +130,29 @@ wrangler deploy
 | `Worker not configured` error | Run `wrangler secret put LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` |
 | 502 Bad Gateway | Check `LANGFUSE_HOST` is correct; verify network connectivity to Langfuse |
 | 401 Unauthorized | Verify secrets are correct: `wrangler secret put LANGFUSE_PUBLIC_KEY` |
-| No traces in Langfuse | Check Worker logs: `wrangler tail` |
+| No traces in Langfuse | Check Worker logs: `wrangler tail`; verify v4 endpoint is being used |
+
+## Migration Details
+
+### What Changed
+
+1. **Endpoint**: `/api/public/ingestion` → `/api/public/otel/v1/traces`
+2. **Format**: Legacy batch format → OTLP/HTTP JSON format
+3. **Header**: Added `x-langfuse-ingestion-version: 4`
+4. **Backward Compatibility**: Old clients sending legacy format are automatically converted
+
+### Format Conversion
+
+The Worker converts legacy events:
+- `trace-create` → OTEL trace context
+- `generation-create` → OTEL span with `langfuse.observation.type: generation`
+- Preserves: session IDs, user IDs, metadata, usage, cost
+
+### Client Migration
+
+- **Relay mode** (production): Old clients still send legacy format; relay converts it
+- **Direct mode** (local dev): Updated to send OTEL format directly to v4 endpoint
+- **No client changes required** for existing releases using the relay
 
 ## Advantages
 
@@ -138,3 +171,9 @@ Cloudflare Workers pricing (as of 2024):
 - **Paid**: $5/month for 10M requests, then $0.50 per additional 1M
 
 For typical PsyClaw usage (hundreds of LLM calls per day), the free tier is sufficient.
+
+## References
+
+- [Langfuse OTEL v4 Migration Guide](https://langfuse.com/integrations/native/opentelemetry/migration-to-v4)
+- [Deprecated API Migration](https://langfuse.com/faq/all/deprecated-api-migration)
+- [OTLP/HTTP Endpoint Configuration](https://langfuse.com/docs/integrations/opentelemetry/get-started#endpoint-configuration)
