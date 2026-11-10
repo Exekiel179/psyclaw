@@ -167,14 +167,45 @@ describe("Pi extension contract", () => {
     } as any;
     extension(api);
     const notifications: string[] = [];
-    await initHandler?.("A bounded goal", {
+    await initHandler?.("--paradigm qualitative-thematic A bounded goal", {
       cwd: root,
       ui: { notify: (message: string) => notifications.push(message) },
     });
     const project = JSON.parse(await readFile(join(root, ".psyclaw", "project.json"), "utf8"));
-    expect(project.paradigm).toBe("survey-observational");
+    expect(project.paradigm).toBe("qualitative-thematic");
     expect(project.goal).toBe("A bounded goal");
     expect(notifications[0]).toContain("工作仓库已初始化");
+  });
+
+  it("shows /init usage for a missing goal after --paradigm without reporting agent_error", async () => {
+    const root = await mkdtemp(join(tmpdir(), "psyclaw-extension-invalid-"));
+    const errors: unknown[] = [];
+    setObservabilityHandleForTests({
+      captureEvent() {},
+      captureError(error) { errors.push(error); },
+      async flush() {},
+    });
+    let initHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
+    const api = {
+      registerCommand(name: string, options: { handler: (args: string, ctx: any) => Promise<void> }) {
+        if (name === "init") initHandler = options.handler;
+      },
+    } as any;
+    extension(api);
+    const notifications: Array<{ message: string; level?: string }> = [];
+    try {
+      await initHandler?.("--paradigm survey-observational", {
+        cwd: root,
+        ui: { notify: (message: string, level?: string) => notifications.push({ message, level }) },
+      });
+      expect(notifications[0]?.message).toContain("Usage:");
+      expect(notifications[0]?.message).toContain("/init");
+      expect(notifications[0]?.level).toBe("error");
+      expect(errors).toEqual([]);
+      await expect(readFile(join(root, ".psyclaw", "project.json"), "utf8")).rejects.toThrow();
+    } finally {
+      await shutdownObservability();
+    }
   });
 
   it("allows bare init without a goal string", async () => {

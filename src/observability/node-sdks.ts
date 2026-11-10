@@ -60,6 +60,19 @@ export async function bootNodeSdks(config: NodeObservabilityConfig): Promise<Obs
         if (isExpectedUserErrorMessage(event.message ?? "") || (typeof exceptionText === "string" && isExpectedUserErrorMessage(exceptionText))) {
           return null;
         }
+        // Filter out known shutdown noise: setRawMode EIO during InteractiveMode cleanup
+        if (exceptionText?.includes("setRawMode EIO") || event.message?.includes("setRawMode EIO")) {
+          return null;
+        }
+        // Filter out Anthropic API permission denials (user/account issue, not product bug)
+        if ((exceptionText?.includes('403') && exceptionText?.includes('forbidden')) || 
+            (event.message?.includes('403') && event.message?.includes('forbidden'))) {
+          const isAnthropicError = exceptionText?.includes('anthropic') || 
+                                   event.message?.includes('anthropic') ||
+                                   values?.some(v => v.stacktrace?.frames?.some(f => 
+                                     f.filename?.includes('@anthropic-ai/sdk')));
+          if (isAnthropicError) return null;
+        }
         if (event.user) {
           event.user = event.user.id === undefined ? {} : { id: event.user.id };
         }

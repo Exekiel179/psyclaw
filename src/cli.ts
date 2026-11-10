@@ -470,6 +470,37 @@ async function dispatch(args: string[], opts: { continuouslyWork: boolean }): Pr
   throw new ExpectedUserError(`Unknown command: ${command}\n\n${usage()}`);
 }
 
+// Global error handlers to catch unhandled rejections and exceptions
+process.on("unhandledRejection", (reason: unknown) => {
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  // Filter known benign shutdown noise
+  const message = error.message || "";
+  if (message.includes("setRawMode EIO")) {
+    // Known Pi agent shutdown race condition - ignore
+    return;
+  }
+  if (message.includes("403") && message.includes("forbidden") && message.includes("anthropic")) {
+    // Anthropic API permission denial - user/account issue, not a product bug
+    console.error(`${c.red("✗ API Error:")} Anthropic API request denied (403 Forbidden). Please check your API key and account permissions.`);
+    return;
+  }
+  // Report unexpected unhandled rejections
+  void captureAgentError(error, { phase: "unhandled_rejection" });
+  console.error(`${c.red("✗ Unhandled rejection:")} ${message}`);
+});
+
+process.on("uncaughtException", (error: Error) => {
+  const message = error.message || "";
+  // Filter known benign shutdown noise
+  if (message.includes("setRawMode EIO")) {
+    return;
+  }
+  // Report unexpected uncaught exceptions
+  void captureAgentError(error, { phase: "uncaught_exception" });
+  console.error(`${c.red("✗ Uncaught exception:")} ${message}`);
+  process.exitCode = 1;
+});
+
 main().catch((error: unknown) => {
   process.stderr.write(`${c.red("✗ Error:")} ${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;

@@ -10,6 +10,14 @@
 - Layer the questions (core, then one technical-settings card, then choices that depend on a parent) and reject stage-4 questions, unlabeled constants, and @intent choices that no hypothesis test uses
 - Accept `equivalent` as a decision-point source when the options agree only in this data set, and remind analysis plans that alpha, tails, multiplicity, and support rules are declarations
 
+## 0.31.5 - 2026-11-03
+
+- /init usage mistakes show a friendly TUI hint instead of throwing into Sentry/agent_error
+
+## 0.31.4 - 2026-11-02
+
+- Fixed known errors around atomic file writes, panel request handling, and Sentry noise for benign shutdown / Anthropic 403 cases
+
 ## 0.31.3 - 2026-10-31
 
 - Time costly computations at a small size first, cap timing probes, rerun only the changed section of a slow script, and flag repeated full runs of a slow script in the shell tool result
