@@ -7,7 +7,7 @@ describe("session help", () => {
     const doc = sessionHelpDocument();
     expect(doc.steps.some((step) => /AI.*\/crosscheck|\/crosscheck/.test(step))).toBe(true);
     expect(doc.steps.some((step) => /强制人审|人审/.test(step))).toBe(true);
-    expect(doc.commands.find((row) => row.cmd === "/crosscheck")?.blurb).toMatch(/AI|人审/);
+    expect(doc.commands.find((row) => row.cmd === "/crosscheck [焦点]")?.blurb).toMatch(/AI|核对/);
     expect(doc.notes.some((note) => /人审/.test(note))).toBe(true);
     expect(formatSessionHelp()).toMatch(/人审|核实/);
   });

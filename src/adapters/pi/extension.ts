@@ -4,6 +4,7 @@ import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js
 import { applyShellTimeout, isShellTimeout, SHELL_TIMEOUT_HINT, ShellClock } from "../../analysis/shell-timeout.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
 import { priorToolBlock } from "../../analysis/prior/gate.js";
+import { readPriorMemory } from "../../analysis/prior/memory.js";
 import { priorApproved, priorPlanExists, priorRecallExists, recordPriorApproval } from "../../analysis/prior/submit.js";
 import { registerPriorTools } from "../../analysis/prior/tools.js";
 import { PSYCLAW_VERSION } from "../../branding.js";
@@ -139,6 +140,7 @@ import {
   formatChatModeMismatchNotice,
   nextSessionMode,
   parseSessionMode,
+  analysisFollowsPriorPrompt,
   sessionModePrompt,
   unattendedAnalysisPrompt,
   unattendedPriorPrompt,
@@ -1582,14 +1584,19 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     const prompt = userRulesPrompt(await loadUserRules(ctx?.cwd ?? process.cwd()));
     if (prompt) return { systemPrompt: `${event.systemPrompt}\n\n${prompt}` };
   });
-  if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", (event, ctx) => {
+  if (!legacyTestApi && typeof pi.on === "function") pi.on("before_agent_start", async (event, ctx) => {
     const restored = restoreSessionMode(ctx?.sessionManager);
     sessionMode = restored;
-    const modeBlock = restored === "analysis" && ctx && !ctx.hasUI
-      ? `${sessionModePrompt(restored)}\n\n${unattendedAnalysisPrompt()}`
-      : restored === "prior" && ctx && !ctx.hasUI
-        ? `${sessionModePrompt(restored)}\n\n${unattendedPriorPrompt()}`
-        : sessionModePrompt(restored);
+    const priorMemory = restored === "chat" || restored === "analysis"
+      ? await readPriorMemory(ctx?.cwd ?? process.cwd())
+      : "";
+    let modeBlock = sessionModePrompt(restored);
+    if (restored === "analysis" && ctx && !ctx.hasUI) modeBlock = `${modeBlock}\n\n${unattendedAnalysisPrompt()}`;
+    if (restored === "prior" && ctx && !ctx.hasUI) modeBlock = `${modeBlock}\n\n${unattendedPriorPrompt()}`;
+    if (priorMemory && restored === "chat") {
+      modeBlock = `## PsyClaw mode: chat\nPlain assistant on the Pi harness. Follow the prior plan memory below for later analysis. Do not ask for a mode switch.\n\n${priorMemory}`;
+    }
+    if (priorMemory && restored === "analysis") modeBlock = `${modeBlock}\n\n${analysisFollowsPriorPrompt(priorMemory)}`;
     if (restored === "academic" || isArsPiTurn(event.systemPrompt) || isArsPiActive(ctx?.sessionManager)) {
       return {
         systemPrompt: `${event.systemPrompt}\n\n${modeBlock}\n\n${psyclawArsPatch({
@@ -1708,12 +1715,21 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     if (mode === "prior" && isPlanRitualConfirm(trimmed)) {
       const result = await recordPriorApproval(ctx.cwd);
       if (result.handoff) applySessionMode("chat");
-      ctx.ui.notify(result.handoff ? "脚本已按确认结果改好并执行。当前是普通对话，可以使用 skill。" : result.message, result.ok ? "info" : "warning");
+      ctx.ui.notify(
+        !result.handoff
+          ? result.message
+          : result.runFailed
+            ? "脚本已按确认结果改好，但执行失败。报错末尾在对话里，完整日志没有放进来。"
+            : "脚本已按确认结果改好并执行。当前是普通对话，可以使用 skill。",
+        result.ok && !result.runFailed ? "info" : "warning",
+      );
       return {
         action: "transform",
-        text: result.handoff
-          ? `User approved the prior plan ("${PLAN_RITUAL_PHRASE}"). The script was updated from the confirmed choices and has already been run. ${result.message} The session is now plain chat. Skills may be used. Do not ask to switch modes and do not run the script again unless the researcher asks.`
-          : `User typed the approval phrase, but the prior plan is not ready. ${result.message} Do not execute.`,
+        text: !result.handoff
+          ? `User typed the approval phrase, but the prior plan is not ready. ${result.message} Do not execute.`
+          : result.runFailed
+            ? result.message
+            : `User approved the prior plan ("${PLAN_RITUAL_PHRASE}"). The script was updated from the confirmed choices and has already been run. ${result.message} The session is now plain chat. Skills may be used. Do not ask to switch modes and do not run the script again unless the researcher asks.`,
       };
     }
 

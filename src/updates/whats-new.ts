@@ -8,10 +8,14 @@ import { dirname } from "node:path";
 
 /** User-facing notes per version, newest first. Versions without an entry stay quiet. */
 export const WHATS_NEW: Record<string, readonly string[]> = {
+  "0.33.0": [
+    "提供新的交互模式 prior。按 Shift+Tab 可切到先回忆；批准后的分析以已定稿方案为准",
+  ],
   "0.32.0": [
     "新增 prior 模式：先按假设回忆，再解锁数据；分析方案由脚本开头的带标签常量生成",
     "按 Shift+Tab 可切到 prior。核心问题逐张问，技术设置一次确认；α、单双尾、多重比较和支持规则直接声明，不拿来问",
     "prior 里不调用 skill。批准后按你的选择改脚本并直接运行，然后回到普通对话，这时可以使用 skill",
+    "批准后的对话只记已定稿方案。后续分析按这份方案走，不再重开回忆和选项卡",
   ],
   "0.31.3": [
     "修复任务超时问题：耗时计算先小规模计时，慢脚本只重跑改动部分，并提示重复的完整重跑",

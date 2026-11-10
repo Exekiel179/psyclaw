@@ -49,6 +49,7 @@ export function renderCliBanner(): string {
   return [
     "",
     `  ${c.teal(c.bold("ψ PsyClaw"))} ${c.badge(`v${PSYCLAW_VERSION}`, "teal")} ${c.gray("· 社会科学科研智能体工作台")}`,
+    `  ${c.gray("提供新的交互模式 prior · Shift+Tab")}`,
     `  ${c.darkGray("Evidence-Grounded Social Science Research Agent")}`,
     `  ${line}`,
   ].join("\n");

@@ -123,6 +123,15 @@ export function unattendedPriorPrompt(): string {
   ].join("\n");
 }
 
+/** Analysis already has a settled prior plan. These lines take precedence over filling or re-approving that plan. */
+export function analysisFollowsPriorPrompt(memory: string): string {
+  return [
+    "## Settled prior plan",
+    "This plan is already approved. Do not refill analysis/plans/plan.md and do not ask for 「我已审阅并批准本方案」 again. Continue from the script and the rows below.",
+    memory,
+  ].join("\n\n");
+}
+
 /** Mode-specific guidance appended while that sticky mode is active. */
 export function sessionModePrompt(mode: PsyClawSessionMode): string {
   if (mode === "chat") {

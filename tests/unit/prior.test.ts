@@ -7,8 +7,8 @@ import { checkPlanScript, checkRecall, recalledApproachIds } from "../../src/ana
 import { isBriefPath, isDataPath, priorToolBlock, type PriorGateState } from "../../src/analysis/prior/gate.js";
 import { parseConstants } from "../../src/analysis/prior/constants.js";
 import { layerCards, renderPriorPlan } from "../../src/analysis/prior/render.js";
-import { recordPriorApproval, submitPriorRecall, submitPriorScript } from "../../src/analysis/prior/submit.js";
-import { nextSessionMode, parseSessionMode, sessionModePrompt, unattendedPriorPrompt } from "../../src/session/modes.js";
+import { briefFailedRun, recordPriorApproval, submitPriorRecall, submitPriorScript } from "../../src/analysis/prior/submit.js";
+import { analysisFollowsPriorPrompt, nextSessionMode, parseSessionMode, sessionModePrompt, unattendedPriorPrompt } from "../../src/session/modes.js";
 
 const RECALL = [
   "## H1",
@@ -37,6 +37,8 @@ describe("prior mode", () => {
     expect(nextSessionMode("prior")).toBe("chat");
     expect(parseSessionMode("prior")).toBe("prior");
     expect(sessionModePrompt("prior")).toContain("psyclaw_submit_recall");
+    expect(analysisFollowsPriorPrompt("PRIMARY_MODEL = robust_hc3")).toContain("Do not refill");
+    expect(analysisFollowsPriorPrompt("PRIMARY_MODEL = robust_hc3")).toContain("robust_hc3");
     expect(sessionModePrompt("prior").toLowerCase()).toContain("do not call any skill");
     expect(sessionModePrompt("prior")).toContain("plain chat");
     expect(unattendedPriorPrompt()).toContain("plain chat");
@@ -147,8 +149,27 @@ describe("prior mode", () => {
     });
     expect(approval.ok).toBe(true);
     expect(approval.handoff).toBe(true);
+    expect(approval.runFailed).toBe(false);
     expect(approval.message).toContain("PRIMARY_MODEL = robust_hc3");
     expect(approval.message).toContain("prior-ran");
+    const filler = "HEADER_SHOULD_DROP\n" + "pad line\n".repeat(40);
+    const failed = await recordPriorApproval(root, undefined, async () => ({
+      stdout: `${filler}ValueError: bad column\n`,
+      stderr: "",
+      exitCode: 1,
+    }));
+    expect(failed.runFailed).toBe(true);
+    expect(failed.handoff).toBe(true);
+    expect(failed.message).toContain("ValueError: bad column");
+    expect(failed.message).toContain("psyclaw-run.log");
+    expect(failed.message).not.toContain("HEADER_SHOULD_DROP");
+    const memory = await readFile(join(root, ".psyclaw/prior/memory.md"), "utf8");
+    expect(memory).toContain("## Decision points");
+    expect(memory).toContain("robust_hc3");
+    expect(memory).toContain("(exit 1)");
+    expect(memory).not.toContain("Core questions");
+    expect(memory).not.toContain("HEADER_SHOULD_DROP");
+    expect(briefFailedRun("python missing").failed).toBe(true);
     expect(ran.some((args) => args.includes("analysis/scripts/analysis.py"))).toBe(true);
     const script = await readFile(join(root, "analysis/scripts/analysis.py"), "utf8");
     expect(script).toContain('PRIMARY_MODEL = "robust_hc3"');

@@ -141,7 +141,7 @@ export function renderPriorPlan(source: string, coreN = DEFAULT_CORE_N): Rendere
   const lines = [
     "# Analysis plan",
     "",
-    "Rendered from labeled constants. Prior mode does not run outcome models.",
+    "Rendered from labeled constants. Later analysis follows these rows.",
     "",
     ...hypothesisRows(constants),
     "",

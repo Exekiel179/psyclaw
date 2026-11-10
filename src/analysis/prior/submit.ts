@@ -9,6 +9,7 @@ import { assertSafeProjectPath } from "../../project/paths.js";
 import { PLAN_RITUAL_PHRASE } from "../plan.js";
 import { runAnalysisEntrypoint, type CommandRunner } from "../runtime-tools.js";
 import { rewriteScriptFromChoices } from "./apply.js";
+import { buildPriorMemory, PRIOR_MEMORY_REL, runFact } from "./memory.js";
 import { checkPlanScript, checkRecall } from "./checks.js";
 import { DEFAULT_CORE_N, formatCardInstructions, renderPriorPlan } from "./render.js";
 import { reflectHints } from "./reflect.js";
@@ -148,16 +149,34 @@ export async function priorApproved(root: string): Promise<boolean> {
   }
 }
 
+const FAILED_TAIL_LINES = 8;
+const FAILED_TAIL_CHARS = 500;
+
+/** A failed run is pasted into the user message, so later turns keep paying for it. Keep the exit line, the log path, and the error tail. */
+export function briefFailedRun(output: string): { failed: boolean; text: string } {
+  const lines = output.split("\n");
+  const header = lines[0] ?? "";
+  const failed = /\(exit (?!0\b)\d+\)/.test(header) || !header.startsWith("Ran ");
+  if (!failed) return { failed: false, text: output };
+  const log = lines.find((line) => line.startsWith("Log: "));
+  let tail = lines.slice(-FAILED_TAIL_LINES).join("\n");
+  if (tail.length > FAILED_TAIL_CHARS) tail = tail.slice(tail.length - FAILED_TAIL_CHARS);
+  return {
+    failed: true,
+    text: [header, log, tail, "完整日志留在磁盘。不要读取日志，不要把报错复述进回复。"].filter((line): line is string => Boolean(line)).join("\n"),
+  };
+}
+
 export async function recordPriorApproval(
   root: string,
   at = new Date().toISOString(),
   run?: CommandRunner,
-): Promise<{ ok: boolean; handoff: boolean; message: string }> {
+): Promise<{ ok: boolean; handoff: boolean; runFailed: boolean; message: string }> {
   let state: { script?: unknown };
   try {
     state = JSON.parse(await readFile(await assertSafeProjectPath(root, PRIOR_STATE_REL), "utf8")) as { script?: unknown };
   } catch {
-    return { ok: false, handoff: false, message: "还没有通过检查的 prior 方案。先提交带标签的脚本。" };
+    return { ok: false, handoff: false, runFailed: false, message: "还没有通过检查的 prior 方案。先提交带标签的脚本。" };
   }
   const scriptRelative = typeof state.script === "string" ? state.script : "";
   let changes: string[] = [];
@@ -166,7 +185,7 @@ export async function recordPriorApproval(
       const source = await readFile(join(root, scriptRelative), "utf8");
       changes = (await rewriteScriptFromChoices(root, scriptRelative, source)).changes;
     } catch {
-      return { ok: false, handoff: false, message: "方案脚本读不到，没有改代码，也没有开始执行。" };
+      return { ok: false, handoff: false, runFailed: false, message: "方案脚本读不到，没有改代码，也没有开始执行。" };
     }
   }
   let output = "";
@@ -185,10 +204,19 @@ export async function recordPriorApproval(
     at,
     changes,
   }, null, 2)}\n`);
+  try {
+    const planMarkdown = await readFile(join(root, PRIOR_PLAN_REL), "utf8");
+    await atomicWriteFile(await assertSafeProjectPath(root, PRIOR_MEMORY_REL), buildPriorMemory(planMarkdown, {
+      script: scriptRelative,
+      run: runFact(output),
+    }));
+  } catch {
+    // The run still stands if the memory file cannot be written.
+  }
   const edited = changes.length > 0 ? `已按确认结果改写：${changes.join("；")}。` : "确认结果与脚本当前取值一致，常量未改。";
-  return {
-    ok: true,
-    handoff: true,
-    message: `${edited}脚本已执行。会话回到普通对话，此后可以使用 skill。\n${output}`,
-  };
+  const brief = briefFailedRun(output);
+  const lead = brief.failed
+    ? `${edited}脚本已执行但未成功。后续分析以已定稿方案为准。会话回到普通对话。`
+    : `${edited}脚本已执行。后续分析以已定稿方案为准。会话回到普通对话，此后可以使用 skill。`;
+  return { ok: true, handoff: true, runFailed: brief.failed, message: `${lead}\n${brief.text}` };
 }
