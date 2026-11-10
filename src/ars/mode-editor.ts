@@ -25,7 +25,7 @@ export function enterArsModeEditorText(existing = ""): string {
 type KeybindingsLike = ConstructorParameters<typeof CustomEditor>[2];
 
 /**
- * Sticky session mode editor: Shift+Tab cycles chat → analysis → academic.
+ * Sticky session mode editor: Shift+Tab cycles chat → analysis → academic → prior.
  */
 export class ArsModeEditor extends CustomEditor {
   private readonly restingBorder: (str: string) => string;

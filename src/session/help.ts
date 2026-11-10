@@ -16,7 +16,7 @@ export type SessionHelpDocument = {
 export function sessionHelpDocument(): SessionHelpDocument {
   return {
     title: "使用速览",
-    subtitle: "三种模式 · AI 核查 · 强制人审",
+    subtitle: "四种模式 · AI 核查 · 强制人审",
     modes: [
       {
         id: "chat",
@@ -36,11 +36,17 @@ export function sessionHelpDocument(): SessionHelpDocument {
         hint: "academic",
         blurb: "文献、写作与评审；定稿前须 AI /crosscheck 且人审通过。",
       },
+      {
+        id: "prior",
+        label: "先回忆",
+        hint: "prior",
+        blurb: "先按假设回忆，再解锁数据；带标签常量生成方案，不在此跑结局模型。",
+      },
     ],
     thinking: "思考深度：Ctrl+Shift+T（多数终端比 Ctrl+Shift+Tab 更可靠）",
     steps: [
       "可选：/init 或 /init <研究目标> 搭建工作区。",
-      "Shift+Tab 在 对话 → 分析 → 学术 间切换。",
+      "Shift+Tab 在 对话 → 分析 → 学术 → 先回忆（prior）间切换。出方案用 prior，跑数用分析。",
       "分析模式：/plan 后逐项确认每个子分析；整体批准须完整输入「我已审阅并批准本方案」。",
       "大段 `/crosscheck` / `/verify` 须人先同意再开；收尾人审仍由 Panel「核实」/唤醒选项。",
       "人审通过后 /handoff 写入交接；切到学术模式继续文献、初稿或 /review。",
@@ -103,7 +109,7 @@ export function formatSessionHelp(): string {
     `# ${doc.title}`,
     doc.subtitle,
     "",
-    "## 三种模式（Shift+Tab）",
+    "## 四种模式（Shift+Tab）",
     ...doc.modes.map((mode) => `- **${mode.label}** (\`${mode.hint}\`)：${mode.blurb}`),
     "",
     doc.thinking,

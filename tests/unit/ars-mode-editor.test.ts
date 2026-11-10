@@ -10,16 +10,17 @@ import { ARS_MODE_STATUS, enterArsModeEditorText, isArsModeEditorText } from "..
 import { defaultVerifyChecklist, formatVerifyChecklist } from "../../src/verify/checklist.js";
 
 describe("session modes", () => {
-  it("cycles chat → analysis → academic → chat", () => {
+  it("cycles chat → analysis → academic → prior → chat", () => {
     expect(nextSessionMode("chat")).toBe("analysis");
     expect(nextSessionMode("analysis")).toBe("academic");
-    expect(nextSessionMode("academic")).toBe("chat");
+    expect(nextSessionMode("academic")).toBe("prior");
+    expect(nextSessionMode("prior")).toBe("chat");
     expect(MODE_STATUS.academic).toBe("academic");
     expect(ARS_MODE_STATUS).toBe("academic");
   });
 
   it("exposes mode prompts for soft pipeline", () => {
-    expect(sessionModePrompt("analysis")).toContain("Priority: get runnable analysis results");
+    expect(sessionModePrompt("analysis")).toContain("Pipeline: clarify");
     expect(sessionModePrompt("academic")).toContain("psyclaw_ars_multi_agent");
     expect(sessionModePrompt("chat")).toContain("MUST remind");
   });

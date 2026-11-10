@@ -43,8 +43,13 @@ describe("decision points", () => {
     const bad = checkDecisionPoints(FILLED
       .replace("| convention |", "| framework rule |")
       .replace("| pooled model with group term |", "| |"));
-    expect(bad).toContain('Decision DP2: "Settled by" must be one of brief, data, convention, intent.');
+    expect(bad).toContain('Decision DP2: "Settled by" must be one of brief, data, convention, equivalent, intent.');
     expect(bad.some((finding) => finding.startsWith("Decision DP1 depends on researcher intent: run the main alternative"))).toBe(true);
+    const stage4 = checkDecisionPoints(FILLED.replace(
+      "| DP1 | Groups | separate / pooled | intent | separate per group | pooled model with group term |",
+      "| DP1 | Alpha | .05 / .01 | intent | .05 | .01 |",
+    ));
+    expect(stage4.some((finding) => finding.includes("Declare it"))).toBe(true);
   });
 
   it("adds a non-blocking plan check to a fresh run only while the plan is incomplete", async () => {

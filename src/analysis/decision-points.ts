@@ -11,7 +11,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-export const DECISION_SOURCES = ["brief", "data", "convention", "intent"] as const;
+export const DECISION_SOURCES = ["brief", "data", "convention", "equivalent", "intent"] as const;
 export type DecisionSource = (typeof DECISION_SOURCES)[number];
 
 export const DECISION_POINTS_HEADING = "## Decision points";
@@ -38,6 +38,12 @@ export function tableRowsUnder(markdown: string, heading: string): Record<string
     .map((row) => Object.fromEntries(header.map((name, i) => [name, row[i] ?? ""])));
 }
 
+const STAGE4_DECISION = /\b(alpha|tails?|tailed|multiplicity|multiple[- ]comparisons?|equivalence|support rule|α|单双尾|多重比较|支持规则)\b/i;
+
+function isStage4Decision(row: Record<string, string>): boolean {
+  return STAGE4_DECISION.test(`${row["id"] ?? ""} ${row["decision"] ?? ""}`);
+}
+
 function sourceOf(value: string): DecisionSource | undefined {
   const lowered = value.toLowerCase();
   return DECISION_SOURCES.find((source) => lowered.startsWith(source));
@@ -62,6 +68,9 @@ export function checkDecisionPoints(planMarkdown: string): string[] {
     }
     if (source === "intent" && !(row["alternative (sensitivity)"] ?? row["alternative"] ?? "").trim()) {
       findings.push(`Decision ${id} depends on researcher intent: run the main alternative as a labelled sensitivity analysis, or note who settled it.`);
+    }
+    if (source === "intent" && isStage4Decision(row)) {
+      findings.push(`Decision ${id} is an inference or support rule (alpha, tails, multiplicity, equivalence, or what counts as support). Declare it; do not ask.`);
     }
   }
   const verdicts = tableRowsUnder(planMarkdown, VERDICT_RULES_HEADING);

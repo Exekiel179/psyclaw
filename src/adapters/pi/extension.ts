@@ -3,6 +3,9 @@ import { isInstructionResult, isObservationEvidence, maskToolObservationsStable,
 import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js";
 import { applyShellTimeout, isShellTimeout, SHELL_TIMEOUT_HINT, ShellClock } from "../../analysis/shell-timeout.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
+import { priorToolBlock } from "../../analysis/prior/gate.js";
+import { priorRecallExists, recordPriorApproval } from "../../analysis/prior/submit.js";
+import { registerPriorTools } from "../../analysis/prior/tools.js";
 import { PSYCLAW_VERSION } from "../../branding.js";
 import { takeWhatsNew } from "../../updates/whats-new.js";
 import { formatDataAccess, loadDataAccess, redactScriptOnlyOutput, scriptOnlyBlock, setDataAccess, type DataAccessLevel } from "../../safety/data-access.js";
@@ -138,6 +141,7 @@ import {
   parseSessionMode,
   sessionModePrompt,
   unattendedAnalysisPrompt,
+  unattendedPriorPrompt,
 } from "../../session/modes.js";
 import {
   continuouslyWorkWarningText,
@@ -239,7 +243,7 @@ async function notifyAfterSkillChange(
 }
 
 const activeAgentRuns = new Set<string>();
-const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "analysis-plan"]);
+const CORE_SKILLS = new Set(["academic-grill", "research-intake", "evidence-capture", "citation-audit", "analysis-plan", "prior-plan"]);
 
 function findLastMatching<T>(items: readonly T[], predicate: (item: T) => boolean): T | undefined {
   for (let index = items.length - 1; index >= 0; index -= 1) {
@@ -1505,7 +1509,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
 
   if (!legacyTestApi && typeof pi.registerShortcut === "function") {
     pi.registerShortcut("shift+tab", {
-      description: "Cycle chat → analysis → academic",
+      description: "Cycle chat → analysis → academic → prior",
       handler: () => {
         cycleSessionMode();
       },
@@ -1583,7 +1587,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     sessionMode = restored;
     const modeBlock = restored === "analysis" && ctx && !ctx.hasUI
       ? `${sessionModePrompt(restored)}\n\n${unattendedAnalysisPrompt()}`
-      : sessionModePrompt(restored);
+      : restored === "prior" && ctx && !ctx.hasUI
+        ? `${sessionModePrompt(restored)}\n\n${unattendedPriorPrompt()}`
+        : sessionModePrompt(restored);
     if (restored === "academic" || isArsPiTurn(event.systemPrompt) || isArsPiActive(ctx?.sessionManager)) {
       return {
         systemPrompt: `${event.systemPrompt}\n\n${modeBlock}\n\n${psyclawArsPatch({
@@ -1697,6 +1703,17 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
           text: formatChatModeMismatchNotice(mismatch, trimmed),
         };
       }
+    }
+
+    if (mode === "prior" && isPlanRitualConfirm(trimmed)) {
+      const result = await recordPriorApproval(ctx.cwd);
+      ctx.ui.notify(result.message, result.ok ? "info" : "warning");
+      return {
+        action: "transform",
+        text: result.ok
+          ? `User approved the prior plan ("${PLAN_RITUAL_PHRASE}"). Do not run outcome models. Tell them to press Shift+Tab until the footer shows analysis, then execute there.`
+          : `User typed the approval phrase, but the prior plan is not ready. ${result.message} Do not execute.`,
+      };
     }
 
     // Plan confirmations: soft「可以」= per-node / method acknowledge; ritual phrase = authorize execute.
@@ -1890,6 +1907,17 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     } catch {
       // A broken checker must not take down unrelated tools. Defaults still apply on the next call.
     }
+    if (sessionMode === "prior") {
+      try {
+        const priorReason = priorToolBlock(sessionMode, event.toolName, event.input, await priorRecallExists(ctx.cwd));
+        if (priorReason) {
+          ctx.ui.notify(priorReason, "warning");
+          return { block: true, reason: priorReason };
+        }
+      } catch {
+        // A broken prior gate must not take down unrelated tools.
+      }
+    }
     const run = await readActiveProject(ctx.cwd);
     if (!run || !toolNeedsApproval(event.toolName, event.input)) return;
     const summary = toolApprovalSummary(event.toolName, event.input);
@@ -1983,7 +2011,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             [
               `已检测到既有工作区，无需重新建仓：${project.id}`,
               "规范目录与 psyclaw.md 已存在；跨会话可直接继续 analysis / academic。",
-              "Shift+Tab：chat → analysis → academic · 输入 /help 查看速览。",
+              "Shift+Tab：chat → analysis → academic → prior · 输入 /help 查看速览。",
             ].join("\n"),
             "info",
           );
@@ -1994,9 +2022,9 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             `工作仓库已初始化：${project.id}`,
             "已创建 data/raw|clean|secret、analysis/、literature/、paper/、psyclaw.md、.psyclaw/",
             "data/secret 默认 script-only：模型不能直接读内容，分析脚本可以打开。/data-access 可改级别或指定其他文件。",
-            "Shift+Tab：chat → analysis → academic",
+            "Shift+Tab：chat → analysis → academic → prior",
             "Thinking：Ctrl+Shift+T",
-            "澄清与分析请切到 analysis；写作审稿请切到 academic。输入 /help 查看速览。",
+            "出方案前先回忆切到 prior；跑数切到 analysis；写作审稿切到 academic。输入 /help 查看速览。",
           ].join("\n"),
           "info",
         );
@@ -2566,6 +2594,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
 
   if (typeof pi.registerTool === "function") {
   registerAnalysisRuntimeTools(pi);
+  registerPriorTools(pi, () => sessionMode);
   pi.registerTool({
     name: "psyclaw_research_decision",
     label: "Research decision",
@@ -2845,7 +2874,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     label: "Research skill",
     description: "Load one trusted bundled psyclaw core skill and make its use visible to the user. Use this instead of directly reading a core SKILL.md file.",
     parameters: Type.Object({
-      name: Type.String({ description: "Core skill name: academic-grill, research-intake, evidence-capture, citation-audit, or analysis-plan" }),
+      name: Type.String({ description: "Core skill name: academic-grill, research-intake, evidence-capture, citation-audit, analysis-plan, or prior-plan" }),
       purpose: Type.Optional(Type.String({ description: "Short user-facing reason for using this skill now" })),
     }),
     executionMode: "sequential",

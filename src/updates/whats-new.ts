@@ -8,6 +8,11 @@ import { dirname } from "node:path";
 
 /** User-facing notes per version, newest first. Versions without an entry stay quiet. */
 export const WHATS_NEW: Record<string, readonly string[]> = {
+  "0.32.0": [
+    "新增 prior 模式：先按假设回忆，再解锁数据；分析方案由脚本开头的带标签常量生成",
+    "按 Shift+Tab 可切到 prior。核心问题逐张问，技术设置一次确认；α、单双尾、多重比较和支持规则直接声明，不拿来问",
+    "批准后切回 analysis 再跑结局模型。prior 本身不执行分析",
+  ],
   "0.31.3": [
     "修复任务超时问题：耗时计算先小规模计时，慢脚本只重跑改动部分，并提示重复的完整重跑",
     "优化学术决策细节：方案中逐项记录分析决策点及其依据，结果判定规则在跑结局模型前锁定；需要研究者意图的选择会先问你，无人审批时把替代方案作为敏感性分析一并报告",

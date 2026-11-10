@@ -74,7 +74,7 @@ export function defaultAnalysisPlan(): string {
     "## Decision points",
     "",
     "Fill in before running any outcome model. One row per analytic fork: sample and exclusion rules, coding and scoring keys, unit of analysis, groups analysed separately or pooled, model family and estimator, random effects and covariates, missing data, alpha, multiplicity family and method, criteria for support.",
-    "Settled by: brief, data, convention (almost any competent analyst would choose it), or intent (the brief and data leave it open and reasonable analysts differ). A framework default does not settle an intent row.",
+    "Settled by: brief, data, convention (almost any competent analyst would choose it), equivalent (the options could differ in other data but give the same result in this data), or intent (the brief and data leave it open and reasonable analysts differ). A framework default does not settle an intent row. Alpha, tails, multiplicity, and support rules are declarations.",
     "Intent rows: ask the researcher or approver when one is available and record the answer. Otherwise make the option closest to the brief's wording primary, run the main alternative as a labelled sensitivity analysis, and report both when their conclusions differ.",
     "",
     "| ID | Decision | Options | Settled by | Primary | Alternative (sensitivity) |",

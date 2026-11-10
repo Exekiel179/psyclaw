@@ -35,6 +35,7 @@ const CORE_SKILLS = new Set([
   "evidence-capture",
   "citation-audit",
   "analysis-plan",
+  "prior-plan",
   "method-change-scores",
   "method-interactions",
   "method-mediation",
