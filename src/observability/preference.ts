@@ -10,6 +10,13 @@ export interface TelemetryPreference {
   anonymousId?: string;
 }
 
+export interface ClientInstallInfo {
+  /** Last recorded installed version. */
+  lastVersion?: string;
+  /** ISO timestamp of first install detection. */
+  firstInstalledAt?: string;
+}
+
 export const DEFAULT_TELEMETRY_PREFERENCE: TelemetryPreference = {
   enabled: true,
   noticeAcknowledged: false,
@@ -132,4 +139,56 @@ export function shouldShowTelemetryNotice(
   if (env.PSYCLAW_SKIP_TELEMETRY_NOTICE === "1") return false;
   if (readTelemetryEnvOverride(env) === false) return false;
   return true;
+}
+
+export function parseClientInstallInfo(settings: unknown): ClientInstallInfo {
+  if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+    return {};
+  }
+  const client = (settings as { client?: unknown }).client;
+  if (!client || typeof client !== "object" || Array.isArray(client)) {
+    return {};
+  }
+  const record = client as { lastVersion?: unknown; firstInstalledAt?: unknown };
+  return {
+    ...(typeof record.lastVersion === "string" && record.lastVersion.trim() ? { lastVersion: record.lastVersion.trim() } : {}),
+    ...(typeof record.firstInstalledAt === "string" && record.firstInstalledAt.trim() ? { firstInstalledAt: record.firstInstalledAt.trim() } : {}),
+  };
+}
+
+export async function readClientInstallInfo(options: { settingsPath?: string } = {}): Promise<ClientInstallInfo> {
+  return parseClientInstallInfo(await readPsyClawSettings(options.settingsPath));
+}
+
+export async function writeClientInstallInfo(
+  patch: ClientInstallInfo,
+  options: { settingsPath?: string; now?: Date } = {},
+): Promise<ClientInstallInfo> {
+  const path = psyclawSettingsPath(options.settingsPath);
+  const existing = await readPsyClawSettings(options.settingsPath);
+  const current = parseClientInstallInfo(existing);
+  const lastVersion = patch.lastVersion ?? current.lastVersion;
+  const firstInstalledAt = patch.firstInstalledAt ?? current.firstInstalledAt;
+  const next: ClientInstallInfo = {
+    ...(lastVersion === undefined ? {} : { lastVersion }),
+    ...(firstInstalledAt === undefined ? {} : { firstInstalledAt }),
+  };
+  const previousClient =
+    existing.client && typeof existing.client === "object" && !Array.isArray(existing.client)
+      ? (existing.client as Record<string, unknown>)
+      : {};
+  await mkdir(dirname(path), { recursive: true });
+  await atomicWriteFile(
+    path,
+    `${JSON.stringify({
+      ...existing,
+      client: {
+        ...previousClient,
+        ...(lastVersion === undefined ? {} : { lastVersion }),
+        ...(firstInstalledAt === undefined ? {} : { firstInstalledAt }),
+        updatedAt: (options.now ?? new Date()).toISOString(),
+      },
+    }, null, 2)}\n`,
+  );
+  return next;
 }

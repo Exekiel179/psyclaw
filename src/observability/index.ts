@@ -29,16 +29,19 @@ export type { BrowserObservabilityConfig, NodeObservabilityConfig, AgentEventPro
 export {
   DEFAULT_TELEMETRY_PREFERENCE,
   parseAnonymousDistinctId,
+  parseClientInstallInfo,
   parseTelemetryPreference,
   psyclawSettingsPath,
+  readClientInstallInfo,
   readTelemetryEnvOverride,
   readTelemetryPreference,
   resolveTelemetryEnabled,
   shouldShowTelemetryNotice,
   telemetryPreferenceOptions,
+  writeClientInstallInfo,
   writeTelemetryPreference,
 } from "./preference.js";
-export type { TelemetryPreference } from "./preference.js";
+export type { ClientInstallInfo, TelemetryPreference } from "./preference.js";
 export { maybeShowTelemetryNotice } from "./notice.js";
 export type { TelemetryNoticeChoice } from "./notice.js";
 export { ensureAnonymousDistinctId, newAnonymousDistinctId } from "./identity.js";
@@ -134,6 +137,22 @@ export function trackSkillInstall(status: "queued" | "started" | "finished" | "e
   return trackAgentEvent(`skill_install_${status === "queued" ? "queued" : status === "started" ? "started" : status === "error" ? "failed" : "finished"}`, {
     phase: "skill_install",
     status,
+    ...properties,
+  });
+}
+
+export function trackClientInstall(properties: Record<string, unknown> = {}): Promise<void> {
+  return trackAgentEvent("client_installed", {
+    phase: "client_lifecycle",
+    event_type: "install",
+    ...properties,
+  });
+}
+
+export function trackClientUpdate(properties: Record<string, unknown> = {}): Promise<void> {
+  return trackAgentEvent("client_updated", {
+    phase: "client_lifecycle",
+    event_type: "update",
     ...properties,
   });
 }
