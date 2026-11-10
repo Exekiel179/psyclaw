@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkDecisionPoints } from "../../src/analysis/decision-points.js";
 import { checkPlanScript, checkRecall, recalledApproachIds } from "../../src/analysis/prior/checks.js";
-import { isBriefPath, isDataPath, priorToolBlock } from "../../src/analysis/prior/gate.js";
+import { isBriefPath, isDataPath, priorToolBlock, type PriorGateState } from "../../src/analysis/prior/gate.js";
 import { parseConstants } from "../../src/analysis/prior/constants.js";
 import { layerCards, renderPriorPlan } from "../../src/analysis/prior/render.js";
 import { recordPriorApproval, submitPriorRecall, submitPriorScript } from "../../src/analysis/prior/submit.js";
-import { nextSessionMode, parseSessionMode, sessionModePrompt } from "../../src/session/modes.js";
+import { nextSessionMode, parseSessionMode, sessionModePrompt, unattendedPriorPrompt } from "../../src/session/modes.js";
 
 const RECALL = [
   "## H1",
@@ -37,6 +37,9 @@ describe("prior mode", () => {
     expect(nextSessionMode("prior")).toBe("chat");
     expect(parseSessionMode("prior")).toBe("prior");
     expect(sessionModePrompt("prior")).toContain("psyclaw_submit_recall");
+    expect(sessionModePrompt("prior").toLowerCase()).toContain("do not call any skill");
+    expect(sessionModePrompt("prior")).toContain("plain chat");
+    expect(unattendedPriorPrompt()).toContain("plain chat");
     expect(sessionModePrompt("analysis")).not.toContain("psyclaw_submit_recall");
   });
 
@@ -95,16 +98,23 @@ describe("prior mode", () => {
     expect(checkDecisionPoints(rendered.markdown)).toEqual([]);
   });
 
-  it("blocks data until recall, then still blocks outcome runs", () => {
+  it("keeps skills closed for the whole prior pass and blocks the run until approval", () => {
+    const closed: PriorGateState = { recallReady: false, planReady: false, approved: false };
+    const planned: PriorGateState = { recallReady: true, planReady: true, approved: false };
+    const approved: PriorGateState = { recallReady: true, planReady: true, approved: true };
     expect(isBriefPath("notes/BRIEF.md")).toBe(true);
     expect(isDataPath("data/raw/scores.csv")).toBe(true);
-    expect(priorToolBlock("analysis", "bash", { command: "python3 -c '1'" }, false)).toBeUndefined();
-    expect(priorToolBlock("prior", "read", { path: "psyclaw.md" }, false)).toBeUndefined();
-    expect(priorToolBlock("prior", "read", { path: "data/scores.csv" }, false)).toContain("psyclaw_submit_recall");
-    expect(priorToolBlock("prior", "bash", { command: "python3 -c '1'" }, false)).toContain("psyclaw_submit_recall");
-    expect(priorToolBlock("prior", "psyclaw_data_profile", { path: "data/scores.csv" }, true)).toBeUndefined();
-    expect(priorToolBlock("prior", "psyclaw_run_analysis", {}, true)).toContain("analysis");
-    expect(priorToolBlock("prior", "bash", { command: "python3 analysis/scripts/analysis.py" }, true)).toContain("analysis");
+    expect(priorToolBlock("analysis", "bash", { command: "python3 -c '1'" }, closed)).toBeUndefined();
+    expect(priorToolBlock("prior", "read", { path: "psyclaw.md" }, closed)).toBeUndefined();
+    expect(priorToolBlock("prior", "read", { path: "data/scores.csv" }, closed)).toContain("psyclaw_submit_recall");
+    expect(priorToolBlock("prior", "psyclaw_skill", {}, closed)).toContain("skills");
+    expect(priorToolBlock("prior", "read", { path: "skills/core/prior-plan/SKILL.md" }, { ...closed, recallReady: true })).toContain("skills");
+    expect(priorToolBlock("prior", "psyclaw_skill", {}, planned)).toContain("skills");
+    expect(priorToolBlock("prior", "psyclaw_skill", {}, approved)).toContain("skills");
+    expect(priorToolBlock("prior", "psyclaw_data_profile", { path: "data/scores.csv" }, { ...closed, recallReady: true })).toBeUndefined();
+    expect(priorToolBlock("prior", "psyclaw_run_analysis", {}, planned)).toContain("批准");
+    expect(priorToolBlock("prior", "psyclaw_run_analysis", {}, approved)).toBeUndefined();
+    expect(priorToolBlock("prior", "bash", { command: "python3 analysis/scripts/analysis.py" }, approved)).toBeUndefined();
   });
 
   it("records recall, reflects once, then writes the plan", async () => {
@@ -124,7 +134,25 @@ describe("prior mode", () => {
     const plan = await readFile(join(root, "analysis/plans/plan.md"), "utf8");
     expect(plan).toContain("## Core questions");
     expect(checkDecisionPoints(plan)).toEqual([]);
-    expect((await recordPriorApproval(root)).ok).toBe(true);
+    await writeFile(join(root, ".psyclaw/choices.jsonl"), `${JSON.stringify({
+      prompt: "PRIMARY_MODEL",
+      originalResponse: "robust_hc3",
+      selectedIds: ["robust_hc3"],
+      selectedLabels: ["robust HC3"],
+    })}\n`, "utf8");
+    const ran: string[] = [];
+    const approval = await recordPriorApproval(root, undefined, async (_command, args) => {
+      ran.push(args.join(" "));
+      return { stdout: "prior-ran\n", stderr: "", exitCode: 0 };
+    });
+    expect(approval.ok).toBe(true);
+    expect(approval.handoff).toBe(true);
+    expect(approval.message).toContain("PRIMARY_MODEL = robust_hc3");
+    expect(approval.message).toContain("prior-ran");
+    expect(ran.some((args) => args.includes("analysis/scripts/analysis.py"))).toBe(true);
+    const script = await readFile(join(root, "analysis/scripts/analysis.py"), "utf8");
+    expect(script).toContain('PRIMARY_MODEL = "robust_hc3"');
+    expect(script).toContain("@intent");
   });
 
   it("honours coreN and an R script path", async () => {

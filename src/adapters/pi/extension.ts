@@ -4,7 +4,7 @@ import { outputLogFooter, persistToolOutput } from "../../analysis/output-log.js
 import { applyShellTimeout, isShellTimeout, SHELL_TIMEOUT_HINT, ShellClock } from "../../analysis/shell-timeout.js";
 import { registerAnalysisRuntimeTools } from "../../analysis/runtime-tools.js";
 import { priorToolBlock } from "../../analysis/prior/gate.js";
-import { priorRecallExists, recordPriorApproval } from "../../analysis/prior/submit.js";
+import { priorApproved, priorPlanExists, priorRecallExists, recordPriorApproval } from "../../analysis/prior/submit.js";
 import { registerPriorTools } from "../../analysis/prior/tools.js";
 import { PSYCLAW_VERSION } from "../../branding.js";
 import { takeWhatsNew } from "../../updates/whats-new.js";
@@ -1707,11 +1707,12 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
 
     if (mode === "prior" && isPlanRitualConfirm(trimmed)) {
       const result = await recordPriorApproval(ctx.cwd);
-      ctx.ui.notify(result.message, result.ok ? "info" : "warning");
+      if (result.handoff) applySessionMode("chat");
+      ctx.ui.notify(result.handoff ? "脚本已按确认结果改好并执行。当前是普通对话，可以使用 skill。" : result.message, result.ok ? "info" : "warning");
       return {
         action: "transform",
-        text: result.ok
-          ? `User approved the prior plan ("${PLAN_RITUAL_PHRASE}"). Do not run outcome models. Tell them to press Shift+Tab until the footer shows analysis, then execute there.`
+        text: result.handoff
+          ? `User approved the prior plan ("${PLAN_RITUAL_PHRASE}"). The script was updated from the confirmed choices and has already been run. ${result.message} The session is now plain chat. Skills may be used. Do not ask to switch modes and do not run the script again unless the researcher asks.`
           : `User typed the approval phrase, but the prior plan is not ready. ${result.message} Do not execute.`,
       };
     }
@@ -1909,7 +1910,11 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
     }
     if (sessionMode === "prior") {
       try {
-        const priorReason = priorToolBlock(sessionMode, event.toolName, event.input, await priorRecallExists(ctx.cwd));
+        const priorReason = priorToolBlock(sessionMode, event.toolName, event.input, {
+          recallReady: await priorRecallExists(ctx.cwd),
+          planReady: await priorPlanExists(ctx.cwd),
+          approved: await priorApproved(ctx.cwd),
+        });
         if (priorReason) {
           ctx.ui.notify(priorReason, "warning");
           return { block: true, reason: priorReason };
@@ -2024,7 +2029,7 @@ export default function psyclawExtension(pi: ExtensionAPI): void {
             "data/secret 默认 script-only：模型不能直接读内容，分析脚本可以打开。/data-access 可改级别或指定其他文件。",
             "Shift+Tab：chat → analysis → academic → prior",
             "Thinking：Ctrl+Shift+T",
-            "出方案前先回忆切到 prior；跑数切到 analysis；写作审稿切到 academic。输入 /help 查看速览。",
+            "prior 先回忆再出方案，确认后直接跑脚本并回到普通对话；analysis 仍可直接跑数；写作审稿切到 academic。输入 /help 查看速览。",
           ].join("\n"),
           "info",
         );

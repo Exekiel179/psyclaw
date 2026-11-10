@@ -6,7 +6,7 @@ license: MIT
 
 # Prior plan
 
-Use this skill only in **prior** mode. Analysis mode still runs scripts. This mode stops when the researcher types `我已审阅并批准本方案`.
+Prior mode does not load this skill. The session follows the prior prompt until the researcher approves. Approval rewrites the constants, runs the script, and returns to plain chat, where skills may be used.
 
 ## Order
 
@@ -50,4 +50,4 @@ After the script is accepted, ask in the order the tool reports:
 - Technical settings: one card that confirms the current values together.
 - Dependent questions: wait until the parent choice is known.
 
-Use `psyclaw_wake_options`. Soft「可以」settles only the current card. The plan is approved only when the researcher types `我已审阅并批准本方案`. Then tell them to switch to analysis. Do not run the script here.
+Use `psyclaw_wake_options`, then `psyclaw_record_choice`. Put the constant name in the prompt and the chosen option id in `selectedIds`. Soft「可以」settles only the current card. The plan is approved only when the researcher types `我已审阅并批准本方案`. That writes the confirmed values into the constants and runs the script. Do not run it yourself.

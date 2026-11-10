@@ -2,7 +2,7 @@ import { RESIDENT_METHOD_RULES } from "../analysis/method-rules.js";
 import { analysisSoftRoutePrompt, resolveStatsIntent } from "../analysis/stats-router.js";
 import { academicSoftRoutePrompt, resolveAcademicSoftRoute } from "../ars/academic-router.js";
 
-/** PsyClaw session modes cycled by Shift+Tab. prior plans before data; analysis executes. */
+/** PsyClaw session modes cycled by Shift+Tab. prior plans before data, then runs on approval and returns to chat. */
 export type PsyClawSessionMode = "chat" | "analysis" | "academic" | "prior";
 
 export const SESSION_MODES: readonly PsyClawSessionMode[] = ["chat", "analysis", "academic", "prior"] as const;
@@ -116,9 +116,10 @@ export function unattendedPriorPrompt(): string {
   return [
     "## Unattended prior run (no interactive UI)",
     "Nobody can answer choice cards. These rules take precedence over the prior workflow where they conflict.",
+    "- Do not call any skill in prior mode.",
     "- Submit the recall before reading any data file. Then submit the labeled script.",
     "- For each @intent constant, keep the option closest to the brief as the value and list the main alternative in the comment. Do not ask.",
-    "- Do not run outcome models, do not read analysis/results, and do not write analysis/HANDOFF.md.",
+    "- Do not run the outcome script. A person's approval sentence runs it and returns the session to plain chat.",
   ].join("\n");
 }
 
@@ -156,14 +157,14 @@ export function sessionModePrompt(mode: PsyClawSessionMode): string {
   if (mode === "prior") {
     return [
       "## PsyClaw mode: prior",
-      "Plan the analysis before the data can change the choices. Do not run outcome models and do not write analysis/HANDOFF.md. Execution is analysis mode, after the researcher switches.",
-      "Order: read only BRIEF.md or psyclaw.md → psyclaw_submit_recall → then data profiles are allowed → write labeled constants → psyclaw_submit_plan_script. The script is checked and rendered to analysis/plans/plan.md. It is not run.",
+      "Stay in prior until the researcher approves. Do not call any skill and do not read a SKILL.md. Do not run the outcome script yourself.",
+      "Order: read only BRIEF.md or psyclaw.md → psyclaw_submit_recall → then data profiles are allowed → write labeled constants → psyclaw_submit_plan_script. The script is checked and rendered to analysis/plans/plan.md.",
       "Recall, one block per hypothesis: construct, internal validity, statistical conclusion, dependence. Each recalled approach is a line `- id: description`, and that id must be an option of some constant.",
       "Constants: `NAME = value  # @intent value | other — why`, `@declare — why`, or `@pseudo — why`. @intent only for sample, variable construction, or model specification when no common practice settles it and another option would change a named hypothesis verdict. Stage 4 (alpha, tails, multiplicity, equivalence bounds, what counts as support) is always @declare.",
       "If the options agree in this data but could differ in other data, @declare them as equivalent in this data. @pseudo is only when the options must agree for any data.",
       "An @intent constant must be used by a hypothesis-test step. A constant that only appears in a description, an exploration, or a covariate screen is @declare.",
-      "Order @intent constants with the largest verdict change first. Ask core cards one at a time, confirm the remaining technical settings on one card, and hold dependent questions until the parent choice is known. Use psyclaw_wake_options.",
-      "Follow the prior-plan skill for the stage rules. Soft「可以」settles only the current card. Approval is the typed sentence「我已审阅并批准本方案」, then tell the researcher to switch to analysis.",
+      "Order @intent constants with the largest verdict change first. Ask core cards one at a time, confirm the remaining technical settings on one card, and hold dependent questions until the parent choice is known. Use psyclaw_wake_options, and record each answer with psyclaw_record_choice. Put the constant name in the prompt and the chosen option id in selectedIds.",
+      "Soft「可以」settles only the current card. Approval is the typed sentence「我已审阅并批准本方案」. That writes the confirmed values into the constants, runs the script, and returns the session to plain chat. Skills are available only then.",
       "Before labelling a choice @intent, answer: if the researcher picked the other option, which hypothesis verdict would change? If you cannot name it, @declare it.",
     ].join("\n");
   }

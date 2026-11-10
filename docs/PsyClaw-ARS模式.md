@@ -9,13 +9,13 @@
 | `chat` | chat | 普通对话 |
 | `analysis` | analysis | 澄清→`/plan` 方案→跑数→分析报告→审查→HANDOFF |
 | `academic` | academic | ARS 写作/审稿；消费 `analysis/HANDOFF.md`，不重选主检验 |
-| `prior` | prior | 先回忆再解锁数据；带标签常量生成方案，不跑结局模型 |
+| `prior` | prior | 先回忆再出方案；确认后改脚本、直接运行，再回到普通对话 |
 
 Thinking level：`Ctrl+Shift+T`（多数终端会拦截 Ctrl+Shift+Tab）。
 
 ## Prior（先回忆）
 
-`prior` 只负责出方案。顺序：只读简介 → `psyclaw_submit_recall` → 才能看数据 → `psyclaw_submit_plan_script` 把脚本开头的 `@intent` / `@declare` / `@pseudo` 常量渲染成 `analysis/plans/plan.md`。第 4 组（α、单双尾、多重比较、支持规则）一律声明。核心问题逐张问，技术设置一张卡确认，依赖上层的问题等上层回答后再问。研究者输入「我已审阅并批准本方案」后，切到 analysis 执行。
+`prior` 负责回忆和出方案，全程不调用 skill。顺序：只读简介 → `psyclaw_submit_recall` → 才能看数据 → `psyclaw_submit_plan_script` 把脚本开头的 `@intent` / `@declare` / `@pseudo` 常量渲染成 `analysis/plans/plan.md`。第 4 组（α、单双尾、多重比较、支持规则）一律声明。核心问题逐张问，技术设置一张卡确认，依赖上层的问题等上层回答后再问。研究者输入「我已审阅并批准本方案」后，按确认结果改常量并直接运行脚本，会话回到普通对话，此后可以使用 skill。
 
 ## Analysis 软路由（统计方案）
 

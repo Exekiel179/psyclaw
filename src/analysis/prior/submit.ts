@@ -7,6 +7,8 @@ import { join } from "node:path";
 import { atomicWriteFile } from "../../project/jsonl.js";
 import { assertSafeProjectPath } from "../../project/paths.js";
 import { PLAN_RITUAL_PHRASE } from "../plan.js";
+import { runAnalysisEntrypoint, type CommandRunner } from "../runtime-tools.js";
+import { rewriteScriptFromChoices } from "./apply.js";
 import { checkPlanScript, checkRecall } from "./checks.js";
 import { DEFAULT_CORE_N, formatCardInstructions, renderPriorPlan } from "./render.js";
 import { reflectHints } from "./reflect.js";
@@ -59,7 +61,7 @@ export async function submitPriorRecall(root: string, recall: string): Promise<P
     accepted: true,
     reflect: false,
     problems: [],
-    message: "Recall recorded. You can now read the data and profile it. Do not run outcome models. Write the labeled script and submit it with psyclaw_submit_plan_script.",
+    message: "Recall recorded. You can now read the data and profile it. Do not call any skill and do not run outcome models. Write the labeled script and submit it with psyclaw_submit_plan_script.",
   };
 }
 
@@ -118,26 +120,75 @@ export async function submitPriorScript(root: string, source: string): Promise<P
     scriptPath: relativeScript,
     planPath: PRIOR_PLAN_REL,
     message: [
-      `Accepted. Wrote ${relativeScript} and ${PRIOR_PLAN_REL}.`,
-      "Ask with psyclaw_wake_options. Do not run outcome models in prior mode.",
+      `Accepted. Wrote ${relativeScript} and ${PRIOR_PLAN_REL}. Do not call skills and do not run the script yourself.`,
+      "Ask with psyclaw_wake_options.",
       formatCardInstructions(rendered.cards),
       `When those cards are settled, ask the researcher to type: ${PLAN_RITUAL_PHRASE}`,
-      "Execution waits until they switch to analysis.",
+      "That approval writes the chosen values into the script, runs it, and returns the session to plain chat. Skills are available only after that.",
       findingNote,
     ].filter(Boolean).join("\n\n"),
   };
 }
 
-export async function recordPriorApproval(root: string, at = new Date().toISOString()): Promise<{ ok: boolean; message: string }> {
+export async function priorPlanExists(root: string): Promise<boolean> {
   try {
-    await readFile(await assertSafeProjectPath(root, PRIOR_STATE_REL), "utf8");
+    await readFile(join(root, PRIOR_STATE_REL), "utf8");
+    return true;
   } catch {
-    return { ok: false, message: "还没有通过检查的 prior 方案。先提交带标签的脚本。" };
+    return false;
+  }
+}
+
+export async function priorApproved(root: string): Promise<boolean> {
+  try {
+    await readFile(join(root, PRIOR_APPROVAL_REL), "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function recordPriorApproval(
+  root: string,
+  at = new Date().toISOString(),
+  run?: CommandRunner,
+): Promise<{ ok: boolean; handoff: boolean; message: string }> {
+  let state: { script?: unknown };
+  try {
+    state = JSON.parse(await readFile(await assertSafeProjectPath(root, PRIOR_STATE_REL), "utf8")) as { script?: unknown };
+  } catch {
+    return { ok: false, handoff: false, message: "还没有通过检查的 prior 方案。先提交带标签的脚本。" };
+  }
+  const scriptRelative = typeof state.script === "string" ? state.script : "";
+  let changes: string[] = [];
+  if (scriptRelative) {
+    try {
+      const source = await readFile(join(root, scriptRelative), "utf8");
+      changes = (await rewriteScriptFromChoices(root, scriptRelative, source)).changes;
+    } catch {
+      return { ok: false, handoff: false, message: "方案脚本读不到，没有改代码，也没有开始执行。" };
+    }
+  }
+  let output = "";
+  try {
+    output = await runAnalysisEntrypoint(root, {
+      ...(scriptRelative ? { entrypoint: scriptRelative } : {}),
+      force: true,
+      ...(run ? { run } : {}),
+    });
+  } catch (error) {
+    output = error instanceof Error ? error.message : String(error);
   }
   await atomicWriteFile(await assertSafeProjectPath(root, PRIOR_APPROVAL_REL), `${JSON.stringify({
     schemaVersion: "psyclaw/prior-approval/v1",
     phrase: PLAN_RITUAL_PHRASE,
     at,
+    changes,
   }, null, 2)}\n`);
-  return { ok: true, message: "已记录 prior 方案批准。执行请按 Shift+Tab 切到 analysis。prior 不跑结局模型。" };
+  const edited = changes.length > 0 ? `已按确认结果改写：${changes.join("；")}。` : "确认结果与脚本当前取值一致，常量未改。";
+  return {
+    ok: true,
+    handoff: true,
+    message: `${edited}脚本已执行。会话回到普通对话，此后可以使用 skill。\n${output}`,
+  };
 }

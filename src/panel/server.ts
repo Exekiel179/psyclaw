@@ -138,7 +138,7 @@ const CORE_SKILLS = [
   { id: "evidence-capture", name: "证据登记" },
   { id: "citation-audit", name: "引用审计" },
   { id: "analysis-plan", name: "分析方案" },
-  { id: "prior-plan", name: "Prior 方案", description: "先回忆再解锁数据，用带标签常量出分析方案。Shift+Tab 切到 prior。" },
+  { id: "prior-plan", name: "Prior 方案", description: "先回忆再出方案。确认后改脚本并直接运行，再回到普通对话。" },
   {
     id: "psyclaw-ars",
     name: "PsyClaw ARS",

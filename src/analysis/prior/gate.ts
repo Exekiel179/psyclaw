@@ -1,13 +1,19 @@
 /**
- * Before recall, prior mode can read the brief and nothing about the data.
- * After recall, profiles and data files open. Outcome models and saved result
- * tables stay closed: execution is analysis mode.
+ * Prior mode never calls skills. Approval rewrites the script, runs it, and
+ * leaves the session in plain chat, where skills are available.
  */
 
 const DATA_EXT = /\.(csv|tsv|xlsx|xls|sav|dta|rds|rdata|parquet|feather|jsonl)$/i;
 const RUN_SCRIPT = /analysis\/scripts\/(analysis|run_all)\.(py|r)\b|python3?\s+\S*analysis\.py|Rscript\s+\S*analysis\.R/i;
 const RECALL_BLOCK = "Submit the recall with psyclaw_submit_recall first. Until then only the brief (BRIEF.md or psyclaw.md) can be read.";
-const RUN_BLOCK = "Prior mode stops at the approved plan. Switch to analysis to run outcome models or read saved results.";
+const SKILL_BLOCK = "Prior mode does not call skills. After the approved script has run, the session is plain chat and skills are available.";
+const RUN_BLOCK = "Do not run the outcome script yourself. After 「我已审阅并批准本方案」 the confirmed script is run automatically, then the session becomes plain chat.";
+
+export interface PriorGateState {
+  recallReady: boolean;
+  planReady: boolean;
+  approved: boolean;
+}
 
 function asRecord(input: unknown): Record<string, unknown> {
   return input && typeof input === "object" ? input as Record<string, unknown> : {};
@@ -52,22 +58,35 @@ export function isOutcomePath(path: string): boolean {
   return /(^|\/)analysis\/results(\/|$)/.test(norm) || /(^|\/)results(\/|$)/.test(norm);
 }
 
-export function priorToolBlock(mode: string, toolName: string, input: unknown, recallReady: boolean): string | undefined {
+export function isSkillCall(toolName: string, path: string, command: string): boolean {
+  const name = toolName.toLowerCase();
+  if (name === "skill" || name.endsWith("_skill") || name.includes("skill")) return true;
+  return isSkillPath(path) || isSkillPath(command);
+}
+
+function isSkillPath(path: string): boolean {
+  const norm = normalize(path).toLowerCase();
+  return /skill\.md\b/.test(norm) || /(^|[^a-z0-9_-])skills\//.test(norm);
+}
+
+export function priorToolBlock(mode: string, toolName: string, input: unknown, state: PriorGateState): string | undefined {
   if (mode !== "prior") return undefined;
   const name = toolName.toLowerCase();
   if (name === "psyclaw_submit_recall") return undefined;
   const path = inputPath(input);
   const command = inputCommand(input);
-  if (name === "psyclaw_run_analysis" || name === "psyclaw_read_results") return RUN_BLOCK;
-  if (name === "psyclaw_submit_plan_script" && !recallReady) return RECALL_BLOCK;
-  if (!recallReady) {
-    if (name === "psyclaw_data_profile") return RECALL_BLOCK;
+  if (isSkillCall(name, path, command)) return SKILL_BLOCK;
+  if (name === "psyclaw_submit_plan_script" && !state.recallReady) return RECALL_BLOCK;
+  if (!state.recallReady) {
+    if (name === "psyclaw_data_profile" || name === "psyclaw_run_analysis" || name === "psyclaw_read_results") return RECALL_BLOCK;
     if (name === "bash") return RECALL_BLOCK;
     if (name === "write" || name === "edit") return RECALL_BLOCK;
     if (["read", "grep", "find", "ls", "glob"].includes(name) && (isDataPath(path) || isOutcomePath(path))) return RECALL_BLOCK;
     if (command && (isDataPath(command) || /\b(python3?|rscript|r)\b/i.test(command))) return RECALL_BLOCK;
     return undefined;
   }
-  if (isOutcomePath(path) || (command && isOutcomePath(command)) || RUN_SCRIPT.test(command)) return RUN_BLOCK;
+  if (!state.approved && (name === "psyclaw_run_analysis" || name === "psyclaw_read_results" || isOutcomePath(path) || (command && isOutcomePath(command)) || RUN_SCRIPT.test(command))) {
+    return RUN_BLOCK;
+  }
   return undefined;
 }

@@ -2,7 +2,7 @@
 
 ## 0.32.0 - 2026-11-10
 
-- Add prior mode: recall each hypothesis before data is unlocked, then render the plan from @intent, @declare, and @pseudo constants. Outcome models stay in analysis mode
+- Add prior mode: recall each hypothesis before data is unlocked, then render the plan from @intent, @declare, and @pseudo constants. Prior calls no skills; approval writes the confirmed values into the script, runs it, and returns the session to plain chat where skills are available
 - Layer the questions (core, then one technical-settings card, then choices that depend on a parent) and reject stage-4 questions, unlabeled constants, and @intent choices that no hypothesis test uses
 - Accept `equivalent` as a decision-point source when the options agree only in this data set, and remind analysis plans that alpha, tails, multiplicity, and support rules are declarations
 
