@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.33.1 - 2026-11-11
+
+- Publish the prior interaction mode. The 0.33.0 tag failed the branding check because package governance apiVersion was still 0.31
+
 ## 0.33.0 - 2026-11-11
 
 - Announce the new prior interaction mode on the startup banner. Approval keeps the settled plan as the memory for later analysis, including when the session is in analysis mode, so that plan is not filled in or approved again

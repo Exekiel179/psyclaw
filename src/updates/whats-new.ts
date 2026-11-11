@@ -8,6 +8,9 @@ import { dirname } from "node:path";
 
 /** User-facing notes per version, newest first. Versions without an entry stay quiet. */
 export const WHATS_NEW: Record<string, readonly string[]> = {
+  "0.33.1": [
+    "提供新的交互模式 prior。按 Shift+Tab 可切到先回忆；批准后的分析以已定稿方案为准",
+  ],
   "0.33.0": [
     "提供新的交互模式 prior。按 Shift+Tab 可切到先回忆；批准后的分析以已定稿方案为准",
   ],
