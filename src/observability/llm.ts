@@ -32,6 +32,8 @@ export interface LlmGenerationInput {
   sessionId?: string;
   spanName?: string;
   surface?: string;
+  /** 区分官方网关 vs 自定义 Provider（用于分析官方服务收入） */
+  providerType?: "official" | "custom";
 }
 
 export type PosthogAiPropertyValue = string | number | boolean;
@@ -131,6 +133,7 @@ export function posthogAiGenerationProperties(
   const latencySeconds = finiteNumber(input.latencyMs) !== undefined
     ? Number(((input.latencyMs as number) / 1000).toFixed(4))
     : undefined;
+  const providerType = input.providerType ?? (provider === "psyclaw" ? "official" : "custom");
   const properties: Record<string, PosthogAiPropertyValue> = {
     $ai_trace_id: (input.traceId ?? randomUUID()).slice(0, 80),
     $ai_session_id: (input.sessionId ?? options.sessionId).slice(0, 80),
@@ -146,6 +149,7 @@ export function posthogAiGenerationProperties(
     $ai_stream: input.stream === true,
     $ai_privacy_mode: true,
     surface: (input.surface ?? "cli").slice(0, 32),
+    provider_type: providerType,
     $process_person_profile: false,
   };
   if (latencySeconds !== undefined) properties.$ai_latency = latencySeconds;

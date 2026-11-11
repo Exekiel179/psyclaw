@@ -129,6 +129,18 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     ],
   },
   {
+    id: "psyclaw",
+    name: "PsyClaw 官方",
+    baseUrl: "https://api.psyclaw.ai/v1",
+    api: "openai-completions",
+    apiKeyEnv: "PSYCLAW_GATEWAY_TOKEN",
+    models: [
+      { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+      { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", reasoning: true },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+    ],
+  },
+  {
     id: "custom",
     name: "自定义 OpenAI 兼容接口",
     baseUrl: "",
